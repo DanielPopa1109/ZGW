@@ -171,6 +171,7 @@ void Dcm_Init(const Dcm_ConfigType* ConfigPtr);
 void Dcm_MainFunction(void);
 void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result);
+uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len);
 
 BufReq_ReturnType Dcm_StartOfReception(
     Dcm_PduIdType id,
@@ -305,5 +306,7 @@ Dcm_ReturnType DcmAppl_RequestTransferExit(
 );
 
 extern const Dcm_ConfigType Dcm_Config;
+extern const Dcm_ConnectionConfigType Dcm_DefaultConnections[];
+extern const Dcm_ServiceType Dcm_DefaultServices[];
 
 #endif

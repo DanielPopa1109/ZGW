@@ -19,20 +19,37 @@
 #define CANTP_ADDR_PHYSICAL      0u
 #define CANTP_ADDR_FUNCTIONAL    1u
 
-#define CANTP_N_AS_TICKS         20u
-#define CANTP_N_BS_TICKS         200u
-#define CANTP_N_CS_TICKS         20u
-#define CANTP_N_CR_TICKS         200u
 #define CANTP_WFT_MAX            8u
+
+#define CANTP_MS_TO_TICKS(ms)    (((ms) + CANTP_MAIN_PERIOD_MS - 1u) / CANTP_MAIN_PERIOD_MS)
+
+#define CANTP_N_AS_TICKS         CANTP_MS_TO_TICKS(1000u)
+#define CANTP_N_AR_TICKS         CANTP_MS_TO_TICKS(1000u)
+#define CANTP_N_BS_TICKS         CANTP_MS_TO_TICKS(1000u)
+#define CANTP_N_BR_TICKS         CANTP_MS_TO_TICKS(1000u)
+#define CANTP_N_CS_TICKS         CANTP_MS_TO_TICKS(1000u)
+#define CANTP_N_CR_TICKS         CANTP_MS_TO_TICKS(1000u)
 
 typedef enum
 {
     CANTP_IDLE = 0u,
+    CANTP_RX_WAIT_FC_TX_CONFIRM,
     CANTP_RX_IN_PROGRESS,
+    CANTP_TX_WAIT_CONFIRM,
     CANTP_TX_WAIT_FC,
-    CANTP_TX_CF,
-    CANTP_TX_WAIT_CONFIRM
+    CANTP_TX_CF
 } CanTp_StateType;
+
+typedef enum
+{
+    CANTP_TIMER_NONE = 0u,
+    CANTP_TIMER_N_AS,
+    CANTP_TIMER_N_AR,
+    CANTP_TIMER_N_BS,
+    CANTP_TIMER_N_BR,
+    CANTP_TIMER_N_CS,
+    CANTP_TIMER_N_CR
+} CanTp_TimerType;
 
 typedef struct
 {

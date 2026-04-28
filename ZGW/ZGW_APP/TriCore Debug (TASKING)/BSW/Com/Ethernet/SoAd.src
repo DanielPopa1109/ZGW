@@ -1,0 +1,3238 @@
+	; Module start
+	.compiler_version	"TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler v1.1r8 Build 22011964"
+	.compiler_invocation	"ctc -f cc14540a --dep-file=BSW/Com/Ethernet/SoAd.d -c99 --fp-model=3cflnrSTz -D__CPU__=tc37x -D__CPU_TC37X__ --core=tc1.6.2 --fp-model=+float -D__CPU__=tc37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanIf -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanSM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanTp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat\\\\posix -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat\\\\posix\\\\arpa -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat\\\\posix\\\\net -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat\\\\posix\\\\sys -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\compat\\\\stdc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\lwip -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\lwip\\\\apps -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\lwip\\\\priv -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\lwip\\\\prot -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\netif -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\netif\\\\ppp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\lwip\\\\src\\\\include\\\\netif\\\\ppp\\\\polarssl -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\port -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\port\\\\include -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet\\\\GETH_LWIP_ILLD\\\\port\\\\include\\\\arch -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\PduR -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dcm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Ain -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Fls -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Nvm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core0 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core1 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core2 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\McuSm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Os -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\ScrH -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\00_Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU_Test -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\02_Safety_Mechanisms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SysMgr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Wdg -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Configurations -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore\\\\Compilers -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe\\\\Bsp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\_Utilities -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Asc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Trap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Adc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Geth -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Geth\\\\Eth -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Geth\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Gtm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Gtm\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_Impl -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\SCR Debug (SDCC) -g2 -w544 -w557 -w508 -t4 --language=+volatile -N0 -O0 -Y0 -Z0 --compact-max-size=200 --misrac-version=2012 -o BSW/Com/Ethernet/SoAd.src ../BSW/Com/Ethernet/SoAd.c"
+	.compiler_name		"ctc"
+	;source	'../BSW/Com/Ethernet/SoAd.c'
+
+	
+$TC162
+	
+	.sdecl	'.text.SoAd.SoAd_GetRuntime',code,cluster('SoAd_GetRuntime')
+	.sect	'.text.SoAd.SoAd_GetRuntime'
+	.align	2
+	
+; Function SoAd_GetRuntime
+.L94:
+SoAd_GetRuntime:	.type	func
+	movh.a	a15,#@his(SoAd_ConfigPtr)
+	lea	a15,[a15]@los(SoAd_ConfigPtr)
+	ld.w	d15,[a15]
+.L457:
+	jne	d15,#0,.L2
+.L458:
+	mov.a	a2,#0
+.L459:
+	j	.L3
+.L2:
+	mov	d0,#0
+.L225:
+	j	.L4
+.L5:
+	mov	d15,#2064
+	mul	d15,d0
+.L460:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L461:
+	addsc.a	a15,a15,d15,#0
+.L462:
+	ld.a	a15,[a15]
+.L463:
+	ld.bu	d15,[a15]
+.L464:
+	jne	d15,d4,.L6
+.L465:
+	mov	d15,#2064
+	mul	d0,d15
+.L226:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L466:
+	addsc.a	a2,a15,d0,#0
+.L467:
+	j	.L7
+.L6:
+	add	d0,#1
+.L227:
+	extr.u	d0,d0,#0,#8
+.L4:
+	movh.a	a15,#@his(SoAd_ConfigPtr)
+	lea	a15,[a15]@los(SoAd_ConfigPtr)
+	ld.a	a15,[a15]
+.L468:
+	ld.bu	d15,[a15]4
+.L469:
+	jlt.u	d0,d15,.L5
+.L470:
+	mov.a	a2,#0
+.L471:
+	j	.L8
+.L8:
+.L7:
+.L3:
+	ret
+.L205:
+	
+__SoAd_GetRuntime_function_end:
+	.size	SoAd_GetRuntime,__SoAd_GetRuntime_function_end-SoAd_GetRuntime
+.L151:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_Init',code,cluster('SoAd_Init')
+	.sect	'.text.SoAd.SoAd_Init'
+	.align	2
+	
+	.global	SoAd_Init
+; Function SoAd_Init
+.L96:
+SoAd_Init:	.type	func
+	mov.aa	a12,a4
+.L229:
+	movh.a	a2,#@his(SoAd_ConfigPtr)
+	lea	a2,[a2]@los(SoAd_ConfigPtr)
+.L319:
+	st.a	[a2],a12
+.L320:
+	movh.a	a4,#@his(SoAd_Runtime)
+.L228:
+	lea	a4,[a4]@los(SoAd_Runtime)
+.L321:
+	mov	d4,#0
+.L322:
+	mov	d5,#24768
+	call	memset
+.L323:
+	jnz.a	a12,.L9
+.L324:
+	j	.L10
+.L9:
+	mov	d0,#0
+.L230:
+	j	.L11
+.L12:
+	mov	d15,#2064
+	mul	d15,d0
+.L325:
+	movh.a	a2,#@his(SoAd_Runtime)
+	lea	a2,[a2]@los(SoAd_Runtime)
+.L326:
+	addsc.a	a2,a2,d15,#0
+.L327:
+	mul	d15,d0,#28
+.L328:
+	ld.a	a15,[a12]
+.L329:
+	addsc.a	a15,a15,d15,#0
+.L330:
+	st.a	[a2],a15
+.L331:
+	mov	d15,#2064
+	mul	d15,d0
+.L332:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L333:
+	addsc.a	a15,a15,d15,#0
+.L334:
+	mov	d15,#-1
+.L335:
+	st.w	[a15]4,d15
+.L336:
+	mov	d15,#2064
+	mul	d15,d0
+.L337:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L338:
+	addsc.a	a15,a15,d15,#0
+.L339:
+	mov	d15,#-1
+.L340:
+	st.w	[a15]8,d15
+.L341:
+	mov	d15,#2064
+	mul	d15,d0
+.L342:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L343:
+	addsc.a	a15,a15,d15,#0
+.L344:
+	mov	d15,#0
+.L345:
+	st.b	[a15]12,d15
+.L346:
+	add	d0,#1
+.L11:
+	ld.bu	d15,[a12]4
+.L347:
+	jge.u	d0,d15,.L13
+.L348:
+	jlt.u	d0,#12,.L12
+.L13:
+.L10:
+	ret
+.L171:
+	
+__SoAd_Init_function_end:
+	.size	SoAd_Init,__SoAd_Init_function_end-SoAd_Init
+.L121:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_OpenSoCon',code,cluster('SoAd_OpenSoCon')
+	.sect	'.text.SoAd.SoAd_OpenSoCon'
+	.align	2
+	
+	.global	SoAd_OpenSoCon
+; Function SoAd_OpenSoCon
+.L98:
+SoAd_OpenSoCon:	.type	func
+	call	SoAd_GetRuntime
+.L231:
+	mov.aa	a15,a2
+.L233:
+	jnz.a	a15,.L14
+.L386:
+	mov	d2,#3
+.L387:
+	j	.L15
+.L14:
+	ld.bu	d15,[a15]12
+.L388:
+	jeq	d15,#2,.L16
+.L389:
+	ld.bu	d15,[a15]12
+.L390:
+	jne	d15,#3,.L17
+.L16:
+	mov	d2,#0
+.L391:
+	j	.L18
+.L17:
+	ld.a	a2,[a15]
+.L232:
+	ld.bu	d4,[a2]2
+.L392:
+	mov.aa	a4,a15
+.L235:
+	add.a	a4,#4
+.L234:
+	call	TcpIp_CreateSocket
+.L236:
+	jeq	d2,#0,.L19
+.L393:
+	mov	d15,#0
+.L238:
+	st.b	[a15]12,d15
+.L239:
+	mov	d2,#1
+.L237:
+	j	.L20
+.L19:
+	ld.w	d4,[a15]4
+.L241:
+	call	TcpIp_SetNonBlocking
+.L240:
+	ld.w	d4,[a15]4
+.L394:
+	ld.a	a4,[a15]
+.L242:
+	add.a	a4,#4
+	call	TcpIp_Bind
+.L243:
+	jeq	d2,#0,.L21
+.L245:
+	ld.w	d4,[a15]4
+.L246:
+	call	TcpIp_Close
+.L244:
+	mov	d15,#-1
+.L247:
+	st.w	[a15]4,d15
+.L248:
+	mov	d15,#0
+.L249:
+	st.b	[a15]12,d15
+.L250:
+	mov	d2,#1
+.L395:
+	j	.L22
+.L21:
+	ld.a	a2,[a15]
+.L252:
+	ld.bu	d15,[a2]2
+.L396:
+	jne	d15,#0,.L23
+.L253:
+	ld.a	a2,[a15]
+.L254:
+	ld.bu	d15,[a2]3
+.L397:
+	jeq	d15,#0,.L24
+.L255:
+	ld.w	d4,[a15]4
+.L256:
+	mov	d5,#2
+	call	TcpIp_Listen
+.L398:
+	jeq	d2,#0,.L25
+.L257:
+	ld.w	d4,[a15]4
+.L258:
+	call	TcpIp_Close
+.L251:
+	mov	d15,#-1
+.L259:
+	st.w	[a15]4,d15
+.L260:
+	mov	d15,#0
+.L261:
+	st.b	[a15]12,d15
+.L262:
+	mov	d2,#1
+.L399:
+	j	.L26
+.L25:
+	mov	d15,#3
+.L264:
+	st.b	[a15]12,d15
+.L265:
+	j	.L27
+.L24:
+	ld.w	d4,[a15]4
+.L400:
+	ld.a	a2,[a15]
+.L266:
+	lea	a4,[a2]10
+	call	TcpIp_Connect
+.L401:
+	jeq	d2,#0,.L28
+.L402:
+	jne	d2,#2,.L29
+.L28:
+	mov	d15,#1
+.L267:
+	st.b	[a15]12,d15
+.L268:
+	j	.L30
+.L29:
+	ld.w	d4,[a15]4
+.L269:
+	call	TcpIp_Close
+.L263:
+	mov	d15,#-1
+.L270:
+	st.w	[a15]4,d15
+.L271:
+	mov	d15,#0
+.L272:
+	st.b	[a15]12,d15
+.L273:
+	mov	d2,#1
+.L403:
+	j	.L31
+.L30:
+.L27:
+	j	.L32
+.L23:
+	mov	d15,#2
+.L274:
+	st.b	[a15]12,d15
+.L32:
+	mov	d2,#0
+.L404:
+	j	.L33
+.L33:
+.L31:
+.L26:
+.L22:
+.L20:
+.L18:
+.L15:
+	ret
+.L179:
+	
+__SoAd_OpenSoCon_function_end:
+	.size	SoAd_OpenSoCon,__SoAd_OpenSoCon_function_end-SoAd_OpenSoCon
+.L131:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_CloseSoCon',code,cluster('SoAd_CloseSoCon')
+	.sect	'.text.SoAd.SoAd_CloseSoCon'
+	.align	2
+	
+	.global	SoAd_CloseSoCon
+; Function SoAd_CloseSoCon
+.L100:
+SoAd_CloseSoCon:	.type	func
+	mov	d8,d4
+.L276:
+	mov	d4,d8
+	call	SoAd_GetRuntime
+.L275:
+	mov.aa	a15,a2
+.L278:
+	jnz.a	a15,.L34
+.L409:
+	mov	d2,#3
+.L410:
+	j	.L35
+.L34:
+	ld.w	d15,[a15]8
+.L411:
+	jeq	d15,#-1,.L36
+.L412:
+	ld.w	d4,[a15]8
+	call	TcpIp_Close
+.L277:
+	mov	d15,#-1
+.L413:
+	st.w	[a15]8,d15
+.L36:
+	ld.w	d15,[a15]4
+.L414:
+	jeq	d15,#-1,.L37
+.L415:
+	ld.w	d4,[a15]4
+	call	TcpIp_Close
+.L416:
+	mov	d15,#-1
+.L417:
+	st.w	[a15]4,d15
+.L37:
+	mov	d15,#0
+.L418:
+	st.b	[a15]12,d15
+.L419:
+	ld.a	a2,[a15]
+.L420:
+	ld.w	d15,[a2]24
+.L421:
+	jeq	d15,#0,.L38
+.L422:
+	ld.a	a15,[a15]
+.L279:
+	ld.a	a15,[a15]24
+.L423:
+	mov	d4,d8
+.L280:
+	calli	a15
+.L38:
+	mov	d2,#0
+.L424:
+	j	.L39
+.L39:
+.L35:
+	ret
+.L185:
+	
+__SoAd_CloseSoCon_function_end:
+	.size	SoAd_CloseSoCon,__SoAd_CloseSoCon_function_end-SoAd_CloseSoCon
+.L136:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_IfTransmit',code,cluster('SoAd_IfTransmit')
+	.sect	'.text.SoAd.SoAd_IfTransmit'
+	.align	2
+	
+	.global	SoAd_IfTransmit
+; Function SoAd_IfTransmit
+.L102:
+SoAd_IfTransmit:	.type	func
+	sub.a	a10,#8
+.L281:
+	mov.aa	a12,a4
+.L283:
+	mov.aa	a13,a5
+.L284:
+	mov	d8,d5
+.L285:
+	call	SoAd_GetRuntime
+.L282:
+	jz.a	a2,.L40
+.L429:
+	jz.a	a13,.L41
+.L430:
+	jne	d8,#0,.L42
+.L41:
+.L40:
+	mov	d2,#3
+.L431:
+	j	.L43
+.L42:
+	ld.bu	d15,[a2]12
+.L432:
+	jeq	d15,#2,.L44
+.L433:
+	mov	d2,#2
+.L434:
+	j	.L45
+.L44:
+	ld.a	a15,[a2]
+.L435:
+	ld.bu	d15,[a15]2
+.L436:
+	jne	d15,#1,.L46
+.L437:
+	jnz.a	a12,.L47
+.L438:
+	ld.a	a15,[a2]
+.L439:
+	lea	a12,[a15]10
+.L47:
+	ld.w	d4,[a2]4
+.L440:
+	lea	a6,[a10]0
+	mov.aa	a4,a12
+.L287:
+	mov.aa	a5,a13
+.L288:
+	mov	d5,d8
+.L289:
+	call	TcpIp_SendTo
+.L286:
+	j	.L48
+.L46:
+	ld.w	d15,[a2]8
+.L441:
+	jeq	d15,#-1,.L49
+.L442:
+	ld.w	d4,[a2]8
+.L443:
+	j	.L50
+.L49:
+	ld.w	d4,[a2]4
+.L50:
+	lea	a5,[a10]0
+	mov.aa	a4,a13
+.L290:
+	mov	d5,d8
+.L291:
+	call	TcpIp_Send
+.L48:
+	jne	d2,#0,.L51
+.L444:
+	ld.hu	d15,[a10]0
+.L445:
+	jeq	d15,d8,.L52
+.L51:
+	mov	d2,#2
+.L292:
+	j	.L53
+.L52:
+	mov	d2,#0
+.L293:
+	j	.L54
+.L54:
+.L53:
+.L45:
+.L43:
+	ret
+.L188:
+	
+__SoAd_IfTransmit_function_end:
+	.size	SoAd_IfTransmit,__SoAd_IfTransmit_function_end-SoAd_IfTransmit
+.L141:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_GetSoConMode',code,cluster('SoAd_GetSoConMode')
+	.sect	'.text.SoAd.SoAd_GetSoConMode'
+	.align	2
+	
+	.global	SoAd_GetSoConMode
+; Function SoAd_GetSoConMode
+.L104:
+SoAd_GetSoConMode:	.type	func
+	call	SoAd_GetRuntime
+.L294:
+	jnz.a	a2,.L55
+.L450:
+	mov	d2,#0
+.L451:
+	j	.L56
+.L55:
+	ld.bu	d2,[a2]12
+.L452:
+	j	.L57
+.L57:
+.L56:
+	ret
+.L202:
+	
+__SoAd_GetSoConMode_function_end:
+	.size	SoAd_GetSoConMode,__SoAd_GetSoConMode_function_end-SoAd_GetSoConMode
+.L146:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_MainTcpServer',code,cluster('SoAd_MainTcpServer')
+	.sect	'.text.SoAd.SoAd_MainTcpServer'
+	.align	2
+	
+; Function SoAd_MainTcpServer
+.L106:
+SoAd_MainTcpServer:	.type	func
+	sub.a	a10,#16
+.L295:
+	mov.aa	a15,a4
+.L297:
+	ld.bu	d15,[a15]12
+.L476:
+	jne	d15,#3,.L58
+.L477:
+	ld.w	d4,[a15]4
+.L478:
+	lea	a4,[a10]0
+.L296:
+	lea	a5,[a10]4
+	call	TcpIp_Accept
+.L299:
+	jne	d2,#0,.L59
+.L479:
+	ld.w	d15,[a15]8
+.L480:
+	jeq	d15,#-1,.L60
+.L481:
+	ld.w	d4,[a15]8
+	call	TcpIp_Close
+.L60:
+	ld.w	d15,[a10]
+.L482:
+	st.w	[a15]8,d15
+.L483:
+	ld.w	d4,[a10]
+	call	TcpIp_SetNonBlocking
+.L484:
+	mov	d15,#2
+.L485:
+	st.b	[a15]12,d15
+.L486:
+	ld.a	a2,[a15]
+.L487:
+	ld.w	d15,[a2]20
+.L488:
+	jeq	d15,#0,.L61
+.L489:
+	ld.a	a2,[a15]
+.L490:
+	ld.a	a2,[a2]20
+.L491:
+	ld.a	a4,[a15]
+.L492:
+	ld.bu	d4,[a4]
+	calli	a2
+.L61:
+.L59:
+.L58:
+	ld.bu	d15,[a15]12
+.L493:
+	jne	d15,#2,.L62
+.L494:
+	ld.w	d15,[a15]8
+.L495:
+	jeq	d15,#-1,.L63
+.L496:
+	ld.w	d4,[a15]8
+.L497:
+	lea	a4,[a15]13
+.L498:
+	mov	d5,#2048
+.L499:
+	lea	a5,[a10]10
+	call	TcpIp_Recv
+.L300:
+	jne	d2,#0,.L64
+.L500:
+	ld.hu	d15,[a10]10
+.L501:
+	jlt.u	d15,#1,.L65
+.L502:
+	ld.a	a2,[a15]
+.L503:
+	ld.w	d15,[a2]16
+.L504:
+	jeq	d15,#0,.L66
+.L505:
+	ld.a	a2,[a15]
+.L506:
+	ld.a	a2,[a2]16
+.L507:
+	ld.a	a4,[a15]
+.L508:
+	ld.bu	d4,[a4]
+.L509:
+	ld.a	a4,[a15]
+.L510:
+	lea	a4,[a4]10
+.L511:
+	lea	a5,[a15]13
+.L512:
+	ld.hu	d5,[a10]10
+	calli	a2
+.L66:
+	j	.L67
+.L65:
+.L64:
+	jne	d2,#5,.L68
+.L513:
+	ld.w	d4,[a15]8
+	call	TcpIp_Close
+.L301:
+	mov	d15,#-1
+.L514:
+	st.w	[a15]8,d15
+.L515:
+	mov	d15,#3
+.L516:
+	st.b	[a15]12,d15
+.L517:
+	ld.a	a2,[a15]
+.L518:
+	ld.w	d15,[a2]24
+.L519:
+	jeq	d15,#0,.L69
+.L520:
+	ld.a	a2,[a15]
+.L521:
+	ld.a	a2,[a2]24
+.L522:
+	ld.a	a15,[a15]
+.L298:
+	ld.bu	d4,[a15]
+	calli	a2
+.L69:
+.L68:
+.L67:
+.L63:
+.L62:
+	ret
+.L208:
+	
+__SoAd_MainTcpServer_function_end:
+	.size	SoAd_MainTcpServer,__SoAd_MainTcpServer_function_end-SoAd_MainTcpServer
+.L156:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_MainTcpClient',code,cluster('SoAd_MainTcpClient')
+	.sect	'.text.SoAd.SoAd_MainTcpClient'
+	.align	2
+	
+; Function SoAd_MainTcpClient
+.L108:
+SoAd_MainTcpClient:	.type	func
+	sub.a	a10,#8
+.L302:
+	mov.aa	a12,a4
+.L303:
+	ld.bu	d15,[a12]12
+.L527:
+	jne	d15,#1,.L70
+.L528:
+	mov	d15,#2
+.L529:
+	st.b	[a12]12,d15
+.L530:
+	ld.a	a15,[a12]
+.L531:
+	ld.w	d15,[a15]20
+.L532:
+	jeq	d15,#0,.L71
+.L533:
+	ld.a	a15,[a12]
+.L534:
+	ld.a	a2,[a15]20
+.L535:
+	ld.a	a15,[a12]
+.L536:
+	ld.bu	d4,[a15]
+	calli	a2
+.L71:
+.L70:
+	ld.bu	d15,[a12]12
+.L537:
+	jne	d15,#2,.L72
+.L538:
+	ld.w	d4,[a12]4
+.L539:
+	lea	a4,[a12]13
+.L540:
+	mov	d5,#2048
+.L541:
+	lea	a5,[a10]0
+	call	TcpIp_Recv
+.L304:
+	jne	d2,#0,.L73
+.L542:
+	ld.hu	d15,[a10]0
+.L543:
+	jlt.u	d15,#1,.L74
+.L544:
+	ld.a	a15,[a12]
+.L545:
+	ld.w	d15,[a15]16
+.L546:
+	jeq	d15,#0,.L75
+.L547:
+	ld.a	a15,[a12]
+.L548:
+	ld.a	a15,[a15]16
+.L549:
+	ld.a	a2,[a12]
+.L550:
+	ld.bu	d4,[a2]
+.L551:
+	ld.a	a2,[a12]
+.L552:
+	lea	a4,[a2]10
+.L553:
+	lea	a5,[a12]13
+.L554:
+	ld.hu	d5,[a10]0
+	calli	a15
+.L75:
+	j	.L76
+.L74:
+.L73:
+	jne	d2,#5,.L77
+.L555:
+	ld.a	a15,[a12]
+.L556:
+	ld.bu	d4,[a15]
+	call	SoAd_CloseSoCon
+.L77:
+.L76:
+.L72:
+	ret
+.L215:
+	
+__SoAd_MainTcpClient_function_end:
+	.size	SoAd_MainTcpClient,__SoAd_MainTcpClient_function_end-SoAd_MainTcpClient
+.L161:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_MainUdp',code,cluster('SoAd_MainUdp')
+	.sect	'.text.SoAd.SoAd_MainUdp'
+	.align	2
+	
+; Function SoAd_MainUdp
+.L110:
+SoAd_MainUdp:	.type	func
+	sub.a	a10,#8
+.L305:
+	mov.aa	a12,a4
+.L307:
+	ld.bu	d15,[a12]12
+.L561:
+	jeq	d15,#2,.L78
+.L562:
+	j	.L79
+.L78:
+	ld.w	d4,[a12]4
+.L563:
+	lea	a4,[a10]0
+.L306:
+	lea	a5,[a12]13
+.L564:
+	mov	d5,#2048
+.L565:
+	lea	a6,[a10]6
+	call	TcpIp_RecvFrom
+.L308:
+	jne	d2,#0,.L80
+.L566:
+	ld.hu	d15,[a10]6
+.L567:
+	jlt.u	d15,#1,.L81
+.L568:
+	ld.a	a15,[a12]
+.L569:
+	ld.w	d15,[a15]16
+.L570:
+	jeq	d15,#0,.L82
+.L571:
+	ld.a	a15,[a12]
+.L572:
+	ld.a	a2,[a15]16
+.L573:
+	ld.a	a15,[a12]
+.L574:
+	ld.bu	d4,[a15]
+.L575:
+	lea	a4,[a10]0
+.L576:
+	lea	a5,[a12]13
+.L577:
+	ld.hu	d5,[a10]6
+	calli	a2
+.L82:
+.L81:
+.L80:
+.L79:
+	ret
+.L219:
+	
+__SoAd_MainUdp_function_end:
+	.size	SoAd_MainUdp,__SoAd_MainUdp_function_end-SoAd_MainUdp
+.L166:
+	; End of function
+	
+	.sdecl	'.text.SoAd.SoAd_MainFunction',code,cluster('SoAd_MainFunction')
+	.sect	'.text.SoAd.SoAd_MainFunction'
+	.align	2
+	
+	.global	SoAd_MainFunction
+; Function SoAd_MainFunction
+.L112:
+SoAd_MainFunction:	.type	func
+	movh.a	a15,#@his(SoAd_ConfigPtr)
+	lea	a15,[a15]@los(SoAd_ConfigPtr)
+	ld.w	d15,[a15]
+.L353:
+	jne	d15,#0,.L83
+.L354:
+	j	.L84
+.L83:
+	mov	d8,#0
+.L309:
+	j	.L85
+.L86:
+	mov	d15,#2064
+	mul	d15,d8
+.L355:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L356:
+	addsc.a	a15,a15,d15,#0
+.L357:
+	ld.w	d15,[a15]
+.L358:
+	jne	d15,#0,.L87
+.L359:
+	j	.L88
+.L87:
+	mov	d15,#2064
+	mul	d15,d8
+.L360:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L361:
+	addsc.a	a15,a15,d15,#0
+.L362:
+	ld.a	a15,[a15]
+.L363:
+	ld.bu	d15,[a15]2
+.L364:
+	jne	d15,#1,.L89
+.L365:
+	mov	d15,#2064
+	mul	d15,d8
+.L366:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L367:
+	addsc.a	a4,a15,d15,#0
+	call	SoAd_MainUdp
+.L368:
+	j	.L90
+.L89:
+	mov	d15,#2064
+	mul	d15,d8
+.L369:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L370:
+	addsc.a	a15,a15,d15,#0
+.L371:
+	ld.a	a15,[a15]
+.L372:
+	ld.bu	d15,[a15]3
+.L373:
+	jeq	d15,#0,.L91
+.L374:
+	mov	d15,#2064
+	mul	d15,d8
+.L375:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L376:
+	addsc.a	a4,a15,d15,#0
+	call	SoAd_MainTcpServer
+.L377:
+	j	.L92
+.L91:
+	mov	d15,#2064
+	mul	d15,d8
+.L378:
+	movh.a	a15,#@his(SoAd_Runtime)
+	lea	a15,[a15]@los(SoAd_Runtime)
+.L379:
+	addsc.a	a4,a15,d15,#0
+	call	SoAd_MainTcpClient
+.L92:
+.L90:
+.L88:
+	add	d8,#1
+.L310:
+	extr.u	d8,d8,#0,#8
+.L85:
+	movh.a	a15,#@his(SoAd_ConfigPtr)
+	lea	a15,[a15]@los(SoAd_ConfigPtr)
+	ld.a	a15,[a15]
+.L380:
+	ld.bu	d15,[a15]4
+.L381:
+	jlt.u	d8,d15,.L86
+.L84:
+	ret
+.L176:
+	
+__SoAd_MainFunction_function_end:
+	.size	SoAd_MainFunction,__SoAd_MainFunction_function_end-SoAd_MainFunction
+.L126:
+	; End of function
+	
+	.sdecl	'.data.SoAd.SoAd_ConfigPtr',data,cluster('SoAd_ConfigPtr')
+	.sect	'.data.SoAd.SoAd_ConfigPtr'
+	.align	4
+SoAd_ConfigPtr:	.type	object
+	.size	SoAd_ConfigPtr,4
+	.space	4
+	.sdecl	'.bss.SoAd.SoAd_Runtime',data,cluster('SoAd_Runtime')
+	.sect	'.bss.SoAd.SoAd_Runtime'
+	.align	4
+SoAd_Runtime:	.type	object
+	.size	SoAd_Runtime,24768
+	.space	24768
+	.calls	'SoAd_Init','memset'
+	.calls	'SoAd_OpenSoCon','SoAd_GetRuntime'
+	.calls	'SoAd_OpenSoCon','TcpIp_CreateSocket'
+	.calls	'SoAd_OpenSoCon','TcpIp_SetNonBlocking'
+	.calls	'SoAd_OpenSoCon','TcpIp_Bind'
+	.calls	'SoAd_OpenSoCon','TcpIp_Close'
+	.calls	'SoAd_OpenSoCon','TcpIp_Listen'
+	.calls	'SoAd_OpenSoCon','TcpIp_Connect'
+	.calls	'SoAd_CloseSoCon','SoAd_GetRuntime'
+	.calls	'SoAd_CloseSoCon','TcpIp_Close'
+	.calls	'SoAd_CloseSoCon','__INDIRECT__'
+	.calls	'SoAd_IfTransmit','SoAd_GetRuntime'
+	.calls	'SoAd_IfTransmit','TcpIp_SendTo'
+	.calls	'SoAd_IfTransmit','TcpIp_Send'
+	.calls	'SoAd_GetSoConMode','SoAd_GetRuntime'
+	.calls	'SoAd_MainTcpServer','TcpIp_Accept'
+	.calls	'SoAd_MainTcpServer','TcpIp_Close'
+	.calls	'SoAd_MainTcpServer','TcpIp_SetNonBlocking'
+	.calls	'SoAd_MainTcpServer','__INDIRECT__'
+	.calls	'SoAd_MainTcpServer','TcpIp_Recv'
+	.calls	'SoAd_MainTcpClient','__INDIRECT__'
+	.calls	'SoAd_MainTcpClient','TcpIp_Recv'
+	.calls	'SoAd_MainTcpClient','SoAd_CloseSoCon'
+	.calls	'SoAd_MainUdp','TcpIp_RecvFrom'
+	.calls	'SoAd_MainUdp','__INDIRECT__'
+	.calls	'SoAd_MainFunction','SoAd_MainUdp'
+	.calls	'SoAd_MainFunction','SoAd_MainTcpServer'
+	.calls	'SoAd_MainFunction','SoAd_MainTcpClient'
+	.calls	'SoAd_GetRuntime','',0
+	.calls	'SoAd_Init','',0
+	.calls	'SoAd_OpenSoCon','',0
+	.calls	'SoAd_CloseSoCon','',0
+	.calls	'SoAd_IfTransmit','',8
+	.calls	'SoAd_GetSoConMode','',0
+	.calls	'SoAd_MainTcpServer','',16
+	.calls	'SoAd_MainTcpClient','',8
+	.calls	'SoAd_MainUdp','',8
+	.extern	TcpIp_CreateSocket
+	.extern	TcpIp_SetNonBlocking
+	.extern	TcpIp_Bind
+	.extern	TcpIp_Listen
+	.extern	TcpIp_Accept
+	.extern	TcpIp_Connect
+	.extern	TcpIp_Send
+	.extern	TcpIp_Recv
+	.extern	TcpIp_SendTo
+	.extern	TcpIp_RecvFrom
+	.extern	TcpIp_Close
+	.extern	memset
+	.extern	__INDIRECT__
+	.calls	'SoAd_MainFunction','',0
+	.sdecl	'.debug_info',debug
+	.sect	'.debug_info'
+.L114:
+	.word	2648
+	.half	3
+	.word	.L115
+	.byte	4
+.L113:
+	.byte	1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L116
+.L183:
+	.byte	2,1,17,9,1,3
+	.byte	'TCPIP_OK',0,0,3
+	.byte	'TCPIP_NOT_OK',0,1,3
+	.byte	'TCPIP_BUSY',0,2,3
+	.byte	'TCPIP_TIMEOUT',0,3,3
+	.byte	'TCPIP_PARAM_ERROR',0,4,3
+	.byte	'TCPIP_SOCKET_ERROR',0,5,0,2,1,27,9,1,3
+	.byte	'TCPIP_PROTOCOL_TCP',0,0,3
+	.byte	'TCPIP_PROTOCOL_UDP',0,1,0
+.L199:
+	.byte	4
+	.byte	'int',0,4,5,5
+	.word	342
+	.byte	6
+	.byte	'TcpIp_CreateSocket',0,1,51,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'protocol',0,1,51,56
+	.word	294
+	.byte	7
+	.byte	'socketId',0,1,52,57
+	.word	349
+	.byte	0,6
+	.byte	'TcpIp_SetNonBlocking',0,1,54,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,54,58
+	.word	342
+	.byte	0
+.L174:
+	.byte	4
+	.byte	'unsigned char',0,1,8,8,4
+	.word	471
+	.byte	9,3,0
+.L194:
+	.byte	4
+	.byte	'unsigned short int',0,2,7
+.L211:
+	.byte	10,1,43,9,6,11
+	.byte	'addr',0
+	.word	488
+	.byte	4,2,35,0,11
+	.byte	'port',0
+	.word	497
+	.byte	2,2,35,4,0,12
+	.word	519
+.L190:
+	.byte	5
+	.word	553
+	.byte	6
+	.byte	'TcpIp_Bind',0,1,56,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,56,48
+	.word	342
+	.byte	7
+	.byte	'localAddr',0,1,57,55
+	.word	558
+	.byte	0,6
+	.byte	'TcpIp_Listen',0,1,59,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,59,50
+	.word	342
+	.byte	7
+	.byte	'backlog',0,1,60,39
+	.word	471
+	.byte	0,5
+	.word	519
+	.byte	6
+	.byte	'TcpIp_Accept',0,1,62,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'listenSocket',0,1,62,50
+	.word	342
+	.byte	7
+	.byte	'clientSocket',0,1,63,51
+	.word	349
+	.byte	7
+	.byte	'remoteAddr',0,1,64,51
+	.word	681
+	.byte	0,6
+	.byte	'TcpIp_Connect',0,1,66,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,66,51
+	.word	342
+	.byte	7
+	.byte	'remoteAddr',0,1,67,58
+	.word	558
+	.byte	0,12
+	.word	471
+.L192:
+	.byte	5
+	.word	836
+	.byte	5
+	.word	497
+	.byte	6
+	.byte	'TcpIp_Send',0,1,69,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,69,48
+	.word	342
+	.byte	7
+	.byte	'data',0,1,70,44
+	.word	841
+	.byte	7
+	.byte	'len',0,1,71,38
+	.word	497
+	.byte	7
+	.byte	'sentLen',0,1,72,39
+	.word	846
+	.byte	0,5
+	.word	471
+	.byte	6
+	.byte	'TcpIp_Recv',0,1,74,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,74,48
+	.word	342
+	.byte	7
+	.byte	'data',0,1,75,38
+	.word	933
+	.byte	7
+	.byte	'maxLen',0,1,76,38
+	.word	497
+	.byte	7
+	.byte	'rxLen',0,1,77,39
+	.word	846
+	.byte	0,6
+	.byte	'TcpIp_SendTo',0,1,79,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,79,50
+	.word	342
+	.byte	7
+	.byte	'remoteAddr',0,1,80,57
+	.word	558
+	.byte	7
+	.byte	'data',0,1,81,46
+	.word	841
+	.byte	7
+	.byte	'len',0,1,82,40
+	.word	497
+	.byte	7
+	.byte	'sentLen',0,1,83,41
+	.word	846
+	.byte	0,6
+	.byte	'TcpIp_RecvFrom',0,1,85,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,85,52
+	.word	342
+	.byte	7
+	.byte	'remoteAddr',0,1,86,53
+	.word	681
+	.byte	7
+	.byte	'data',0,1,87,42
+	.word	933
+	.byte	7
+	.byte	'maxLen',0,1,88,42
+	.word	497
+	.byte	7
+	.byte	'rxLen',0,1,89,43
+	.word	846
+	.byte	0,6
+	.byte	'TcpIp_Close',0,1,91,18
+	.word	192
+	.byte	1,1,1,1,7
+	.byte	'socketId',0,1,91,49
+	.word	342
+	.byte	0,2,2,33,9,1,3
+	.byte	'SOAD_UPPER_DOIP',0,0,3
+	.byte	'SOAD_UPPER_SOMEIP',0,1,3
+	.byte	'SOAD_UPPER_SOMEIP_SD',0,2,3
+	.byte	'SOAD_UPPER_USER',0,3,0,12
+	.word	519
+	.byte	5
+	.word	1357
+	.byte	12
+	.word	471
+	.byte	5
+	.word	1367
+	.byte	13,1,1,14
+	.word	471
+	.byte	14
+	.word	1362
+	.byte	14
+	.word	1372
+	.byte	14
+	.word	497
+	.byte	0,5
+	.word	1377
+	.byte	15
+	.byte	'SoAd_RxIndicationFct',0,2,41,16
+	.word	1401
+	.byte	13,1,1,14
+	.word	471
+	.byte	0,5
+	.word	1435
+	.byte	15
+	.byte	'SoAd_TcpConnectedFct',0,2,46,16
+	.word	1444
+	.byte	15
+	.byte	'SoAd_TcpDisconnectedFct',0,2,48,16
+	.word	1444
+	.byte	10,2,50,9,28,11
+	.byte	'soConId',0
+	.word	471
+	.byte	1,2,35,0,11
+	.byte	'upperLayer',0
+	.word	1272
+	.byte	1,2,35,1,11
+	.byte	'protocol',0
+	.word	294
+	.byte	1,2,35,2,11
+	.byte	'isServer',0
+	.word	471
+	.byte	1,2,35,3,11
+	.byte	'localAddr',0
+	.word	519
+	.byte	6,2,35,4,11
+	.byte	'remoteAddr',0
+	.word	519
+	.byte	6,2,35,10,11
+	.byte	'rxIndication',0
+	.word	1406
+	.byte	4,2,35,16,11
+	.byte	'tcpConnected',0
+	.word	1449
+	.byte	4,2,35,20,11
+	.byte	'tcpDisconnected',0
+	.word	1478
+	.byte	4,2,35,24,0,12
+	.word	1510
+	.byte	5
+	.word	1697
+	.byte	10,2,63,9,8,11
+	.byte	'connections',0
+	.word	1702
+	.byte	4,2,35,0,11
+	.byte	'connectionCount',0
+	.word	471
+	.byte	1,2,35,4,0,12
+	.word	1707
+.L172:
+	.byte	5
+	.word	1759
+	.byte	5
+	.word	1377
+	.byte	5
+	.word	1435
+	.byte	5
+	.word	1435
+.L178:
+	.byte	2,2,17,9,1,3
+	.byte	'SOAD_OK',0,0,3
+	.byte	'SOAD_NOT_OK',0,1,3
+	.byte	'SOAD_BUSY',0,2,3
+	.byte	'SOAD_PARAM_ERROR',0,3,0
+.L201:
+	.byte	2,2,25,9,1,3
+	.byte	'SOAD_SOCON_OFFLINE',0,0,3
+	.byte	'SOAD_SOCON_RECONNECT',0,1,3
+	.byte	'SOAD_SOCON_ONLINE',0,2,3
+	.byte	'SOAD_SOCON_LISTENING',0,3,0,8,128,16
+	.word	471
+	.byte	9,255,15,0,10,3,5,9,144,16,11
+	.byte	'cfg',0
+	.word	1702
+	.byte	4,2,35,0,11
+	.byte	'socketId',0
+	.word	342
+	.byte	4,2,35,4,11
+	.byte	'acceptedSocketId',0
+	.word	342
+	.byte	4,2,35,8,11
+	.byte	'mode',0
+	.word	1845
+	.byte	1,2,35,12,11
+	.byte	'rxBuffer',0
+	.word	1938
+	.byte	128,16,2,35,13,0
+.L181:
+	.byte	5
+	.word	1949
+	.byte	16
+	.byte	'void',0,5
+	.word	2051
+	.byte	4
+	.byte	'unsigned int',0,4,7,6
+	.byte	'memset',0,4,56,17
+	.word	2057
+	.byte	1,1,1,1,17,4,56,33
+	.word	2057
+	.byte	17,4,56,36
+	.word	342
+	.byte	17,4,56,41
+	.word	2062
+	.byte	0,18
+	.byte	'__INDIRECT__',0,3,1,1,1,1,1,4
+	.byte	'short int',0,2,5,15
+	.byte	'__wchar_t',0,3,1,1
+	.word	2142
+	.byte	15
+	.byte	'__size_t',0,3,1,1
+	.word	2062
+	.byte	15
+	.byte	'__ptrdiff_t',0,3,1,1
+	.word	342
+	.byte	19,1,5
+	.word	2210
+	.byte	15
+	.byte	'__codeptr',0,3,1,1
+	.word	2212
+	.byte	15
+	.byte	'__intptr_t',0,3,1,1
+	.word	342
+	.byte	15
+	.byte	'__uintptr_t',0,3,1,1
+	.word	2062
+	.byte	15
+	.byte	'uint8_t',0,5,242,1,41
+	.word	471
+	.byte	15
+	.byte	'uint16_t',0,5,246,1,41
+	.word	497
+	.byte	15
+	.byte	'int32_t',0,5,253,1,41
+	.word	342
+	.byte	15
+	.byte	'size_t',0,6,24,25
+	.word	2062
+	.byte	15
+	.byte	'TcpIp_SocketIdType',0,1,15,17
+	.word	342
+	.byte	15
+	.byte	'TcpIp_ReturnType',0,1,25,3
+	.word	192
+	.byte	15
+	.byte	'TcpIp_ProtocolType',0,1,31,3
+	.word	294
+	.byte	15
+	.byte	'TcpIp_SockAddrType',0,1,47,3
+	.word	519
+	.byte	15
+	.byte	'SoAd_SoConIdType',0,2,15,17
+	.word	471
+	.byte	15
+	.byte	'SoAd_ReturnType',0,2,23,3
+	.word	1784
+	.byte	15
+	.byte	'SoAd_SoConModeType',0,2,31,3
+	.word	1845
+	.byte	15
+	.byte	'SoAd_UpperLayerType',0,2,39,3
+	.word	1272
+	.byte	15
+	.byte	'SoAd_SocketConnectionConfigType',0,2,61,3
+	.word	1510
+	.byte	15
+	.byte	'SoAd_ConfigType',0,2,67,3
+	.word	1707
+	.byte	15
+	.byte	'SoAd_RuntimeType',0,3,12,3
+	.word	1949
+.L224:
+	.byte	8,192,193,1
+	.word	1949
+	.byte	9,11,0,0
+	.sdecl	'.debug_abbrev',debug
+	.sect	'.debug_abbrev'
+.L115:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,16,6,0,0,2,4,1,58,15,59,15,57,15,11,15,0,0,3,40,0,3,8,28,13,0,0,4
+	.byte	36,0,3,8,11,15,62,15,0,0,5,15,0,73,19,0,0,6,46,1,3,8,58,15,59,15,57,15,73,19,54,15,39,12,63,12,60,12,0
+	.byte	0,7,5,0,3,8,58,15,59,15,57,15,73,19,0,0,8,1,1,11,15,73,19,0,0,9,33,0,47,15,0,0,10,19,1,58,15,59,15,57
+	.byte	15,11,15,0,0,11,13,0,3,8,73,19,11,15,56,9,0,0,12,38,0,73,19,0,0,13,21,1,54,15,39,12,0,0,14,5,0,73,19,0
+	.byte	0,15,22,0,3,8,58,15,59,15,57,15,73,19,0,0,16,59,0,3,8,0,0,17,5,0,58,15,59,15,57,15,73,19,0,0,18,46,0,3
+	.byte	8,58,15,59,15,57,15,54,15,63,12,60,12,0,0,19,21,0,54,15,0,0,0
+	.sdecl	'.debug_line',debug
+	.sect	'.debug_line'
+.L116:
+	.word	.L312-.L311
+.L311:
+	.half	3
+	.word	.L314-.L313
+.L313:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1
+	.byte	'C:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Ethernet',0
+	.byte	'C:\\Infineon\\AURIX-Studio-1.10.32\\tools\\Compilers\\Tasking_1.1r8\\ctc\\include\\',0,0
+	.byte	'TcpIpH.h',0,1,0,0
+	.byte	'..\\BSW\\Com\\Ethernet\\SoAd.h',0,0,0,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0
+	.byte	'string.h',0,2,0,0
+	.byte	'stdint.h',0,2,0,0
+	.byte	'stddef.h',0,2,0,0,0
+.L314:
+.L312:
+	.sdecl	'.debug_info',debug,cluster('SoAd_Init')
+	.sect	'.debug_info'
+.L117:
+	.word	271
+	.half	3
+	.word	.L118
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L120,.L119
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_Init',0,1,37,6,1,1,1
+	.word	.L96,.L171,.L95
+	.byte	4
+	.byte	'config',0,1,37,39
+	.word	.L172,.L173
+	.byte	5
+	.word	.L96,.L171
+	.byte	6
+	.byte	'i',0,1,39,13
+	.word	.L174,.L175
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_Init')
+	.sect	'.debug_abbrev'
+.L118:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3
+	.byte	8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_Init')
+	.sect	'.debug_line'
+.L119:
+	.word	.L316-.L315
+.L315:
+	.half	3
+	.word	.L318-.L317
+.L317:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L318:
+	.byte	5,6,7,0,5,2
+	.word	.L96
+	.byte	3,36,1,5,5,9
+	.half	.L229-.L96
+	.byte	3,4,1,5,20,9
+	.half	.L319-.L229
+	.byte	1,5,12,9
+	.half	.L320-.L319
+	.byte	3,2,1,5,26,9
+	.half	.L321-.L320
+	.byte	1,5,29,9
+	.half	.L322-.L321
+	.byte	1,5,5,9
+	.half	.L323-.L322
+	.byte	3,2,1,5,9,7,9
+	.half	.L324-.L323
+	.byte	3,2,1,5,12,9
+	.half	.L9-.L324
+	.byte	3,3,1,5,84,9
+	.half	.L230-.L9
+	.byte	1,5,21,9
+	.half	.L12-.L230
+	.byte	3,2,1,5,9,9
+	.half	.L325-.L12
+	.byte	1,5,21,9
+	.half	.L326-.L325
+	.byte	1,5,51,9
+	.half	.L327-.L326
+	.byte	1,5,38,9
+	.half	.L328-.L327
+	.byte	1,5,51,9
+	.half	.L329-.L328
+	.byte	1,5,29,9
+	.half	.L330-.L329
+	.byte	1,5,21,9
+	.half	.L331-.L330
+	.byte	3,1,1,5,9,9
+	.half	.L332-.L331
+	.byte	1,5,21,9
+	.half	.L333-.L332
+	.byte	1,5,36,9
+	.half	.L334-.L333
+	.byte	1,5,34,9
+	.half	.L335-.L334
+	.byte	1,5,21,9
+	.half	.L336-.L335
+	.byte	3,1,1,5,9,9
+	.half	.L337-.L336
+	.byte	1,5,21,9
+	.half	.L338-.L337
+	.byte	1,5,44,9
+	.half	.L339-.L338
+	.byte	1,5,42,9
+	.half	.L340-.L339
+	.byte	1,5,21,9
+	.half	.L341-.L340
+	.byte	3,1,1,5,9,9
+	.half	.L342-.L341
+	.byte	1,5,21,9
+	.half	.L343-.L342
+	.byte	1,5,32,9
+	.half	.L344-.L343
+	.byte	1,5,30,9
+	.half	.L345-.L344
+	.byte	1,5,87,9
+	.half	.L346-.L345
+	.byte	3,123,1,5,29,9
+	.half	.L11-.L346
+	.byte	1,5,18,9
+	.half	.L347-.L11
+	.byte	1,5,54,7,9
+	.half	.L348-.L347
+	.byte	1,5,1,7,9
+	.half	.L10-.L348
+	.byte	3,7,1,7,9
+	.half	.L121-.L10
+	.byte	0,1,1
+.L316:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_Init')
+	.sect	'.debug_ranges'
+.L120:
+	.word	-1,.L96,0,.L121-.L96,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_info'
+.L122:
+	.word	262
+	.half	3
+	.word	.L123
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L125,.L124
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_MainFunction',0,1,221,2,6,1,1,1
+	.word	.L112,.L176,.L111
+	.byte	4
+	.word	.L112,.L176
+	.byte	5
+	.byte	'i',0,1,223,2,13
+	.word	.L174,.L177
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_abbrev'
+.L123:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,11,1,17,1,18,1,0,0,5,52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_line'
+.L124:
+	.word	.L350-.L349
+.L349:
+	.half	3
+	.word	.L352-.L351
+.L351:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L352:
+	.byte	5,9,7,0,5,2
+	.word	.L112
+	.byte	3,224,2,1,5,5,9
+	.half	.L353-.L112
+	.byte	1,5,9,7,9
+	.half	.L354-.L353
+	.byte	3,2,1,5,12,9
+	.half	.L83-.L354
+	.byte	3,3,1,5,53,9
+	.half	.L309-.L83
+	.byte	1,5,25,9
+	.half	.L86-.L309
+	.byte	3,2,1,5,13,9
+	.half	.L355-.L86
+	.byte	1,5,25,9
+	.half	.L356-.L355
+	.byte	1,5,28,9
+	.half	.L357-.L356
+	.byte	1,5,9,9
+	.half	.L358-.L357
+	.byte	1,5,13,7,9
+	.half	.L359-.L358
+	.byte	3,2,1,5,25,9
+	.half	.L87-.L359
+	.byte	3,3,1,5,13,9
+	.half	.L360-.L87
+	.byte	1,5,25,9
+	.half	.L361-.L360
+	.byte	1,5,28,9
+	.half	.L362-.L361
+	.byte	1,5,32,9
+	.half	.L363-.L362
+	.byte	1,5,9,9
+	.half	.L364-.L363
+	.byte	1,5,39,7,9
+	.half	.L365-.L364
+	.byte	3,2,1,5,27,9
+	.half	.L366-.L365
+	.byte	1,5,39,9
+	.half	.L367-.L366
+	.byte	1,5,43,9
+	.half	.L368-.L367
+	.byte	1,5,29,9
+	.half	.L89-.L368
+	.byte	3,4,1,5,17,9
+	.half	.L369-.L89
+	.byte	1,5,29,9
+	.half	.L370-.L369
+	.byte	1,5,32,9
+	.half	.L371-.L370
+	.byte	1,5,36,9
+	.half	.L372-.L371
+	.byte	1,5,13,9
+	.half	.L373-.L372
+	.byte	1,5,49,7,9
+	.half	.L374-.L373
+	.byte	3,2,1,5,37,9
+	.half	.L375-.L374
+	.byte	1,5,49,9
+	.half	.L376-.L375
+	.byte	1,5,53,9
+	.half	.L377-.L376
+	.byte	1,5,49,9
+	.half	.L91-.L377
+	.byte	3,4,1,5,37,9
+	.half	.L378-.L91
+	.byte	1,5,49,9
+	.half	.L379-.L378
+	.byte	1,5,56,9
+	.half	.L88-.L379
+	.byte	3,109,1,5,22,9
+	.half	.L85-.L88
+	.byte	1,5,36,9
+	.half	.L380-.L85
+	.byte	1,5,53,9
+	.half	.L381-.L380
+	.byte	1,5,1,7,9
+	.half	.L84-.L381
+	.byte	3,23,1,7,9
+	.half	.L126-.L84
+	.byte	0,1,1
+.L350:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_ranges'
+.L125:
+	.word	-1,.L112,0,.L126-.L112,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_info'
+.L127:
+	.word	298
+	.half	3
+	.word	.L128
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L130,.L129
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_OpenSoCon',0,1,59,17
+	.word	.L178
+	.byte	1,1,1
+	.word	.L98,.L179,.L97
+	.byte	4
+	.byte	'soConId',0,1,59,49
+	.word	.L174,.L180
+	.byte	5
+	.word	.L98,.L179
+	.byte	6
+	.byte	'rt',0,1,61,23
+	.word	.L181,.L182
+	.byte	6
+	.byte	'ret',0,1,62,22
+	.word	.L183,.L184
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_abbrev'
+.L128:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_line'
+.L129:
+	.word	.L383-.L382
+.L382:
+	.half	3
+	.word	.L385-.L384
+.L384:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L385:
+	.byte	5,26,7,0,5,2
+	.word	.L98
+	.byte	3,63,1,5,8,9
+	.half	.L231-.L98
+	.byte	1,5,5,9
+	.half	.L233-.L231
+	.byte	3,1,1,5,16,7,9
+	.half	.L386-.L233
+	.byte	3,2,1,5,9,9
+	.half	.L387-.L386
+	.byte	1,5,12,9
+	.half	.L14-.L387
+	.byte	3,3,1,5,9,9
+	.half	.L388-.L14
+	.byte	1,5,47,7,9
+	.half	.L389-.L388
+	.byte	1,5,54,9
+	.half	.L390-.L389
+	.byte	1,5,16,7,9
+	.half	.L16-.L390
+	.byte	3,2,1,5,9,9
+	.half	.L391-.L16
+	.byte	1,5,32,9
+	.half	.L17-.L391
+	.byte	3,3,1,5,37,9
+	.half	.L232-.L17
+	.byte	1,5,52,9
+	.half	.L392-.L232
+	.byte	1,5,5,9
+	.half	.L236-.L392
+	.byte	3,1,1,5,20,7,9
+	.half	.L393-.L236
+	.byte	3,2,1,5,18,9
+	.half	.L238-.L393
+	.byte	1,5,16,9
+	.half	.L239-.L238
+	.byte	3,1,1,5,9,9
+	.half	.L237-.L239
+	.byte	1,5,34,9
+	.half	.L19-.L237
+	.byte	3,3,1,5,24,9
+	.half	.L240-.L19
+	.byte	3,2,1,5,39,9
+	.half	.L394-.L240
+	.byte	1,5,44,9
+	.half	.L242-.L394
+	.byte	1,5,5,9
+	.half	.L243-.L242
+	.byte	3,1,1,5,29,7,9
+	.half	.L245-.L243
+	.byte	3,2,1,5,24,9
+	.half	.L244-.L245
+	.byte	3,1,1,5,22,9
+	.half	.L247-.L244
+	.byte	1,5,20,9
+	.half	.L248-.L247
+	.byte	3,1,1,5,18,9
+	.half	.L249-.L248
+	.byte	1,5,16,9
+	.half	.L250-.L249
+	.byte	3,1,1,5,9,9
+	.half	.L395-.L250
+	.byte	1,5,11,9
+	.half	.L21-.L395
+	.byte	3,3,1,5,16,9
+	.half	.L252-.L21
+	.byte	1,5,5,9
+	.half	.L396-.L252
+	.byte	1,5,15,7,9
+	.half	.L253-.L396
+	.byte	3,2,1,5,20,9
+	.half	.L254-.L253
+	.byte	1,5,9,9
+	.half	.L397-.L254
+	.byte	1,5,34,7,9
+	.half	.L255-.L397
+	.byte	3,2,1,5,46,9
+	.half	.L256-.L255
+	.byte	1,5,13,9
+	.half	.L398-.L256
+	.byte	3,1,1,5,37,7,9
+	.half	.L257-.L398
+	.byte	3,2,1,5,32,9
+	.half	.L251-.L257
+	.byte	3,1,1,5,30,9
+	.half	.L259-.L251
+	.byte	1,5,28,9
+	.half	.L260-.L259
+	.byte	3,1,1,5,26,9
+	.half	.L261-.L260
+	.byte	1,5,24,9
+	.half	.L262-.L261
+	.byte	3,1,1,5,17,9
+	.half	.L399-.L262
+	.byte	1,5,24,9
+	.half	.L25-.L399
+	.byte	3,3,1,5,22,9
+	.half	.L264-.L25
+	.byte	1,5,44,9
+	.half	.L265-.L264
+	.byte	1,5,35,9
+	.half	.L24-.L265
+	.byte	3,4,1,5,50,9
+	.half	.L400-.L24
+	.byte	1,5,55,9
+	.half	.L266-.L400
+	.byte	1,5,17,9
+	.half	.L401-.L266
+	.byte	3,1,1,5,43,7,9
+	.half	.L402-.L401
+	.byte	1,5,28,7,9
+	.half	.L28-.L402
+	.byte	3,2,1,5,26,9
+	.half	.L267-.L28
+	.byte	1,5,48,9
+	.half	.L268-.L267
+	.byte	1,5,37,9
+	.half	.L29-.L268
+	.byte	3,4,1,5,32,9
+	.half	.L263-.L29
+	.byte	3,1,1,5,30,9
+	.half	.L270-.L263
+	.byte	1,5,28,9
+	.half	.L271-.L270
+	.byte	3,1,1,5,26,9
+	.half	.L272-.L271
+	.byte	1,5,24,9
+	.half	.L273-.L272
+	.byte	3,1,1,5,17,9
+	.half	.L403-.L273
+	.byte	1,5,9,9
+	.half	.L27-.L403
+	.byte	3,116,1,5,20,9
+	.half	.L23-.L27
+	.byte	3,18,1,5,18,9
+	.half	.L274-.L23
+	.byte	1,5,12,9
+	.half	.L32-.L274
+	.byte	3,3,1,5,5,9
+	.half	.L404-.L32
+	.byte	1,5,1,9
+	.half	.L15-.L404
+	.byte	3,1,1,7,9
+	.half	.L131-.L15
+	.byte	0,1,1
+.L383:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_ranges'
+.L130:
+	.word	-1,.L98,0,.L131-.L98,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_info'
+.L132:
+	.word	286
+	.half	3
+	.word	.L133
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L135,.L134
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_CloseSoCon',0,1,132,1,17
+	.word	.L178
+	.byte	1,1,1
+	.word	.L100,.L185,.L99
+	.byte	4
+	.byte	'soConId',0,1,132,1,50
+	.word	.L174,.L186
+	.byte	5
+	.word	.L100,.L185
+	.byte	6
+	.byte	'rt',0,1,134,1,23
+	.word	.L181,.L187
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_abbrev'
+.L133:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_line'
+.L134:
+	.word	.L406-.L405
+.L405:
+	.half	3
+	.word	.L408-.L407
+.L407:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L408:
+	.byte	5,17,7,0,5,2
+	.word	.L100
+	.byte	3,131,1,1,5,26,9
+	.half	.L276-.L100
+	.byte	3,4,1,5,8,9
+	.half	.L275-.L276
+	.byte	1,5,5,9
+	.half	.L278-.L275
+	.byte	3,1,1,5,16,7,9
+	.half	.L409-.L278
+	.byte	3,2,1,5,9,9
+	.half	.L410-.L409
+	.byte	1,5,11,9
+	.half	.L34-.L410
+	.byte	3,3,1,5,5,9
+	.half	.L411-.L34
+	.byte	1,5,29,7,9
+	.half	.L412-.L411
+	.byte	3,2,1,5,32,9
+	.half	.L277-.L412
+	.byte	3,1,1,5,30,9
+	.half	.L413-.L277
+	.byte	1,5,11,9
+	.half	.L36-.L413
+	.byte	3,3,1,5,5,9
+	.half	.L414-.L36
+	.byte	1,5,29,7,9
+	.half	.L415-.L414
+	.byte	3,2,1,5,24,9
+	.half	.L416-.L415
+	.byte	3,1,1,5,22,9
+	.half	.L417-.L416
+	.byte	1,5,16,9
+	.half	.L37-.L417
+	.byte	3,3,1,5,14,9
+	.half	.L418-.L37
+	.byte	1,5,11,9
+	.half	.L419-.L418
+	.byte	3,2,1,5,16,9
+	.half	.L420-.L419
+	.byte	1,5,5,9
+	.half	.L421-.L420
+	.byte	1,5,11,7,9
+	.half	.L422-.L421
+	.byte	3,2,1,5,16,9
+	.half	.L279-.L422
+	.byte	1,5,34,9
+	.half	.L423-.L279
+	.byte	1,5,12,9
+	.half	.L38-.L423
+	.byte	3,3,1,5,5,9
+	.half	.L424-.L38
+	.byte	1,5,1,9
+	.half	.L35-.L424
+	.byte	3,1,1,7,9
+	.half	.L136-.L35
+	.byte	0,1,1
+.L406:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_ranges'
+.L135:
+	.word	-1,.L100,0,.L136-.L100,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_info'
+.L137:
+	.word	405
+	.half	3
+	.word	.L138
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L140,.L139
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_IfTransmit',0,1,164,1,17
+	.word	.L178
+	.byte	1,1,1
+	.word	.L102,.L188,.L101
+	.byte	4
+	.byte	'soConId',0,1,164,1,50
+	.word	.L174,.L189
+	.byte	4
+	.byte	'remoteAddr',0,1,165,1,59
+	.word	.L190,.L191
+	.byte	4
+	.byte	'data',0,1,166,1,48
+	.word	.L192,.L193
+	.byte	4
+	.byte	'len',0,1,167,1,42
+	.word	.L194,.L195
+	.byte	5
+	.word	.L102,.L188
+	.byte	6
+	.byte	'rt',0,1,169,1,23
+	.word	.L181,.L196
+	.byte	6
+	.byte	'sentLen',0,1,170,1,14
+	.word	.L194,.L197
+	.byte	6
+	.byte	'ret',0,1,171,1,22
+	.word	.L183,.L198
+	.byte	6
+	.byte	'txSocket',0,1,172,1,24
+	.word	.L199,.L200
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_abbrev'
+.L138:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_line'
+.L139:
+	.word	.L426-.L425
+.L425:
+	.half	3
+	.word	.L428-.L427
+.L427:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L428:
+	.byte	5,17,7,0,5,2
+	.word	.L102
+	.byte	3,163,1,1,5,26,9
+	.half	.L285-.L102
+	.byte	3,10,1,5,9,9
+	.half	.L282-.L285
+	.byte	3,1,1,5,28,7,9
+	.half	.L429-.L282
+	.byte	1,5,42,7,9
+	.half	.L430-.L429
+	.byte	1,5,16,7,9
+	.half	.L40-.L430
+	.byte	3,2,1,5,9,9
+	.half	.L431-.L40
+	.byte	1,5,11,9
+	.half	.L42-.L431
+	.byte	3,3,1,5,5,9
+	.half	.L432-.L42
+	.byte	1,5,16,7,9
+	.half	.L433-.L432
+	.byte	3,2,1,5,9,9
+	.half	.L434-.L433
+	.byte	1,5,11,9
+	.half	.L44-.L434
+	.byte	3,3,1,5,16,9
+	.half	.L435-.L44
+	.byte	1,5,5,9
+	.half	.L436-.L435
+	.byte	1,5,9,7,9
+	.half	.L437-.L436
+	.byte	3,2,1,5,29,7,9
+	.half	.L438-.L437
+	.byte	3,2,1,5,34,9
+	.half	.L439-.L438
+	.byte	1,5,30,9
+	.half	.L47-.L439
+	.byte	3,3,1,5,66,9
+	.half	.L440-.L47
+	.byte	1,5,74,9
+	.half	.L286-.L440
+	.byte	1,5,23,9
+	.half	.L46-.L286
+	.byte	3,4,1,5,20,9
+	.half	.L441-.L46
+	.byte	1,5,71,7,9
+	.half	.L442-.L441
+	.byte	1,5,90,9
+	.half	.L443-.L442
+	.byte	1,5,94,9
+	.half	.L49-.L443
+	.byte	1,5,48,9
+	.half	.L50-.L49
+	.byte	3,1,1,5,9,9
+	.half	.L48-.L50
+	.byte	3,3,1,5,31,7,9
+	.half	.L444-.L48
+	.byte	1,5,39,9
+	.half	.L445-.L444
+	.byte	1,5,16,7,9
+	.half	.L51-.L445
+	.byte	3,2,1,5,9,9
+	.half	.L292-.L51
+	.byte	1,5,12,9
+	.half	.L52-.L292
+	.byte	3,3,1,5,5,9
+	.half	.L293-.L52
+	.byte	1,5,1,9
+	.half	.L43-.L293
+	.byte	3,1,1,7,9
+	.half	.L141-.L43
+	.byte	0,1,1
+.L426:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_ranges'
+.L140:
+	.word	-1,.L102,0,.L141-.L102,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_info'
+.L142:
+	.word	288
+	.half	3
+	.word	.L143
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L145,.L144
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_GetSoConMode',0,1,208,1,20
+	.word	.L201
+	.byte	1,1,1
+	.word	.L104,.L202,.L103
+	.byte	4
+	.byte	'soConId',0,1,208,1,55
+	.word	.L174,.L203
+	.byte	5
+	.word	.L104,.L202
+	.byte	6
+	.byte	'rt',0,1,210,1,23
+	.word	.L181,.L204
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_abbrev'
+.L143:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_line'
+.L144:
+	.word	.L447-.L446
+.L446:
+	.half	3
+	.word	.L449-.L448
+.L448:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L449:
+	.byte	5,26,7,0,5,2
+	.word	.L104
+	.byte	3,211,1,1,5,5,9
+	.half	.L294-.L104
+	.byte	3,1,1,5,16,7,9
+	.half	.L450-.L294
+	.byte	3,2,1,5,9,9
+	.half	.L451-.L450
+	.byte	1,5,14,9
+	.half	.L55-.L451
+	.byte	3,3,1,5,5,9
+	.half	.L452-.L55
+	.byte	1,5,1,9
+	.half	.L56-.L452
+	.byte	3,1,1,7,9
+	.half	.L146-.L56
+	.byte	0,1,1
+.L447:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_ranges'
+.L145:
+	.word	-1,.L104,0,.L146-.L104,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_info'
+.L147:
+	.word	281
+	.half	3
+	.word	.L148
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L150,.L149
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_GetRuntime',0,1,17,26
+	.word	.L181
+	.byte	1,1
+	.word	.L94,.L205,.L93
+	.byte	4
+	.byte	'soConId',0,1,17,59
+	.word	.L174,.L206
+	.byte	5
+	.word	.L94,.L205
+	.byte	6
+	.byte	'i',0,1,19,13
+	.word	.L174,.L207
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_abbrev'
+.L148:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3
+	.byte	8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_line'
+.L149:
+	.word	.L454-.L453
+.L453:
+	.half	3
+	.word	.L456-.L455
+.L455:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L456:
+	.byte	5,9,7,0,5,2
+	.word	.L94
+	.byte	3,20,1,5,5,9
+	.half	.L457-.L94
+	.byte	1,5,16,7,9
+	.half	.L458-.L457
+	.byte	3,2,1,5,9,9
+	.half	.L459-.L458
+	.byte	1,5,12,9
+	.half	.L2-.L459
+	.byte	3,3,1,5,53,9
+	.half	.L225-.L2
+	.byte	1,5,25,9
+	.half	.L5-.L225
+	.byte	3,2,1,5,13,9
+	.half	.L460-.L5
+	.byte	1,5,25,9
+	.half	.L461-.L460
+	.byte	1,5,28,9
+	.half	.L462-.L461
+	.byte	1,5,32,9
+	.half	.L463-.L462
+	.byte	1,5,9,9
+	.half	.L464-.L463
+	.byte	1,5,33,7,9
+	.half	.L465-.L464
+	.byte	3,2,1,5,21,9
+	.half	.L226-.L465
+	.byte	1,5,33,9
+	.half	.L466-.L226
+	.byte	1,5,13,9
+	.half	.L467-.L466
+	.byte	1,5,56,9
+	.half	.L6-.L467
+	.byte	3,124,1,5,22,9
+	.half	.L4-.L6
+	.byte	1,5,36,9
+	.half	.L468-.L4
+	.byte	1,5,53,9
+	.half	.L469-.L468
+	.byte	1,5,12,7,9
+	.half	.L470-.L469
+	.byte	3,8,1,5,5,9
+	.half	.L471-.L470
+	.byte	1,5,1,9
+	.half	.L3-.L471
+	.byte	3,1,1,7,9
+	.half	.L151-.L3
+	.byte	0,1,1
+.L454:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_ranges'
+.L150:
+	.word	-1,.L94,0,.L151-.L94,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_info'
+.L152:
+	.word	349
+	.half	3
+	.word	.L153
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L155,.L154
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_MainTcpServer',0,1,221,1,13,1,1
+	.word	.L106,.L208,.L105
+	.byte	4
+	.byte	'rt',0,1,221,1,50
+	.word	.L181,.L209
+	.byte	5
+	.word	.L106,.L208
+	.byte	6
+	.byte	'clientSocket',0,1,223,1,24
+	.word	.L199,.L210
+	.byte	6
+	.byte	'remoteAddr',0,1,224,1,24
+	.word	.L211,.L212
+	.byte	6
+	.byte	'ret',0,1,225,1,22
+	.word	.L183,.L213
+	.byte	6
+	.byte	'rxLen',0,1,226,1,14
+	.word	.L194,.L214
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_abbrev'
+.L153:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3,8,58
+	.byte	15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_line'
+.L154:
+	.word	.L473-.L472
+.L472:
+	.half	3
+	.word	.L475-.L474
+.L474:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L475:
+	.byte	5,13,7,0,5,2
+	.word	.L106
+	.byte	3,220,1,1,5,11,9
+	.half	.L297-.L106
+	.byte	3,7,1,5,5,9
+	.half	.L476-.L297
+	.byte	1,5,30,7,9
+	.half	.L477-.L476
+	.byte	3,2,1,5,43,9
+	.half	.L478-.L477
+	.byte	1,5,58,9
+	.half	.L296-.L478
+	.byte	1,5,9,9
+	.half	.L299-.L296
+	.byte	3,1,1,5,19,7,9
+	.half	.L479-.L299
+	.byte	3,2,1,5,13,9
+	.half	.L480-.L479
+	.byte	1,5,37,7,9
+	.half	.L481-.L480
+	.byte	3,2,1,5,36,9
+	.half	.L60-.L481
+	.byte	3,3,1,5,34,9
+	.half	.L482-.L60
+	.byte	1,5,42,9
+	.half	.L483-.L482
+	.byte	3,1,1,5,24,9
+	.half	.L484-.L483
+	.byte	3,2,1,5,22,9
+	.half	.L485-.L484
+	.byte	1,5,19,9
+	.half	.L486-.L485
+	.byte	3,2,1,5,24,9
+	.half	.L487-.L486
+	.byte	1,5,13,9
+	.half	.L488-.L487
+	.byte	1,5,19,7,9
+	.half	.L489-.L488
+	.byte	3,2,1,5,24,9
+	.half	.L490-.L489
+	.byte	1,5,41,9
+	.half	.L491-.L490
+	.byte	1,5,46,9
+	.half	.L492-.L491
+	.byte	1,5,12,9
+	.half	.L58-.L492
+	.byte	3,5,1,5,9,9
+	.half	.L493-.L58
+	.byte	1,5,47,7,9
+	.half	.L494-.L493
+	.byte	1,5,66,9
+	.half	.L495-.L494
+	.byte	1,5,28,7,9
+	.half	.L496-.L495
+	.byte	3,2,1,9
+	.half	.L497-.L496
+	.byte	3,1,1,5,26,9
+	.half	.L498-.L497
+	.byte	3,1,1,5,27,9
+	.half	.L499-.L498
+	.byte	3,1,1,5,13,9
+	.half	.L300-.L499
+	.byte	3,2,1,5,35,7,9
+	.half	.L500-.L300
+	.byte	1,5,41,9
+	.half	.L501-.L500
+	.byte	1,5,19,7,9
+	.half	.L502-.L501
+	.byte	3,2,1,5,24,9
+	.half	.L503-.L502
+	.byte	1,5,13,9
+	.half	.L504-.L503
+	.byte	1,5,19,7,9
+	.half	.L505-.L504
+	.byte	3,2,1,5,24,9
+	.half	.L506-.L505
+	.byte	1,5,41,9
+	.half	.L507-.L506
+	.byte	1,5,46,9
+	.half	.L508-.L507
+	.byte	1,5,42,9
+	.half	.L509-.L508
+	.byte	3,1,1,5,47,9
+	.half	.L510-.L509
+	.byte	1,5,41,9
+	.half	.L511-.L510
+	.byte	3,1,1,5,39,9
+	.half	.L512-.L511
+	.byte	3,1,1,5,13,9
+	.half	.L66-.L512
+	.byte	3,123,1,5,14,9
+	.half	.L64-.L66
+	.byte	3,8,1,5,33,7,9
+	.half	.L513-.L64
+	.byte	3,2,1,5,36,9
+	.half	.L301-.L513
+	.byte	3,1,1,5,34,9
+	.half	.L514-.L301
+	.byte	1,5,24,9
+	.half	.L515-.L514
+	.byte	3,1,1,5,22,9
+	.half	.L516-.L515
+	.byte	1,5,19,9
+	.half	.L517-.L516
+	.byte	3,2,1,5,24,9
+	.half	.L518-.L517
+	.byte	1,5,13,9
+	.half	.L519-.L518
+	.byte	1,5,19,7,9
+	.half	.L520-.L519
+	.byte	3,2,1,5,24,9
+	.half	.L521-.L520
+	.byte	1,5,44,9
+	.half	.L522-.L521
+	.byte	1,5,49,9
+	.half	.L298-.L522
+	.byte	1,5,1,9
+	.half	.L62-.L298
+	.byte	3,4,1,7,9
+	.half	.L156-.L62
+	.byte	0,1,1
+.L473:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_ranges'
+.L155:
+	.word	-1,.L106,0,.L156-.L106,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_info'
+.L157:
+	.word	299
+	.half	3
+	.word	.L158
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L160,.L159
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_MainTcpClient',0,1,153,2,13,1,1
+	.word	.L108,.L215,.L107
+	.byte	4
+	.byte	'rt',0,1,153,2,50
+	.word	.L181,.L216
+	.byte	5
+	.word	.L108,.L215
+	.byte	6
+	.byte	'ret',0,1,155,2,22
+	.word	.L183,.L217
+	.byte	6
+	.byte	'rxLen',0,1,156,2,14
+	.word	.L194,.L218
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_abbrev'
+.L158:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3,8,58
+	.byte	15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_line'
+.L159:
+	.word	.L524-.L523
+.L523:
+	.half	3
+	.word	.L526-.L525
+.L525:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L526:
+	.byte	5,13,7,0,5,2
+	.word	.L108
+	.byte	3,152,2,1,5,11,9
+	.half	.L303-.L108
+	.byte	3,5,1,5,5,9
+	.half	.L527-.L303
+	.byte	1,5,20,7,9
+	.half	.L528-.L527
+	.byte	3,2,1,5,18,9
+	.half	.L529-.L528
+	.byte	1,5,15,9
+	.half	.L530-.L529
+	.byte	3,2,1,5,20,9
+	.half	.L531-.L530
+	.byte	1,5,9,9
+	.half	.L532-.L531
+	.byte	1,5,15,7,9
+	.half	.L533-.L532
+	.byte	3,2,1,5,20,9
+	.half	.L534-.L533
+	.byte	1,5,37,9
+	.half	.L535-.L534
+	.byte	1,5,42,9
+	.half	.L536-.L535
+	.byte	1,5,11,9
+	.half	.L70-.L536
+	.byte	3,4,1,5,5,9
+	.half	.L537-.L70
+	.byte	1,5,28,7,9
+	.half	.L538-.L537
+	.byte	3,2,1,9
+	.half	.L539-.L538
+	.byte	3,1,1,5,26,9
+	.half	.L540-.L539
+	.byte	3,1,1,5,27,9
+	.half	.L541-.L540
+	.byte	3,1,1,5,13,9
+	.half	.L304-.L541
+	.byte	3,2,1,5,35,7,9
+	.half	.L542-.L304
+	.byte	1,5,41,9
+	.half	.L543-.L542
+	.byte	1,5,19,7,9
+	.half	.L544-.L543
+	.byte	3,2,1,5,24,9
+	.half	.L545-.L544
+	.byte	1,5,13,9
+	.half	.L546-.L545
+	.byte	1,5,19,7,9
+	.half	.L547-.L546
+	.byte	3,2,1,5,24,9
+	.half	.L548-.L547
+	.byte	1,5,41,9
+	.half	.L549-.L548
+	.byte	1,5,46,9
+	.half	.L550-.L549
+	.byte	1,5,42,9
+	.half	.L551-.L550
+	.byte	3,1,1,5,47,9
+	.half	.L552-.L551
+	.byte	1,5,41,9
+	.half	.L553-.L552
+	.byte	3,1,1,5,39,9
+	.half	.L554-.L553
+	.byte	3,1,1,5,13,9
+	.half	.L75-.L554
+	.byte	3,123,1,5,14,9
+	.half	.L73-.L75
+	.byte	3,8,1,5,37,7,9
+	.half	.L555-.L73
+	.byte	3,2,1,5,42,9
+	.half	.L556-.L555
+	.byte	1,5,1,9
+	.half	.L72-.L556
+	.byte	3,3,1,7,9
+	.half	.L161-.L72
+	.byte	0,1,1
+.L524:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_ranges'
+.L160:
+	.word	-1,.L108,0,.L161-.L108,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_info'
+.L162:
+	.word	317
+	.half	3
+	.word	.L163
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L165,.L164
+	.byte	2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_MainUdp',0,1,192,2,13,1,1
+	.word	.L110,.L219,.L109
+	.byte	4
+	.byte	'rt',0,1,192,2,44
+	.word	.L181,.L220
+	.byte	5
+	.word	.L110,.L219
+	.byte	6
+	.byte	'ret',0,1,194,2,22
+	.word	.L183,.L221
+	.byte	6
+	.byte	'remoteAddr',0,1,195,2,24
+	.word	.L211,.L222
+	.byte	6
+	.byte	'rxLen',0,1,196,2,14
+	.word	.L194,.L223
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_abbrev'
+.L163:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3,8,58
+	.byte	15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_line'
+.L164:
+	.word	.L558-.L557
+.L557:
+	.half	3
+	.word	.L560-.L559
+.L559:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0,0,0,0,0
+.L560:
+	.byte	5,13,7,0,5,2
+	.word	.L110
+	.byte	3,191,2,1,5,11,9
+	.half	.L307-.L110
+	.byte	3,6,1,5,5,9
+	.half	.L561-.L307
+	.byte	1,5,9,7,9
+	.half	.L562-.L561
+	.byte	3,2,1,5,28,9
+	.half	.L78-.L562
+	.byte	3,3,1,5,27,9
+	.half	.L563-.L78
+	.byte	3,1,1,5,28,9
+	.half	.L306-.L563
+	.byte	3,1,1,5,26,9
+	.half	.L564-.L306
+	.byte	3,1,1,5,27,9
+	.half	.L565-.L564
+	.byte	3,1,1,5,9,9
+	.half	.L308-.L565
+	.byte	3,2,1,5,31,7,9
+	.half	.L566-.L308
+	.byte	1,5,37,9
+	.half	.L567-.L566
+	.byte	1,5,15,7,9
+	.half	.L568-.L567
+	.byte	3,2,1,5,20,9
+	.half	.L569-.L568
+	.byte	1,5,9,9
+	.half	.L570-.L569
+	.byte	1,5,15,7,9
+	.half	.L571-.L570
+	.byte	3,2,1,5,20,9
+	.half	.L572-.L571
+	.byte	1,5,37,9
+	.half	.L573-.L572
+	.byte	1,5,42,9
+	.half	.L574-.L573
+	.byte	1,5,36,9
+	.half	.L575-.L574
+	.byte	3,1,1,5,37,9
+	.half	.L576-.L575
+	.byte	3,1,1,5,35,9
+	.half	.L577-.L576
+	.byte	3,1,1,5,1,9
+	.half	.L79-.L577
+	.byte	3,3,1,7,9
+	.half	.L166-.L79
+	.byte	0,1,1
+.L558:
+	.sdecl	'.debug_ranges',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_ranges'
+.L165:
+	.word	-1,.L110,0,.L166-.L110,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_ConfigPtr')
+	.sect	'.debug_info'
+.L167:
+	.word	219
+	.half	3
+	.word	.L168
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1,2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_ConfigPtr',0,3,14,31
+	.word	.L172
+	.byte	5,3
+	.word	SoAd_ConfigPtr
+	.byte	0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_ConfigPtr')
+	.sect	'.debug_abbrev'
+.L168:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,0,0,2,61,0,24,16,0,0,3,52,0,3,8,58,15,59,15,57,15,73,16,2,9,0,0,0
+	.sdecl	'.debug_info',debug,cluster('SoAd_Runtime')
+	.sect	'.debug_info'
+.L169:
+	.word	217
+	.half	3
+	.word	.L170
+	.byte	4,1
+	.byte	'../BSW/Com/Ethernet/SoAd.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1,2
+	.word	.L113
+	.byte	3
+	.byte	'SoAd_Runtime',0,3,15,25
+	.word	.L224
+	.byte	5,3
+	.word	SoAd_Runtime
+	.byte	0
+	.sdecl	'.debug_abbrev',debug,cluster('SoAd_Runtime')
+	.sect	'.debug_abbrev'
+.L170:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,0,0,2,61,0,24,16,0,0,3,52,0,3,8,58,15,59,15,57,15,73,16,2,9,0,0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_loc'
+.L99:
+	.word	-1,.L100,0,.L185-.L100
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L187:
+	.word	-1,.L100,.L275-.L100,.L277-.L100
+	.half	1
+	.byte	98
+	.word	.L278-.L100,.L279-.L100
+	.half	1
+	.byte	111
+	.word	0,0
+.L186:
+	.word	-1,.L100,0,.L275-.L100
+	.half	1
+	.byte	84
+	.word	.L276-.L100,.L185-.L100
+	.half	1
+	.byte	88
+	.word	.L280-.L100,.L38-.L100
+	.half	1
+	.byte	84
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_loc'
+.L93:
+	.word	-1,.L94,0,.L205-.L94
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L207:
+	.word	-1,.L94,.L225-.L94,.L226-.L94
+	.half	5
+	.byte	144,32,157,32,0
+	.word	.L6-.L94,.L227-.L94
+	.half	5
+	.byte	144,32,157,32,0
+	.word	.L4-.L94,.L3-.L94
+	.half	5
+	.byte	144,32,157,32,0
+	.word	0,0
+.L206:
+	.word	-1,.L94,0,.L205-.L94
+	.half	1
+	.byte	84
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_loc'
+.L103:
+	.word	-1,.L104,0,.L202-.L104
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L204:
+	.word	-1,.L104,.L294-.L104,.L202-.L104
+	.half	1
+	.byte	98
+	.word	0,0
+.L203:
+	.word	-1,.L104,0,.L294-.L104
+	.half	1
+	.byte	84
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_loc'
+.L101:
+	.word	-1,.L102,0,.L281-.L102
+	.half	2
+	.byte	138,0
+	.word	.L281-.L102,.L188-.L102
+	.half	2
+	.byte	138,8
+	.word	.L188-.L102,.L188-.L102
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L193:
+	.word	-1,.L102,0,.L282-.L102
+	.half	1
+	.byte	101
+	.word	.L284-.L102,.L188-.L102
+	.half	1
+	.byte	109
+	.word	.L288-.L102,.L286-.L102
+	.half	1
+	.byte	101
+	.word	.L290-.L102,.L48-.L102
+	.half	1
+	.byte	100
+	.word	0,0
+.L195:
+	.word	-1,.L102,0,.L282-.L102
+	.half	1
+	.byte	85
+	.word	.L285-.L102,.L188-.L102
+	.half	1
+	.byte	88
+	.word	.L289-.L102,.L286-.L102
+	.half	1
+	.byte	85
+	.word	.L291-.L102,.L48-.L102
+	.half	1
+	.byte	85
+	.word	0,0
+.L191:
+	.word	-1,.L102,0,.L282-.L102
+	.half	1
+	.byte	100
+	.word	.L283-.L102,.L188-.L102
+	.half	1
+	.byte	108
+	.word	.L287-.L102,.L286-.L102
+	.half	1
+	.byte	100
+	.word	0,0
+.L198:
+	.word	-1,.L102,.L286-.L102,.L46-.L102
+	.half	1
+	.byte	82
+	.word	.L48-.L102,.L292-.L102
+	.half	1
+	.byte	82
+	.word	.L52-.L102,.L293-.L102
+	.half	1
+	.byte	82
+	.word	0,0
+.L196:
+	.word	-1,.L102,.L282-.L102,.L286-.L102
+	.half	1
+	.byte	98
+	.word	.L46-.L102,.L48-.L102
+	.half	1
+	.byte	98
+	.word	0,0
+.L197:
+	.word	-1,.L102,0,.L188-.L102
+	.half	2
+	.byte	145,120
+	.word	0,0
+.L189:
+	.word	-1,.L102,0,.L282-.L102
+	.half	1
+	.byte	84
+	.word	0,0
+.L200:
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_Init')
+	.sect	'.debug_loc'
+.L95:
+	.word	-1,.L96,0,.L171-.L96
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L173:
+	.word	-1,.L96,0,.L228-.L96
+	.half	1
+	.byte	100
+	.word	.L229-.L96,.L171-.L96
+	.half	1
+	.byte	108
+	.word	0,0
+.L175:
+	.word	-1,.L96,.L230-.L96,.L10-.L96
+	.half	5
+	.byte	144,32,157,32,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_loc'
+.L111:
+	.word	-1,.L112,0,.L176-.L112
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L177:
+	.word	-1,.L112,.L309-.L112,.L310-.L112
+	.half	1
+	.byte	88
+	.word	.L85-.L112,.L84-.L112
+	.half	1
+	.byte	88
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_loc'
+.L107:
+	.word	-1,.L108,0,.L302-.L108
+	.half	2
+	.byte	138,0
+	.word	.L302-.L108,.L215-.L108
+	.half	2
+	.byte	138,8
+	.word	.L215-.L108,.L215-.L108
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L217:
+	.word	-1,.L108,.L304-.L108,.L75-.L108
+	.half	1
+	.byte	82
+	.word	.L73-.L108,.L72-.L108
+	.half	1
+	.byte	82
+	.word	0,0
+.L216:
+	.word	-1,.L108,0,.L70-.L108
+	.half	1
+	.byte	100
+	.word	.L303-.L108,.L215-.L108
+	.half	1
+	.byte	108
+	.word	0,0
+.L218:
+	.word	-1,.L108,0,.L215-.L108
+	.half	2
+	.byte	145,120
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_loc'
+.L105:
+	.word	-1,.L106,0,.L295-.L106
+	.half	2
+	.byte	138,0
+	.word	.L295-.L106,.L208-.L106
+	.half	2
+	.byte	138,16
+	.word	.L208-.L106,.L208-.L106
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L210:
+	.word	-1,.L106,0,.L208-.L106
+	.half	2
+	.byte	145,112
+	.word	0,0
+.L212:
+	.word	-1,.L106,0,.L208-.L106
+	.half	2
+	.byte	145,116
+	.word	0,0
+.L213:
+	.word	-1,.L106,.L299-.L106,.L60-.L106
+	.half	1
+	.byte	82
+	.word	.L300-.L106,.L66-.L106
+	.half	1
+	.byte	82
+	.word	.L64-.L106,.L301-.L106
+	.half	1
+	.byte	82
+	.word	0,0
+.L209:
+	.word	-1,.L106,0,.L296-.L106
+	.half	1
+	.byte	100
+	.word	.L297-.L106,.L298-.L106
+	.half	1
+	.byte	111
+	.word	0,0
+.L214:
+	.word	-1,.L106,0,.L208-.L106
+	.half	2
+	.byte	145,122
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_loc'
+.L109:
+	.word	-1,.L110,0,.L305-.L110
+	.half	2
+	.byte	138,0
+	.word	.L305-.L110,.L219-.L110
+	.half	2
+	.byte	138,8
+	.word	.L219-.L110,.L219-.L110
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L222:
+	.word	-1,.L110,0,.L219-.L110
+	.half	2
+	.byte	145,120
+	.word	0,0
+.L221:
+	.word	-1,.L110,.L308-.L110,.L79-.L110
+	.half	1
+	.byte	82
+	.word	0,0
+.L220:
+	.word	-1,.L110,0,.L306-.L110
+	.half	1
+	.byte	100
+	.word	.L307-.L110,.L219-.L110
+	.half	1
+	.byte	108
+	.word	0,0
+.L223:
+	.word	-1,.L110,0,.L219-.L110
+	.half	2
+	.byte	145,126
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_loc'
+.L97:
+	.word	-1,.L98,0,.L179-.L98
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L184:
+	.word	-1,.L98,.L236-.L98,.L237-.L98
+	.half	1
+	.byte	82
+	.word	.L19-.L98,.L240-.L98
+	.half	1
+	.byte	82
+	.word	.L243-.L98,.L244-.L98
+	.half	1
+	.byte	82
+	.word	.L21-.L98,.L251-.L98
+	.half	1
+	.byte	82
+	.word	.L25-.L98,.L263-.L98
+	.half	1
+	.byte	82
+	.word	.L23-.L98,.L32-.L98
+	.half	1
+	.byte	82
+	.word	0,0
+.L182:
+	.word	-1,.L98,.L231-.L98,.L232-.L98
+	.half	1
+	.byte	98
+	.word	.L233-.L98,.L234-.L98
+	.half	1
+	.byte	111
+	.word	.L235-.L98,.L236-.L98
+	.half	1
+	.byte	100
+	.word	.L238-.L98,.L239-.L98
+	.half	1
+	.byte	111
+	.word	.L19-.L98,.L241-.L98
+	.half	1
+	.byte	111
+	.word	.L240-.L98,.L242-.L98
+	.half	1
+	.byte	111
+	.word	.L245-.L98,.L246-.L98
+	.half	1
+	.byte	111
+	.word	.L247-.L98,.L248-.L98
+	.half	1
+	.byte	111
+	.word	.L249-.L98,.L250-.L98
+	.half	1
+	.byte	111
+	.word	.L21-.L98,.L252-.L98
+	.half	1
+	.byte	111
+	.word	.L253-.L98,.L254-.L98
+	.half	1
+	.byte	111
+	.word	.L255-.L98,.L256-.L98
+	.half	1
+	.byte	111
+	.word	.L257-.L98,.L258-.L98
+	.half	1
+	.byte	111
+	.word	.L259-.L98,.L260-.L98
+	.half	1
+	.byte	111
+	.word	.L261-.L98,.L262-.L98
+	.half	1
+	.byte	111
+	.word	.L264-.L98,.L265-.L98
+	.half	1
+	.byte	111
+	.word	.L24-.L98,.L266-.L98
+	.half	1
+	.byte	111
+	.word	.L267-.L98,.L268-.L98
+	.half	1
+	.byte	111
+	.word	.L29-.L98,.L269-.L98
+	.half	1
+	.byte	111
+	.word	.L270-.L98,.L271-.L98
+	.half	1
+	.byte	111
+	.word	.L272-.L98,.L273-.L98
+	.half	1
+	.byte	111
+	.word	.L274-.L98,.L32-.L98
+	.half	1
+	.byte	111
+	.word	0,0
+.L180:
+	.word	-1,.L98,0,.L231-.L98
+	.half	1
+	.byte	84
+	.word	0,0
+	.sdecl	'.debug_frame',debug
+	.sect	'.debug_frame'
+.L578:
+	.word	48
+	.word	-1
+	.byte	3,0,2,1,27,12,26,0,8,26,8,27,8,30,8,29,8,28,8,16,8,17,8,24,8,25,8,31,8,32,8,33,8,34,8,35,8,36,8,37,8,38
+	.byte	8,39
+	.sdecl	'.debug_frame',debug,cluster('SoAd_GetRuntime')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L578,.L94,.L205-.L94
+	.byte	8,19,8,20,8,21,8,22,8,23,0,0
+	.sdecl	'.debug_frame',debug,cluster('SoAd_Init')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L578,.L96,.L171-.L96
+	.sdecl	'.debug_frame',debug,cluster('SoAd_OpenSoCon')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L578,.L98,.L179-.L98
+	.sdecl	'.debug_frame',debug,cluster('SoAd_CloseSoCon')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L578,.L100,.L185-.L100
+	.sdecl	'.debug_frame',debug,cluster('SoAd_IfTransmit')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L578,.L102,.L188-.L102
+	.byte	4
+	.word	(.L281-.L102)/2
+	.byte	19,8,22,26,3,19,138,8,4
+	.word	(.L188-.L281)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('SoAd_GetSoConMode')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L578,.L104,.L202-.L104
+	.sdecl	'.debug_frame',debug,cluster('SoAd_MainTcpServer')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L578,.L106,.L208-.L106
+	.byte	4
+	.word	(.L295-.L106)/2
+	.byte	19,16,22,26,3,19,138,16,4
+	.word	(.L208-.L295)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('SoAd_MainTcpClient')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L578,.L108,.L215-.L108
+	.byte	4
+	.word	(.L302-.L108)/2
+	.byte	19,8,22,26,3,19,138,8,4
+	.word	(.L215-.L302)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('SoAd_MainUdp')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L578,.L110,.L219-.L110
+	.byte	4
+	.word	(.L305-.L110)/2
+	.byte	19,8,22,26,3,19,138,8,4
+	.word	(.L219-.L305)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('SoAd_MainFunction')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L578,.L112,.L176-.L112
+	; Module end

@@ -19,6 +19,9 @@ RM := rm -rf
 -include Libraries/iLLD/TC3xx/Tricore/Port/Io/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Pms/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Mtu/Std/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Gtm/Std/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Geth/Std/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Geth/Eth/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Flash/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Fce/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Fce/Crc/subdir.mk
@@ -63,6 +66,16 @@ RM := rm -rf
 -include BSW/Diag/Dcm/subdir.mk
 -include BSW/Com/PduR/subdir.mk
 -include BSW/Com/Lin/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/port/src/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/ppp/polarssl/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/ppp/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core/ipv6/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core/ipv4/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/api/subdir.mk
+-include BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk
+-include BSW/Com/Ethernet/subdir.mk
 -include BSW/Com/CanTp/subdir.mk
 -include BSW/Com/CanSM/subdir.mk
 -include BSW/Com/CanIf/subdir.mk
@@ -124,7 +137,7 @@ all: main-build
 main-build: ZGW_APP.elf secondary-outputs
 
 dependents:
-	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) clean all
+	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) all
 
 # Tool invocations
 ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)/SCR_AURIX_TC3x" makefile $(OPTIONAL_TOOL_DEPS) .ZGW_APP.elf.opt

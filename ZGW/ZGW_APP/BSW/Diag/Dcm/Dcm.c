@@ -259,7 +259,7 @@ static uint32 Dcm_SecCalcKey(uint32 seed, uint8 level);
 
 /* ===================== Default config ===================== */
 
-static const Dcm_ServiceType Dcm_DefaultServices[] =
+const Dcm_ServiceType Dcm_DefaultServices[] =
 {
         { DCM_SID_DIAGNOSTIC_SESSION_CONTROL, Dcm_Service_0x10 },
         { DCM_SID_ECU_RESET,                  Dcm_Service_0x11 },
@@ -298,24 +298,6 @@ static const Dcm_ServiceAccessType Dcm_ServiceAccessTable[] =
         { DCM_SID_REQUEST_TRANSFER_EXIT,      DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_TESTER_PRESENT,             DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED, DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_CONTROL_DTC_SETTING,        DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 }
-};
-
-static const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
-{
-        { 0u, 1u, 0x710u, 0x718u, DCM_ADDR_PHYSICAL,   DCM_BUS_CAN_CLASSIC },
-        { 2u, 3u, 0x711u, 0x719u, DCM_ADDR_PHYSICAL,   DCM_BUS_CAN_FD      },
-        { 4u, 5u, 0x712u, 0x71Au, DCM_ADDR_PHYSICAL,   DCM_BUS_ETHERNET    },
-        { 6u, 7u, 0x713u, 0x71Bu, DCM_ADDR_PHYSICAL,   DCM_BUS_LIN         },
-        { 8u, 9u, 0x7DFu, 0x718u, DCM_ADDR_FUNCTIONAL, DCM_BUS_CAN_CLASSIC },
-        {10u,11u, 0x7E0u, 0x719u, DCM_ADDR_FUNCTIONAL, DCM_BUS_CAN_FD      }
-};
-
-const Dcm_ConfigType Dcm_Config =
-{
-        Dcm_DefaultConnections,
-        (uint8)(sizeof(Dcm_DefaultConnections) / sizeof(Dcm_DefaultConnections[0])),
-        Dcm_DefaultServices,
-        (uint8)(sizeof(Dcm_DefaultServices) / sizeof(Dcm_DefaultServices[0]))
 };
 
 /* ===================== API ===================== */
@@ -1823,4 +1805,10 @@ DCM_WEAK Dcm_ReturnType DcmAppl_RequestTransferExit(
 
     *respLen = 0u;
     return DCM_E_OK;
+}
+
+uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len)
+{
+    (void)len;
+    return NULL;
 }

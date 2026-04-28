@@ -1,0 +1,42 @@
+#include "Dcm.h"
+#include "Dcm_Cfg.h"
+
+const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
+{
+    {
+        DCM_RX_CAN_PHYS,
+        DCM_TX_CAN_PHYS,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN
+    },
+    {
+        DCM_RX_CAN_FUNC,
+        DCM_TX_CAN_FUNC,
+        DCM_ADDR_FUNCTIONAL,
+        DCM_BUS_CAN
+    },
+    {
+        DCM_RX_CANFD_PHYS,
+        DCM_TX_CANFD_PHYS,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CANFD
+    },
+    {
+        DCM_RX_CANFD_FUNC,
+        DCM_TX_CANFD_FUNC,
+        DCM_ADDR_FUNCTIONAL,
+        DCM_BUS_CANFD
+    },
+    {
+        DCM_RX_LIN_PHYS,
+        DCM_TX_LIN_PHYS,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_LIN
+    }
+};
+
+const Dcm_ConfigType Dcm_Config =
+{
+    Dcm_DefaultConnections,
+    (uint16)(sizeof(Dcm_DefaultConnections) / sizeof(Dcm_DefaultConnections[0]))
+};

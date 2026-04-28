@@ -49,7 +49,9 @@ static const PduR_TxRouteType PduR_DcmTxRoutes[] =
 {
     { 0u, 0u, PDUR_BUS_CAN },
     { 1u, 1u, PDUR_BUS_CAN },
-    { 2u, 2u, PDUR_BUS_LIN }
+    { 2u, 2u, PDUR_BUS_CAN },
+    { 3u, 3u, PDUR_BUS_CAN },
+    { 4u, 4u, PDUR_BUS_LIN }
 };
 
 static PduR_TpBufferType PduR_CanTpRxBuf[PDUR_MAX_CANTP_ROUTES];
@@ -102,12 +104,72 @@ static const PduR_TxRouteType* PduR_FindDcmTxRoute(PduIdType upperTxPduId)
     return NULL_PTR;
 }
 
+/* PduR.c */
+
+static uint8 PduR_DcmRxPduExists(PduIdType id)
+{
+    uint16 i;
+
+    for (i = 0u; i < Dcm_Config.numConnections; i++)
+    {
+        if (Dcm_Config.connections[i].rxPduId == id)
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
+static uint8 PduR_DcmTxPduExists(PduIdType id)
+{
+    uint16 i;
+
+    for (i = 0u; i < Dcm_Config.numConnections; i++)
+    {
+        if (Dcm_Config.connections[i].txPduId == id)
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
 void PduR_Init(void)
 {
-    memset(PduR_CanTpRxBuf, 0, sizeof(PduR_CanTpRxBuf));
-    memset(PduR_LinTpRxBuf, 0, sizeof(PduR_LinTpRxBuf));
+    uint16 i;
+
+    PduR_Initialized = FALSE;
+
+    for (i = 0u; i < (uint16)(sizeof(PduR_CanTpRxRoutes) / sizeof(PduR_CanTpRxRoutes[0])); i++)
+    {
+        if (PduR_DcmRxPduExists(PduR_CanTpRxRoutes[i].upperRxPduId) == FALSE)
+        {
+            return;
+        }
+    }
+
+    for (i = 0u; i < (uint16)(sizeof(PduR_LinTpRxRoutes) / sizeof(PduR_LinTpRxRoutes[0])); i++)
+    {
+        if (PduR_DcmRxPduExists(PduR_LinTpRxRoutes[i].upperRxPduId) == FALSE)
+        {
+            return;
+        }
+    }
+
+    for (i = 0u; i < (uint16)(sizeof(PduR_DcmTxRoutes) / sizeof(PduR_DcmTxRoutes[0])); i++)
+    {
+        if (PduR_DcmTxPduExists(PduR_DcmTxRoutes[i].upperTxPduId) == FALSE)
+        {
+            return;
+        }
+    }
+
     PduR_Initialized = TRUE;
 }
+
+
 
 Std_ReturnType PduR_ComTransmit(PduIdType TxPduId, const uint8* data, PduLengthType len)
 {

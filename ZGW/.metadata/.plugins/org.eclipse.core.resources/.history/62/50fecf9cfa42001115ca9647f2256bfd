@@ -1,0 +1,41 @@
+/* Dcm_Cfg.c */
+
+const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
+{
+    {
+        .rxPduId = DCM_RX_CAN_PHYS,
+        .txPduId = DCM_TX_CAN_PHYS,
+        .addressing = DCM_ADDR_PHYSICAL,
+        .busType = DCM_BUS_CAN
+    },
+    {
+        .rxPduId = DCM_RX_CAN_FUNC,
+        .txPduId = DCM_TX_CAN_FUNC,
+        .addressing = DCM_ADDR_FUNCTIONAL,
+        .busType = DCM_BUS_CAN
+    },
+    {
+        .rxPduId = DCM_RX_CANFD_PHYS,
+        .txPduId = DCM_TX_CANFD_PHYS,
+        .addressing = DCM_ADDR_PHYSICAL,
+        .busType = DCM_BUS_CANFD
+    },
+    {
+        .rxPduId = DCM_RX_CANFD_FUNC,
+        .txPduId = DCM_TX_CANFD_FUNC,
+        .addressing = DCM_ADDR_FUNCTIONAL,
+        .busType = DCM_BUS_CANFD
+    },
+    {
+        .rxPduId = DCM_RX_LIN_PHYS,
+        .txPduId = DCM_TX_LIN_PHYS,
+        .addressing = DCM_ADDR_PHYSICAL,
+        .busType = DCM_BUS_LIN
+    }
+};
+
+const Dcm_ConfigType Dcm_Config =
+{
+    .connections = Dcm_DefaultConnections,
+    .numConnections = sizeof(Dcm_DefaultConnections) / sizeof(Dcm_DefaultConnections[0])
+};

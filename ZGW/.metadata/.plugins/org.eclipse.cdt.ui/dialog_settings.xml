@@ -15,6 +15,10 @@
 		<item key="caseSensitive" value="false"/>
 		<item key="searchFlags" value="227191"/>
 		<list key="previousPatterns">
+			<item value="xTaskHandle"/>
+			<item value="INCLUDE_vTaskDelay_core2"/>
+			<item value="vTaskDelay"/>
+			<item value="configSUPPORT_DYNAMIC_ALLOCATION"/>
 			<item value="IfxAsclin_Lin_initModuleConfig"/>
 			<item value="CanSM_RequestComMode"/>
 			<item value="IfxStm"/>

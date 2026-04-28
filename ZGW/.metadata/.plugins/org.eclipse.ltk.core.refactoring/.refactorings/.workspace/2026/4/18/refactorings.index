@@ -1,1 +1,4 @@
 1777273441432	Delete resource 'ZGW_APP/BSW/Sys/Bsw_Wrapper'
+1777378126820	Delete resource 'ZGW_APP/BSW/Com/PduR/PduR_Cfg.c'
+1777379823393	Delete resource 'ZGW_APP/BSW/Com/Ethernet/TcpIp'
+1777410806189	Delete resource 'ZGW_APP/BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/slipif.c'

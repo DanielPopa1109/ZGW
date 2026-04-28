@@ -4,8 +4,8 @@
 #include "ComStack_Types.h"
 
 #define PDUR_MAX_TP_BUFFER      4095u
-#define PDUR_MAX_CANTP_ROUTES   4u
-#define PDUR_MAX_LINTP_ROUTES   2u
+#define PDUR_MAX_CANTP_ROUTES        4u
+#define PDUR_MAX_LINTP_ROUTES        1u
 
 void PduR_Init(void);
 

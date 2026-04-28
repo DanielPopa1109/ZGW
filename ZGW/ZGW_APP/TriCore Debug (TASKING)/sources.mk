@@ -35,6 +35,16 @@ BSW/Com/CanIf \
 BSW/Com/CanSM \
 BSW/Com/CanTp \
 BSW/Com \
+BSW/Com/Ethernet \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/api \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core/ipv4 \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core/ipv6 \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/ppp \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/ppp/polarssl \
+BSW/Com/Ethernet/GETH_LWIP_ILLD \
+BSW/Com/Ethernet/GETH_LWIP_ILLD/port/src \
 BSW/Com/Lin \
 BSW/Com/PduR \
 BSW/Diag/Dcm \
@@ -80,6 +90,9 @@ Libraries/iLLD/TC3xx/Tricore/Evadc/Std \
 Libraries/iLLD/TC3xx/Tricore/Fce/Crc \
 Libraries/iLLD/TC3xx/Tricore/Fce/Std \
 Libraries/iLLD/TC3xx/Tricore/Flash/Std \
+Libraries/iLLD/TC3xx/Tricore/Geth/Eth \
+Libraries/iLLD/TC3xx/Tricore/Geth/Std \
+Libraries/iLLD/TC3xx/Tricore/Gtm/Std \
 Libraries/iLLD/TC3xx/Tricore/Mtu/Std \
 Libraries/iLLD/TC3xx/Tricore/Pms/Std \
 Libraries/iLLD/TC3xx/Tricore/Port/Io \

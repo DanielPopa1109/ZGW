@@ -9,10 +9,20 @@ typedef enum
     CANTP_DIR_TX
 } CanTp_DirectionType;
 
+typedef enum
+{
+    CANTP_TXFRAME_NONE = 0u,
+    CANTP_TXFRAME_SF,
+    CANTP_TXFRAME_FF,
+    CANTP_TXFRAME_CF,
+    CANTP_TXFRAME_FC
+} CanTp_TxFrameType;
+
 typedef struct
 {
     CanTp_StateType state;
     CanTp_DirectionType direction;
+    CanTp_TimerType timerType;
 
     PduLengthType rxLen;
     PduLengthType rxExpectedLen;
@@ -29,6 +39,7 @@ typedef struct
     uint8 txStTimer;
     uint8 txWaitFrameCounter;
     uint8 txBusy;
+    CanTp_TxFrameType pendingTxFrame;
 
     uint16 timer;
 } CanTp_ChannelStateType;
@@ -36,9 +47,9 @@ typedef struct
 static const CanTp_ChannelConfigType CanTp_ChannelConfig[] =
 {
     { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, 0u, 0u, CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0xAAu },
-    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 0u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu },
-    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 1u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu },
-    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 1u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu }
+    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 1u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 2u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu },
+    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 3u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu }
 };
 
 const CanTp_ConfigType CanTp_Config =
@@ -49,6 +60,32 @@ const CanTp_ConfigType CanTp_Config =
 
 static const CanTp_ConfigType* CanTp_ConfigPtr;
 static CanTp_ChannelStateType CanTp_Channel[CANTP_MAX_CHANNELS];
+
+static uint16 CanTp_GetTimerTicks(CanTp_TimerType timer)
+{
+    switch (timer)
+    {
+        case CANTP_TIMER_N_AS: return (uint16)CANTP_N_AS_TICKS;
+        case CANTP_TIMER_N_AR: return (uint16)CANTP_N_AR_TICKS;
+        case CANTP_TIMER_N_BS: return (uint16)CANTP_N_BS_TICKS;
+        case CANTP_TIMER_N_BR: return (uint16)CANTP_N_BR_TICKS;
+        case CANTP_TIMER_N_CS: return (uint16)CANTP_N_CS_TICKS;
+        case CANTP_TIMER_N_CR: return (uint16)CANTP_N_CR_TICKS;
+        default: return 0u;
+    }
+}
+
+static void CanTp_StartTimer(uint8 ch, CanTp_TimerType timer)
+{
+    CanTp_Channel[ch].timerType = timer;
+    CanTp_Channel[ch].timer = CanTp_GetTimerTicks(timer);
+}
+
+static void CanTp_StopTimer(uint8 ch)
+{
+    CanTp_Channel[ch].timerType = CANTP_TIMER_NONE;
+    CanTp_Channel[ch].timer = 0u;
+}
 
 static uint8 CanTp_IsConfigValid(void)
 {
@@ -111,7 +148,7 @@ static uint8 CanTp_FindTxChannelByUpper(PduIdType upperTxPduId)
     return 0xFFu;
 }
 
-static uint8 CanTp_FindTxChannelByCanIf(PduIdType txPduId)
+static uint8 CanTp_FindChannelByCanIfTx(PduIdType txPduId)
 {
     uint8 i;
 
@@ -122,7 +159,8 @@ static uint8 CanTp_FindTxChannelByCanIf(PduIdType txPduId)
 
     for (i = 0u; i < CanTp_ConfigPtr->numChannels; i++)
     {
-        if (CanTp_ConfigPtr->channels[i].txPduId == txPduId)
+        if ((CanTp_ConfigPtr->channels[i].txPduId == txPduId) &&
+            (CanTp_Channel[i].txBusy == TRUE))
         {
             return i;
         }
@@ -143,7 +181,43 @@ static uint8 CanTp_StMinToTicks(uint8 stMin)
         return 1u;
     }
 
-    return 1u;
+    return 0xFFu;
+}
+
+static Std_ReturnType CanTp_ValidateFlowControl(const uint8* data, PduLengthType len)
+{
+    uint8 fs;
+    uint8 stMin;
+
+    if ((data == NULL_PTR) || (len < 3u))
+    {
+        return E_NOT_OK;
+    }
+
+    if ((data[0] & 0xF0u) != CANTP_NPCI_FC)
+    {
+        return E_NOT_OK;
+    }
+
+    fs = data[0] & 0x0Fu;
+    stMin = data[2];
+
+    if (fs > CANTP_FS_OVFLW)
+    {
+        return E_NOT_OK;
+    }
+
+    if ((stMin >= 0x80u) && (stMin <= 0xF0u))
+    {
+        return E_NOT_OK;
+    }
+
+    if (stMin > 0xF9u)
+    {
+        return E_NOT_OK;
+    }
+
+    return E_OK;
 }
 
 static void CanTp_ResetChannel(uint8 ch)
@@ -153,6 +227,8 @@ static void CanTp_ResetChannel(uint8 ch)
         memset(&CanTp_Channel[ch], 0, sizeof(CanTp_Channel[ch]));
         CanTp_Channel[ch].state = CANTP_IDLE;
         CanTp_Channel[ch].direction = CANTP_DIR_NONE;
+        CanTp_Channel[ch].timerType = CANTP_TIMER_NONE;
+        CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
     }
 }
 
@@ -191,7 +267,21 @@ static Std_ReturnType CanTp_SendFc(uint8 ch, uint8 fs)
     frame[1] = cfg->blockSize;
     frame[2] = cfg->stMinMs;
 
-    return CanIf_Transmit(cfg->txPduId, frame, cfg->canDl);
+    CanTp_Channel[ch].txBusy = TRUE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_FC;
+    CanTp_Channel[ch].state = CANTP_RX_WAIT_FC_TX_CONFIRM;
+    CanTp_Channel[ch].direction = CANTP_DIR_RX;
+    CanTp_StartTimer(ch, CANTP_TIMER_N_AR);
+
+    if (CanIf_Transmit(cfg->txPduId, frame, cfg->canDl) != E_OK)
+    {
+        CanTp_Channel[ch].txBusy = FALSE;
+        CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
+        CanTp_ResetChannel(ch);
+        return E_NOT_OK;
+    }
+
+    return E_OK;
 }
 
 static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
@@ -199,11 +289,6 @@ static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
     uint8 frame[64u];
     uint8 len;
     const CanTp_ChannelConfigType* cfg;
-
-    if ((CanTp_IsConfigValid() == FALSE) || (ch >= CanTp_ConfigPtr->numChannels))
-    {
-        return E_NOT_OK;
-    }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
     len = (uint8)CanTp_Channel[ch].txLen;
@@ -237,8 +322,9 @@ static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
 
     CanTp_Channel[ch].state = CANTP_TX_WAIT_CONFIRM;
     CanTp_Channel[ch].direction = CANTP_DIR_TX;
-    CanTp_Channel[ch].timer = CANTP_N_AS_TICKS;
     CanTp_Channel[ch].txBusy = TRUE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_SF;
+    CanTp_StartTimer(ch, CANTP_TIMER_N_AS);
 
     if (CanIf_Transmit(cfg->txPduId, frame, cfg->canDl) != E_OK)
     {
@@ -253,13 +339,7 @@ static Std_ReturnType CanTp_SendFirstFrame(uint8 ch)
 {
     uint8 frame[64u];
     uint8 payloadInFf;
-    PduLengthType remaining;
     const CanTp_ChannelConfigType* cfg;
-
-    if ((CanTp_IsConfigValid() == FALSE) || (ch >= CanTp_ConfigPtr->numChannels))
-    {
-        return E_NOT_OK;
-    }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
 
@@ -273,22 +353,17 @@ static Std_ReturnType CanTp_SendFirstFrame(uint8 ch)
     frame[0] = (uint8)(CANTP_NPCI_FF | ((CanTp_Channel[ch].txLen >> 8u) & 0x0Fu));
     frame[1] = (uint8)(CanTp_Channel[ch].txLen & 0xFFu);
 
-    remaining = CanTp_Channel[ch].txLen;
     payloadInFf = (uint8)(cfg->canDl - 2u);
-
-    if (remaining < payloadInFf)
-    {
-        payloadInFf = (uint8)remaining;
-    }
 
     memcpy(&frame[2], CanTp_Channel[ch].txBuffer, payloadInFf);
 
     CanTp_Channel[ch].txOffset = payloadInFf;
     CanTp_Channel[ch].txSn = 1u;
-    CanTp_Channel[ch].state = CANTP_TX_WAIT_FC;
+    CanTp_Channel[ch].state = CANTP_TX_WAIT_CONFIRM;
     CanTp_Channel[ch].direction = CANTP_DIR_TX;
-    CanTp_Channel[ch].timer = CANTP_N_BS_TICKS;
     CanTp_Channel[ch].txBusy = TRUE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_FF;
+    CanTp_StartTimer(ch, CANTP_TIMER_N_AS);
 
     if (CanIf_Transmit(cfg->txPduId, frame, cfg->canDl) != E_OK)
     {
@@ -307,12 +382,12 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
     uint8 copy;
     const CanTp_ChannelConfigType* cfg;
 
-    if ((CanTp_IsConfigValid() == FALSE) || (ch >= CanTp_ConfigPtr->numChannels))
+    if (CanTp_Channel[ch].txBusy == TRUE)
     {
         return E_NOT_OK;
     }
 
-    if ((CanTp_Channel[ch].txBusy == TRUE) || (CanTp_Channel[ch].txStTimer > 0u))
+    if (CanTp_Channel[ch].txStTimer > 0u)
     {
         return E_NOT_OK;
     }
@@ -334,16 +409,24 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
 
     memcpy(&frame[1], &CanTp_Channel[ch].txBuffer[CanTp_Channel[ch].txOffset], copy);
 
+    CanTp_Channel[ch].txBusy = TRUE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_CF;
+    CanTp_Channel[ch].state = CANTP_TX_WAIT_CONFIRM;
+    CanTp_Channel[ch].direction = CANTP_DIR_TX;
+    CanTp_StartTimer(ch, CANTP_TIMER_N_AS);
+
     if (CanIf_Transmit(cfg->txPduId, frame, cfg->canDl) != E_OK)
     {
+        CanTp_Channel[ch].txBusy = FALSE;
+        CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
+        CanTp_Channel[ch].state = CANTP_TX_CF;
+        CanTp_StartTimer(ch, CANTP_TIMER_N_CS);
         return E_NOT_OK;
     }
 
     CanTp_Channel[ch].txOffset = (PduLengthType)(CanTp_Channel[ch].txOffset + copy);
     CanTp_Channel[ch].txSn = (uint8)((CanTp_Channel[ch].txSn + 1u) & 0x0Fu);
     CanTp_Channel[ch].txBlockCounter++;
-    CanTp_Channel[ch].txBusy = TRUE;
-    CanTp_Channel[ch].timer = CANTP_N_AS_TICKS;
 
     return E_OK;
 }
@@ -378,6 +461,7 @@ Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLeng
     CanTp_Channel[ch].txStTimer = 0u;
     CanTp_Channel[ch].txWaitFrameCounter = 0u;
     CanTp_Channel[ch].txBusy = FALSE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
     CanTp_Channel[ch].direction = CANTP_DIR_TX;
 
     sfMax = (CanTp_ConfigPtr->channels[ch].canDl <= 8u) ? 7u : 62u;
@@ -460,31 +544,20 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
 
     cfg = &CanTp_ConfigPtr->channels[ch];
 
-    if (len < 2u)
+    if ((len < 3u) || (cfg->addressingType == CANTP_ADDR_FUNCTIONAL))
     {
         return;
     }
 
     totalLen = (PduLengthType)((((PduLengthType)data[0] & 0x0Fu) << 8u) | data[1]);
 
-    if ((totalLen == 0u) || (totalLen > CANTP_MAX_PAYLOAD_LEN))
+    if ((totalLen <= 7u) || (totalLen > CANTP_MAX_PAYLOAD_LEN))
     {
         (void)CanTp_SendFc(ch, CANTP_FS_OVFLW);
         return;
     }
 
-    if (cfg->addressingType == CANTP_ADDR_FUNCTIONAL)
-    {
-        return;
-    }
-
     payload = (uint8)(len - 2u);
-
-    if (payload == 0u)
-    {
-        return;
-    }
-
     copy = (totalLen > payload) ? payload : (uint8)totalLen;
 
     if (PduR_CanTpStartOfReception(cfg->upperRxPduId, totalLen) != E_OK)
@@ -496,6 +569,7 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
     if (PduR_CanTpCopyRxData(cfg->upperRxPduId, &data[2], copy) != E_OK)
     {
         PduR_CanTpRxIndication(cfg->upperRxPduId, E_NOT_OK);
+        CanTp_ResetChannel(ch);
         return;
     }
 
@@ -503,9 +577,8 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
     CanTp_Channel[ch].rxLen = copy;
     CanTp_Channel[ch].rxNextSn = 1u;
     CanTp_Channel[ch].rxBlockCounter = 0u;
-    CanTp_Channel[ch].state = CANTP_RX_IN_PROGRESS;
     CanTp_Channel[ch].direction = CANTP_DIR_RX;
-    CanTp_Channel[ch].timer = CANTP_N_CR_TICKS;
+    CanTp_StartTimer(ch, CANTP_TIMER_N_BR);
 
     (void)CanTp_SendFc(ch, CANTP_FS_CTS);
 }
@@ -555,7 +628,6 @@ static void CanTp_HandleConsecutiveFrame(uint8 ch, const uint8* data, PduLengthT
     CanTp_Channel[ch].rxLen = (PduLengthType)(CanTp_Channel[ch].rxLen + copy);
     CanTp_Channel[ch].rxNextSn = (uint8)((CanTp_Channel[ch].rxNextSn + 1u) & 0x0Fu);
     CanTp_Channel[ch].rxBlockCounter++;
-    CanTp_Channel[ch].timer = CANTP_N_CR_TICKS;
 
     if (CanTp_Channel[ch].rxLen >= CanTp_Channel[ch].rxExpectedLen)
     {
@@ -565,24 +637,32 @@ static void CanTp_HandleConsecutiveFrame(uint8 ch, const uint8* data, PduLengthT
     else if ((cfg->blockSize != 0u) && (CanTp_Channel[ch].rxBlockCounter >= cfg->blockSize))
     {
         CanTp_Channel[ch].rxBlockCounter = 0u;
+        CanTp_StartTimer(ch, CANTP_TIMER_N_BR);
         (void)CanTp_SendFc(ch, CANTP_FS_CTS);
+    }
+    else
+    {
+        CanTp_StartTimer(ch, CANTP_TIMER_N_CR);
     }
 }
 
 static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType len)
 {
     uint8 fs;
+    uint8 ticks;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
 
-    if (len < 3u)
+    if (CanTp_Channel[ch].state != CANTP_TX_WAIT_FC)
     {
         return;
     }
 
-    if (CanTp_Channel[ch].state != CANTP_TX_WAIT_FC)
+    if (CanTp_ValidateFlowControl(data, len) != E_OK)
     {
+        PduR_CanTpTxConfirmation(cfg->upperTxPduId, E_NOT_OK);
+        CanTp_ResetChannel(ch);
         return;
     }
 
@@ -590,12 +670,23 @@ static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType l
 
     if (fs == CANTP_FS_CTS)
     {
+        ticks = CanTp_StMinToTicks(data[2]);
+
+        if (ticks == 0xFFu)
+        {
+            PduR_CanTpTxConfirmation(cfg->upperTxPduId, E_NOT_OK);
+            CanTp_ResetChannel(ch);
+            return;
+        }
+
         CanTp_Channel[ch].txBlockSize = data[1];
-        CanTp_Channel[ch].txStMinTicks = CanTp_StMinToTicks(data[2]);
+        CanTp_Channel[ch].txStMinTicks = ticks;
         CanTp_Channel[ch].txBlockCounter = 0u;
+        CanTp_Channel[ch].txWaitFrameCounter = 0u;
         CanTp_Channel[ch].state = CANTP_TX_CF;
         CanTp_Channel[ch].direction = CANTP_DIR_TX;
-        CanTp_Channel[ch].timer = CANTP_N_CS_TICKS;
+        CanTp_Channel[ch].txStTimer = ticks;
+        CanTp_StartTimer(ch, CANTP_TIMER_N_CS);
     }
     else if (fs == CANTP_FS_WAIT)
     {
@@ -608,10 +699,10 @@ static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType l
         }
         else
         {
-            CanTp_Channel[ch].timer = CANTP_N_BS_TICKS;
+            CanTp_StartTimer(ch, CANTP_TIMER_N_BS);
         }
     }
-    else if (fs == CANTP_FS_OVFLW)
+    else
     {
         PduR_CanTpTxConfirmation(cfg->upperTxPduId, E_NOT_OK);
         CanTp_ResetChannel(ch);
@@ -666,13 +757,14 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
 {
     uint8 ch;
     const CanTp_ChannelConfigType* cfg;
+    CanTp_TxFrameType confirmedFrame;
 
     if (CanTp_IsConfigValid() == FALSE)
     {
         return;
     }
 
-    ch = CanTp_FindTxChannelByCanIf(CanIfTxPduId);
+    ch = CanTp_FindChannelByCanIfTx(CanIfTxPduId);
 
     if (ch >= CanTp_ConfigPtr->numChannels)
     {
@@ -680,18 +772,29 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
     }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-    CanTp_Channel[ch].txBusy = FALSE;
 
-    if (CanTp_Channel[ch].state == CANTP_TX_WAIT_CONFIRM)
+    confirmedFrame = CanTp_Channel[ch].pendingTxFrame;
+    CanTp_Channel[ch].txBusy = FALSE;
+    CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
+
+    if (confirmedFrame == CANTP_TXFRAME_FC)
+    {
+        CanTp_Channel[ch].state = CANTP_RX_IN_PROGRESS;
+        CanTp_Channel[ch].direction = CANTP_DIR_RX;
+        CanTp_StartTimer(ch, CANTP_TIMER_N_CR);
+    }
+    else if (confirmedFrame == CANTP_TXFRAME_SF)
     {
         PduR_CanTpTxConfirmation(cfg->upperTxPduId, E_OK);
         CanTp_ResetChannel(ch);
     }
-    else if (CanTp_Channel[ch].state == CANTP_TX_WAIT_FC)
+    else if (confirmedFrame == CANTP_TXFRAME_FF)
     {
-        CanTp_Channel[ch].timer = CANTP_N_BS_TICKS;
+        CanTp_Channel[ch].state = CANTP_TX_WAIT_FC;
+        CanTp_Channel[ch].direction = CANTP_DIR_TX;
+        CanTp_StartTimer(ch, CANTP_TIMER_N_BS);
     }
-    else if (CanTp_Channel[ch].state == CANTP_TX_CF)
+    else if (confirmedFrame == CANTP_TXFRAME_CF)
     {
         if (CanTp_Channel[ch].txOffset >= CanTp_Channel[ch].txLen)
         {
@@ -702,12 +805,13 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
                  (CanTp_Channel[ch].txBlockCounter >= CanTp_Channel[ch].txBlockSize))
         {
             CanTp_Channel[ch].state = CANTP_TX_WAIT_FC;
-            CanTp_Channel[ch].timer = CANTP_N_BS_TICKS;
+            CanTp_StartTimer(ch, CANTP_TIMER_N_BS);
         }
         else
         {
+            CanTp_Channel[ch].state = CANTP_TX_CF;
             CanTp_Channel[ch].txStTimer = CanTp_Channel[ch].txStMinTicks;
-            CanTp_Channel[ch].timer = CANTP_N_CS_TICKS;
+            CanTp_StartTimer(ch, CANTP_TIMER_N_CS);
         }
     }
 }

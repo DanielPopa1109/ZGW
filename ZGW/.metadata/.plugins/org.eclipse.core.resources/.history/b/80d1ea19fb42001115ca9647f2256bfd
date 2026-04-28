@@ -1,0 +1,413 @@
+#include "PduR.h"
+#include "CanIf.h"
+#include "CanTp.h"
+#include "LinTp.h"
+#include "Dcm.h"
+#include <string.h>
+
+typedef enum
+{
+    PDUR_BUS_CAN = 0u,
+    PDUR_BUS_LIN = 1u
+} PduR_BusType;
+
+typedef struct
+{
+    PduIdType lowerRxPduId;
+    PduIdType upperRxPduId;
+} PduR_RxRouteType;
+
+typedef struct
+{
+    PduIdType upperTxPduId;
+    PduIdType lowerTxPduId;
+    PduR_BusType bus;
+} PduR_TxRouteType;
+
+typedef struct
+{
+    uint8 buffer[PDUR_MAX_TP_BUFFER];
+    PduLengthType expectedLen;
+    PduLengthType offset;
+    uint8 active;
+} PduR_TpBufferType;
+
+static const PduR_RxRouteType PduR_CanTpRxRoutes[] =
+{
+    { 0u, 0u },
+    { 1u, 1u },
+    { 2u, 2u },
+    { 3u, 3u }
+};
+
+static const PduR_RxRouteType PduR_LinTpRxRoutes[] =
+{
+    { 4u, 4u }
+};;
+
+static const PduR_TxRouteType PduR_DcmTxRoutes[] =
+{
+    { 0u, 0u, PDUR_BUS_CAN },
+    { 1u, 1u, PDUR_BUS_CAN },
+    { 2u, 2u, PDUR_BUS_CAN },
+    { 3u, 3u, PDUR_BUS_CAN },
+    { 4u, 4u, PDUR_BUS_LIN }
+};
+static PduR_TpBufferType PduR_CanTpRxBuf[PDUR_MAX_CANTP_ROUTES];
+static PduR_TpBufferType PduR_LinTpRxBuf[PDUR_MAX_LINTP_ROUTES];
+
+static uint8 PduR_Initialized;
+
+static uint8 PduR_FindCanTpRxRoute(PduIdType lowerRxPduId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(PduR_CanTpRxRoutes) / sizeof(PduR_CanTpRxRoutes[0])); i++)
+    {
+        if (PduR_CanTpRxRoutes[i].lowerRxPduId == lowerRxPduId)
+        {
+            return i;
+        }
+    }
+
+    return 0xFFu;
+}
+
+static uint8 PduR_FindLinTpRxRoute(PduIdType lowerRxPduId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(PduR_LinTpRxRoutes) / sizeof(PduR_LinTpRxRoutes[0])); i++)
+    {
+        if (PduR_LinTpRxRoutes[i].lowerRxPduId == lowerRxPduId)
+        {
+            return i;
+        }
+    }
+
+    return 0xFFu;
+}
+
+static const PduR_TxRouteType* PduR_FindDcmTxRoute(PduIdType upperTxPduId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(PduR_DcmTxRoutes) / sizeof(PduR_DcmTxRoutes[0])); i++)
+    {
+        if (PduR_DcmTxRoutes[i].upperTxPduId == upperTxPduId)
+        {
+            return &PduR_DcmTxRoutes[i];
+        }
+    }
+
+    return NULL_PTR;
+}
+
+/* PduR.c */
+
+static uint8 PduR_DcmRxPduExists(PduIdType id)
+{
+    uint16 i;
+
+    for (i = 0u; i < Dcm_Config.numConnections; i++)
+    {
+        if (Dcm_Config.connections[i].rxPduId == id)
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
+static uint8 PduR_DcmTxPduExists(PduIdType id)
+{
+    uint16 i;
+
+    for (i = 0u; i < Dcm_Config.numConnections; i++)
+    {
+        if (Dcm_Config.connections[i].txPduId == id)
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
+void PduR_Init(void)
+{
+    uint16 i;
+
+    PduR_Initialized = 0u;
+
+    for (i = 0u; i < PDUR_CANTP_RX_ROUTE_COUNT; i++)
+    {
+        if (PduR_DcmRxPduExists(PduR_CanTpRxRoutes[i].upperRxPduId) == 0u)
+        {
+            return;
+        }
+    }
+
+    for (i = 0u; i < PDUR_DCM_TX_ROUTE_COUNT; i++)
+    {
+        if (PduR_DcmTxPduExists(PduR_DcmTxRoutes[i].upperTxPduId) == 0u)
+        {
+            return;
+        }
+    }
+
+    PduR_Initialized = 1u;
+}
+
+
+
+Std_ReturnType PduR_ComTransmit(PduIdType TxPduId, const uint8* data, PduLengthType len)
+{
+    if ((PduR_Initialized == FALSE) || (data == NULL_PTR) || (len == 0u))
+    {
+        return E_NOT_OK;
+    }
+
+    return CanIf_Transmit(TxPduId, data, len);
+}
+
+Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId, const uint8* data, PduLengthType len)
+{
+    const PduR_TxRouteType* route;
+
+    if ((PduR_Initialized == FALSE) || (data == NULL_PTR) || (len == 0u) || (len > PDUR_MAX_TP_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    route = PduR_FindDcmTxRoute(DcmTxPduId);
+
+    if (route == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    if (route->bus == PDUR_BUS_CAN)
+    {
+        return CanTp_Transmit(route->lowerTxPduId, data, len);
+    }
+
+    return LinTp_Transmit(route->lowerTxPduId, data, len);
+}
+
+Std_ReturnType PduR_CanTpStartOfReception(PduIdType CanTpRxPduId, PduLengthType len)
+{
+    uint8 routeIdx;
+
+    if ((PduR_Initialized == FALSE) || (len == 0u) || (len > PDUR_MAX_TP_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    routeIdx = PduR_FindCanTpRxRoute(CanTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_CANTP_ROUTES))
+    {
+        return E_NOT_OK;
+    }
+
+    PduR_CanTpRxBuf[routeIdx].expectedLen = len;
+    PduR_CanTpRxBuf[routeIdx].offset = 0u;
+    PduR_CanTpRxBuf[routeIdx].active = TRUE;
+
+    return E_OK;
+}
+
+Std_ReturnType PduR_CanTpCopyRxData(PduIdType CanTpRxPduId, const uint8* data, PduLengthType len)
+{
+    uint8 routeIdx;
+    PduR_TpBufferType* buf;
+
+    if ((PduR_Initialized == FALSE) || (data == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    routeIdx = PduR_FindCanTpRxRoute(CanTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_CANTP_ROUTES))
+    {
+        return E_NOT_OK;
+    }
+
+    buf = &PduR_CanTpRxBuf[routeIdx];
+
+    if (buf->active == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    if ((buf->offset + len) > buf->expectedLen)
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(&buf->buffer[buf->offset], data, len);
+    buf->offset = (PduLengthType)(buf->offset + len);
+
+    return E_OK;
+}
+
+void PduR_CanTpRxIndication(PduIdType CanTpRxPduId, Std_ReturnType result)
+{
+    uint8 routeIdx;
+    PduR_TpBufferType* buf;
+    PduIdType dcmRxPduId;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    routeIdx = PduR_FindCanTpRxRoute(CanTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_CANTP_ROUTES))
+    {
+        return;
+    }
+
+    buf = &PduR_CanTpRxBuf[routeIdx];
+    dcmRxPduId = PduR_CanTpRxRoutes[routeIdx].upperRxPduId;
+
+    if ((result == E_OK) &&
+        (buf->active != FALSE) &&
+        (buf->offset == buf->expectedLen))
+    {
+        Dcm_RxIndication(dcmRxPduId, buf->buffer, buf->expectedLen);
+    }
+
+    buf->active = FALSE;
+    buf->expectedLen = 0u;
+    buf->offset = 0u;
+}
+
+void PduR_CanTpTxConfirmation(PduIdType CanTpTxPduId, Std_ReturnType result)
+{
+    const PduR_TxRouteType* route;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    route = PduR_FindDcmTxRoute(CanTpTxPduId);
+
+    if ((route != NULL_PTR) && (route->bus == PDUR_BUS_CAN))
+    {
+        Dcm_TxConfirmation(route->upperTxPduId, result);
+    }
+}
+
+Std_ReturnType PduR_LinTpStartOfReception(PduIdType LinTpRxPduId, PduLengthType len)
+{
+    uint8 routeIdx;
+
+    if ((PduR_Initialized == FALSE) || (len == 0u) || (len > PDUR_MAX_TP_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    routeIdx = PduR_FindLinTpRxRoute(LinTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_LINTP_ROUTES))
+    {
+        return E_NOT_OK;
+    }
+
+    PduR_LinTpRxBuf[routeIdx].expectedLen = len;
+    PduR_LinTpRxBuf[routeIdx].offset = 0u;
+    PduR_LinTpRxBuf[routeIdx].active = TRUE;
+
+    return E_OK;
+}
+
+Std_ReturnType PduR_LinTpCopyRxData(PduIdType LinTpRxPduId, const uint8* data, PduLengthType len)
+{
+    uint8 routeIdx;
+    PduR_TpBufferType* buf;
+
+    if ((PduR_Initialized == FALSE) || (data == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    routeIdx = PduR_FindLinTpRxRoute(LinTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_LINTP_ROUTES))
+    {
+        return E_NOT_OK;
+    }
+
+    buf = &PduR_LinTpRxBuf[routeIdx];
+
+    if (buf->active == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    if ((buf->offset + len) > buf->expectedLen)
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(&buf->buffer[buf->offset], data, len);
+    buf->offset = (PduLengthType)(buf->offset + len);
+
+    return E_OK;
+}
+
+void PduR_LinTpRxIndication(PduIdType LinTpRxPduId, Std_ReturnType result)
+{
+    uint8 routeIdx;
+    PduR_TpBufferType* buf;
+    PduIdType dcmRxPduId;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    routeIdx = PduR_FindLinTpRxRoute(LinTpRxPduId);
+
+    if ((routeIdx == 0xFFu) || (routeIdx >= PDUR_MAX_LINTP_ROUTES))
+    {
+        return;
+    }
+
+    buf = &PduR_LinTpRxBuf[routeIdx];
+    dcmRxPduId = PduR_LinTpRxRoutes[routeIdx].upperRxPduId;
+
+    if ((result == E_OK) &&
+        (buf->active != FALSE) &&
+        (buf->offset == buf->expectedLen))
+    {
+        Dcm_RxIndication(dcmRxPduId, buf->buffer, buf->expectedLen);
+    }
+
+    buf->active = FALSE;
+    buf->expectedLen = 0u;
+    buf->offset = 0u;
+}
+
+void PduR_LinTpTxConfirmation(PduIdType LinTpTxPduId, Std_ReturnType result)
+{
+    const PduR_TxRouteType* route;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    route = PduR_FindDcmTxRoute(LinTpTxPduId);
+
+    if ((route != NULL_PTR) && (route->bus == PDUR_BUS_LIN))
+    {
+        Dcm_TxConfirmation(route->upperTxPduId, result);
+    }
+}
