@@ -1,0 +1,57 @@
+#ifndef LIN_H
+#define LIN_H
+
+#include "Lin_Protocol.h"
+
+#define LIN_MAX_DATA_LEN 8u
+#define LIN_CHANNEL_0    0u
+
+typedef enum
+{
+    LIN_UNINIT = 0u,
+    LIN_INIT,
+    LIN_IDLE,
+    LIN_TX_HEADER,
+    LIN_TX_RESPONSE,
+    LIN_RX_RESPONSE,
+    LIN_SLEEP,
+    LIN_WAKEUP
+} Lin_StateType;
+
+typedef enum
+{
+    LIN_MASTER_RESPONSE = 0u,
+    LIN_SLAVE_RESPONSE,
+    LIN_NO_RESPONSE
+} Lin_DirectionType;
+
+typedef struct
+{
+    uint8 pid;
+    uint8 dlc;
+    Lin_DirectionType direction;
+    Lin_ChecksumType checksumType;
+    uint8 data[LIN_MAX_DATA_LEN];
+} Lin_PduType;
+
+void Lin_Init(void);
+void Lin_MainFunction(void);
+
+Std_ReturnType Lin_SendFrame(uint8 Channel, const Lin_PduType* PduInfoPtr);
+Std_ReturnType Lin_GoToSleep(uint8 Channel);
+Std_ReturnType Lin_Wakeup(uint8 Channel);
+
+Lin_StateType Lin_GetState(uint8 Channel);
+Lin_ResultType Lin_GetStatus(uint8 Channel, uint8* dataOut, uint8* lenOut);
+
+void Lin_IsrRxByte(uint8 Channel, uint8 byte);
+void Lin_IsrTxDone(uint8 Channel);
+void Lin_IsrError(uint8 Channel, Lin_ResultType error);
+
+void Lin_LowLevel_SendBreak(uint8 Channel);
+void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte);
+void Lin_LowLevel_EnableRx(uint8 Channel);
+void Lin_LowLevel_DisableRx(uint8 Channel);
+void Lin_LowLevel_WakeupPulse(uint8 Channel);
+
+#endif

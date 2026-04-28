@@ -1,0 +1,221 @@
+#include "LinIf.h"
+#include "LinTp.h"
+#include <string.h>
+
+static const LinIf_ConfigType* LinIf_ConfigPtr = NULL_PTR;
+static LinIf_StatusType LinIf_Status = LINIF_UNINIT;
+static uint16 LinIf_ScheduleIndex;
+static uint16 LinIf_TickCounter;
+static uint8 LinIf_TxShadow[LIN_MAX_FRAME_DATA_LEN];
+
+static const LinIf_FrameConfigType* LinIf_FindByPduId(LinIf_PduIdType PduId)
+{
+    uint16 i;
+
+    if (LinIf_ConfigPtr == NULL_PTR)
+    {
+        return NULL_PTR;
+    }
+
+    for (i = 0u; i < LinIf_ConfigPtr->numFrames; i++)
+    {
+        if (LinIf_ConfigPtr->frames[i].pduId == PduId)
+        {
+            return &LinIf_ConfigPtr->frames[i];
+        }
+    }
+
+    return NULL_PTR;
+}
+
+static const LinIf_FrameConfigType* LinIf_FindByLinId(Lin_ChannelType Channel, uint8 LinId)
+{
+    uint16 i;
+
+    if (LinIf_ConfigPtr == NULL_PTR)
+    {
+        return NULL_PTR;
+    }
+
+    for (i = 0u; i < LinIf_ConfigPtr->numFrames; i++)
+    {
+        if ((LinIf_ConfigPtr->frames[i].channel == Channel) &&
+            (LinIf_ConfigPtr->frames[i].linId == LinId))
+        {
+            return &LinIf_ConfigPtr->frames[i];
+        }
+    }
+
+    return NULL_PTR;
+}
+
+void LinIf_Init(const LinIf_ConfigType* ConfigPtr)
+{
+    LinIf_ConfigPtr = ConfigPtr;
+    LinIf_ScheduleIndex = 0u;
+    LinIf_TickCounter = 0u;
+    LinIf_Status = LINIF_INIT;
+    LinIf_Status = LINIF_OPERATIONAL;
+}
+
+Std_ReturnType LinIf_Transmit(LinIf_PduIdType TxPduId, const uint8* data, uint8 len)
+{
+    const LinIf_FrameConfigType* cfg;
+    Lin_PduType pdu;
+
+    cfg = LinIf_FindByPduId(TxPduId);
+
+    if ((cfg == NULL_PTR) || (len > LIN_MAX_FRAME_DATA_LEN))
+    {
+        return E_NOT_OK;
+    }
+
+    pdu.id = cfg->linId;
+    pdu.dlc = cfg->dlc;
+    pdu.checksumType = cfg->checksumType;
+    pdu.responseType = cfg->responseType;
+
+    memset(pdu.data, 0, sizeof(pdu.data));
+
+    if (data != NULL_PTR)
+    {
+        memcpy(pdu.data, data, len);
+    }
+    else
+    {
+        memcpy(pdu.data, cfg->defaultData, cfg->dlc);
+    }
+
+    return Lin_SendFrame(cfg->channel, &pdu);
+}
+
+void LinIf_MainFunction(void)
+{
+    const LinIf_FrameConfigType* cfg;
+
+    if ((LinIf_Status != LINIF_OPERATIONAL) || (LinIf_ConfigPtr == NULL_PTR))
+    {
+        return;
+    }
+
+    if (LinIf_ConfigPtr->numFrames == 0u)
+    {
+        return;
+    }
+
+    cfg = &LinIf_ConfigPtr->frames[LinIf_ScheduleIndex];
+
+    if (LinIf_TickCounter < cfg->delayTicks)
+    {
+        LinIf_TickCounter++;
+        return;
+    }
+
+    LinIf_TickCounter = 0u;
+
+    if (cfg->frameKind == LINIF_FRAME_UNCONDITIONAL)
+    {
+        (void)LinIf_Transmit(cfg->pduId, cfg->defaultData, cfg->dlc);
+    }
+    else if (cfg->frameKind == LINIF_FRAME_DIAG_SLAVE_RESP)
+    {
+        (void)LinIf_Transmit(cfg->pduId, NULL_PTR, 0u);
+    }
+    else
+    {
+        /* Diagnostic master request is triggered by LinTp, not cyclic schedule. */
+    }
+
+    LinIf_ScheduleIndex++;
+    if (LinIf_ScheduleIndex >= LinIf_ConfigPtr->numFrames)
+    {
+        LinIf_ScheduleIndex = 0u;
+    }
+}
+
+void LinIf_RxIndication(Lin_ChannelType Channel, uint8 LinId, const uint8* data, uint8 len)
+{
+    const LinIf_FrameConfigType* cfg;
+
+    cfg = LinIf_FindByLinId(Channel, LinId);
+
+    if (cfg == NULL_PTR)
+    {
+        return;
+    }
+
+    if (cfg->frameKind == LINIF_FRAME_DIAG_SLAVE_RESP)
+    {
+        LinTp_RxIndication(cfg->pduId, data, len);
+    }
+    else
+    {
+        /* User application hook. */
+        LinIf_AppRxIndication(cfg->pduId, data, len);
+    }
+}
+
+void LinIf_TxConfirmation(Lin_ChannelType Channel, uint8 LinId)
+{
+    const LinIf_FrameConfigType* cfg;
+
+    cfg = LinIf_FindByLinId(Channel, LinId);
+
+    if (cfg == NULL_PTR)
+    {
+        return;
+    }
+
+    if (cfg->frameKind == LINIF_FRAME_DIAG_MASTER_REQ)
+    {
+        LinTp_TxConfirmation(cfg->pduId, E_OK);
+    }
+    else
+    {
+        LinIf_AppTxConfirmation(cfg->pduId);
+    }
+}
+
+void LinIf_ErrorIndication(Lin_ChannelType Channel, uint8 LinId)
+{
+    const LinIf_FrameConfigType* cfg;
+
+    cfg = LinIf_FindByLinId(Channel, LinId);
+
+    if (cfg != NULL_PTR)
+    {
+        LinIf_AppErrorIndication(cfg->pduId);
+    }
+}
+
+/* Weak application hooks */
+__attribute__((weak)) void LinIf_AppRxIndication(LinIf_PduIdType PduId, const uint8* data, uint8 len)
+{
+    (void)PduId;
+    (void)data;
+    (void)len;
+}
+
+__attribute__((weak)) void LinIf_AppTxConfirmation(LinIf_PduIdType PduId)
+{
+    (void)PduId;
+}
+
+__attribute__((weak)) void LinIf_AppErrorIndication(LinIf_PduIdType PduId)
+{
+    (void)PduId;
+}
+
+static const LinIf_FrameConfigType LinIf_FrameConfig[] =
+{
+    { 0u, LIN_CHANNEL_ASCLIN1, 0x10u, 8u, LIN_CS_ENHANCED, LIN_FRAMERESPONSE_TX, LINIF_FRAME_UNCONDITIONAL, 2u, {0x11u,0x22u,0x33u,0x44u,0x55u,0x66u,0x77u,0x88u} },
+    { 1u, LIN_CHANNEL_ASCLIN1, 0x11u, 8u, LIN_CS_ENHANCED, LIN_FRAMERESPONSE_RX, LINIF_FRAME_UNCONDITIONAL, 2u, {0u} },
+    { 2u, LIN_CHANNEL_ASCLIN1, LIN_DIAG_MASTER_REQ_ID, 8u, LIN_CS_CLASSIC, LIN_FRAMERESPONSE_TX, LINIF_FRAME_DIAG_MASTER_REQ, 0u, {0u} },
+    { 3u, LIN_CHANNEL_ASCLIN1, LIN_DIAG_SLAVE_RESP_ID, 8u, LIN_CS_CLASSIC, LIN_FRAMERESPONSE_RX, LINIF_FRAME_DIAG_SLAVE_RESP, 2u, {0u} }
+};
+
+const LinIf_ConfigType LinIf_Config =
+{
+    LinIf_FrameConfig,
+    (uint16)(sizeof(LinIf_FrameConfig) / sizeof(LinIf_FrameConfig[0]))
+};

@@ -1,0 +1,114 @@
+/* CanIf.c */
+#include "CanIf.h"
+#include "CanTp.h"
+#include <string.h>
+
+static const CanIf_RxPduConfigType CanIf_RxPduConfig[] =
+{
+    { CANIF_PDU_CLASSIC_PHYS_RX, CAN_CONTROLLER_CLASSIC, 0x710u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, CANIF_RX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_FUNC_RX, CAN_CONTROLLER_CLASSIC, 0x7DFu, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, CANIF_RX_TARGET_CANTP },
+    { CANIF_PDU_FD_PHYS_RX,      CAN_CONTROLLER_FD,      0x711u, CAN_ID_STANDARD, CAN_FRAME_FD,      CANIF_RX_TARGET_CANTP },
+    { CANIF_PDU_FD_FUNC_RX,      CAN_CONTROLLER_FD,      0x7E0u, CAN_ID_STANDARD, CAN_FRAME_FD,      CANIF_RX_TARGET_CANTP }
+};
+
+static const CanIf_TxPduConfigType CanIf_TxPduConfig[] =
+{
+    { CANIF_PDU_CLASSIC_PHYS_TX, 0u, CAN_CONTROLLER_CLASSIC, 0x718u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC },
+    { CANIF_PDU_FD_PHYS_TX,      1u, CAN_CONTROLLER_FD,      0x719u, CAN_ID_STANDARD, CAN_FRAME_FD      }
+};
+
+const CanIf_ConfigType CanIf_Config =
+{
+    CanIf_RxPduConfig,
+    (uint8)(sizeof(CanIf_RxPduConfig) / sizeof(CanIf_RxPduConfig[0])),
+    CanIf_TxPduConfig,
+    (uint8)(sizeof(CanIf_TxPduConfig) / sizeof(CanIf_TxPduConfig[0]))
+};
+
+static const CanIf_ConfigType* CanIf_ConfigPtr;
+
+void CanIf_Init(const CanIf_ConfigType* ConfigPtr)
+{
+    CanIf_ConfigPtr = (ConfigPtr == NULL_PTR) ? &CanIf_Config : ConfigPtr;
+}
+
+Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLengthType len)
+{
+    uint8 i;
+    Can_PduType pdu;
+
+    if ((CanIf_ConfigPtr == NULL_PTR) || (data == NULL_PTR) || (len > CAN_MAX_DLC))
+    {
+        return E_NOT_OK;
+    }
+
+    for (i = 0u; i < CanIf_ConfigPtr->numTxPdus; i++)
+    {
+        if (CanIf_ConfigPtr->txPdus[i].txPduId == CanIfTxSduId)
+        {
+            pdu.swPduHandle = CanIfTxSduId;
+            pdu.id = CanIf_ConfigPtr->txPdus[i].canId;
+            pdu.idType = CanIf_ConfigPtr->txPdus[i].idType;
+            pdu.controllerId = CanIf_ConfigPtr->txPdus[i].controllerId;
+            pdu.frameType = CanIf_ConfigPtr->txPdus[i].frameType;
+            pdu.dlc = (uint8)len;
+            pdu.sdu = data;
+
+            return Can_Write(CanIf_ConfigPtr->txPdus[i].hth, &pdu);
+        }
+    }
+
+    return E_NOT_OK;
+}
+
+void CanIf_RxIndication(const Can_FrameType* frame)
+{
+    uint8 i;
+
+    if ((CanIf_ConfigPtr == NULL_PTR) || (frame == NULL_PTR))
+    {
+        return;
+    }
+
+    for (i = 0u; i < CanIf_ConfigPtr->numRxPdus; i++)
+    {
+        if ((CanIf_ConfigPtr->rxPdus[i].controllerId == frame->controllerId) &&
+            (CanIf_ConfigPtr->rxPdus[i].canId == frame->id) &&
+            (CanIf_ConfigPtr->rxPdus[i].idType == frame->idType))
+        {
+            if (CanIf_ConfigPtr->rxPdus[i].target == CANIF_RX_TARGET_CANTP)
+            {
+                CanTp_RxIndication(CanIf_ConfigPtr->rxPdus[i].rxPduId, frame->data, frame->dlc);
+            }
+            else
+            {
+                CanIf_AppRxIndication(CanIf_ConfigPtr->rxPdus[i].rxPduId, frame->data, frame->dlc);
+            }
+
+            return;
+        }
+    }
+}
+
+void CanIf_TxConfirmation(PduIdType CanIfTxSduId)
+{
+    CanTp_TxConfirmation(CanIfTxSduId);
+    CanIf_AppTxConfirmation(CanIfTxSduId);
+}
+
+void CanIf_ControllerBusOff(uint8 ControllerId)
+{
+    (void)ControllerId;
+}
+
+__attribute__((weak)) void CanIf_AppRxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len)
+{
+    (void)RxPduId;
+    (void)data;
+    (void)len;
+}
+
+__attribute__((weak)) void CanIf_AppTxConfirmation(PduIdType TxPduId)
+{
+    (void)TxPduId;
+}

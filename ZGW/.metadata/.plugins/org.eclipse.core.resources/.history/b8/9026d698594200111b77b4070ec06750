@@ -1,0 +1,33 @@
+#ifndef LINTP_H
+#define LINTP_H
+
+#include "Std_Types.h"
+#include "LinIf.h"
+
+//typedef uint16 PduIdType;
+//typedef uint16 PduLengthType;
+
+#define LINTP_MAX_PAYLOAD_LEN        4095u
+#define LINTP_NAD_FUNCTIONAL         0x7Fu
+#define LINTP_DEFAULT_NAD            0x01u
+#define LINTP_PCI_SF                 0x00u
+#define LINTP_PCI_FF                 0x10u
+#define LINTP_PCI_CF                 0x20u
+#define LINTP_FRAME_DATA_LEN         8u
+#define LINTP_DIAG_DATA_LEN          6u
+
+typedef enum
+{
+    LINTP_IDLE = 0u,
+    LINTP_RX_IN_PROGRESS,
+    LINTP_TX_IN_PROGRESS,
+    LINTP_WAIT_SLAVE_RESPONSE
+} LinTp_StateType;
+
+void LinTp_Init(void);
+Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len);
+void LinTp_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
+void LinTp_TxConfirmation(PduIdType TxPduId, Std_ReturnType result);
+void LinTp_MainFunction(void);
+
+#endif

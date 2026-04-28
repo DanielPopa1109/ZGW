@@ -1,0 +1,2824 @@
+	; Module start
+	.compiler_version	"TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler v1.1r8 Build 22011964"
+	.compiler_invocation	"ctc -f cc9348a --dep-file=BSW/Com/Lin/Lin.d -c99 --fp-model=3cflnrSTz -D__CPU__=tc37x -D__CPU_TC37X__ --core=tc1.6.2 --fp-model=+float -D__CPU__=tc37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanIf -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanSM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanTp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\PduR -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dcm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Ain -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Fls -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Nvm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core0 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core1 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core2 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\McuSm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Os -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\ScrH -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\00_Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU_Test -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\02_Safety_Mechanisms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SysMgr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Wdg -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Configurations -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore\\\\Compilers -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe\\\\Bsp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\_Utilities -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Asc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Trap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Adc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_Impl -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\SCR Debug (SDCC) -g2 -w544 -w557 -w508 -t4 --language=+volatile -N0 -O0 -Y0 -Z0 --compact-max-size=200 --misrac-version=2012 -o BSW/Com/Lin/Lin.src ../BSW/Com/Lin/Lin.c"
+	.compiler_name		"ctc"
+	;source	'../BSW/Com/Lin/Lin.c'
+
+	
+$TC162
+	
+	.sdecl	'.text.Lin.Lin_Init',code,cluster('Lin_Init')
+	.sect	'.text.Lin.Lin_Init'
+	.align	2
+	
+	.global	Lin_Init
+; Function Lin_Init
+.L56:
+Lin_Init:	.type	func
+	movh.a	a4,#@his(Lin_Ch)
+	lea	a4,[a4]@los(Lin_Ch)
+.L207:
+	mov	d4,#0
+.L208:
+	mov	d5,#36
+	call	memset
+.L209:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L210:
+	mov	d15,#2
+.L211:
+	st.b	[a15],d15
+.L212:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L213:
+	mov	d15,#0
+.L214:
+	st.b	[a15]1,d15
+.L215:
+	call	Lin_LowLevel_Init
+.L216:
+	ret
+.L131:
+	
+__Lin_Init_function_end:
+	.size	Lin_Init,__Lin_Init_function_end-Lin_Init
+.L83:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_SendFrame',code,cluster('Lin_SendFrame')
+	.sect	'.text.Lin.Lin_SendFrame'
+	.align	2
+	
+	.global	Lin_SendFrame
+; Function Lin_SendFrame
+.L58:
+Lin_SendFrame:	.type	func
+	sub.a	a10,#8
+.L165:
+	mov	d8,d4
+.L168:
+	mov.aa	a15,a4
+.L169:
+	jz.a	a15,.L2
+.L268:
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L269:
+	ld.bu	d15,[a2]
+.L270:
+	jeq	d15,#2,.L3
+.L2:
+	mov	d2,#1
+.L271:
+	j	.L4
+.L3:
+	ld.bu	d15,[a15]1
+.L272:
+	jeq	d15,#0,.L5
+.L273:
+	ld.bu	d15,[a15]1
+.L274:
+	jlt.u	d15,#9,.L6
+.L5:
+	mov	d2,#1
+.L275:
+	j	.L7
+.L6:
+	ld.bu	d4,[a15]
+.L166:
+	lea	a4,[a10]0
+.L167:
+	call	Lin_CheckPid
+.L276:
+	jeq	d2,#0,.L8
+.L277:
+	mov	d2,#1
+.L278:
+	j	.L9
+.L8:
+	movh.a	a4,#@his(Lin_Ch)
+	lea	a4,[a4]@los(Lin_Ch)
+.L279:
+	add.a	a4,#4
+.L280:
+	mov	d4,#12
+	mov.aa	a5,a15
+.L171:
+	call	memcpy
+.L172:
+	ld.bu	d15,[a15]1
+.L281:
+	add	d15,#1
+.L282:
+	extr.u	d4,d15,#0,#8
+	call	Lin_LowLevel_SetResponseLength
+.L283:
+	movh.a	a15,#@his(Lin_Ch)
+.L170:
+	lea	a15,[a15]@los(Lin_Ch)
+.L284:
+	mov	d15,#0
+.L285:
+	st.b	[a15]25,d15
+.L286:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L287:
+	mov	d15,#0
+.L288:
+	st.b	[a15]26,d15
+.L289:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L290:
+	mov	d15,#20
+.L291:
+	st.h	[a15]28,d15
+.L292:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L293:
+	mov	d15,#2
+.L294:
+	st.b	[a15]1,d15
+.L295:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L296:
+	mov	d15,#3
+.L297:
+	st.b	[a15],d15
+.L298:
+	mov	d4,d8
+.L173:
+	call	Lin_LowLevel_SendBreak
+.L174:
+	mov	d2,#0
+.L299:
+	j	.L10
+.L10:
+.L9:
+.L7:
+.L4:
+	ret
+.L134:
+	
+__Lin_SendFrame_function_end:
+	.size	Lin_SendFrame,__Lin_SendFrame_function_end-Lin_SendFrame
+.L93:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_IsrTxDone',code,cluster('Lin_IsrTxDone')
+	.sect	'.text.Lin.Lin_IsrTxDone'
+	.align	2
+	
+	.global	Lin_IsrTxDone
+; Function Lin_IsrTxDone
+.L60:
+Lin_IsrTxDone:	.type	func
+	mov	d8,d4
+.L176:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L380:
+	ld.bu	d15,[a15]
+.L381:
+	jne	d15,#3,.L11
+.L382:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L383:
+	mov	d15,#4
+.L384:
+	st.b	[a15],d15
+.L385:
+	mov	d5,#85
+	mov	d4,d8
+	call	Lin_LowLevel_SendByte
+.L175:
+	j	.L12
+.L11:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L386:
+	ld.bu	d15,[a15]
+.L387:
+	jne	d15,#4,.L13
+.L388:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L389:
+	mov	d15,#5
+.L390:
+	st.b	[a15],d15
+.L391:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L392:
+	ld.bu	d5,[a15]4
+	mov	d4,d8
+	call	Lin_LowLevel_SendByte
+.L177:
+	j	.L14
+.L13:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L393:
+	ld.bu	d15,[a15]
+.L394:
+	jne	d15,#5,.L15
+.L395:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L396:
+	ld.bu	d15,[a15]6
+.L397:
+	jne	d15,#0,.L16
+.L398:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L399:
+	mov	d15,#6
+.L400:
+	st.b	[a15],d15
+.L401:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L402:
+	mov	d15,#0
+.L403:
+	st.b	[a15]26,d15
+.L404:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L405:
+	ld.bu	d5,[a15]8
+	mov	d4,d8
+	call	Lin_LowLevel_SendByte
+.L178:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L406:
+	mov	d15,#1
+.L407:
+	st.b	[a15]26,d15
+.L408:
+	j	.L17
+.L16:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L409:
+	ld.bu	d15,[a15]6
+.L410:
+	jne	d15,#1,.L18
+.L411:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L412:
+	mov	d15,#7
+.L413:
+	st.b	[a15],d15
+.L414:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L415:
+	mov	d15,#0
+.L416:
+	st.b	[a15]25,d15
+.L417:
+	mov	d4,d8
+	call	Lin_LowLevel_EnableRx
+.L179:
+	j	.L19
+.L18:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L418:
+	mov	d15,#0
+.L419:
+	st.b	[a15]1,d15
+.L420:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L421:
+	mov	d15,#2
+.L422:
+	st.b	[a15],d15
+.L19:
+.L17:
+	j	.L20
+.L15:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L423:
+	ld.bu	d15,[a15]
+.L424:
+	jne	d15,#6,.L21
+.L425:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L426:
+	ld.bu	d0,[a15]26
+.L427:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L428:
+	ld.bu	d15,[a15]5
+.L429:
+	jge.u	d0,d15,.L22
+.L430:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L431:
+	ld.bu	d15,[a15]26
+.L432:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L433:
+	addsc.a	a15,a15,d15,#0
+	ld.bu	d5,[a15]8
+	mov	d4,d8
+	call	Lin_LowLevel_SendByte
+.L180:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L434:
+	ld.bu	d15,[a2]26
+.L435:
+	add	d15,#1
+	st.b	[a15]26,d15
+.L436:
+	j	.L23
+.L22:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L437:
+	ld.bu	d0,[a15]26
+.L438:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L439:
+	ld.bu	d15,[a15]5
+.L440:
+	jne	d15,d0,.L24
+.L441:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L442:
+	ld.bu	d4,[a15]4
+.L181:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L443:
+	lea	a4,[a15]8
+.L444:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L445:
+	ld.bu	d5,[a15]5
+.L446:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L447:
+	ld.bu	d6,[a15]7
+	call	Lin_CalcChecksum
+.L182:
+	mov	e4,d2,d8
+	call	Lin_LowLevel_SendByte
+.L183:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L448:
+	ld.bu	d15,[a2]26
+.L449:
+	add	d15,#1
+	st.b	[a15]26,d15
+.L450:
+	j	.L25
+.L24:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L451:
+	mov	d15,#0
+.L452:
+	st.b	[a15]1,d15
+.L453:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L454:
+	ld.bu	d15,[a15]32
+.L455:
+	jeq	d15,#0,.L26
+.L456:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L457:
+	mov	d15,#0
+.L458:
+	st.b	[a15]32,d15
+.L459:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L460:
+	mov	d15,#9
+.L461:
+	st.b	[a15],d15
+.L462:
+	j	.L27
+.L26:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L463:
+	mov	d15,#2
+.L464:
+	st.b	[a15],d15
+.L27:
+.L25:
+.L23:
+.L21:
+.L20:
+.L14:
+.L12:
+	ret
+.L154:
+	
+__Lin_IsrTxDone_function_end:
+	.size	Lin_IsrTxDone,__Lin_IsrTxDone_function_end-Lin_IsrTxDone
+.L118:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_IsrRxByte',code,cluster('Lin_IsrRxByte')
+	.sect	'.text.Lin.Lin_IsrRxByte'
+	.align	2
+	
+	.global	Lin_IsrRxByte
+; Function Lin_IsrRxByte
+.L62:
+Lin_IsrRxByte:	.type	func
+	mov	d8,d4
+.L186:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L469:
+	ld.bu	d15,[a15]
+.L470:
+	jeq	d15,#7,.L28
+.L471:
+	j	.L29
+.L28:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L472:
+	ld.bu	d0,[a15]25
+.L473:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L474:
+	ld.bu	d15,[a15]5
+.L475:
+	add	d15,#1
+.L476:
+	extr.u	d15,d15,#0,#8
+.L477:
+	jge.u	d0,d15,.L30
+.L478:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L479:
+	ld.bu	d15,[a15]25
+.L480:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L481:
+	addsc.a	a15,a15,d15,#0
+.L482:
+	st.b	[a15]16,d5
+.L483:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L484:
+	ld.bu	d15,[a2]25
+.L485:
+	add	d15,#1
+	st.b	[a15]25,d15
+.L30:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L486:
+	ld.bu	d0,[a15]25
+.L487:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L488:
+	ld.bu	d15,[a15]5
+.L489:
+	add	d15,#1
+.L490:
+	extr.u	d15,d15,#0,#8
+.L491:
+	jlt.u	d0,d15,.L31
+.L492:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L493:
+	ld.bu	d4,[a15]4
+.L184:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L494:
+	lea	a4,[a15]16
+.L495:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L496:
+	ld.bu	d5,[a15]5
+.L185:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L497:
+	ld.bu	d6,[a15]7
+	call	Lin_CalcChecksum
+.L187:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L498:
+	ld.bu	d15,[a15]5
+.L499:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L500:
+	addsc.a	a15,a15,d15,#0
+	ld.bu	d15,[a15]16
+.L501:
+	jne	d15,d2,.L32
+.L502:
+	mov	d15,#0
+.L503:
+	j	.L33
+.L32:
+	mov	d15,#3
+.L33:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L504:
+	st.b	[a15]1,d15
+.L505:
+	mov	d4,d8
+.L189:
+	call	Lin_LowLevel_DisableRx
+.L188:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L506:
+	mov	d15,#2
+.L507:
+	st.b	[a15],d15
+.L31:
+.L29:
+	ret
+.L157:
+	
+__Lin_IsrRxByte_function_end:
+	.size	Lin_IsrRxByte,__Lin_IsrRxByte_function_end-Lin_IsrRxByte
+.L123:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_IsrError',code,cluster('Lin_IsrError')
+	.sect	'.text.Lin.Lin_IsrError'
+	.align	2
+	
+	.global	Lin_IsrError
+; Function Lin_IsrError
+.L64:
+Lin_IsrError:	.type	func
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L512:
+	st.b	[a15]1,d5
+.L513:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L514:
+	mov	d15,#0
+.L515:
+	st.b	[a15]32,d15
+.L516:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L517:
+	mov	d15,#2
+.L518:
+	st.b	[a15],d15
+.L519:
+	ret
+.L161:
+	
+__Lin_IsrError_function_end:
+	.size	Lin_IsrError,__Lin_IsrError_function_end-Lin_IsrError
+.L128:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_MainFunction',code,cluster('Lin_MainFunction')
+	.sect	'.text.Lin.Lin_MainFunction'
+	.align	2
+	
+	.global	Lin_MainFunction
+; Function Lin_MainFunction
+.L66:
+Lin_MainFunction:	.type	func
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L221:
+	ld.bu	d15,[a15]
+.L222:
+	jeq	d15,#7,.L34
+.L223:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L224:
+	ld.bu	d15,[a15]
+.L225:
+	jeq	d15,#6,.L35
+.L226:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L227:
+	ld.bu	d15,[a15]
+.L228:
+	jeq	d15,#3,.L36
+.L229:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L230:
+	ld.bu	d15,[a15]
+.L231:
+	jeq	d15,#4,.L37
+.L232:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L233:
+	ld.bu	d15,[a15]
+.L234:
+	jne	d15,#5,.L38
+.L37:
+.L36:
+.L35:
+.L34:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L235:
+	ld.hu	d15,[a15]28
+.L236:
+	jlt.u	d15,#1,.L39
+.L237:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L238:
+	ld.hu	d15,[a2]28
+.L239:
+	add	d15,#-1
+	st.h	[a15]28,d15
+.L240:
+	j	.L40
+.L39:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L241:
+	mov	d15,#7
+.L242:
+	st.b	[a15]1,d15
+.L243:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L244:
+	mov	d15,#0
+.L245:
+	st.b	[a15]32,d15
+.L246:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L247:
+	mov	d15,#2
+.L248:
+	st.b	[a15],d15
+.L40:
+.L38:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L249:
+	ld.bu	d0,[a15]
+.L250:
+	mov	d15,#10
+.L251:
+	jne	d15,d0,.L41
+.L252:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L253:
+	ld.hu	d15,[a15]30
+.L254:
+	jlt.u	d15,#1,.L42
+.L255:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+	movh.a	a2,#@his(Lin_Ch)
+	lea	a2,[a2]@los(Lin_Ch)
+.L256:
+	ld.hu	d15,[a2]30
+.L257:
+	add	d15,#-1
+	st.h	[a15]30,d15
+.L258:
+	j	.L43
+.L42:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L259:
+	mov	d15,#2
+.L260:
+	st.b	[a15],d15
+.L261:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L262:
+	mov	d15,#0
+.L263:
+	st.b	[a15]1,d15
+.L43:
+.L41:
+	ret
+.L132:
+	
+__Lin_MainFunction_function_end:
+	.size	Lin_MainFunction,__Lin_MainFunction_function_end-Lin_MainFunction
+.L88:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_GoToSleep',code,cluster('Lin_GoToSleep')
+	.sect	'.text.Lin.Lin_GoToSleep'
+	.align	2
+	
+	.global	Lin_GoToSleep
+; Function Lin_GoToSleep
+.L68:
+Lin_GoToSleep:	.type	func
+	sub.a	a10,#16
+.L190:
+	mov	d8,d4
+.L192:
+	lea	a4,[a10]0
+.L304:
+	mov	d4,#0
+.L191:
+	mov	d5,#12
+	call	memset
+.L305:
+	mov	d15,#60
+.L306:
+	st.b	[a10],d15
+.L307:
+	mov	d15,#8
+.L308:
+	st.b	[a10]1,d15
+.L309:
+	mov	d15,#0
+.L310:
+	st.b	[a10]2,d15
+.L311:
+	mov	d15,#0
+.L312:
+	st.b	[a10]3,d15
+.L313:
+	mov	d15,#0
+.L314:
+	st.b	[a10]4,d15
+.L315:
+	mov	d15,#255
+.L316:
+	st.b	[a10]5,d15
+.L317:
+	mov	d15,#255
+.L318:
+	st.b	[a10]6,d15
+.L319:
+	mov	d15,#255
+.L320:
+	st.b	[a10]7,d15
+.L321:
+	mov	d15,#255
+.L322:
+	st.b	[a10]8,d15
+.L323:
+	mov	d15,#255
+.L324:
+	st.b	[a10]9,d15
+.L325:
+	mov	d15,#255
+.L326:
+	st.b	[a10]10,d15
+.L327:
+	mov	d15,#255
+.L328:
+	st.b	[a10]11,d15
+.L329:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L330:
+	mov	d15,#1
+.L331:
+	st.b	[a15]32,d15
+.L332:
+	lea	a4,[a10]0
+	mov	d4,d8
+.L193:
+	call	Lin_SendFrame
+.L194:
+	jeq	d2,#0,.L44
+.L333:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L334:
+	mov	d15,#0
+.L335:
+	st.b	[a15]32,d15
+.L336:
+	mov	d2,#1
+.L337:
+	j	.L45
+.L44:
+	mov	d2,#0
+.L338:
+	j	.L46
+.L46:
+.L45:
+	ret
+.L139:
+	
+__Lin_GoToSleep_function_end:
+	.size	Lin_GoToSleep,__Lin_GoToSleep_function_end-Lin_GoToSleep
+.L98:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_Wakeup',code,cluster('Lin_Wakeup')
+	.sect	'.text.Lin.Lin_Wakeup'
+	.align	2
+	
+	.global	Lin_Wakeup
+; Function Lin_Wakeup
+.L70:
+Lin_Wakeup:	.type	func
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L343:
+	ld.bu	d0,[a15]
+.L344:
+	mov	d15,#9
+.L345:
+	jeq	d15,d0,.L47
+.L346:
+	mov	d2,#1
+.L347:
+	j	.L48
+.L47:
+	call	Lin_LowLevel_WakeupPulse
+.L195:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L348:
+	mov	d15,#10
+.L349:
+	st.b	[a15],d15
+.L350:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L351:
+	mov	d15,#30
+.L352:
+	st.h	[a15]30,d15
+.L353:
+	mov	d2,#0
+.L354:
+	j	.L49
+.L49:
+.L48:
+	ret
+.L143:
+	
+__Lin_Wakeup_function_end:
+	.size	Lin_Wakeup,__Lin_Wakeup_function_end-Lin_Wakeup
+.L103:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_GetState',code,cluster('Lin_GetState')
+	.sect	'.text.Lin.Lin_GetState'
+	.align	2
+	
+	.global	Lin_GetState
+; Function Lin_GetState
+.L72:
+Lin_GetState:	.type	func
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L359:
+	ld.bu	d2,[a15]
+.L360:
+	j	.L50
+.L50:
+	ret
+.L146:
+	
+__Lin_GetState_function_end:
+	.size	Lin_GetState,__Lin_GetState_function_end-Lin_GetState
+.L108:
+	; End of function
+	
+	.sdecl	'.text.Lin.Lin_GetStatus',code,cluster('Lin_GetStatus')
+	.sect	'.text.Lin.Lin_GetStatus'
+	.align	2
+	
+	.global	Lin_GetStatus
+; Function Lin_GetStatus
+.L74:
+Lin_GetStatus:	.type	func
+	mov.aa	a12,a5
+.L198:
+	jz.a	a4,.L51
+.L365:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L366:
+	ld.bu	d15,[a15]1
+.L367:
+	jne	d15,#0,.L52
+.L368:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L369:
+	lea	a5,[a15]16
+.L197:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L370:
+	ld.bu	d4,[a15]5
+.L196:
+	call	memcpy
+.L52:
+.L51:
+	jz.a	a12,.L53
+.L371:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L372:
+	ld.bu	d15,[a15]5
+.L373:
+	st.b	[a12],d15
+.L53:
+	movh.a	a15,#@his(Lin_Ch)
+	lea	a15,[a15]@los(Lin_Ch)
+.L374:
+	ld.bu	d2,[a15]1
+.L375:
+	j	.L54
+.L54:
+	ret
+.L149:
+	
+__Lin_GetStatus_function_end:
+	.size	Lin_GetStatus,__Lin_GetStatus_function_end-Lin_GetStatus
+.L113:
+	; End of function
+	
+	.sdecl	'.bss.Lin.Lin_Ch',data,cluster('Lin_Ch')
+	.sect	'.bss.Lin.Lin_Ch'
+	.align	4
+Lin_Ch:	.type	object
+	.size	Lin_Ch,36
+	.space	36
+	.calls	'Lin_Init','memset'
+	.calls	'Lin_Init','Lin_LowLevel_Init'
+	.calls	'Lin_SendFrame','Lin_CheckPid'
+	.calls	'Lin_SendFrame','memcpy'
+	.calls	'Lin_SendFrame','Lin_LowLevel_SetResponseLength'
+	.calls	'Lin_SendFrame','Lin_LowLevel_SendBreak'
+	.calls	'Lin_IsrTxDone','Lin_LowLevel_SendByte'
+	.calls	'Lin_IsrTxDone','Lin_LowLevel_EnableRx'
+	.calls	'Lin_IsrTxDone','Lin_CalcChecksum'
+	.calls	'Lin_IsrRxByte','Lin_CalcChecksum'
+	.calls	'Lin_IsrRxByte','Lin_LowLevel_DisableRx'
+	.calls	'Lin_GoToSleep','memset'
+	.calls	'Lin_GoToSleep','Lin_SendFrame'
+	.calls	'Lin_Wakeup','Lin_LowLevel_WakeupPulse'
+	.calls	'Lin_GetStatus','memcpy'
+	.calls	'Lin_Init','',0
+	.calls	'Lin_SendFrame','',8
+	.calls	'Lin_IsrTxDone','',0
+	.calls	'Lin_IsrRxByte','',0
+	.calls	'Lin_IsrError','',0
+	.calls	'Lin_MainFunction','',0
+	.calls	'Lin_GoToSleep','',16
+	.calls	'Lin_Wakeup','',0
+	.calls	'Lin_GetState','',0
+	.extern	Lin_CheckPid
+	.extern	Lin_CalcChecksum
+	.extern	Lin_LowLevel_SendBreak
+	.extern	Lin_LowLevel_SendByte
+	.extern	Lin_LowLevel_EnableRx
+	.extern	Lin_LowLevel_DisableRx
+	.extern	Lin_LowLevel_WakeupPulse
+	.extern	Lin_LowLevel_Init
+	.extern	Lin_LowLevel_SetResponseLength
+	.extern	memcpy
+	.extern	memset
+	.calls	'Lin_GetStatus','',0
+	.sdecl	'.debug_info',debug
+	.sect	'.debug_info'
+.L76:
+	.word	2180
+	.half	3
+	.word	.L77
+	.byte	4
+.L75:
+	.byte	1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L78
+.L133:
+	.byte	2
+	.byte	'unsigned char',0,1,8
+.L151:
+	.byte	3
+	.word	186
+	.byte	4
+	.byte	'Lin_CheckPid',0,1,48,16
+	.word	186
+	.byte	1,1,1,1,5
+	.byte	'pid',0,1,48,35
+	.word	186
+	.byte	5
+	.byte	'idOut',0,1,48,47
+	.word	203
+	.byte	0,6
+	.word	186
+	.byte	3
+	.word	260
+	.byte	7,1,9,9,1,8
+	.byte	'LIN_CS_CLASSIC',0,0,8
+	.byte	'LIN_CS_ENHANCED',0,1,0,4
+	.byte	'Lin_CalcChecksum',0,1,49,7
+	.word	186
+	.byte	1,1,1,1,5
+	.byte	'pid',0,1,49,30
+	.word	186
+	.byte	5
+	.byte	'data',0,1,49,48
+	.word	265
+	.byte	5
+	.byte	'len',0,1,49,60
+	.word	186
+	.byte	5
+	.byte	'type',0,1,49,82
+	.word	270
+	.byte	0,7,2,24,9,1,8
+	.byte	'LIN_MASTER_RESPONSE',0,0,8
+	.byte	'LIN_SLAVE_RESPONSE',0,1,8
+	.byte	'LIN_NO_RESPONSE',0,2,0,9,8
+	.word	186
+	.byte	10,7,0
+.L141:
+	.byte	11,2,31,9,12,12
+	.byte	'pid',0
+	.word	186
+	.byte	1,2,35,0,12
+	.byte	'dlc',0
+	.word	186
+	.byte	1,2,35,1,12
+	.byte	'direction',0
+	.word	391
+	.byte	1,2,35,2,12
+	.byte	'checksumType',0
+	.word	270
+	.byte	1,2,35,3,12
+	.byte	'data',0
+	.word	458
+	.byte	8,2,35,4,0,6
+	.word	467
+.L136:
+	.byte	3
+	.word	554
+.L145:
+	.byte	7,2,9,9,1,8
+	.byte	'LIN_UNINIT',0,0,8
+	.byte	'LIN_INIT',0,1,8
+	.byte	'LIN_IDLE',0,2,8
+	.byte	'LIN_TX_BREAK',0,3,8
+	.byte	'LIN_TX_SYNC',0,4,8
+	.byte	'LIN_TX_PID',0,5,8
+	.byte	'LIN_TX_RESPONSE',0,6,8
+	.byte	'LIN_RX_RESPONSE',0,7,8
+	.byte	'LIN_SLEEP_PENDING',0,8,8
+	.byte	'LIN_SLEEP',0,9,8
+	.byte	'LIN_WAKEUP',0,10,0
+.L148:
+	.byte	7,1,25,9,1,8
+	.byte	'LIN_RES_OK',0,0,8
+	.byte	'LIN_RES_NOT_OK',0,1,8
+	.byte	'LIN_RES_NO_RESPONSE',0,2,8
+	.byte	'LIN_RES_CHECKSUM_ERROR',0,3,8
+	.byte	'LIN_RES_PID_ERROR',0,4,8
+	.byte	'LIN_RES_FRAMING_ERROR',0,5,8
+	.byte	'LIN_RES_SYNC_ERROR',0,6,8
+	.byte	'LIN_RES_TIMEOUT',0,7,0,13
+	.byte	'Lin_LowLevel_SendBreak',0,3,9,6,1,1,1,1,5
+	.byte	'Channel',0,3,9,35
+	.word	186
+	.byte	0,13
+	.byte	'Lin_LowLevel_SendByte',0,3,10,6,1,1,1,1,5
+	.byte	'Channel',0,3,10,34
+	.word	186
+	.byte	5
+	.byte	'Byte',0,3,10,49
+	.word	186
+	.byte	0,13
+	.byte	'Lin_LowLevel_EnableRx',0,3,12,6,1,1,1,1,5
+	.byte	'Channel',0,3,12,34
+	.word	186
+	.byte	0,13
+	.byte	'Lin_LowLevel_DisableRx',0,3,13,6,1,1,1,1,5
+	.byte	'Channel',0,3,13,35
+	.word	186
+	.byte	0,13
+	.byte	'Lin_LowLevel_WakeupPulse',0,3,15,6,1,1,1,1,5
+	.byte	'Channel',0,3,15,37
+	.word	186
+	.byte	0,14
+	.byte	'Lin_LowLevel_Init',0,3,7,6,1,1,1,1,13
+	.byte	'Lin_LowLevel_SetResponseLength',0,3,17,6,1,1,1,1,5
+	.byte	'Length',0,3,17,43
+	.word	186
+	.byte	0,15
+	.byte	'void',0,3
+	.word	1228
+	.byte	16
+	.word	1234
+	.byte	6
+	.word	1228
+	.byte	3
+	.word	1244
+	.byte	16
+	.word	1249
+	.byte	2
+	.byte	'unsigned int',0,4,7,4
+	.byte	'memcpy',0,4,53,17
+	.word	1234
+	.byte	1,1,1,1,17,4,53,33
+	.word	1239
+	.byte	17,4,53,56
+	.word	1254
+	.byte	17,4,53,68
+	.word	1259
+	.byte	0,2
+	.byte	'int',0,4,5,4
+	.byte	'memset',0,4,56,17
+	.word	1234
+	.byte	1,1,1,1,17,4,56,33
+	.word	1234
+	.byte	17,4,56,36
+	.word	1319
+	.byte	17,4,56,41
+	.word	1259
+	.byte	0,2
+	.byte	'short int',0,2,5,18
+	.byte	'__wchar_t',0,5,1,1
+	.word	1370
+	.byte	18
+	.byte	'__size_t',0,5,1,1
+	.word	1259
+	.byte	18
+	.byte	'__ptrdiff_t',0,5,1,1
+	.word	1319
+	.byte	19,1,3
+	.word	1438
+	.byte	18
+	.byte	'__codeptr',0,5,1,1
+	.word	1440
+	.byte	18
+	.byte	'uint8',0,6,108,29
+	.word	186
+	.byte	2
+	.byte	'unsigned short int',0,2,7,18
+	.byte	'uint16',0,6,112,29
+	.word	1477
+	.byte	2
+	.byte	'unsigned long int',0,4,7,18
+	.byte	'uint32',0,6,116,29
+	.word	1514
+	.byte	18
+	.byte	'sint16',0,6,129,1,29
+	.word	1370
+	.byte	2
+	.byte	'long int',0,4,5,18
+	.byte	'sint32',0,6,134,1,29
+	.word	1566
+	.byte	2
+	.byte	'long long int',0,8,5,18
+	.byte	'sint64',0,6,141,1,29
+	.word	1594
+	.byte	2
+	.byte	'float',0,4,4,18
+	.byte	'float32',0,6,170,1,29
+	.word	1627
+	.byte	18
+	.byte	'size_t',0,7,24,25
+	.word	1259
+	.byte	18
+	.byte	'pvoid',0,8,54,28
+	.word	1234
+	.byte	18
+	.byte	'Std_ReturnType',0,8,57,16
+	.word	186
+	.byte	18
+	.byte	'Lin_ChecksumType',0,1,13,3
+	.word	270
+	.byte	7,1,15,9,1,8
+	.byte	'LIN_FRM_UNCONDITIONAL',0,0,8
+	.byte	'LIN_FRM_EVENT_TRIGGERED',0,1,8
+	.byte	'LIN_FRM_SPORADIC',0,2,8
+	.byte	'LIN_FRM_DIAGNOSTIC_MRF',0,3,8
+	.byte	'LIN_FRM_DIAGNOSTIC_SRF',0,4,8
+	.byte	'LIN_FRM_SLEEP',0,5,0,18
+	.byte	'Lin_FrameClassType',0,1,23,3
+	.word	1730
+	.byte	18
+	.byte	'Lin_ResultType',0,1,35,3
+	.word	728
+	.byte	18
+	.byte	'Lin_StateType',0,2,22,3
+	.word	564
+	.byte	18
+	.byte	'Lin_DirectionType',0,2,29,3
+	.word	391
+	.byte	18
+	.byte	'Lin_PduType',0,2,38,3
+	.word	467
+	.byte	9,9
+	.word	186
+	.byte	10,8,0
+.L164:
+	.byte	11,5,10,9,36,12
+	.byte	'state',0
+	.word	564
+	.byte	1,2,35,0,12
+	.byte	'result',0
+	.word	728
+	.byte	1,2,35,1,12
+	.byte	'activePdu',0
+	.word	467
+	.byte	12,2,35,4,12
+	.byte	'rxBuf',0
+	.word	1989
+	.byte	9,2,35,16,12
+	.byte	'rxCnt',0
+	.word	186
+	.byte	1,2,35,25,12
+	.byte	'txCnt',0
+	.word	186
+	.byte	1,2,35,26,12
+	.byte	'timeout',0
+	.word	1477
+	.byte	2,2,35,28,12
+	.byte	'wakeupTimer',0
+	.word	1477
+	.byte	2,2,35,30,12
+	.byte	'sleepAfterTx',0
+	.word	186
+	.byte	1,2,35,32,0,18
+	.byte	'Lin_ChannelType',0,5,21,3
+	.word	1998
+	.byte	0
+	.sdecl	'.debug_abbrev',debug
+	.sect	'.debug_abbrev'
+.L77:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,16,6,0,0,2,36,0,3,8,11,15,62,15,0,0,3,15,0,73,19,0,0,4,46,1,3,8,58
+	.byte	15,59,15,57,15,73,19,54,15,39,12,63,12,60,12,0,0,5,5,0,3,8,58,15,59,15,57,15,73,19,0,0,6,38,0,73,19,0
+	.byte	0,7,4,1,58,15,59,15,57,15,11,15,0,0,8,40,0,3,8,28,13,0,0,9,1,1,11,15,73,19,0,0,10,33,0,47,15,0,0,11,19
+	.byte	1,58,15,59,15,57,15,11,15,0,0,12,13,0,3,8,73,19,11,15,56,9,0,0,13,46,1,3,8,58,15,59,15,57,15,54,15,39
+	.byte	12,63,12,60,12,0,0,14,46,0,3,8,58,15,59,15,57,15,54,15,39,12,63,12,60,12,0,0,15,59,0,3,8,0,0,16,55,0,73
+	.byte	19,0,0,17,5,0,58,15,59,15,57,15,73,19,0,0,18,22,0,3,8,58,15,59,15,57,15,73,19,0,0,19,21,0,54,15,0,0,0
+	.sdecl	'.debug_line',debug
+	.sect	'.debug_line'
+.L78:
+	.word	.L200-.L199
+.L199:
+	.half	3
+	.word	.L202-.L201
+.L201:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1
+	.byte	'C:\\Infineon\\AURIX-Studio-1.10.32\\tools\\Compilers\\Tasking_1.1r8\\ctc\\include\\',0
+	.byte	'C:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Std',0
+	.byte	0
+	.byte	'..\\BSW\\Com\\Lin\\Lin_Protocol.h',0,0,0,0
+	.byte	'..\\BSW\\Com\\Lin\\Lin.h',0,0,0,0
+	.byte	'..\\BSW\\Com\\Lin\\Lin_LowLevel.h',0,0,0,0
+	.byte	'string.h',0,1,0,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0
+	.byte	'Platform_Types.h',0,2,0,0
+	.byte	'stddef.h',0,1,0,0
+	.byte	'Ifx_Types.h',0,2,0,0,0
+.L202:
+.L200:
+	.sdecl	'.debug_info',debug,cluster('Lin_Init')
+	.sect	'.debug_info'
+.L79:
+	.word	230
+	.half	3
+	.word	.L80
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L82,.L81
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_Init',0,1,25,6,1,1,1
+	.word	.L56,.L131,.L55
+	.byte	4
+	.word	.L56,.L131
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_Init')
+	.sect	'.debug_abbrev'
+.L80:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_Init')
+	.sect	'.debug_line'
+.L81:
+	.word	.L204-.L203
+.L203:
+	.half	3
+	.word	.L206-.L205
+.L205:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L206:
+	.byte	5,13,7,0,5,2
+	.word	.L56
+	.byte	3,26,1,5,21,9
+	.half	.L207-.L56
+	.byte	1,5,24,9
+	.half	.L208-.L207
+	.byte	1,5,5,9
+	.half	.L209-.L208
+	.byte	3,1,1,5,20,9
+	.half	.L210-.L209
+	.byte	1,5,18,9
+	.half	.L211-.L210
+	.byte	1,5,5,9
+	.half	.L212-.L211
+	.byte	3,1,1,5,21,9
+	.half	.L213-.L212
+	.byte	1,5,19,9
+	.half	.L214-.L213
+	.byte	1,5,22,9
+	.half	.L215-.L214
+	.byte	3,2,1,5,1,9
+	.half	.L216-.L215
+	.byte	3,1,1,7,9
+	.half	.L83-.L216
+	.byte	0,1,1
+.L204:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_Init')
+	.sect	'.debug_ranges'
+.L82:
+	.word	-1,.L56,0,.L83-.L56,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_info'
+.L84:
+	.word	239
+	.half	3
+	.word	.L85
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L87,.L86
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_MainFunction',0,1,186,1,6,1,1,1
+	.word	.L66,.L132,.L65
+	.byte	4
+	.word	.L66,.L132
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_abbrev'
+.L85:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_line'
+.L86:
+	.word	.L218-.L217
+.L217:
+	.half	3
+	.word	.L220-.L219
+.L219:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L220:
+	.byte	5,10,7,0,5,2
+	.word	.L66
+	.byte	3,187,1,1,5,16,9
+	.half	.L221-.L66
+	.byte	1,5,9,9
+	.half	.L222-.L221
+	.byte	1,5,10,7,9
+	.half	.L223-.L222
+	.byte	3,1,1,5,16,9
+	.half	.L224-.L223
+	.byte	1,5,23,9
+	.half	.L225-.L224
+	.byte	1,5,10,7,9
+	.half	.L226-.L225
+	.byte	3,1,1,5,16,9
+	.half	.L227-.L226
+	.byte	1,5,23,9
+	.half	.L228-.L227
+	.byte	1,5,10,7,9
+	.half	.L229-.L228
+	.byte	3,1,1,5,16,9
+	.half	.L230-.L229
+	.byte	1,5,23,9
+	.half	.L231-.L230
+	.byte	1,5,10,7,9
+	.half	.L232-.L231
+	.byte	3,1,1,5,16,9
+	.half	.L233-.L232
+	.byte	1,5,23,9
+	.half	.L234-.L233
+	.byte	1,5,13,7,9
+	.half	.L34-.L234
+	.byte	3,2,1,5,19,9
+	.half	.L235-.L34
+	.byte	1,5,9,9
+	.half	.L236-.L235
+	.byte	1,5,13,7,9
+	.half	.L237-.L236
+	.byte	3,2,1,5,19,9
+	.half	.L238-.L237
+	.byte	1,5,27,9
+	.half	.L239-.L238
+	.byte	1,5,29,9
+	.half	.L240-.L239
+	.byte	1,5,13,9
+	.half	.L39-.L240
+	.byte	3,4,1,5,29,9
+	.half	.L241-.L39
+	.byte	1,5,27,9
+	.half	.L242-.L241
+	.byte	1,5,13,9
+	.half	.L243-.L242
+	.byte	3,1,1,5,35,9
+	.half	.L244-.L243
+	.byte	1,5,33,9
+	.half	.L245-.L244
+	.byte	1,5,13,9
+	.half	.L246-.L245
+	.byte	3,1,1,5,28,9
+	.half	.L247-.L246
+	.byte	1,5,26,9
+	.half	.L248-.L247
+	.byte	1,5,9,9
+	.half	.L38-.L248
+	.byte	3,4,1,5,15,9
+	.half	.L249-.L38
+	.byte	1,5,25,9
+	.half	.L250-.L249
+	.byte	1,5,5,9
+	.half	.L251-.L250
+	.byte	1,5,13,7,9
+	.half	.L252-.L251
+	.byte	3,2,1,5,19,9
+	.half	.L253-.L252
+	.byte	1,5,9,9
+	.half	.L254-.L253
+	.byte	1,5,13,7,9
+	.half	.L255-.L254
+	.byte	3,2,1,5,19,9
+	.half	.L256-.L255
+	.byte	1,5,31,9
+	.half	.L257-.L256
+	.byte	1,5,33,9
+	.half	.L258-.L257
+	.byte	1,5,13,9
+	.half	.L42-.L258
+	.byte	3,4,1,5,28,9
+	.half	.L259-.L42
+	.byte	1,5,26,9
+	.half	.L260-.L259
+	.byte	1,5,13,9
+	.half	.L261-.L260
+	.byte	3,1,1,5,29,9
+	.half	.L262-.L261
+	.byte	1,5,27,9
+	.half	.L263-.L262
+	.byte	1,5,1,9
+	.half	.L41-.L263
+	.byte	3,3,1,7,9
+	.half	.L88-.L41
+	.byte	0,1,1
+.L218:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_ranges'
+.L87:
+	.word	-1,.L66,0,.L88-.L66,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_info'
+.L89:
+	.word	298
+	.half	3
+	.word	.L90
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L92,.L91
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_SendFrame',0,1,34,16
+	.word	.L133
+	.byte	1,1,1
+	.word	.L58,.L134,.L57
+	.byte	4
+	.byte	'Channel',0,1,34,36
+	.word	.L133,.L135
+	.byte	4
+	.byte	'PduInfoPtr',0,1,34,64
+	.word	.L136,.L137
+	.byte	5
+	.word	.L58,.L134
+	.byte	6
+	.byte	'id',0,1,36,11
+	.word	.L133,.L138
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_abbrev'
+.L90:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_line'
+.L91:
+	.word	.L265-.L264
+.L264:
+	.half	3
+	.word	.L267-.L266
+.L266:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L267:
+	.byte	5,16,7,0,5,2
+	.word	.L58
+	.byte	3,33,1,5,9,9
+	.half	.L169-.L58
+	.byte	3,6,1,5,38,7,9
+	.half	.L268-.L169
+	.byte	1,5,44,9
+	.half	.L269-.L268
+	.byte	1,5,51,9
+	.half	.L270-.L269
+	.byte	1,5,16,7,9
+	.half	.L2-.L270
+	.byte	3,2,1,5,9,9
+	.half	.L271-.L2
+	.byte	1,5,20,9
+	.half	.L3-.L271
+	.byte	3,3,1,5,9,9
+	.half	.L272-.L3
+	.byte	1,5,47,7,9
+	.half	.L273-.L272
+	.byte	1,5,53,9
+	.half	.L274-.L273
+	.byte	1,5,16,7,9
+	.half	.L5-.L274
+	.byte	3,2,1,5,9,9
+	.half	.L275-.L5
+	.byte	1,5,32,9
+	.half	.L6-.L275
+	.byte	3,3,1,5,40,9
+	.half	.L166-.L6
+	.byte	1,5,5,9
+	.half	.L276-.L166
+	.byte	1,5,16,7,9
+	.half	.L277-.L276
+	.byte	3,2,1,5,9,9
+	.half	.L278-.L277
+	.byte	1,5,13,9
+	.half	.L8-.L278
+	.byte	3,3,1,5,19,9
+	.half	.L279-.L8
+	.byte	1,5,43,9
+	.half	.L280-.L279
+	.byte	1,5,54,9
+	.half	.L172-.L280
+	.byte	3,2,1,5,60,9
+	.half	.L281-.L172
+	.byte	1,5,36,9
+	.half	.L282-.L281
+	.byte	1,5,5,9
+	.half	.L283-.L282
+	.byte	3,2,1,5,20,9
+	.half	.L284-.L283
+	.byte	1,5,18,9
+	.half	.L285-.L284
+	.byte	1,5,5,9
+	.half	.L286-.L285
+	.byte	3,1,1,5,20,9
+	.half	.L287-.L286
+	.byte	1,5,18,9
+	.half	.L288-.L287
+	.byte	1,5,5,9
+	.half	.L289-.L288
+	.byte	3,1,1,5,22,9
+	.half	.L290-.L289
+	.byte	1,5,20,9
+	.half	.L291-.L290
+	.byte	1,5,5,9
+	.half	.L292-.L291
+	.byte	3,1,1,5,21,9
+	.half	.L293-.L292
+	.byte	1,5,19,9
+	.half	.L294-.L293
+	.byte	1,5,5,9
+	.half	.L295-.L294
+	.byte	3,1,1,5,20,9
+	.half	.L296-.L295
+	.byte	1,5,18,9
+	.half	.L297-.L296
+	.byte	1,5,28,9
+	.half	.L298-.L297
+	.byte	3,2,1,5,12,9
+	.half	.L174-.L298
+	.byte	3,2,1,5,5,9
+	.half	.L299-.L174
+	.byte	1,5,1,9
+	.half	.L4-.L299
+	.byte	3,1,1,7,9
+	.half	.L93-.L4
+	.byte	0,1,1
+.L265:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_ranges'
+.L92:
+	.word	-1,.L58,0,.L93-.L58,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_info'
+.L94:
+	.word	279
+	.half	3
+	.word	.L95
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L97,.L96
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_GoToSleep',0,1,220,1,16
+	.word	.L133
+	.byte	1,1,1
+	.word	.L68,.L139,.L67
+	.byte	4
+	.byte	'Channel',0,1,220,1,36
+	.word	.L133,.L140
+	.byte	5
+	.word	.L68,.L139
+	.byte	6
+	.byte	'pdu',0,1,222,1,17
+	.word	.L141,.L142
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_abbrev'
+.L95:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6
+	.byte	52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_line'
+.L96:
+	.word	.L301-.L300
+.L300:
+	.half	3
+	.word	.L303-.L302
+.L302:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L303:
+	.byte	5,16,7,0,5,2
+	.word	.L68
+	.byte	3,219,1,1,5,13,9
+	.half	.L192-.L68
+	.byte	3,4,1,5,18,9
+	.half	.L304-.L192
+	.byte	1,5,21,9
+	.half	.L191-.L304
+	.byte	1,5,15,9
+	.half	.L305-.L191
+	.byte	3,2,1,5,13,9
+	.half	.L306-.L305
+	.byte	1,5,15,9
+	.half	.L307-.L306
+	.byte	3,1,1,5,13,9
+	.half	.L308-.L307
+	.byte	1,5,21,9
+	.half	.L309-.L308
+	.byte	3,1,1,5,19,9
+	.half	.L310-.L309
+	.byte	1,5,24,9
+	.half	.L311-.L310
+	.byte	3,1,1,5,22,9
+	.half	.L312-.L311
+	.byte	1,5,19,9
+	.half	.L313-.L312
+	.byte	3,2,1,5,17,9
+	.half	.L314-.L313
+	.byte	1,5,19,9
+	.half	.L315-.L314
+	.byte	3,1,1,5,17,9
+	.half	.L316-.L315
+	.byte	1,5,19,9
+	.half	.L317-.L316
+	.byte	3,1,1,5,17,9
+	.half	.L318-.L317
+	.byte	1,5,19,9
+	.half	.L319-.L318
+	.byte	3,1,1,5,17,9
+	.half	.L320-.L319
+	.byte	1,5,19,9
+	.half	.L321-.L320
+	.byte	3,1,1,5,17,9
+	.half	.L322-.L321
+	.byte	1,5,19,9
+	.half	.L323-.L322
+	.byte	3,1,1,5,17,9
+	.half	.L324-.L323
+	.byte	1,5,19,9
+	.half	.L325-.L324
+	.byte	3,1,1,5,17,9
+	.half	.L326-.L325
+	.byte	1,5,19,9
+	.half	.L327-.L326
+	.byte	3,1,1,5,17,9
+	.half	.L328-.L327
+	.byte	1,5,5,9
+	.half	.L329-.L328
+	.byte	3,2,1,5,27,9
+	.half	.L330-.L329
+	.byte	1,5,25,9
+	.half	.L331-.L330
+	.byte	1,5,33,9
+	.half	.L332-.L331
+	.byte	3,2,1,5,5,9
+	.half	.L194-.L332
+	.byte	1,5,9,7,9
+	.half	.L333-.L194
+	.byte	3,2,1,5,31,9
+	.half	.L334-.L333
+	.byte	1,5,29,9
+	.half	.L335-.L334
+	.byte	1,5,16,9
+	.half	.L336-.L335
+	.byte	3,1,1,5,9,9
+	.half	.L337-.L336
+	.byte	1,5,12,9
+	.half	.L44-.L337
+	.byte	3,3,1,5,5,9
+	.half	.L338-.L44
+	.byte	1,5,1,9
+	.half	.L45-.L338
+	.byte	3,1,1,7,9
+	.half	.L98-.L45
+	.byte	0,1,1
+.L301:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_ranges'
+.L97:
+	.word	-1,.L68,0,.L98-.L68,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_info'
+.L99:
+	.word	258
+	.half	3
+	.word	.L100
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L102,.L101
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_Wakeup',0,1,251,1,16
+	.word	.L133
+	.byte	1,1,1
+	.word	.L70,.L143,.L69
+	.byte	4
+	.byte	'Channel',0,1,251,1,33
+	.word	.L133,.L144
+	.byte	5
+	.word	.L70,.L143
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_abbrev'
+.L100:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_line'
+.L101:
+	.word	.L340-.L339
+.L339:
+	.half	3
+	.word	.L342-.L341
+.L341:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L342:
+	.byte	5,9,7,0,5,2
+	.word	.L70
+	.byte	3,252,1,1,5,15,9
+	.half	.L343-.L70
+	.byte	1,5,25,9
+	.half	.L344-.L343
+	.byte	1,5,5,9
+	.half	.L345-.L344
+	.byte	1,5,16,7,9
+	.half	.L346-.L345
+	.byte	3,2,1,5,9,9
+	.half	.L347-.L346
+	.byte	1,5,30,9
+	.half	.L47-.L347
+	.byte	3,3,1,5,5,9
+	.half	.L195-.L47
+	.byte	3,1,1,5,20,9
+	.half	.L348-.L195
+	.byte	1,5,18,9
+	.half	.L349-.L348
+	.byte	1,5,5,9
+	.half	.L350-.L349
+	.byte	3,1,1,5,26,9
+	.half	.L351-.L350
+	.byte	1,5,24,9
+	.half	.L352-.L351
+	.byte	1,5,12,9
+	.half	.L353-.L352
+	.byte	3,2,1,5,5,9
+	.half	.L354-.L353
+	.byte	1,5,1,9
+	.half	.L48-.L354
+	.byte	3,1,1,7,9
+	.half	.L103-.L48
+	.byte	0,1,1
+.L340:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_ranges'
+.L102:
+	.word	-1,.L70,0,.L103-.L70,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_GetState')
+	.sect	'.debug_info'
+.L104:
+	.word	260
+	.half	3
+	.word	.L105
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L107,.L106
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_GetState',0,1,137,2,15
+	.word	.L145
+	.byte	1,1,1
+	.word	.L72,.L146,.L71
+	.byte	4
+	.byte	'Channel',0,1,137,2,34
+	.word	.L133,.L147
+	.byte	5
+	.word	.L72,.L146
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_GetState')
+	.sect	'.debug_abbrev'
+.L105:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_GetState')
+	.sect	'.debug_line'
+.L106:
+	.word	.L356-.L355
+.L355:
+	.half	3
+	.word	.L358-.L357
+.L357:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L358:
+	.byte	5,12,7,0,5,2
+	.word	.L72
+	.byte	3,139,2,1,5,18,9
+	.half	.L359-.L72
+	.byte	1,5,5,9
+	.half	.L360-.L359
+	.byte	1,5,1,9
+	.half	.L50-.L360
+	.byte	3,1,1,7,9
+	.half	.L108-.L50
+	.byte	0,1,1
+.L356:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_GetState')
+	.sect	'.debug_ranges'
+.L107:
+	.word	-1,.L72,0,.L108-.L72,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_info'
+.L109:
+	.word	302
+	.half	3
+	.word	.L110
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L112,.L111
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_GetStatus',0,1,143,2,16
+	.word	.L148
+	.byte	1,1,1
+	.word	.L74,.L149,.L73
+	.byte	4
+	.byte	'Channel',0,1,143,2,36
+	.word	.L133,.L150
+	.byte	4
+	.byte	'dataOut',0,1,143,2,52
+	.word	.L151,.L152
+	.byte	4
+	.byte	'lenOut',0,1,143,2,68
+	.word	.L151,.L153
+	.byte	5
+	.word	.L74,.L149
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_abbrev'
+.L110:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_line'
+.L111:
+	.word	.L362-.L361
+.L361:
+	.half	3
+	.word	.L364-.L363
+.L363:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L364:
+	.byte	5,16,7,0,5,2
+	.word	.L74
+	.byte	3,142,2,1,5,9,9
+	.half	.L198-.L74
+	.byte	3,4,1,5,35,7,9
+	.half	.L365-.L198
+	.byte	1,5,41,9
+	.half	.L366-.L365
+	.byte	1,5,49,9
+	.half	.L367-.L366
+	.byte	1,5,25,7,9
+	.half	.L368-.L367
+	.byte	3,2,1,5,31,9
+	.half	.L369-.L368
+	.byte	1,5,39,9
+	.half	.L197-.L369
+	.byte	1,5,55,9
+	.half	.L370-.L197
+	.byte	1,5,5,9
+	.half	.L51-.L370
+	.byte	3,3,1,5,19,7,9
+	.half	.L371-.L51
+	.byte	3,2,1,5,35,9
+	.half	.L372-.L371
+	.byte	1,5,17,9
+	.half	.L373-.L372
+	.byte	1,5,12,9
+	.half	.L53-.L373
+	.byte	3,3,1,5,18,9
+	.half	.L374-.L53
+	.byte	1,5,5,9
+	.half	.L375-.L374
+	.byte	1,5,1,9
+	.half	.L54-.L375
+	.byte	3,1,1,7,9
+	.half	.L113-.L54
+	.byte	0,1,1
+.L362:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_ranges'
+.L112:
+	.word	-1,.L74,0,.L113-.L74,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_info'
+.L114:
+	.word	277
+	.half	3
+	.word	.L115
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L117,.L116
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_IsrTxDone',0,1,70,6,1,1,1
+	.word	.L60,.L154,.L59
+	.byte	4
+	.byte	'Channel',0,1,70,26
+	.word	.L133,.L155
+	.byte	5
+	.word	.L60,.L154
+	.byte	6
+	.byte	'checksum',0,1,72,11
+	.word	.L133,.L156
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_abbrev'
+.L115:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3
+	.byte	8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_line'
+.L116:
+	.word	.L377-.L376
+.L376:
+	.half	3
+	.word	.L379-.L378
+.L378:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L379:
+	.byte	5,6,7,0,5,2
+	.word	.L60
+	.byte	3,197,0,1,5,9,9
+	.half	.L176-.L60
+	.byte	3,4,1,5,15,9
+	.half	.L380-.L176
+	.byte	1,5,5,9
+	.half	.L381-.L380
+	.byte	1,5,9,7,9
+	.half	.L382-.L381
+	.byte	3,2,1,5,24,9
+	.half	.L383-.L382
+	.byte	1,5,22,9
+	.half	.L384-.L383
+	.byte	1,5,40,9
+	.half	.L385-.L384
+	.byte	3,1,1,5,9,9
+	.half	.L175-.L385
+	.byte	3,1,1,9
+	.half	.L11-.L175
+	.byte	3,3,1,5,15,9
+	.half	.L386-.L11
+	.byte	1,5,5,9
+	.half	.L387-.L386
+	.byte	1,5,9,7,9
+	.half	.L388-.L387
+	.byte	3,2,1,5,24,9
+	.half	.L389-.L388
+	.byte	1,5,22,9
+	.half	.L390-.L389
+	.byte	1,5,40,9
+	.half	.L391-.L390
+	.byte	3,1,1,5,56,9
+	.half	.L392-.L391
+	.byte	1,5,9,9
+	.half	.L177-.L392
+	.byte	3,1,1,9
+	.half	.L13-.L177
+	.byte	3,3,1,5,15,9
+	.half	.L393-.L13
+	.byte	1,5,5,9
+	.half	.L394-.L393
+	.byte	1,5,13,7,9
+	.half	.L395-.L394
+	.byte	3,2,1,5,29,9
+	.half	.L396-.L395
+	.byte	1,5,9,9
+	.half	.L397-.L396
+	.byte	1,5,13,7,9
+	.half	.L398-.L397
+	.byte	3,2,1,5,28,9
+	.half	.L399-.L398
+	.byte	1,5,26,9
+	.half	.L400-.L399
+	.byte	1,5,13,9
+	.half	.L401-.L400
+	.byte	3,1,1,5,28,9
+	.half	.L402-.L401
+	.byte	1,5,26,9
+	.half	.L403-.L402
+	.byte	1,5,44,9
+	.half	.L404-.L403
+	.byte	3,1,1,5,65,9
+	.half	.L405-.L404
+	.byte	1,5,13,9
+	.half	.L178-.L405
+	.byte	3,1,1,5,28,9
+	.half	.L406-.L178
+	.byte	1,5,26,9
+	.half	.L407-.L406
+	.byte	1,5,43,9
+	.half	.L408-.L407
+	.byte	3,125,1,5,18,9
+	.half	.L16-.L408
+	.byte	3,5,1,5,34,9
+	.half	.L409-.L16
+	.byte	1,5,14,9
+	.half	.L410-.L409
+	.byte	1,5,13,7,9
+	.half	.L411-.L410
+	.byte	3,2,1,5,28,9
+	.half	.L412-.L411
+	.byte	1,5,26,9
+	.half	.L413-.L412
+	.byte	1,5,13,9
+	.half	.L414-.L413
+	.byte	3,1,1,5,28,9
+	.half	.L415-.L414
+	.byte	1,5,26,9
+	.half	.L416-.L415
+	.byte	1,5,35,9
+	.half	.L417-.L416
+	.byte	3,1,1,5,43,9
+	.half	.L179-.L417
+	.byte	3,126,1,5,13,9
+	.half	.L18-.L179
+	.byte	3,6,1,5,29,9
+	.half	.L418-.L18
+	.byte	1,5,27,9
+	.half	.L419-.L418
+	.byte	1,5,13,9
+	.half	.L420-.L419
+	.byte	3,1,1,5,28,9
+	.half	.L421-.L420
+	.byte	1,5,26,9
+	.half	.L422-.L421
+	.byte	1,5,9,9
+	.half	.L17-.L422
+	.byte	3,3,1,9
+	.half	.L15-.L17
+	.byte	3,3,1,5,15,9
+	.half	.L423-.L15
+	.byte	1,5,5,9
+	.half	.L424-.L423
+	.byte	1,5,13,7,9
+	.half	.L425-.L424
+	.byte	3,2,1,5,19,9
+	.half	.L426-.L425
+	.byte	1,5,28,9
+	.half	.L427-.L426
+	.byte	1,5,44,9
+	.half	.L428-.L427
+	.byte	1,5,9,9
+	.half	.L429-.L428
+	.byte	1,5,66,7,9
+	.half	.L430-.L429
+	.byte	3,2,1,5,72,9
+	.half	.L431-.L430
+	.byte	1,5,44,9
+	.half	.L432-.L431
+	.byte	1,5,65,9
+	.half	.L433-.L432
+	.byte	1,5,13,9
+	.half	.L180-.L433
+	.byte	3,1,1,5,19,9
+	.half	.L434-.L180
+	.byte	1,5,25,9
+	.half	.L435-.L434
+	.byte	1,5,80,9
+	.half	.L436-.L435
+	.byte	3,127,1,5,18,9
+	.half	.L22-.L436
+	.byte	3,3,1,5,24,9
+	.half	.L437-.L22
+	.byte	1,5,34,9
+	.half	.L438-.L437
+	.byte	1,5,50,9
+	.half	.L439-.L438
+	.byte	1,5,14,9
+	.half	.L440-.L439
+	.byte	1,5,41,7,9
+	.half	.L441-.L440
+	.byte	3,2,1,5,57,9
+	.half	.L442-.L441
+	.byte	1,5,41,9
+	.half	.L181-.L442
+	.byte	3,1,1,5,57,9
+	.half	.L443-.L181
+	.byte	1,5,41,9
+	.half	.L444-.L443
+	.byte	3,1,1,5,57,9
+	.half	.L445-.L444
+	.byte	1,5,41,9
+	.half	.L446-.L445
+	.byte	3,1,1,5,57,9
+	.half	.L447-.L446
+	.byte	1,5,44,9
+	.half	.L182-.L447
+	.byte	3,2,1,5,13,9
+	.half	.L183-.L182
+	.byte	3,1,1,5,19,9
+	.half	.L448-.L183
+	.byte	1,5,25,9
+	.half	.L449-.L448
+	.byte	1,5,71,9
+	.half	.L450-.L449
+	.byte	3,125,1,5,13,9
+	.half	.L24-.L450
+	.byte	3,7,1,5,29,9
+	.half	.L451-.L24
+	.byte	1,5,27,9
+	.half	.L452-.L451
+	.byte	1,5,17,9
+	.half	.L453-.L452
+	.byte	3,2,1,5,23,9
+	.half	.L454-.L453
+	.byte	1,5,13,9
+	.half	.L455-.L454
+	.byte	1,5,17,7,9
+	.half	.L456-.L455
+	.byte	3,2,1,5,39,9
+	.half	.L457-.L456
+	.byte	1,5,37,9
+	.half	.L458-.L457
+	.byte	1,5,17,9
+	.half	.L459-.L458
+	.byte	3,1,1,5,32,9
+	.half	.L460-.L459
+	.byte	1,5,30,9
+	.half	.L461-.L460
+	.byte	1,5,44,9
+	.half	.L462-.L461
+	.byte	3,127,1,5,17,9
+	.half	.L26-.L462
+	.byte	3,5,1,5,32,9
+	.half	.L463-.L26
+	.byte	1,5,30,9
+	.half	.L464-.L463
+	.byte	1,5,1,9
+	.half	.L12-.L464
+	.byte	3,4,1,7,9
+	.half	.L118-.L12
+	.byte	0,1,1
+.L377:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_ranges'
+.L117:
+	.word	-1,.L60,0,.L118-.L60,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_info'
+.L119:
+	.word	298
+	.half	3
+	.word	.L120
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L122,.L121
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_IsrRxByte',0,1,146,1,6,1,1,1
+	.word	.L62,.L157,.L61
+	.byte	4
+	.byte	'Channel',0,1,146,1,26
+	.word	.L133,.L158
+	.byte	4
+	.byte	'byte',0,1,146,1,41
+	.word	.L133,.L159
+	.byte	5
+	.word	.L62,.L157
+	.byte	6
+	.byte	'checksum',0,1,148,1,11
+	.word	.L133,.L160
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_abbrev'
+.L120:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,1,17,1,18,1,0,0,6,52,0,3
+	.byte	8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_line'
+.L121:
+	.word	.L466-.L465
+.L465:
+	.half	3
+	.word	.L468-.L467
+.L467:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L468:
+	.byte	5,6,7,0,5,2
+	.word	.L62
+	.byte	3,145,1,1,5,9,9
+	.half	.L186-.L62
+	.byte	3,6,1,5,15,9
+	.half	.L469-.L186
+	.byte	1,5,5,9
+	.half	.L470-.L469
+	.byte	1,5,9,7,9
+	.half	.L471-.L470
+	.byte	3,2,1,9
+	.half	.L28-.L471
+	.byte	3,3,1,5,15,9
+	.half	.L472-.L28
+	.byte	1,5,32,9
+	.half	.L473-.L472
+	.byte	1,5,48,9
+	.half	.L474-.L473
+	.byte	1,5,53,9
+	.half	.L475-.L474
+	.byte	1,5,24,9
+	.half	.L476-.L475
+	.byte	1,5,5,9
+	.half	.L477-.L476
+	.byte	1,5,22,7,9
+	.half	.L478-.L477
+	.byte	3,2,1,5,28,9
+	.half	.L479-.L478
+	.byte	1,5,9,9
+	.half	.L480-.L479
+	.byte	1,5,21,9
+	.half	.L481-.L480
+	.byte	1,5,36,9
+	.half	.L482-.L481
+	.byte	1,5,9,9
+	.half	.L483-.L482
+	.byte	3,1,1,5,15,9
+	.half	.L484-.L483
+	.byte	1,5,21,9
+	.half	.L485-.L484
+	.byte	1,5,9,9
+	.half	.L30-.L485
+	.byte	3,3,1,5,15,9
+	.half	.L486-.L30
+	.byte	1,5,33,9
+	.half	.L487-.L486
+	.byte	1,5,49,9
+	.half	.L488-.L487
+	.byte	1,5,54,9
+	.half	.L489-.L488
+	.byte	1,5,25,9
+	.half	.L490-.L489
+	.byte	1,5,5,9
+	.half	.L491-.L490
+	.byte	1,5,37,7,9
+	.half	.L492-.L491
+	.byte	3,2,1,5,53,9
+	.half	.L493-.L492
+	.byte	1,5,37,9
+	.half	.L184-.L493
+	.byte	3,1,1,5,43,9
+	.half	.L494-.L184
+	.byte	1,5,37,9
+	.half	.L495-.L494
+	.byte	3,1,1,5,53,9
+	.half	.L496-.L495
+	.byte	1,5,37,9
+	.half	.L185-.L496
+	.byte	3,1,1,5,53,9
+	.half	.L497-.L185
+	.byte	1,5,51,9
+	.half	.L187-.L497
+	.byte	3,2,1,5,67,9
+	.half	.L498-.L187
+	.byte	1,5,38,9
+	.half	.L499-.L498
+	.byte	1,5,50,9
+	.half	.L500-.L499
+	.byte	1,5,25,9
+	.half	.L501-.L500
+	.byte	1,5,74,7,9
+	.half	.L502-.L501
+	.byte	1,5,87,9
+	.half	.L503-.L502
+	.byte	1,5,74,9
+	.half	.L32-.L503
+	.byte	1,5,9,9
+	.half	.L33-.L32
+	.byte	1,5,23,9
+	.half	.L504-.L33
+	.byte	1,5,32,9
+	.half	.L505-.L504
+	.byte	3,2,1,5,9,9
+	.half	.L188-.L505
+	.byte	3,1,1,5,24,9
+	.half	.L506-.L188
+	.byte	1,5,22,9
+	.half	.L507-.L506
+	.byte	1,5,1,9
+	.half	.L29-.L507
+	.byte	3,2,1,7,9
+	.half	.L123-.L29
+	.byte	0,1,1
+.L466:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_ranges'
+.L122:
+	.word	-1,.L62,0,.L123-.L62,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_IsrError')
+	.sect	'.debug_info'
+.L124:
+	.word	275
+	.half	3
+	.word	.L125
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L127,.L126
+	.byte	2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_IsrError',0,1,177,1,6,1,1,1
+	.word	.L64,.L161,.L63
+	.byte	4
+	.byte	'Channel',0,1,177,1,25
+	.word	.L133,.L162
+	.byte	4
+	.byte	'error',0,1,177,1,49
+	.word	.L148,.L163
+	.byte	5
+	.word	.L64,.L161
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_IsrError')
+	.sect	'.debug_abbrev'
+.L125:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('Lin_IsrError')
+	.sect	'.debug_line'
+.L126:
+	.word	.L509-.L508
+.L508:
+	.half	3
+	.word	.L511-.L510
+.L510:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/Lin.c',0,0,0,0,0
+.L511:
+	.byte	5,5,7,0,5,2
+	.word	.L64
+	.byte	3,180,1,1,5,19,9
+	.half	.L512-.L64
+	.byte	1,5,5,9
+	.half	.L513-.L512
+	.byte	3,1,1,5,27,9
+	.half	.L514-.L513
+	.byte	1,5,25,9
+	.half	.L515-.L514
+	.byte	1,5,5,9
+	.half	.L516-.L515
+	.byte	3,1,1,5,20,9
+	.half	.L517-.L516
+	.byte	1,5,18,9
+	.half	.L518-.L517
+	.byte	1,5,1,9
+	.half	.L519-.L518
+	.byte	3,1,1,7,9
+	.half	.L128-.L519
+	.byte	0,1,1
+.L509:
+	.sdecl	'.debug_ranges',debug,cluster('Lin_IsrError')
+	.sect	'.debug_ranges'
+.L127:
+	.word	-1,.L64,0,.L128-.L64,0,0
+	.sdecl	'.debug_info',debug,cluster('Lin_Ch')
+	.sect	'.debug_info'
+.L129:
+	.word	205
+	.half	3
+	.word	.L130
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/Lin.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1,2
+	.word	.L75
+	.byte	3
+	.byte	'Lin_Ch',0,5,23,24
+	.word	.L164
+	.byte	5,3
+	.word	Lin_Ch
+	.byte	0
+	.sdecl	'.debug_abbrev',debug,cluster('Lin_Ch')
+	.sect	'.debug_abbrev'
+.L130:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,0,0,2,61,0,24,16,0,0,3,52,0,3,8,58,15,59,15,57,15,73,16,2,9,0,0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_GetState')
+	.sect	'.debug_loc'
+.L147:
+	.word	-1,.L72,0,.L146-.L72
+	.half	1
+	.byte	84
+	.word	0,0
+.L71:
+	.word	-1,.L72,0,.L146-.L72
+	.half	2
+	.byte	138,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_loc'
+.L150:
+	.word	-1,.L74,0,.L196-.L74
+	.half	1
+	.byte	84
+	.word	0,0
+.L73:
+	.word	-1,.L74,0,.L149-.L74
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L152:
+	.word	-1,.L74,0,.L51-.L74
+	.half	1
+	.byte	100
+	.word	0,0
+.L153:
+	.word	-1,.L74,0,.L197-.L74
+	.half	1
+	.byte	101
+	.word	.L198-.L74,.L149-.L74
+	.half	1
+	.byte	108
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_loc'
+.L140:
+	.word	-1,.L68,0,.L191-.L68
+	.half	1
+	.byte	84
+	.word	.L192-.L68,.L139-.L68
+	.half	1
+	.byte	88
+	.word	.L193-.L68,.L194-.L68
+	.half	1
+	.byte	84
+	.word	0,0
+.L67:
+	.word	-1,.L68,0,.L190-.L68
+	.half	2
+	.byte	138,0
+	.word	.L190-.L68,.L139-.L68
+	.half	2
+	.byte	138,16
+	.word	.L139-.L68,.L139-.L68
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L142:
+	.word	-1,.L68,0,.L139-.L68
+	.half	2
+	.byte	145,112
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_Init')
+	.sect	'.debug_loc'
+.L55:
+	.word	-1,.L56,0,.L131-.L56
+	.half	2
+	.byte	138,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_IsrError')
+	.sect	'.debug_loc'
+.L162:
+	.word	-1,.L64,0,.L161-.L64
+	.half	1
+	.byte	84
+	.word	0,0
+.L63:
+	.word	-1,.L64,0,.L161-.L64
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L163:
+	.word	-1,.L64,0,.L161-.L64
+	.half	1
+	.byte	85
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_loc'
+.L158:
+	.word	-1,.L62,0,.L184-.L62
+	.half	1
+	.byte	84
+	.word	.L186-.L62,.L157-.L62
+	.half	1
+	.byte	88
+	.word	.L189-.L62,.L188-.L62
+	.half	1
+	.byte	84
+	.word	0,0
+.L61:
+	.word	-1,.L62,0,.L157-.L62
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L159:
+	.word	-1,.L62,0,.L185-.L62
+	.half	1
+	.byte	85
+	.word	0,0
+.L160:
+	.word	-1,.L62,.L187-.L62,.L188-.L62
+	.half	1
+	.byte	82
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_loc'
+.L155:
+	.word	-1,.L60,0,.L175-.L60
+	.half	1
+	.byte	84
+	.word	.L176-.L60,.L154-.L60
+	.half	1
+	.byte	88
+	.word	.L11-.L60,.L177-.L60
+	.half	1
+	.byte	84
+	.word	.L13-.L60,.L178-.L60
+	.half	1
+	.byte	84
+	.word	.L16-.L60,.L179-.L60
+	.half	1
+	.byte	84
+	.word	.L18-.L60,.L17-.L60
+	.half	1
+	.byte	84
+	.word	.L15-.L60,.L180-.L60
+	.half	1
+	.byte	84
+	.word	.L22-.L60,.L181-.L60
+	.half	1
+	.byte	84
+	.word	.L24-.L60,.L12-.L60
+	.half	1
+	.byte	84
+	.word	0,0
+.L59:
+	.word	-1,.L60,0,.L154-.L60
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L156:
+	.word	-1,.L60,.L182-.L60,.L183-.L60
+	.half	1
+	.byte	82
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_loc'
+.L65:
+	.word	-1,.L66,0,.L132-.L66
+	.half	2
+	.byte	138,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_loc'
+.L135:
+	.word	-1,.L58,0,.L166-.L58
+	.half	1
+	.byte	84
+	.word	.L168-.L58,.L134-.L58
+	.half	1
+	.byte	88
+	.word	.L173-.L58,.L174-.L58
+	.half	1
+	.byte	84
+	.word	0,0
+.L57:
+	.word	-1,.L58,0,.L165-.L58
+	.half	2
+	.byte	138,0
+	.word	.L165-.L58,.L134-.L58
+	.half	2
+	.byte	138,8
+	.word	.L134-.L58,.L134-.L58
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L137:
+	.word	-1,.L58,0,.L167-.L58
+	.half	1
+	.byte	100
+	.word	.L169-.L58,.L170-.L58
+	.half	1
+	.byte	111
+	.word	.L171-.L58,.L172-.L58
+	.half	1
+	.byte	101
+	.word	0,0
+.L138:
+	.word	-1,.L58,0,.L134-.L58
+	.half	2
+	.byte	145,120
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_loc'
+.L144:
+	.word	-1,.L70,0,.L195-.L70
+	.half	1
+	.byte	84
+	.word	0,0
+.L69:
+	.word	-1,.L70,0,.L143-.L70
+	.half	2
+	.byte	138,0
+	.word	0,0
+	.sdecl	'.debug_frame',debug
+	.sect	'.debug_frame'
+.L520:
+	.word	48
+	.word	-1
+	.byte	3,0,2,1,27,12,26,0,8,26,8,27,8,30,8,29,8,28,8,16,8,17,8,24,8,25,8,31,8,32,8,33,8,34,8,35,8,36,8,37,8,38
+	.byte	8,39
+	.sdecl	'.debug_frame',debug,cluster('Lin_Init')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L520,.L56,.L131-.L56
+	.sdecl	'.debug_frame',debug,cluster('Lin_SendFrame')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L520,.L58,.L134-.L58
+	.byte	4
+	.word	(.L165-.L58)/2
+	.byte	19,8,22,26,3,19,138,8,4
+	.word	(.L134-.L165)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('Lin_IsrTxDone')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L520,.L60,.L154-.L60
+	.sdecl	'.debug_frame',debug,cluster('Lin_IsrRxByte')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L520,.L62,.L157-.L62
+	.sdecl	'.debug_frame',debug,cluster('Lin_IsrError')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L520,.L64,.L161-.L64
+	.byte	8,18,8,19,8,20,8,21,8,22,8,23
+	.sdecl	'.debug_frame',debug,cluster('Lin_MainFunction')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L520,.L66,.L132-.L66
+	.byte	8,19,8,20,8,21,8,22,8,23,0,0
+	.sdecl	'.debug_frame',debug,cluster('Lin_GoToSleep')
+	.sect	'.debug_frame'
+	.word	36
+	.word	.L520,.L68,.L139-.L68
+	.byte	4
+	.word	(.L190-.L68)/2
+	.byte	19,16,22,26,3,19,138,16,4
+	.word	(.L139-.L190)/2
+	.byte	19,0,8,26,0,0
+	.sdecl	'.debug_frame',debug,cluster('Lin_Wakeup')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L520,.L70,.L143-.L70
+	.sdecl	'.debug_frame',debug,cluster('Lin_GetState')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L520,.L72,.L146-.L72
+	.byte	8,18,8,19,8,20,8,21,8,22,8,23
+	.sdecl	'.debug_frame',debug,cluster('Lin_GetStatus')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L520,.L74,.L149-.L74
+	; Module end

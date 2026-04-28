@@ -1,0 +1,104 @@
+#include "Can.h"
+#include "IfxScuWdt.h"
+#include "IfxPort.h"
+
+/* ================= GLOBAL ================= */
+Can_DriverType Can_Driver;
+static Can_StateType Can_State = CAN_UNINIT;
+
+/* ================= INIT ================= */
+void Can_Init(void)
+{
+    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+
+    IfxCan_Can_Config canConfig;
+    IfxCan_Can_initModuleConfig(&canConfig, &MODULE_CAN0);
+    IfxCan_Can_initModule(&Can_Driver.canModule, &canConfig);
+
+    IfxCan_Can_initNodeConfig(&Can_Driver.nodeConfig, &Can_Driver.canModule);
+
+    Can_Driver.nodeConfig.baudRate.baudrate = 500000;
+    Can_Driver.nodeConfig.frame.mode = IfxCan_FrameMode_standard;
+
+    Can_Driver.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
+    Can_Driver.nodeConfig.txConfig.dedicatedTxBuffersNumber = CAN_TX_BUFFER_COUNT;
+
+    Can_Driver.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_dedicatedBuffers;
+
+    /* Enable RX interrupt */
+    Can_Driver.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
+    Can_Driver.nodeConfig.interruptConfig.reint.priority = 10;
+    Can_Driver.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
+
+    IfxCan_Can_initNode(&Can_Driver.canNode, &Can_Driver.nodeConfig);
+
+    /* Pins */
+    IfxCan_Node_initRxPin(Can_Driver.canNode.node,
+                         &IfxCan_RXD00B_P20_7_IN,
+                         IfxPort_Mode_inputPullUp,
+                         IfxPort_PadDriver_cmosAutomotiveSpeed1);
+
+    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT,
+                         IfxPort_OutputMode_pushPull,
+                         IfxPort_PadDriver_cmosAutomotiveSpeed4);
+
+    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+
+    Can_State = CAN_READY;
+}
+
+/* ================= TRANSMIT ================= */
+bool Can_Write(Can_IdType id, const uint8 *data, uint8 dlc)
+{
+    if (Can_State != CAN_READY || dlc > CAN_MAX_DLC)
+        return false;
+
+    IfxCan_Message msg;
+    IfxCan_Can_initMessage(&msg);
+
+    msg.messageId = id;
+    msg.dataLengthCode = dlc;
+
+    uint32 payload[2] = {0};
+
+    for (uint8 i = 0; i < dlc; i++)
+    {
+        ((uint8*)payload)[i] = data[i];
+    }
+
+    return IfxCan_Can_sendMessage(&Can_Driver.canNode, &msg, payload);
+}
+
+/* ================= RX ISR ================= */
+void Can_IsrRxHandler(void)
+{
+    IfxCan_Message rxMsg;
+    uint32 data[2];
+
+    IfxCan_Can_readMessage(&Can_Driver.canNode, &rxMsg, data);
+
+    Can_HwType hw;
+    hw.CanId = rxMsg.messageId;
+    hw.Hoh   = rxMsg.bufferNumber;
+    hw.ControllerId = 0;
+
+    PduInfoType pdu;
+    pdu.SduDataPtr = (uint8*)data;
+    pdu.SduLength  = rxMsg.dataLengthCode;
+
+    /* Forward to upper layer */
+    CanIf_RxIndication(&hw, &pdu);
+}
+
+/* ================= MAIN FUNCTION ================= */
+void Can_MainFunction(void)
+{
+    if (Can_State != CAN_READY)
+        return;
+
+    /* Error handling (bus-off recovery) */
+    if (IfxCan_Node_getBusOffStatus(Can_Driver.canNode.node))
+    {
+        Can_Init(); /* simple recovery */
+    }
+}

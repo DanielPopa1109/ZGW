@@ -1,0 +1,28 @@
+#ifndef LINTP_H
+#define LINTP_H
+
+#include "ComStack_Types.h"
+
+#define LINTP_NAD_BROADCAST       0x7Fu
+#define LINTP_NAD_FUNCTIONAL      0x7Eu
+#define LINTP_MAX_PAYLOAD         4095u
+
+#define LINTP_PCI_SF              0x00u
+#define LINTP_PCI_FF              0x10u
+#define LINTP_PCI_CF              0x20u
+
+#define LINTP_PDUR_ID             2u
+
+void LinTp_Init(uint8 configuredNad);
+void LinTp_MainFunction(void);
+
+Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len);
+void LinTp_TxFrameConfirmation(uint8 success);
+
+void LinTp_RxMasterRequest(const uint8 frame[8]);
+void LinTp_RxSlaveResponse(const uint8 frame[8]);
+
+Std_ReturnType LinTp_AssignNad(uint8 initialNad, uint16 supplierId, uint16 functionId, uint8 newNad);
+uint8 LinTp_GetNad(void);
+
+#endif

@@ -1,0 +1,290 @@
+#include "Lin.h"
+#include "Lin_LowLevel.h"
+#include <string.h>
+
+#define LIN_RESPONSE_TIMEOUT_TICKS 20u
+#define LIN_WAKEUP_TICKS          30u
+#define LIN_SLEEP_D0              0x00u
+#define LIN_SLEEP_D1              0xFFu
+
+typedef struct
+{
+    Lin_StateType state;
+    Lin_ResultType result;
+    Lin_PduType activePdu;
+    uint8 rxBuf[LIN_MAX_DATA_LEN + 1u];
+    uint8 rxCnt;
+    uint8 txCnt;
+    uint16 timeout;
+    uint16 wakeupTimer;
+    uint8 sleepAfterTx;
+} Lin_ChannelType;
+
+static Lin_ChannelType Lin_Ch;
+
+void Lin_Init(void)
+{
+    memset(&Lin_Ch, 0, sizeof(Lin_Ch));
+    Lin_Ch.state = LIN_IDLE;
+    Lin_Ch.result = LIN_RES_OK;
+}
+
+Std_ReturnType Lin_SendFrame(uint8 Channel, const Lin_PduType* PduInfoPtr)
+{
+    uint8 id;
+
+    (void)Channel;
+
+    if ((PduInfoPtr == NULL_PTR) || (Lin_Ch.state != LIN_IDLE))
+    {
+        return E_NOT_OK;
+    }
+
+    if ((PduInfoPtr->dlc == 0u) || (PduInfoPtr->dlc > LIN_MAX_DATA_LEN))
+    {
+        return E_NOT_OK;
+    }
+
+    if (Lin_CheckPid(PduInfoPtr->pid, &id) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(&Lin_Ch.activePdu, PduInfoPtr, sizeof(Lin_PduType));
+
+    Lin_LowLevel_SetResponseLength(PduInfoPtr->dlc);
+
+    Lin_Ch.rxCnt = 0u;
+    Lin_Ch.txCnt = 0u;
+    Lin_Ch.timeout = LIN_RESPONSE_TIMEOUT_TICKS;
+    Lin_Ch.result = LIN_RES_NO_RESPONSE;
+    Lin_Ch.state = LIN_TX_BREAK;
+
+    Lin_LowLevel_SendBreak(Channel);
+
+    return E_OK;
+}
+
+void Lin_IsrTxDone(uint8 Channel)
+{
+    uint8 checksum;
+
+    if (Lin_Ch.state == LIN_TX_BREAK)
+    {
+        Lin_Ch.state = LIN_TX_SYNC;
+        Lin_LowLevel_SendByte(Channel, 0x55u);
+        return;
+    }
+
+    if (Lin_Ch.state == LIN_TX_SYNC)
+    {
+        Lin_Ch.state = LIN_TX_PID;
+        Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.pid);
+        return;
+    }
+
+    if (Lin_Ch.state == LIN_TX_PID)
+    {
+        if (Lin_Ch.activePdu.direction == LIN_MASTER_RESPONSE)
+        {
+            Lin_Ch.state = LIN_TX_RESPONSE;
+            Lin_Ch.txCnt = 0u;
+            Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.data[0]);
+            Lin_Ch.txCnt = 1u;
+        }
+        else if (Lin_Ch.activePdu.direction == LIN_SLAVE_RESPONSE)
+        {
+            Lin_Ch.state = LIN_RX_RESPONSE;
+            Lin_Ch.rxCnt = 0u;
+            Lin_LowLevel_EnableRx(Channel);
+        }
+        else
+        {
+            Lin_Ch.result = LIN_RES_OK;
+            Lin_Ch.state = LIN_IDLE;
+        }
+
+        return;
+    }
+
+    if (Lin_Ch.state == LIN_TX_RESPONSE)
+    {
+        if (Lin_Ch.txCnt < Lin_Ch.activePdu.dlc)
+        {
+            Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.data[Lin_Ch.txCnt]);
+            Lin_Ch.txCnt++;
+        }
+        else if (Lin_Ch.txCnt == Lin_Ch.activePdu.dlc)
+        {
+            checksum = Lin_CalcChecksum(Lin_Ch.activePdu.pid,
+                                        Lin_Ch.activePdu.data,
+                                        Lin_Ch.activePdu.dlc,
+                                        Lin_Ch.activePdu.checksumType);
+
+            Lin_LowLevel_SendByte(Channel, checksum);
+            Lin_Ch.txCnt++;
+        }
+        else
+        {
+            Lin_Ch.result = LIN_RES_OK;
+
+            if (Lin_Ch.sleepAfterTx != FALSE)
+            {
+                Lin_Ch.sleepAfterTx = FALSE;
+                Lin_Ch.state = LIN_SLEEP;
+            }
+            else
+            {
+                Lin_Ch.state = LIN_IDLE;
+            }
+        }
+    }
+}
+
+void Lin_IsrRxByte(uint8 Channel, uint8 byte)
+{
+    uint8 checksum;
+
+    (void)Channel;
+
+    if (Lin_Ch.state != LIN_RX_RESPONSE)
+    {
+        return;
+    }
+
+    if (Lin_Ch.rxCnt < (uint8)(Lin_Ch.activePdu.dlc + 1u))
+    {
+        Lin_Ch.rxBuf[Lin_Ch.rxCnt] = byte;
+        Lin_Ch.rxCnt++;
+    }
+
+    if (Lin_Ch.rxCnt >= (uint8)(Lin_Ch.activePdu.dlc + 1u))
+    {
+        checksum = Lin_CalcChecksum(Lin_Ch.activePdu.pid,
+                                    Lin_Ch.rxBuf,
+                                    Lin_Ch.activePdu.dlc,
+                                    Lin_Ch.activePdu.checksumType);
+
+        Lin_Ch.result = (checksum == Lin_Ch.rxBuf[Lin_Ch.activePdu.dlc]) ? LIN_RES_OK : LIN_RES_CHECKSUM_ERROR;
+
+        Lin_LowLevel_DisableRx(Channel);
+        Lin_Ch.state = LIN_IDLE;
+    }
+}
+
+void Lin_IsrError(uint8 Channel, Lin_ResultType error)
+{
+    (void)Channel;
+
+    Lin_Ch.result = error;
+    Lin_Ch.sleepAfterTx = FALSE;
+    Lin_Ch.state = LIN_IDLE;
+}
+
+void Lin_MainFunction(void)
+{
+    if ((Lin_Ch.state == LIN_RX_RESPONSE) ||
+        (Lin_Ch.state == LIN_TX_RESPONSE) ||
+        (Lin_Ch.state == LIN_TX_BREAK) ||
+        (Lin_Ch.state == LIN_TX_SYNC) ||
+        (Lin_Ch.state == LIN_TX_PID))
+    {
+        if (Lin_Ch.timeout > 0u)
+        {
+            Lin_Ch.timeout--;
+        }
+        else
+        {
+            Lin_Ch.result = LIN_RES_TIMEOUT;
+            Lin_Ch.sleepAfterTx = FALSE;
+            Lin_Ch.state = LIN_IDLE;
+        }
+    }
+
+    if (Lin_Ch.state == LIN_WAKEUP)
+    {
+        if (Lin_Ch.wakeupTimer > 0u)
+        {
+            Lin_Ch.wakeupTimer--;
+        }
+        else
+        {
+            Lin_Ch.state = LIN_IDLE;
+            Lin_Ch.result = LIN_RES_OK;
+        }
+    }
+}
+
+Std_ReturnType Lin_GoToSleep(uint8 Channel)
+{
+    Lin_PduType pdu;
+
+    memset(&pdu, 0, sizeof(pdu));
+
+    pdu.pid = LIN_PID_MASTER_REQUEST;
+    pdu.dlc = 8u;
+    pdu.direction = LIN_MASTER_RESPONSE;
+    pdu.checksumType = LIN_CS_CLASSIC;
+
+    pdu.data[0] = LIN_SLEEP_D0;
+    pdu.data[1] = LIN_SLEEP_D1;
+    pdu.data[2] = LIN_SLEEP_D1;
+    pdu.data[3] = LIN_SLEEP_D1;
+    pdu.data[4] = LIN_SLEEP_D1;
+    pdu.data[5] = LIN_SLEEP_D1;
+    pdu.data[6] = LIN_SLEEP_D1;
+    pdu.data[7] = LIN_SLEEP_D1;
+
+    Lin_Ch.sleepAfterTx = TRUE;
+
+    if (Lin_SendFrame(Channel, &pdu) != E_OK)
+    {
+        Lin_Ch.sleepAfterTx = FALSE;
+        return E_NOT_OK;
+    }
+
+    return E_OK;
+}
+
+Std_ReturnType Lin_Wakeup(uint8 Channel)
+{
+    if (Lin_Ch.state != LIN_SLEEP)
+    {
+        return E_NOT_OK;
+    }
+
+    Lin_LowLevel_WakeupPulse(Channel);
+    Lin_Ch.state = LIN_WAKEUP;
+    Lin_Ch.wakeupTimer = LIN_WAKEUP_TICKS;
+
+    return E_OK;
+}
+
+Lin_StateType Lin_GetState(uint8 Channel)
+{
+    (void)Channel;
+    return Lin_Ch.state;
+}
+
+Lin_ResultType Lin_GetStatus(uint8 Channel, uint8* dataOut, uint8* lenOut)
+{
+    (void)Channel;
+
+    if ((dataOut != NULL_PTR) && (Lin_Ch.result == LIN_RES_OK))
+    {
+        memcpy(dataOut, Lin_Ch.rxBuf, Lin_Ch.activePdu.dlc);
+    }
+
+    if (lenOut != NULL_PTR)
+    {
+        *lenOut = Lin_Ch.activePdu.dlc;
+    }
+
+    return Lin_Ch.result;
+}
+
+__attribute__((weak)) void Lin_LowLevel_SendBreak(uint8 Channel) { (void)Channel; }
+__attribute__((weak)) void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte) { (void)Channel; (void)byte; }
+__attribute__((weak)) void Lin_LowLevel_EnableRx(uint8 Channel) { (void)Channel; }
+__attribute__((weak)) void Lin_LowLevel_DisableRx(uint8 Channel) { (void)Channel; }
+__attribute__((weak)) void Lin_LowLevel_WakeupPulse(uint8 Channel) { (void)Channel; }

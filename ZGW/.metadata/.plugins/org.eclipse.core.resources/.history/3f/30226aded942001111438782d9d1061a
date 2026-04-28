@@ -1,0 +1,218 @@
+#include "LinTp.h"
+#include "PduR.h"
+#include <string.h>
+
+typedef struct
+{
+    LinTp_StateType state;
+    uint8 nad;
+    uint8 rxBuffer[LINTP_MAX_PAYLOAD_LEN];
+    uint8 txBuffer[LINTP_MAX_PAYLOAD_LEN];
+    PduLengthType rxExpectedLen;
+    PduLengthType rxIndex;
+    PduLengthType txLen;
+    PduLengthType txIndex;
+    uint8 nextSN;
+    uint16 timeoutTicks;
+} LinTp_ChannelType;
+
+static LinTp_ChannelType LinTp_Ch;
+
+static void LinTp_SendNextTxFrame(void)
+{
+    uint8 frame[8u];
+    uint8 copyLen;
+    uint16 remain;
+
+    memset(frame, 0xFF, sizeof(frame));
+    frame[0] = LinTp_Ch.nad;
+
+    if (LinTp_Ch.txLen <= 6u)
+    {
+        frame[1] = (uint8)(LINTP_PCI_SF | (uint8)LinTp_Ch.txLen);
+        memcpy(&frame[2], LinTp_Ch.txBuffer, LinTp_Ch.txLen);
+
+        LinTp_Ch.txIndex = LinTp_Ch.txLen;
+        LinTp_Ch.state = LINTP_TX_IN_PROGRESS;
+
+        (void)LinIf_Transmit(2u, frame, 8u);
+        return;
+    }
+
+    if (LinTp_Ch.txIndex == 0u)
+    {
+        frame[1] = (uint8)(LINTP_PCI_FF | ((LinTp_Ch.txLen >> 8u) & 0x0Fu));
+        frame[2] = (uint8)(LinTp_Ch.txLen & 0xFFu);
+
+        copyLen = 5u;
+        memcpy(&frame[3], LinTp_Ch.txBuffer, copyLen);
+
+        LinTp_Ch.txIndex = copyLen;
+        LinTp_Ch.nextSN = 1u;
+        LinTp_Ch.state = LINTP_TX_IN_PROGRESS;
+
+        (void)LinIf_Transmit(2u, frame, 8u);
+        return;
+    }
+
+    remain = (uint16)(LinTp_Ch.txLen - LinTp_Ch.txIndex);
+    copyLen = (remain > 6u) ? 6u : (uint8)remain;
+
+    frame[1] = (uint8)(LINTP_PCI_CF | (LinTp_Ch.nextSN & 0x0Fu));
+    memcpy(&frame[2], &LinTp_Ch.txBuffer[LinTp_Ch.txIndex], copyLen);
+
+    LinTp_Ch.txIndex += copyLen;
+    LinTp_Ch.nextSN = (uint8)((LinTp_Ch.nextSN + 1u) & 0x0Fu);
+
+    (void)LinIf_Transmit(2u, frame, 8u);
+}
+
+void LinTp_Init(void)
+{
+    memset(&LinTp_Ch, 0, sizeof(LinTp_Ch));
+    LinTp_Ch.state = LINTP_IDLE;
+    LinTp_Ch.nad = LINTP_DEFAULT_NAD;
+}
+
+Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len)
+{
+    (void)TxPduId;
+
+    if ((data == NULL_PTR) || (len > LINTP_MAX_PAYLOAD_LEN) || (LinTp_Ch.state != LINTP_IDLE))
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(LinTp_Ch.txBuffer, data, len);
+    LinTp_Ch.txLen = len;
+    LinTp_Ch.txIndex = 0u;
+    LinTp_Ch.timeoutTicks = 200u;
+
+    LinTp_SendNextTxFrame();
+
+    return E_OK;
+}
+
+void LinTp_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len)
+{
+    uint8 nad;
+    uint8 pci;
+    uint8 pciType;
+    uint8 sn;
+    uint8 copyLen;
+    PduLengthType totalLen;
+
+    (void)RxPduId;
+
+    if ((data == NULL_PTR) || (len != 8u))
+    {
+        return;
+    }
+
+    nad = data[0];
+
+    if ((nad != LinTp_Ch.nad) && (nad != LINTP_NAD_FUNCTIONAL))
+    {
+        return;
+    }
+
+    pci = data[1];
+    pciType = (uint8)(pci & 0xF0u);
+
+    if (pciType == LINTP_PCI_SF)
+    {
+        totalLen = (PduLengthType)(pci & 0x0Fu);
+
+        if (totalLen > 6u)
+        {
+            return;
+        }
+
+        memcpy(LinTp_Ch.rxBuffer, &data[2], totalLen);
+        LinTp_Ch.state = LINTP_IDLE;
+
+        PduR_LinTpRxIndication(0u, LinTp_Ch.rxBuffer, totalLen);
+    }
+    else if (pciType == LINTP_PCI_FF)
+    {
+        totalLen = (PduLengthType)((((PduLengthType)pci & 0x0Fu) << 8u) | data[2]);
+
+        if (totalLen > LINTP_MAX_PAYLOAD_LEN)
+        {
+            LinTp_Ch.state = LINTP_IDLE;
+            return;
+        }
+
+        LinTp_Ch.rxExpectedLen = totalLen;
+        LinTp_Ch.rxIndex = 5u;
+        LinTp_Ch.nextSN = 1u;
+        LinTp_Ch.state = LINTP_RX_IN_PROGRESS;
+        LinTp_Ch.timeoutTicks = 200u;
+
+        memcpy(LinTp_Ch.rxBuffer, &data[3], 5u);
+    }
+    else if ((pciType == LINTP_PCI_CF) && (LinTp_Ch.state == LINTP_RX_IN_PROGRESS))
+    {
+        sn = (uint8)(pci & 0x0Fu);
+
+        if (sn != LinTp_Ch.nextSN)
+        {
+            LinTp_Ch.state = LINTP_IDLE;
+            return;
+        }
+
+        copyLen = (uint8)((LinTp_Ch.rxExpectedLen - LinTp_Ch.rxIndex) > 6u ? 6u : (LinTp_Ch.rxExpectedLen - LinTp_Ch.rxIndex));
+
+        memcpy(&LinTp_Ch.rxBuffer[LinTp_Ch.rxIndex], &data[2], copyLen);
+
+        LinTp_Ch.rxIndex += copyLen;
+        LinTp_Ch.nextSN = (uint8)((LinTp_Ch.nextSN + 1u) & 0x0Fu);
+        LinTp_Ch.timeoutTicks = 200u;
+
+        if (LinTp_Ch.rxIndex >= LinTp_Ch.rxExpectedLen)
+        {
+            LinTp_Ch.state = LINTP_IDLE;
+            PduR_LinTpRxIndication(0u, LinTp_Ch.rxBuffer, LinTp_Ch.rxExpectedLen);
+        }
+    }
+    else
+    {
+    }
+}
+
+void LinTp_TxConfirmation(PduIdType TxPduId, Std_ReturnType result)
+{
+    (void)TxPduId;
+
+    if (result != E_OK)
+    {
+        LinTp_Ch.state = LINTP_IDLE;
+        PduR_LinTpTxConfirmation(0u, E_NOT_OK);
+        return;
+    }
+
+    if (LinTp_Ch.txIndex >= LinTp_Ch.txLen)
+    {
+        LinTp_Ch.state = LINTP_IDLE;
+        PduR_LinTpTxConfirmation(0u, E_OK);
+    }
+    else
+    {
+        LinTp_SendNextTxFrame();
+    }
+}
+
+void LinTp_MainFunction(void)
+{
+    if (LinTp_Ch.state != LINTP_IDLE)
+    {
+        if (LinTp_Ch.timeoutTicks > 0u)
+        {
+            LinTp_Ch.timeoutTicks--;
+        }
+        else
+        {
+            LinTp_Ch.state = LINTP_IDLE;
+        }
+    }
+}

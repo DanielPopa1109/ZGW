@@ -1,0 +1,141 @@
+#include "PduR.h"
+#include "CanTp.h"
+#include "LinTp.h"
+#include "Dcm.h"
+#include "Com.h"
+#include <string.h>
+
+typedef struct
+{
+    uint8 buffer[PDUR_MAX_TP_BUFFER];
+    PduLengthType len;
+    PduLengthType offset;
+    uint8 active;
+} PduR_TpBufferType;
+
+static PduR_TpBufferType PduR_CanTpRxBuf;
+static PduR_TpBufferType PduR_LinTpRxBuf;
+
+void PduR_Init(void)
+{
+    memset(&PduR_CanTpRxBuf, 0, sizeof(PduR_CanTpRxBuf));
+    memset(&PduR_LinTpRxBuf, 0, sizeof(PduR_LinTpRxBuf));
+}
+
+Std_ReturnType PduR_ComTransmit(PduIdType TxPduId, const uint8* data, PduLengthType len)
+{
+    return CanIf_Transmit(TxPduId, data, len);
+}
+
+Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId, const uint8* data, PduLengthType len)
+{
+    uint8 i;
+
+    for (i = 0u; i < PDUR_DCM_TO_CANTP_CHANNELS; i++)
+    {
+        if (PduR_DcmToCanTp[i].sourcePduId == DcmTxPduId)
+        {
+            return CanTp_Transmit(PduR_DcmToCanTp[i].destPduId, data, len);
+        }
+    }
+
+    for (i = 0u; i < PDUR_DCM_TO_LINTP_CHANNELS; i++)
+    {
+        if (PduR_DcmToLinTp[i].sourcePduId == DcmTxPduId)
+        {
+            return LinTp_Transmit(PduR_DcmToLinTp[i].destPduId, data, len);
+        }
+    }
+
+    return E_NOT_OK;
+}
+
+Std_ReturnType PduR_CanTpStartOfReception(PduIdType id, PduLengthType len)
+{
+    (void)id;
+
+    if (len > PDUR_MAX_TP_BUFFER)
+    {
+        return E_NOT_OK;
+    }
+
+    PduR_CanTpRxBuf.len = len;
+    PduR_CanTpRxBuf.offset = 0u;
+    PduR_CanTpRxBuf.active = TRUE;
+    return E_OK;
+}
+
+Std_ReturnType PduR_CanTpCopyRxData(PduIdType id, const uint8* data, PduLengthType len)
+{
+    (void)id;
+
+    if ((data == NULL_PTR) || (PduR_CanTpRxBuf.active == FALSE) ||
+        ((PduR_CanTpRxBuf.offset + len) > PduR_CanTpRxBuf.len))
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(&PduR_CanTpRxBuf.buffer[PduR_CanTpRxBuf.offset], data, len);
+    PduR_CanTpRxBuf.offset = (PduLengthType)(PduR_CanTpRxBuf.offset + len);
+    return E_OK;
+}
+
+void PduR_CanTpRxIndication(PduIdType id, Std_ReturnType result)
+{
+    if ((result == E_OK) && (PduR_CanTpRxBuf.active == TRUE))
+    {
+        Dcm_RxIndication(id, PduR_CanTpRxBuf.buffer, PduR_CanTpRxBuf.len);
+    }
+
+    PduR_CanTpRxBuf.active = FALSE;
+}
+
+void PduR_CanTpTxConfirmation(PduIdType id, Std_ReturnType result)
+{
+    Dcm_TxConfirmation(id, result);
+}
+
+Std_ReturnType PduR_LinTpStartOfReception(PduIdType id, PduLengthType len)
+{
+    (void)id;
+
+    if (len > PDUR_MAX_TP_BUFFER)
+    {
+        return E_NOT_OK;
+    }
+
+    PduR_LinTpRxBuf.len = len;
+    PduR_LinTpRxBuf.offset = 0u;
+    PduR_LinTpRxBuf.active = TRUE;
+    return E_OK;
+}
+
+Std_ReturnType PduR_LinTpCopyRxData(PduIdType id, const uint8* data, PduLengthType len)
+{
+    (void)id;
+
+    if ((data == NULL_PTR) || (PduR_LinTpRxBuf.active == FALSE) ||
+        ((PduR_LinTpRxBuf.offset + len) > PduR_LinTpRxBuf.len))
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(&PduR_LinTpRxBuf.buffer[PduR_LinTpRxBuf.offset], data, len);
+    PduR_LinTpRxBuf.offset = (PduLengthType)(PduR_LinTpRxBuf.offset + len);
+    return E_OK;
+}
+
+void PduR_LinTpRxIndication(PduIdType id, Std_ReturnType result)
+{
+    if ((result == E_OK) && (PduR_LinTpRxBuf.active == TRUE))
+    {
+        Dcm_RxIndication(id, PduR_LinTpRxBuf.buffer, PduR_LinTpRxBuf.len);
+    }
+
+    PduR_LinTpRxBuf.active = FALSE;
+}
+
+void PduR_LinTpTxConfirmation(PduIdType id, Std_ReturnType result)
+{
+    Dcm_TxConfirmation(id, result);
+}

@@ -1,0 +1,15 @@
+#ifndef STD_TYPES_H
+#define STD_TYPES_H
+
+#include "Platform_Types.h"
+
+typedef uint8 Std_ReturnType;
+
+#define E_OK        0u
+#define E_NOT_OK    1u
+
+typedef uint8 boolean;
+#define TRUE  1u
+#define FALSE 0u
+
+#endif

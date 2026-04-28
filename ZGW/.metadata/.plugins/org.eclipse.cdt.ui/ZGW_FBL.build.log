@@ -1,0 +1,18 @@
+19:51:20 **** Incremental Build of configuration TriCore Debug (TASKING) for project ZGW_FBL ****
+amk -j12 all 
+TASKING VX-toolset for AURIX Development Studio (non-commercial): program builder v1.1r8 Build 22011964
+Building target: ZGW_FBL.elf
+Invoking: TASKING Linker
+cctc -f .ZGW_FBL.elf.opt
+Finished building target: ZGW_FBL.elf
+ 
+Invoking: Print Size
+elfsize  "ZGW_FBL.elf"
+Total sizes:
+ROM: 0x695e (26974) = code: 0x53fa (21498) + romdata: 0x1564 (5476)
+RAM: 0x96f5 (38645) = data + bss
+Finished building: ZGW_FBL.siz
+ 
+
+19:51:21 Build Finished. 0 errors, 0 warnings. (took 996ms)
+

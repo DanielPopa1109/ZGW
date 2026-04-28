@@ -1,0 +1,187 @@
+#include "Lin_LowLevel.h"
+#include "Lin.h"
+#include "Lin_Cfg.h"
+
+#include "IfxAsclin_Asc.h"
+#include "IfxAsclin.h"
+#include "IfxCpu_Irq.h"
+#include "IfxPort.h"
+
+#define LIN_ASC_TX_BUFFER_SIZE 32u
+#define LIN_ASC_RX_BUFFER_SIZE 32u
+
+#define LIN_TX_ISR_PRIORITY    40u
+#define LIN_RX_ISR_PRIORITY    41u
+#define LIN_ERR_ISR_PRIORITY   42u
+
+static IfxAsclin_Asc Lin_Asc;
+static uint8 Lin_TxBuffer[LIN_ASC_TX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8u];
+static uint8 Lin_RxBuffer[LIN_ASC_RX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8u];
+
+static volatile uint8 Lin_RxEnabled = FALSE;
+static volatile uint8 Lin_BreakActive = FALSE;
+
+IFX_INTERRUPT(Lin_AsclinTxIsr, 0, LIN_TX_ISR_PRIORITY);
+IFX_INTERRUPT(Lin_AsclinRxIsr, 0, LIN_RX_ISR_PRIORITY);
+IFX_INTERRUPT(Lin_AsclinErrIsr, 0, LIN_ERR_ISR_PRIORITY);
+
+void Lin_LowLevel_Init(void)
+{
+    IfxAsclin_Asc_Config ascConfig;
+
+    IfxAsclin_Asc_initModuleConfig(&ascConfig, &LIN_ASCLIN_MODULE);
+
+    ascConfig.baudrate.baudrate = LIN_DEFAULT_BAUDRATE;
+    ascConfig.baudrate.oversampling = IfxAsclin_OversamplingFactor_16;
+
+    ascConfig.bitTiming.medianFilter = IfxAsclin_SamplesPerBit_three;
+    ascConfig.bitTiming.samplePointPosition = IfxAsclin_SamplePointPosition_8;
+
+    ascConfig.frame.dataLength = IfxAsclin_DataLength_8;
+    ascConfig.frame.stopBit = IfxAsclin_StopBit_1;
+    ascConfig.frame.parityBit = FALSE;
+
+    ascConfig.txBuffer = Lin_TxBuffer;
+    ascConfig.txBufferSize = LIN_ASC_TX_BUFFER_SIZE;
+    ascConfig.rxBuffer = Lin_RxBuffer;
+    ascConfig.rxBufferSize = LIN_ASC_RX_BUFFER_SIZE;
+
+    ascConfig.interrupt.txPriority = LIN_TX_ISR_PRIORITY;
+    ascConfig.interrupt.rxPriority = LIN_RX_ISR_PRIORITY;
+    ascConfig.interrupt.erPriority = LIN_ERR_ISR_PRIORITY;
+    ascConfig.interrupt.typeOfService = IfxSrc_Tos_cpu0;
+
+    ascConfig.pins = NULL_PTR;
+
+    IfxAsclin_Asc_initModule(&Lin_Asc, &ascConfig);
+
+    IfxAsclin_initTxPin(&LIN_TX_PIN,
+                        LIN_TX_PIN_MODE,
+                        LIN_PIN_PAD_DRIVER);
+
+    IfxAsclin_initRxPin(&LIN_RX_PIN,
+                        LIN_RX_PIN_MODE,
+                        LIN_PIN_PAD_DRIVER);
+
+    Lin_RxEnabled = FALSE;
+    Lin_BreakActive = FALSE;
+}
+
+void Lin_LowLevel_SendBreak(uint8 Channel)
+{
+    (void)Channel;
+
+    Lin_BreakActive = TRUE;
+
+    IfxAsclin_setTxBreak(&LIN_ASCLIN_MODULE, TRUE);
+
+    {
+        volatile uint32 delay;
+
+        for (delay = 0u; delay < 3000u; delay++)
+        {
+            __asm("nop");
+        }
+    }
+
+    IfxAsclin_setTxBreak(&LIN_ASCLIN_MODULE, FALSE);
+
+    Lin_BreakActive = FALSE;
+
+    Lin_IsrTxDone(Channel);
+}
+
+void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
+{
+    Ifx_SizeT count = 1;
+
+    (void)Channel;
+
+    (void)IfxAsclin_Asc_write(&Lin_Asc, &byte, &count, TIME_INFINITE);
+}
+
+void Lin_LowLevel_EnableRx(uint8 Channel)
+{
+    (void)Channel;
+
+    Lin_RxEnabled = TRUE;
+}
+
+void Lin_LowLevel_DisableRx(uint8 Channel)
+{
+    (void)Channel;
+
+    Lin_RxEnabled = FALSE;
+}
+
+void Lin_LowLevel_WakeupPulse(uint8 Channel)
+{
+    (void)Channel;
+
+    IfxAsclin_setTxBreak(&LIN_ASCLIN_MODULE, TRUE);
+
+    {
+        volatile uint32 delay;
+
+        for (delay = 0u; delay < 1200u; delay++)
+        {
+            __asm("nop");
+        }
+    }
+
+    IfxAsclin_setTxBreak(&LIN_ASCLIN_MODULE, FALSE);
+}
+
+void Lin_AsclinTxIsr(void)
+{
+    IfxAsclin_Asc_isrTransmit(&Lin_Asc);
+
+    if (Lin_BreakActive == FALSE)
+    {
+        Lin_IsrTxDone(LIN_CHANNEL_0);
+    }
+}
+
+void Lin_AsclinRxIsr(void)
+{
+    uint8 byte;
+    Ifx_SizeT count = 1;
+
+    IfxAsclin_Asc_isrReceive(&Lin_Asc);
+
+    while (IfxAsclin_Asc_getReadCount(&Lin_Asc) > 0u)
+    {
+        count = 1;
+
+        if (IfxAsclin_Asc_read(&Lin_Asc, &byte, &count, 0u) == TRUE)
+        {
+            if (Lin_RxEnabled != FALSE)
+            {
+                Lin_IsrRxByte(LIN_CHANNEL_0, byte);
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+void Lin_AsclinErrIsr(void)
+{
+    uint32 flags;
+
+    flags = IfxAsclin_getFlags(&LIN_ASCLIN_MODULE);
+
+    IfxAsclin_clearAllFlags(&LIN_ASCLIN_MODULE);
+    IfxAsclin_Asc_isrError(&Lin_Asc);
+
+    if ((flags & IFXASCLIN_FLAGS_FE) != 0u)
+    {
+        Lin_IsrError(LIN_CHANNEL_0, LIN_RES_FRAMING_ERROR);
+    }
+    else
+    {
+        Lin_IsrError(LIN_CHANNEL_0, LIN_RES_NOT_OK);
+    }
+}

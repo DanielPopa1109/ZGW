@@ -1,0 +1,94 @@
+################################################################################
+# Automatically-generated file. Do not edit!
+################################################################################
+
+C++M_SRCS := 
+C++_SRCS := 
+CCM_SRCS := 
+CC_SRCS := 
+CPP_SRCS := 
+CXXM_SRCS := 
+CXX_SRCS := 
+C_SRCS := 
+C_UPPER_SRCS := 
+OBJ_SRCS := 
+O_SRCS := 
+SRC_SRCS := 
+C++M_DEPS := 
+C++_DEPS := 
+CCM_DEPS := 
+CC_DEPS := 
+COMPILED_SRCS := 
+CPP_DEPS := 
+CXXM_DEPS := 
+CXX_DEPS := 
+C_DEPS := 
+C_UPPER_DEPS := 
+EXECUTABLES := 
+OBJS := 
+SECONDARY_SIZE := 
+
+# Every subdirectory with source files must be described here
+SUBDIRS := \
+BSW/Com/Can \
+BSW/Com/CanIf \
+BSW/Com/CanSM \
+BSW/Com/CanTp \
+BSW/Com \
+BSW/Com/Lin \
+BSW/Com/PduR \
+BSW/Diag/Dcm \
+BSW/Diag/Dem \
+BSW/Io/Ain \
+BSW/Io/Irq \
+BSW/Mem/Fls \
+BSW/Mem/Nvm \
+BSW/Sys/Crc \
+BSW/Sys/FreeRTOS_core0 \
+BSW/Sys/FreeRTOS_core1 \
+BSW/Sys/FreeRTOS_core2 \
+BSW/Sys/McuSm \
+BSW/Sys/Os \
+BSW/Sys/ScrH \
+BSW/Sys/SmM/00_Ssw \
+BSW/Sys/SmM/01_Smu/SMU \
+BSW/Sys/SmM/01_Smu/SMU_Test \
+BSW/Sys/SmM/02_Safety_Mechanisms \
+BSW/Sys/SmM \
+BSW/Sys/SysMgr \
+BSW/Sys/Wdg \
+Configurations/Debug \
+Configurations \
+. \
+Libraries/Infra/Platform/Tricore/Compilers \
+Libraries/Infra/Ssw/TC3xx/Tricore \
+Libraries/Service/CpuGeneric/SysSe/Bsp \
+Libraries \
+Libraries/iLLD/TC3xx/Tricore/Asclin/Lin \
+Libraries/iLLD/TC3xx/Tricore/Asclin/Std \
+Libraries/iLLD/TC3xx/Tricore/Can/Can \
+Libraries/iLLD/TC3xx/Tricore/Can/Std \
+Libraries/iLLD/TC3xx/Tricore/Cpu/Irq \
+Libraries/iLLD/TC3xx/Tricore/Cpu/Std \
+Libraries/iLLD/TC3xx/Tricore/Cpu/Trap \
+Libraries/iLLD/TC3xx/Tricore/Dma/Dma \
+Libraries/iLLD/TC3xx/Tricore/Dma/Std \
+Libraries/iLLD/TC3xx/Tricore/Dts/Dts \
+Libraries/iLLD/TC3xx/Tricore/Dts/Std \
+Libraries/iLLD/TC3xx/Tricore/Evadc/Adc \
+Libraries/iLLD/TC3xx/Tricore/Evadc/Std \
+Libraries/iLLD/TC3xx/Tricore/Fce/Crc \
+Libraries/iLLD/TC3xx/Tricore/Fce/Std \
+Libraries/iLLD/TC3xx/Tricore/Flash/Std \
+Libraries/iLLD/TC3xx/Tricore/Mtu/Std \
+Libraries/iLLD/TC3xx/Tricore/Pms/Std \
+Libraries/iLLD/TC3xx/Tricore/Port/Io \
+Libraries/iLLD/TC3xx/Tricore/Port/Std \
+Libraries/iLLD/TC3xx/Tricore/Scu/Std \
+Libraries/iLLD/TC3xx/Tricore/Smu/Std \
+Libraries/iLLD/TC3xx/Tricore/Src/Std \
+Libraries/iLLD/TC3xx/Tricore/Stm/Std \
+Libraries/iLLD/TC3xx/Tricore/_Impl \
+Libraries/iLLD/TC3xx/Tricore/_PinMap/TC37x \
+SCR \
+

@@ -1,0 +1,401 @@
+#include "Dcm.h"
+#include <string.h>
+
+/* ===== Timing (ticks of MainFunction) ===== */
+#define DCM_P2_TIMEOUT      50u
+#define DCM_P2STAR_TIMEOUT  500u
+
+/* ===== Internal ===== */
+
+static const Dcm_ConfigType* Dcm_ConfigPtr;
+
+/* ===== ISO-TP RX (queued frames from ISR) ===== */
+#define RX_QUEUE_SIZE 8
+
+typedef struct {
+    uint8_t data[8];
+    uint8_t len;
+} CanFrameType;
+
+static CanFrameType rxQueue[RX_QUEUE_SIZE];
+static uint8_t rxHead, rxTail;
+
+/* ISO-TP reassembly */
+typedef struct {
+    uint8_t buffer[DCM_MAX_PDU_LEN];
+    uint16_t totalLen;
+    uint16_t index;
+    uint8_t nextSN;
+    bool inProgress;
+    bool complete;
+} IsoTpRxType;
+
+static IsoTpRxType isoRx;
+
+/* ISO-TP TX */
+typedef struct {
+    uint8_t buffer[DCM_MAX_PDU_LEN];
+    uint16_t len;
+    uint16_t index;
+    uint8_t sn;
+    bool inProgress;
+} IsoTpTxType;
+
+static IsoTpTxType isoTx;
+
+/* DCM state */
+typedef struct {
+    uint8_t sid;
+    const Dcm_ServiceType* service;
+    Dcm_OpStatusType opStatus;
+    uint16_t p2Timer;
+    uint16_t p2StarTimer;
+    bool pendingActive;
+} Dcm_ContextType;
+
+static Dcm_ContextType ctx;
+static Dcm_SecState_t sec[DCM_SEC_LEVELS];
+static const uint32_t SEC_SECRET = 0x6A09E667u;
+
+/* ===== Forward ===== */
+static void Dcm_IsoTpRxMain(void);
+static void Dcm_IsoTpTxMain(void);
+static void Dcm_StartProcessing(void);
+static void Dcm_ContinueProcessing(void);
+
+/* ===== Config ===== */
+static uint8_t Service_0x10(Dcm_OpStatusType, const uint8_t*, uint16_t, uint8_t*, uint16_t*);
+
+static const Dcm_ServiceType serviceTable[] = {
+    {0x10, Service_0x10}
+};
+
+const Dcm_ConfigType Dcm_Config = {
+    serviceTable,
+    1
+};
+
+/* ===== Init ===== */
+void Dcm_Init(const Dcm_ConfigType* config)
+{
+    Dcm_ConfigPtr = config;
+    memset(&isoRx, 0, sizeof(isoRx));
+    memset(&isoTx, 0, sizeof(isoTx));
+    memset(&ctx, 0, sizeof(ctx));
+}
+
+/* ===== ISR entry ===== */
+void Dcm_CanRxIndication(const uint8_t* data, uint8_t dlc)
+{
+    uint8_t next = (rxHead + 1) % RX_QUEUE_SIZE;
+    if (next == rxTail) return;
+
+    memcpy(rxQueue[rxHead].data, data, dlc);
+    rxQueue[rxHead].len = dlc;
+    rxHead = next;
+}
+
+/* ===== Main ===== */
+void Dcm_MainFunction(void)
+{
+    Dcm_IsoTpRxMain();
+    Dcm_ContinueProcessing();
+    Dcm_IsoTpTxMain();
+}
+
+static void Dcm_IsoTpTxReset(void)
+{
+    memset(&isoTx, 0, sizeof(isoTx));
+}
+
+static void Dcm_IsoTpRxReset(void)
+{
+    memset(&isoRx, 0, sizeof(isoRx));
+}
+
+
+/* ===== Start processing ===== */
+static void Dcm_StartProcessing(void)
+{
+    ctx.sid = isoRx.buffer[0];
+    ctx.opStatus = DCM_INITIAL;
+    ctx.p2Timer = DCM_P2_TIMEOUT;
+    ctx.p2StarTimer = DCM_P2STAR_TIMEOUT;
+    ctx.pendingActive = false;
+
+    ctx.service = NULL;
+
+    for (uint8_t i = 0; i < Dcm_ConfigPtr->numServices; i++)
+    {
+        if (Dcm_ConfigPtr->serviceTable[i].sid == ctx.sid)
+        {
+            ctx.service = &Dcm_ConfigPtr->serviceTable[i];
+            break;
+        }
+    }
+
+    if (ctx.service == NULL)
+    {
+        isoTx.buffer[0] = 0x7F;
+        isoTx.buffer[1] = ctx.sid;
+        isoTx.buffer[2] = DCM_NRC_SERVICE_NOT_SUPPORTED;
+        isoTx.len = 3;
+        isoTx.inProgress = true;
+        return;
+    }
+
+    Dcm_IsoTpTxReset();
+}
+
+/* ===== Continue processing ===== */
+static void Dcm_ContinueProcessing(void)
+{
+    if (ctx.service == NULL) return;
+    if (isoTx.inProgress) return;
+
+    uint16_t respLen = 0;
+
+    uint8_t result = ctx.service->handler(
+        ctx.opStatus,
+        &isoRx.buffer[1],
+        (isoRx.totalLen > 0) ? (isoRx.totalLen - 1) : 0,
+        &isoTx.buffer[1],
+        &respLen
+    );
+
+    if (result == DCM_E_PENDING)
+    {
+        ctx.opStatus = DCM_PENDING;
+
+        if (ctx.p2Timer > 0)
+        {
+            ctx.p2Timer--;
+            return;
+        }
+
+        /* first ResponsePending */
+        if (!ctx.pendingActive)
+        {
+            isoTx.buffer[0] = 0x7F;
+            isoTx.buffer[1] = ctx.sid;
+            isoTx.buffer[2] = DCM_NRC_RESPONSE_PENDING;
+            isoTx.len = 3;
+            isoTx.inProgress = true;
+
+            ctx.pendingActive = true;
+            return;
+        }
+
+        /* P2* supervision */
+        if (ctx.p2StarTimer > 0)
+        {
+            ctx.p2StarTimer--;
+        }
+
+        return;
+    }
+
+    /* final response */
+    if (result == DCM_E_OK)
+    {
+        isoTx.buffer[0] = ctx.sid + 0x40;
+        isoTx.len = respLen + 1;
+    }
+    else
+    {
+        isoTx.buffer[0] = 0x7F;
+        isoTx.buffer[1] = ctx.sid;
+        isoTx.buffer[2] = result;
+        isoTx.len = 3;
+    }
+
+    isoTx.inProgress = true;
+    ctx.service = NULL;
+}
+
+/* ===== ISO-TP RX ===== */
+static void Dcm_IsoTpRxMain(void)
+{
+    while (rxTail != rxHead)
+    {
+        CanFrameType* f = &rxQueue[rxTail];
+        rxTail = (rxTail + 1) % RX_QUEUE_SIZE;
+
+        uint8_t pci = f->data[0] >> 4;
+
+        if (pci == ISOTP_SF)
+        {
+            uint8_t len = f->data[0] & 0x0F;
+            if (len > 7) continue;
+
+            memcpy(isoRx.buffer, &f->data[1], len);
+            isoRx.totalLen = len;
+            isoRx.complete = true;
+        }
+        else if (pci == ISOTP_FF)
+        {
+            isoRx.totalLen = ((f->data[0] & 0x0F) << 8) | f->data[1];
+            if (isoRx.totalLen > DCM_MAX_PDU_LEN) continue;
+
+            isoRx.index = 6;
+            memcpy(isoRx.buffer, &f->data[2], 6);
+
+            isoRx.nextSN = 1;
+            isoRx.inProgress = true;
+        }
+        else if (pci == ISOTP_CF && isoRx.inProgress)
+        {
+            uint8_t sn = f->data[0] & 0x0F;
+            if (sn != isoRx.nextSN) continue;
+
+            uint8_t copyLen = (isoRx.totalLen - isoRx.index > 7) ?
+                               7 : (isoRx.totalLen - isoRx.index);
+
+            memcpy(&isoRx.buffer[isoRx.index], &f->data[1], copyLen);
+
+            isoRx.index += copyLen;
+            isoRx.nextSN = (isoRx.nextSN + 1) & 0x0F;
+
+            if (isoRx.index >= isoRx.totalLen)
+            {
+                isoRx.inProgress = false;
+                isoRx.complete = true;
+            }
+        }
+    }
+
+    if (isoRx.complete)
+    {
+        isoRx.complete = false;
+        Dcm_StartProcessing();
+    }
+}
+
+/* ===== TX main ===== */
+static void Dcm_IsoTpTxMain(void)
+{
+    if (!isoTx.inProgress) return;
+
+    uint8_t frame[8] = {0};
+
+    if (isoTx.len <= 7)
+    {
+        frame[0] = (ISOTP_SF << 4) | isoTx.len;
+        memcpy(&frame[1], isoTx.buffer, isoTx.len);
+
+        Dcm_CanTransmit(frame, 8);
+        Dcm_IsoTpTxReset();
+        return;
+    }
+
+    if (isoTx.index == 0)
+    {
+        frame[0] = (ISOTP_FF << 4) | ((isoTx.len >> 8) & 0x0F);
+        frame[1] = isoTx.len & 0xFF;
+
+        memcpy(&frame[2], isoTx.buffer, 6);
+
+        isoTx.index = 6;
+        isoTx.sn = 1;
+
+        Dcm_CanTransmit(frame, 8);
+        return;
+    }
+
+    if (isoTx.index < isoTx.len)
+    {
+        frame[0] = (ISOTP_CF << 4) | (isoTx.sn & 0x0F);
+
+        uint8_t remain = isoTx.len - isoTx.index;
+        uint8_t copy = (remain > 7) ? 7 : remain;
+
+        memcpy(&frame[1], &isoTx.buffer[isoTx.index], copy);
+
+        isoTx.index += copy;
+        isoTx.sn++;
+
+        Dcm_CanTransmit(frame, 8);
+        return;
+    }
+
+    Dcm_IsoTpTxReset();
+}
+
+
+static uint32_t Dcm_SecMix(uint32_t x)
+{
+    x ^= SEC_SECRET;
+    x *= 0x45D9F3Bu;
+    x ^= (x >> 16);
+    x *= 0x45D9F3Bu;
+    x ^= (x >> 16);
+    return x;
+}
+
+static void Dcm_SecGenSeed(uint8_t level, uint8_t out[4])
+{
+    uint32_t t = HAL_GetTick();
+    uint32_t v = Dcm_SecMix(t ^ ((uint32_t)level << 24) ^ (uint32_t)Dcm_SessionCounter);
+
+    out[0] = (uint8_t)(v >> 24);
+    out[1] = (uint8_t)(v >> 16);
+    out[2] = (uint8_t)(v >> 8);
+    out[3] = (uint8_t)(v);
+}
+
+static uint32_t Dcm_SecSeedToU32(const uint8_t s[4])
+{
+    return ((uint32_t)s[0] << 24) |
+           ((uint32_t)s[1] << 16) |
+           ((uint32_t)s[2] << 8)  |
+           ((uint32_t)s[3]);
+}
+
+/* same algorithm class, but bound to ECU secret */
+static uint32_t Dcm_SecCalcKey(uint32_t seed, uint8_t level)
+{
+    uint32_t x = seed ^ SEC_SECRET;
+    x += 0x13572468u + (level * 0x1F3D5B79u);
+    x = (x << 3) | (x >> (32u - 3u));
+    x ^= ((seed << 16) | (seed >> 16));
+    return x;
+}
+
+static bool Dcm_SecConstEq4(const uint8_t *a, const uint8_t *b)
+{
+    uint8_t r = 0u;
+    for (uint8_t i = 0u; i < 4u; i++)
+    {
+        r |= (a[i] ^ b[i]);
+    }
+    return (r == 0u);
+}
+
+
+/* ===== Example service ===== */
+static uint8_t Service_0x10(Dcm_OpStatusType opStatus,
+                           const uint8_t* req,
+                           uint16_t len,
+                           uint8_t* resp,
+                           uint16_t* respLen)
+{
+    static uint16_t counter = 0;
+
+    if (opStatus == DCM_INITIAL)
+    {
+        counter = 100; /* simulate long op */
+    }
+
+    if (counter > 0)
+    {
+        counter--;
+        return DCM_E_PENDING;
+    }
+
+    resp[0] = req[0];
+    resp[1] = 0x00;
+    resp[2] = 0x32;
+    *respLen = 3;
+
+    return DCM_E_OK;
+}

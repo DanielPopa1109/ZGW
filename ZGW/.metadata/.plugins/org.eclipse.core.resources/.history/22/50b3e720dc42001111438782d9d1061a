@@ -1,0 +1,16 @@
+#ifndef COM_H
+#define COM_H
+
+#include "ComStack_Types.h"
+
+#define COM_MAX_IPDU_LEN 64u
+
+void Com_Init(void);
+void Com_MainFunctionTx(void);
+void Com_MainFunctionRx(void);
+
+Std_ReturnType Com_SendSignal(PduIdType SignalId, const void* SignalDataPtr);
+void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
+void Com_TxConfirmation(PduIdType TxPduId);
+
+#endif

@@ -1,0 +1,1077 @@
+	; Module start
+	.compiler_version	"TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler v1.1r8 Build 22011964"
+	.compiler_invocation	"ctc -f cc17932a --dep-file=BSW/Com/Lin/LinSM.d -c99 --fp-model=3cflnrSTz -D__CPU__=tc37x -D__CPU_TC37X__ --core=tc1.6.2 --fp-model=+float -D__CPU__=tc37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanIf -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanSM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\CanTp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Com\\\\PduR -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dcm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Diag\\\\Dem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Ain -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Io\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Fls -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Mem\\\\Nvm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core0 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core1 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\FreeRTOS_core2 -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\McuSm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Os -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\ScrH -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\00_Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\01_Smu\\\\SMU_Test -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SmM\\\\02_Safety_Mechanisms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\SysMgr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\BSW\\\\Sys\\\\Wdg -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Configurations -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Platform\\\\Tricore\\\\Compilers -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Sfr\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Infra\\\\Ssw\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\SysSe\\\\Bsp -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\Service\\\\CpuGeneric\\\\_Utilities -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Asc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Lin -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Asclin\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Can -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Can\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Irq -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Trap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Dma -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dma\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Dts -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Dts\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Adc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Evadc\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Crc -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Fce\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Flash\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Mtu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Pms\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Io -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Port\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Scu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Smu\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Src\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Stm\\\\Std -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_Impl -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\_PinMap\\\\TC37x -IC:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\SCR Debug (SDCC) -g2 -w544 -w557 -w508 -t4 --language=+volatile -N0 -O0 -Y0 -Z0 --compact-max-size=200 --misrac-version=2012 -o BSW/Com/Lin/LinSM.src ../BSW/Com/Lin/LinSM.c"
+	.compiler_name		"ctc"
+	;source	'../BSW/Com/Lin/LinSM.c'
+
+	
+$TC162
+	
+	.sdecl	'.text.LinSM.LinSM_Init',code,cluster('LinSM_Init')
+	.sect	'.text.LinSM.LinSM_Init'
+	.align	2
+	
+	.global	LinSM_Init
+; Function LinSM_Init
+.L30:
+LinSM_Init:	.type	func
+	mov	d0,#0
+.L78:
+	j	.L2
+.L3:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L94:
+	add.a	a15,#0
+.L95:
+	mov	d15,#1
+.L96:
+	st.b	[a15],d15
+.L97:
+	movh.a	a15,#@his(LinSM_Timer)
+	lea	a15,[a15]@los(LinSM_Timer)
+.L98:
+	mul	d15,d0,#2
+	addsc.a	a15,a15,d15,#0
+.L99:
+	mov	d15,#0
+.L100:
+	st.h	[a15],d15
+.L101:
+	add	d0,#1
+.L2:
+	jlt.u	d0,#1,.L3
+.L102:
+	ret
+.L65:
+	
+__LinSM_Init_function_end:
+	.size	LinSM_Init,__LinSM_Init_function_end-LinSM_Init
+.L45:
+	; End of function
+	
+	.sdecl	'.text.LinSM.LinSM_RequestComMode',code,cluster('LinSM_RequestComMode')
+	.sect	'.text.LinSM.LinSM_RequestComMode'
+	.align	2
+	
+	.global	LinSM_RequestComMode
+; Function LinSM_RequestComMode
+.L32:
+LinSM_RequestComMode:	.type	func
+	mov	d8,d4
+.L80:
+	jlt.u	d8,#1,.L4
+.L135:
+	mov	d2,#1
+.L136:
+	j	.L5
+.L4:
+	mov	d15,#1
+	jeq	d15,d5,.L6
+.L137:
+	mov	d15,#2
+	jeq	d15,d5,.L7
+.L138:
+	mov	d15,#4
+	jeq	d15,d5,.L8
+	j	.L9
+.L7:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L139:
+	add.a	a15,#0
+	ld.bu	d15,[a15]
+.L140:
+	jne	d15,#4,.L10
+.L141:
+	mov	d4,d8
+	call	Lin_Wakeup
+.L79:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L142:
+	add.a	a15,#0
+.L143:
+	mov	d15,#5
+.L144:
+	st.b	[a15],d15
+.L145:
+	movh.a	a15,#@his(LinSM_Timer)
+	lea	a15,[a15]@los(LinSM_Timer)
+.L146:
+	mul	d15,d8,#2
+	addsc.a	a15,a15,d15,#0
+.L147:
+	mov	d15,#30
+.L148:
+	st.h	[a15],d15
+.L149:
+	j	.L11
+.L10:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L150:
+	add.a	a15,#0
+.L151:
+	mov	d15,#2
+.L152:
+	st.b	[a15],d15
+.L153:
+	mov	d4,#0
+.L81:
+	call	LinIf_SwitchSchedule
+.L11:
+	mov	d2,#0
+.L154:
+	j	.L12
+.L8:
+	mov	d4,d8
+	call	Lin_GoToSleep
+.L82:
+	jne	d2,#0,.L13
+.L155:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L156:
+	add.a	a15,#0
+.L157:
+	mov	d15,#3
+.L158:
+	st.b	[a15],d15
+.L159:
+	mov	d2,#0
+.L160:
+	j	.L14
+.L13:
+	mov	d2,#1
+.L161:
+	j	.L15
+.L6:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L162:
+	add.a	a15,#0
+.L163:
+	mov	d15,#1
+.L164:
+	st.b	[a15],d15
+.L165:
+	mov	d2,#0
+.L166:
+	j	.L16
+.L9:
+	mov	d2,#1
+.L167:
+	j	.L17
+.L17:
+.L16:
+.L15:
+.L14:
+.L12:
+.L5:
+	ret
+.L70:
+	
+__LinSM_RequestComMode_function_end:
+	.size	LinSM_RequestComMode,__LinSM_RequestComMode_function_end-LinSM_RequestComMode
+.L55:
+	; End of function
+	
+	.sdecl	'.text.LinSM.LinSM_GetState',code,cluster('LinSM_GetState')
+	.sect	'.text.LinSM.LinSM_GetState'
+	.align	2
+	
+	.global	LinSM_GetState
+; Function LinSM_GetState
+.L34:
+LinSM_GetState:	.type	func
+	jlt.u	d4,#1,.L18
+.L172:
+	mov	d2,#0
+.L173:
+	j	.L19
+.L18:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L174:
+	add.a	a15,#0
+	ld.bu	d2,[a15]
+.L175:
+	j	.L20
+.L20:
+.L19:
+	ret
+.L74:
+	
+__LinSM_GetState_function_end:
+	.size	LinSM_GetState,__LinSM_GetState_function_end-LinSM_GetState
+.L60:
+	; End of function
+	
+	.sdecl	'.text.LinSM.LinSM_MainFunction',code,cluster('LinSM_MainFunction')
+	.sect	'.text.LinSM.LinSM_MainFunction'
+	.align	2
+	
+	.global	LinSM_MainFunction
+; Function LinSM_MainFunction
+.L36:
+LinSM_MainFunction:	.type	func
+	mov	d8,#0
+.L83:
+	j	.L21
+.L22:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L107:
+	add.a	a15,#0
+	ld.bu	d15,[a15]
+.L108:
+	jne	d15,#3,.L23
+.L109:
+	mov	d4,d8
+.L84:
+	call	Lin_GetState
+.L85:
+	mov	d15,#9
+.L110:
+	jne	d15,d2,.L24
+.L111:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L112:
+	add.a	a15,#0
+.L113:
+	mov	d15,#4
+.L114:
+	st.b	[a15],d15
+.L24:
+	j	.L25
+.L23:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L115:
+	add.a	a15,#0
+	ld.bu	d15,[a15]
+.L116:
+	jne	d15,#5,.L26
+.L117:
+	movh.a	a15,#@his(LinSM_Timer)
+	lea	a15,[a15]@los(LinSM_Timer)
+.L118:
+	mul	d15,d8,#2
+	addsc.a	a15,a15,d15,#0
+	ld.hu	d15,[a15]0
+.L119:
+	jlt.u	d15,#1,.L27
+.L120:
+	movh.a	a15,#@his(LinSM_Timer)
+	lea	a15,[a15]@los(LinSM_Timer)
+.L121:
+	mul	d15,d8,#2
+	addsc.a	a15,a15,d15,#0
+.L122:
+	movh.a	a2,#@his(LinSM_Timer)
+	lea	a2,[a2]@los(LinSM_Timer)
+.L123:
+	mul	d15,d8,#2
+	addsc.a	a2,a2,d15,#0
+	ld.hu	d15,[a2]0
+.L124:
+	add	d15,#-1
+	st.h	[a15],d15
+.L125:
+	j	.L28
+.L27:
+	movh.a	a15,#@his(LinSM_State)
+	lea	a15,[a15]@los(LinSM_State)
+.L126:
+	add.a	a15,#0
+.L127:
+	mov	d15,#2
+.L128:
+	st.b	[a15],d15
+.L129:
+	mov	d4,#0
+	call	LinIf_SwitchSchedule
+.L28:
+.L26:
+.L25:
+	add	d8,#1
+.L21:
+	jlt.u	d8,#1,.L22
+.L130:
+	ret
+.L68:
+	
+__LinSM_MainFunction_function_end:
+	.size	LinSM_MainFunction,__LinSM_MainFunction_function_end-LinSM_MainFunction
+.L50:
+	; End of function
+	
+	.sdecl	'.bss.LinSM.LinSM_State',data,cluster('LinSM_State')
+	.sect	'.bss.LinSM.LinSM_State'
+LinSM_State:	.type	object
+	.size	LinSM_State,1
+	.space	1
+	.sdecl	'.bss.LinSM.LinSM_Timer',data,cluster('LinSM_Timer')
+	.sect	'.bss.LinSM.LinSM_Timer'
+	.align	2
+LinSM_Timer:	.type	object
+	.size	LinSM_Timer,2
+	.space	2
+	.calls	'LinSM_RequestComMode','Lin_Wakeup'
+	.calls	'LinSM_RequestComMode','LinIf_SwitchSchedule'
+	.calls	'LinSM_RequestComMode','Lin_GoToSleep'
+	.calls	'LinSM_MainFunction','Lin_GetState'
+	.calls	'LinSM_MainFunction','LinIf_SwitchSchedule'
+	.calls	'LinSM_Init','',0
+	.calls	'LinSM_RequestComMode','',0
+	.calls	'LinSM_GetState','',0
+	.extern	Lin_GoToSleep
+	.extern	Lin_Wakeup
+	.extern	Lin_GetState
+	.extern	LinIf_SwitchSchedule
+	.calls	'LinSM_MainFunction','',0
+	.sdecl	'.debug_info',debug
+	.sect	'.debug_info'
+.L38:
+	.word	1656
+	.half	3
+	.word	.L39
+	.byte	4
+.L37:
+	.byte	1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L40
+.L66:
+	.byte	2
+	.byte	'unsigned char',0,1,8
+.L72:
+	.byte	3,1,6,9,1,4
+	.byte	'LINSM_UNINIT',0,0,4
+	.byte	'LINSM_NO_COMMUNICATION',0,1,4
+	.byte	'LINSM_FULL_COMMUNICATION',0,2,4
+	.byte	'LINSM_GOTO_SLEEP',0,3,4
+	.byte	'LINSM_SLEEP',0,4,4
+	.byte	'LINSM_WAKEUP',0,5,0,5
+	.byte	'Lin_GoToSleep',0,2,44,16
+	.word	188
+	.byte	1,1,1,1,6
+	.byte	'Channel',0,2,44,36
+	.word	188
+	.byte	0,5
+	.byte	'Lin_Wakeup',0,2,45,16
+	.word	188
+	.byte	1,1,1,1,6
+	.byte	'Channel',0,2,45,33
+	.word	188
+	.byte	0,3,2,9,9,1,4
+	.byte	'LIN_UNINIT',0,0,4
+	.byte	'LIN_INIT',0,1,4
+	.byte	'LIN_IDLE',0,2,4
+	.byte	'LIN_TX_BREAK',0,3,4
+	.byte	'LIN_TX_SYNC',0,4,4
+	.byte	'LIN_TX_PID',0,5,4
+	.byte	'LIN_TX_RESPONSE',0,6,4
+	.byte	'LIN_RX_RESPONSE',0,7,4
+	.byte	'LIN_SLEEP_PENDING',0,8,4
+	.byte	'LIN_SLEEP',0,9,4
+	.byte	'LIN_WAKEUP',0,10,0,5
+	.byte	'Lin_GetState',0,2,47,15
+	.word	409
+	.byte	1,1,1,1,6
+	.byte	'Channel',0,2,47,34
+	.word	188
+	.byte	0,5
+	.byte	'LinIf_SwitchSchedule',0,3,38,16
+	.word	188
+	.byte	1,1,1,1,6
+	.byte	'scheduleId',0,3,38,43
+	.word	188
+	.byte	0,2
+	.byte	'short int',0,2,5,7
+	.byte	'__wchar_t',0,4,1,1
+	.word	668
+	.byte	2
+	.byte	'unsigned int',0,4,7,7
+	.byte	'__size_t',0,4,1,1
+	.word	699
+	.byte	2
+	.byte	'int',0,4,5,7
+	.byte	'__ptrdiff_t',0,4,1,1
+	.word	732
+	.byte	8,1,9
+	.word	759
+	.byte	7
+	.byte	'__codeptr',0,4,1,1
+	.word	761
+	.byte	7
+	.byte	'uint8',0,5,108,29
+	.word	188
+	.byte	2
+	.byte	'unsigned short int',0,2,7,7
+	.byte	'uint16',0,5,112,29
+	.word	798
+	.byte	2
+	.byte	'unsigned long int',0,4,7,7
+	.byte	'uint32',0,5,116,29
+	.word	835
+	.byte	7
+	.byte	'sint16',0,5,129,1,29
+	.word	668
+	.byte	2
+	.byte	'long int',0,4,5,7
+	.byte	'sint32',0,5,134,1,29
+	.word	887
+	.byte	2
+	.byte	'long long int',0,8,5,7
+	.byte	'sint64',0,5,141,1,29
+	.word	915
+	.byte	2
+	.byte	'float',0,4,4,7
+	.byte	'float32',0,5,170,1,29
+	.word	948
+	.byte	10
+	.byte	'void',0,9
+	.word	974
+	.byte	7
+	.byte	'pvoid',0,6,54,28
+	.word	980
+	.byte	7
+	.byte	'Std_ReturnType',0,6,57,16
+	.word	188
+	.byte	7
+	.byte	'LinSM_StateType',0,1,14,3
+	.word	205
+	.byte	3,7,9,9,1,4
+	.byte	'LIN_CS_CLASSIC',0,0,4
+	.byte	'LIN_CS_ENHANCED',0,1,0,7
+	.byte	'Lin_ChecksumType',0,7,13,3
+	.word	1046
+	.byte	3,7,15,9,1,4
+	.byte	'LIN_FRM_UNCONDITIONAL',0,0,4
+	.byte	'LIN_FRM_EVENT_TRIGGERED',0,1,4
+	.byte	'LIN_FRM_SPORADIC',0,2,4
+	.byte	'LIN_FRM_DIAGNOSTIC_MRF',0,3,4
+	.byte	'LIN_FRM_DIAGNOSTIC_SRF',0,4,4
+	.byte	'LIN_FRM_SLEEP',0,5,0,7
+	.byte	'Lin_FrameClassType',0,7,23,3
+	.word	1112
+	.byte	11,7,37,9,8,12
+	.byte	'id',0
+	.word	188
+	.byte	1,2,35,0,12
+	.byte	'pid',0
+	.word	188
+	.byte	1,2,35,1,12
+	.byte	'dlc',0
+	.word	188
+	.byte	1,2,35,2,12
+	.byte	'checksumType',0
+	.word	1046
+	.byte	1,2,35,3,12
+	.byte	'frameClass',0
+	.word	1112
+	.byte	1,2,35,4,12
+	.byte	'responseTimeoutTicks',0
+	.word	798
+	.byte	2,2,35,6,0,7
+	.byte	'Lin_FrameConfigType',0,7,45,3
+	.word	1280
+	.byte	7
+	.byte	'Lin_StateType',0,2,22,3
+	.word	409
+	.byte	3,2,24,9,1,4
+	.byte	'LIN_MASTER_RESPONSE',0,0,4
+	.byte	'LIN_SLAVE_RESPONSE',0,1,4
+	.byte	'LIN_NO_RESPONSE',0,2,0,7
+	.byte	'Lin_DirectionType',0,2,29,3
+	.word	1446
+	.byte	13
+	.word	1280
+	.byte	9
+	.word	1539
+	.byte	11,3,21,9,8,12
+	.byte	'frame',0
+	.word	1544
+	.byte	4,2,35,0,12
+	.byte	'delayTicks',0
+	.word	798
+	.byte	2,2,35,4,12
+	.byte	'direction',0
+	.word	1446
+	.byte	1,2,35,6,0,7
+	.byte	'LinIf_ScheduleEntryType',0,3,26,3
+	.word	1549
+.L76:
+	.byte	14,1
+	.word	205
+	.byte	15,0,0
+.L77:
+	.byte	14,2
+	.word	798
+	.byte	15,0,0,0
+	.sdecl	'.debug_abbrev',debug
+	.sect	'.debug_abbrev'
+.L39:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,16,6,0,0,2,36,0,3,8,11,15,62,15,0,0,3,4,1,58,15,59,15,57,15,11,15
+	.byte	0,0,4,40,0,3,8,28,13,0,0,5,46,1,3,8,58,15,59,15,57,15,73,19,54,15,39,12,63,12,60,12,0,0,6,5,0,3,8,58,15
+	.byte	59,15,57,15,73,19,0,0,7,22,0,3,8,58,15,59,15,57,15,73,19,0,0,8,21,0,54,15,0,0,9,15,0,73,19,0,0,10,59,0
+	.byte	3,8,0,0,11,19,1,58,15,59,15,57,15,11,15,0,0,12,13,0,3,8,73,19,11,15,56,9,0,0,13,38,0,73,19,0,0,14,1,1
+	.byte	11,15,73,19,0,0,15,33,0,47,15,0,0,0
+	.sdecl	'.debug_line',debug
+	.sect	'.debug_line'
+.L40:
+	.word	.L87-.L86
+.L86:
+	.half	3
+	.word	.L89-.L88
+.L88:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1
+	.byte	'C:\\\\Users\\\\Daniel\\\\Desktop\\\\ZGW_Repo\\\\ZGW\\\\ZGW_APP\\\\Libraries\\\\iLLD\\\\TC3xx\\\\Tricore\\\\Cpu\\\\Std',0
+	.byte	0
+	.byte	'..\\BSW\\Com\\Lin\\LinSM.h',0,0,0,0
+	.byte	'..\\BSW\\Com\\Lin\\Lin.h',0,0,0,0
+	.byte	'..\\BSW\\Com\\Lin\\LinIf.h',0,0,0,0
+	.byte	'../BSW/Com/Lin/LinSM.c',0,0,0,0
+	.byte	'Platform_Types.h',0,1,0,0
+	.byte	'Ifx_Types.h',0,1,0,0
+	.byte	'..\\BSW\\Com\\Lin\\Lin_Protocol.h',0,0,0,0,0
+.L89:
+.L87:
+	.sdecl	'.debug_info',debug,cluster('LinSM_Init')
+	.sect	'.debug_info'
+.L41:
+	.word	250
+	.half	3
+	.word	.L42
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L44,.L43
+	.byte	2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_Init',0,1,11,6,1,1,1
+	.word	.L30,.L65,.L29
+	.byte	4
+	.word	.L30,.L65
+	.byte	5
+	.byte	'ch',0,1,13,11
+	.word	.L66,.L67
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_Init')
+	.sect	'.debug_abbrev'
+.L42:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,11,1,17,1,18,1,0,0,5,52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('LinSM_Init')
+	.sect	'.debug_line'
+.L43:
+	.word	.L91-.L90
+.L90:
+	.half	3
+	.word	.L93-.L92
+.L92:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/LinSM.c',0,0,0,0,0
+.L93:
+	.byte	5,13,7,0,5,2
+	.word	.L30
+	.byte	3,14,1,5,42,9
+	.half	.L78-.L30
+	.byte	1,5,9,9
+	.half	.L3-.L78
+	.byte	3,2,1,5,20,9
+	.half	.L94-.L3
+	.byte	1,5,27,9
+	.half	.L95-.L94
+	.byte	1,5,25,9
+	.half	.L96-.L95
+	.byte	1,5,9,9
+	.half	.L97-.L96
+	.byte	3,1,1,5,20,9
+	.half	.L98-.L97
+	.byte	1,5,27,9
+	.half	.L99-.L98
+	.byte	1,5,25,9
+	.half	.L100-.L99
+	.byte	1,5,46,9
+	.half	.L101-.L100
+	.byte	3,125,1,5,42,9
+	.half	.L2-.L101
+	.byte	1,5,1,7,9
+	.half	.L102-.L2
+	.byte	3,5,1,7,9
+	.half	.L45-.L102
+	.byte	0,1,1
+.L91:
+	.sdecl	'.debug_ranges',debug,cluster('LinSM_Init')
+	.sect	'.debug_ranges'
+.L44:
+	.word	-1,.L30,0,.L45-.L30,0,0
+	.sdecl	'.debug_info',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_info'
+.L46:
+	.word	258
+	.half	3
+	.word	.L47
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L49,.L48
+	.byte	2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_MainFunction',0,1,72,6,1,1,1
+	.word	.L36,.L68,.L35
+	.byte	4
+	.word	.L36,.L68
+	.byte	5
+	.byte	'ch',0,1,74,11
+	.word	.L66,.L69
+	.byte	0,0,0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_abbrev'
+.L47:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,54,15
+	.byte	39,12,63,12,17,1,18,1,64,6,0,0,4,11,1,17,1,18,1,0,0,5,52,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,0
+	.sdecl	'.debug_line',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_line'
+.L48:
+	.word	.L104-.L103
+.L103:
+	.half	3
+	.word	.L106-.L105
+.L105:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/LinSM.c',0,0,0,0,0
+.L106:
+	.byte	5,13,7,0,5,2
+	.word	.L36
+	.byte	3,203,0,1,5,42,9
+	.half	.L83-.L36
+	.byte	1,5,13,9
+	.half	.L22-.L83
+	.byte	3,2,1,5,24,9
+	.half	.L107-.L22
+	.byte	1,5,9,9
+	.half	.L108-.L107
+	.byte	1,5,30,7,9
+	.half	.L109-.L108
+	.byte	3,2,1,5,37,9
+	.half	.L85-.L109
+	.byte	1,5,13,9
+	.half	.L110-.L85
+	.byte	1,5,17,7,9
+	.half	.L111-.L110
+	.byte	3,2,1,5,28,9
+	.half	.L112-.L111
+	.byte	1,5,35,9
+	.half	.L113-.L112
+	.byte	1,5,33,9
+	.half	.L114-.L113
+	.byte	1,5,13,9
+	.half	.L24-.L114
+	.byte	3,126,1,5,18,9
+	.half	.L23-.L24
+	.byte	3,5,1,5,29,9
+	.half	.L115-.L23
+	.byte	1,5,14,9
+	.half	.L116-.L115
+	.byte	1,5,17,7,9
+	.half	.L117-.L116
+	.byte	3,2,1,5,28,9
+	.half	.L118-.L117
+	.byte	1,5,13,9
+	.half	.L119-.L118
+	.byte	1,5,17,7,9
+	.half	.L120-.L119
+	.byte	3,2,1,5,28,9
+	.half	.L121-.L120
+	.byte	1,5,17,9
+	.half	.L122-.L121
+	.byte	1,5,28,9
+	.half	.L123-.L122
+	.byte	1,5,32,9
+	.half	.L124-.L123
+	.byte	1,5,34,9
+	.half	.L125-.L124
+	.byte	1,5,17,9
+	.half	.L27-.L125
+	.byte	3,4,1,5,28,9
+	.half	.L126-.L27
+	.byte	1,5,35,9
+	.half	.L127-.L126
+	.byte	1,5,33,9
+	.half	.L128-.L127
+	.byte	1,5,44,9
+	.half	.L129-.L128
+	.byte	3,1,1,5,46,9
+	.half	.L25-.L129
+	.byte	3,110,1,5,42,9
+	.half	.L21-.L25
+	.byte	1,5,1,7,9
+	.half	.L130-.L21
+	.byte	3,22,1,7,9
+	.half	.L50-.L130
+	.byte	0,1,1
+.L104:
+	.sdecl	'.debug_ranges',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_ranges'
+.L49:
+	.word	-1,.L36,0,.L50-.L36,0,0
+	.sdecl	'.debug_info',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_info'
+.L51:
+	.word	295
+	.half	3
+	.word	.L52
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L54,.L53
+	.byte	2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_RequestComMode',0,1,22,16
+	.word	.L66
+	.byte	1,1,1
+	.word	.L32,.L70,.L31
+	.byte	4
+	.byte	'Channel',0,1,22,43
+	.word	.L66,.L71
+	.byte	4
+	.byte	'RequestedState',0,1,22,68
+	.word	.L72,.L73
+	.byte	5
+	.word	.L32,.L70
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_abbrev'
+.L52:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_line'
+.L53:
+	.word	.L132-.L131
+.L131:
+	.half	3
+	.word	.L134-.L133
+.L133:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/LinSM.c',0,0,0,0,0
+.L134:
+	.byte	5,16,7,0,5,2
+	.word	.L32
+	.byte	3,21,1,5,5,9
+	.half	.L80-.L32
+	.byte	3,2,1,5,16,7,9
+	.half	.L135-.L80
+	.byte	3,2,1,5,9,9
+	.half	.L136-.L135
+	.byte	1,5,14,9
+	.half	.L4-.L136
+	.byte	3,27,1,9
+	.half	.L137-.L4
+	.byte	3,106,1,9
+	.half	.L138-.L137
+	.byte	3,14,1,5,17,9
+	.half	.L7-.L138
+	.byte	3,115,1,5,28,9
+	.half	.L139-.L7
+	.byte	1,5,13,9
+	.half	.L140-.L139
+	.byte	1,5,34,7,9
+	.half	.L141-.L140
+	.byte	3,2,1,5,17,9
+	.half	.L79-.L141
+	.byte	3,1,1,5,28,9
+	.half	.L142-.L79
+	.byte	1,5,40,9
+	.half	.L143-.L142
+	.byte	1,5,38,9
+	.half	.L144-.L143
+	.byte	1,5,17,9
+	.half	.L145-.L144
+	.byte	3,1,1,5,28,9
+	.half	.L146-.L145
+	.byte	1,5,40,9
+	.half	.L147-.L146
+	.byte	1,5,38,9
+	.half	.L148-.L147
+	.byte	1,5,42,9
+	.half	.L149-.L148
+	.byte	3,126,1,5,17,9
+	.half	.L10-.L149
+	.byte	3,6,1,5,28,9
+	.half	.L150-.L10
+	.byte	1,5,40,9
+	.half	.L151-.L150
+	.byte	1,5,38,9
+	.half	.L152-.L151
+	.byte	1,5,44,9
+	.half	.L153-.L152
+	.byte	3,1,1,5,20,9
+	.half	.L11-.L153
+	.byte	3,2,1,5,13,9
+	.half	.L154-.L11
+	.byte	1,5,31,9
+	.half	.L8-.L154
+	.byte	3,3,1,5,13,9
+	.half	.L82-.L8
+	.byte	1,5,17,7,9
+	.half	.L155-.L82
+	.byte	3,2,1,5,28,9
+	.half	.L156-.L155
+	.byte	1,5,40,9
+	.half	.L157-.L156
+	.byte	1,5,38,9
+	.half	.L158-.L157
+	.byte	1,5,24,9
+	.half	.L159-.L158
+	.byte	3,1,1,5,17,9
+	.half	.L160-.L159
+	.byte	1,5,20,9
+	.half	.L13-.L160
+	.byte	3,2,1,5,13,9
+	.half	.L161-.L13
+	.byte	1,9
+	.half	.L6-.L161
+	.byte	3,3,1,5,24,9
+	.half	.L162-.L6
+	.byte	1,5,36,9
+	.half	.L163-.L162
+	.byte	1,5,34,9
+	.half	.L164-.L163
+	.byte	1,5,20,9
+	.half	.L165-.L164
+	.byte	3,1,1,5,13,9
+	.half	.L166-.L165
+	.byte	1,5,20,9
+	.half	.L9-.L166
+	.byte	3,3,1,5,13,9
+	.half	.L167-.L9
+	.byte	1,5,1,9
+	.half	.L5-.L167
+	.byte	3,2,1,7,9
+	.half	.L55-.L5
+	.byte	0,1,1
+.L132:
+	.sdecl	'.debug_ranges',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_ranges'
+.L54:
+	.word	-1,.L32,0,.L55-.L32,0,0
+	.sdecl	'.debug_info',debug,cluster('LinSM_GetState')
+	.sect	'.debug_info'
+.L56:
+	.word	262
+	.half	3
+	.word	.L57
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1
+	.word	.L59,.L58
+	.byte	2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_GetState',0,1,62,17
+	.word	.L72
+	.byte	1,1,1
+	.word	.L34,.L74,.L33
+	.byte	4
+	.byte	'Channel',0,1,62,38
+	.word	.L66,.L75
+	.byte	5
+	.word	.L34,.L74
+	.byte	0,0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_GetState')
+	.sect	'.debug_abbrev'
+.L57:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,85,6,16,6,0,0,2,61,0,24,16,0,0,3,46,1,3,8,58,15,59,15,57,15,73,16
+	.byte	54,15,39,12,63,12,17,1,18,1,64,6,0,0,4,5,0,3,8,58,15,59,15,57,15,73,16,2,6,0,0,5,11,0,17,1,18,1,0,0,0
+	.sdecl	'.debug_line',debug,cluster('LinSM_GetState')
+	.sect	'.debug_line'
+.L58:
+	.word	.L169-.L168
+.L168:
+	.half	3
+	.word	.L171-.L170
+.L170:
+	.byte	2,1,-4,9,10,0,1,1,1,1,0,0,0,1,0
+	.byte	'../BSW/Com/Lin/LinSM.c',0,0,0,0,0
+.L171:
+	.byte	5,5,7,0,5,2
+	.word	.L34
+	.byte	3,63,1,5,16,7,9
+	.half	.L172-.L34
+	.byte	3,2,1,5,9,9
+	.half	.L173-.L172
+	.byte	1,5,12,9
+	.half	.L18-.L173
+	.byte	3,3,1,5,23,9
+	.half	.L174-.L18
+	.byte	1,5,5,9
+	.half	.L175-.L174
+	.byte	1,5,1,9
+	.half	.L19-.L175
+	.byte	3,1,1,7,9
+	.half	.L60-.L19
+	.byte	0,1,1
+.L169:
+	.sdecl	'.debug_ranges',debug,cluster('LinSM_GetState')
+	.sect	'.debug_ranges'
+.L59:
+	.word	-1,.L34,0,.L60-.L34,0,0
+	.sdecl	'.debug_info',debug,cluster('LinSM_State')
+	.sect	'.debug_info'
+.L61:
+	.word	212
+	.half	3
+	.word	.L62
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1,2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_State',0,4,8,24
+	.word	.L76
+	.byte	5,3
+	.word	LinSM_State
+	.byte	0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_State')
+	.sect	'.debug_abbrev'
+.L62:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,0,0,2,61,0,24,16,0,0,3,52,0,3,8,58,15,59,15,57,15,73,16,2,9,0,0,0
+	.sdecl	'.debug_info',debug,cluster('LinSM_Timer')
+	.sect	'.debug_info'
+.L63:
+	.word	212
+	.half	3
+	.word	.L64
+	.byte	4,1
+	.byte	'../BSW/Com/Lin/LinSM.c',0
+	.byte	'TASKING VX-toolset for AURIX Development Studio (non-commercial): C compiler',0
+	.byte	'C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\ZGW\\ZGW_APP\\TriCore Debug (TASKING)\\',0,12,1,2
+	.word	.L37
+	.byte	3
+	.byte	'LinSM_Timer',0,4,9,15
+	.word	.L77
+	.byte	5,3
+	.word	LinSM_Timer
+	.byte	0
+	.sdecl	'.debug_abbrev',debug,cluster('LinSM_Timer')
+	.sect	'.debug_abbrev'
+.L64:
+	.byte	1,17,1,3,8,37,8,27,8,19,15,128,70,12,0,0,2,61,0,24,16,0,0,3,52,0,3,8,58,15,59,15,57,15,73,16,2,9,0,0,0
+	.sdecl	'.debug_loc',debug,cluster('LinSM_GetState')
+	.sect	'.debug_loc'
+.L75:
+	.word	-1,.L34,0,.L74-.L34
+	.half	1
+	.byte	84
+	.word	0,0
+.L33:
+	.word	-1,.L34,0,.L74-.L34
+	.half	2
+	.byte	138,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('LinSM_Init')
+	.sect	'.debug_loc'
+.L29:
+	.word	-1,.L30,0,.L65-.L30
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L67:
+	.word	-1,.L30,.L78-.L30,.L65-.L30
+	.half	5
+	.byte	144,32,157,32,0
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_loc'
+.L35:
+	.word	-1,.L36,0,.L68-.L36
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L69:
+	.word	-1,.L36,.L83-.L36,.L68-.L36
+	.half	1
+	.byte	88
+	.word	.L84-.L36,.L85-.L36
+	.half	1
+	.byte	84
+	.word	0,0
+	.sdecl	'.debug_loc',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_loc'
+.L71:
+	.word	-1,.L32,0,.L79-.L32
+	.half	1
+	.byte	84
+	.word	.L80-.L32,.L70-.L32
+	.half	1
+	.byte	88
+	.word	.L10-.L32,.L81-.L32
+	.half	1
+	.byte	84
+	.word	.L8-.L32,.L82-.L32
+	.half	1
+	.byte	84
+	.word	.L6-.L32,.L5-.L32
+	.half	1
+	.byte	84
+	.word	0,0
+.L31:
+	.word	-1,.L32,0,.L70-.L32
+	.half	2
+	.byte	138,0
+	.word	0,0
+.L73:
+	.word	-1,.L32,0,.L79-.L32
+	.half	1
+	.byte	85
+	.word	.L10-.L32,.L11-.L32
+	.half	1
+	.byte	85
+	.word	.L8-.L32,.L82-.L32
+	.half	1
+	.byte	85
+	.word	.L6-.L32,.L5-.L32
+	.half	1
+	.byte	85
+	.word	0,0
+	.sdecl	'.debug_frame',debug
+	.sect	'.debug_frame'
+.L176:
+	.word	48
+	.word	-1
+	.byte	3,0,2,1,27,12,26,0,8,26,8,27,8,30,8,29,8,28,8,16,8,17,8,24,8,25,8,31,8,32,8,33,8,34,8,35,8,36,8,37,8,38
+	.byte	8,39
+	.sdecl	'.debug_frame',debug,cluster('LinSM_Init')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L176,.L30,.L65-.L30
+	.byte	8,18,8,19,8,20,8,21,8,22,8,23
+	.sdecl	'.debug_frame',debug,cluster('LinSM_RequestComMode')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L176,.L32,.L70-.L32
+	.sdecl	'.debug_frame',debug,cluster('LinSM_GetState')
+	.sect	'.debug_frame'
+	.word	24
+	.word	.L176,.L34,.L74-.L34
+	.byte	8,18,8,19,8,20,8,21,8,22,8,23
+	.sdecl	'.debug_frame',debug,cluster('LinSM_MainFunction')
+	.sect	'.debug_frame'
+	.word	12
+	.word	.L176,.L36,.L68-.L36
+	; Module end

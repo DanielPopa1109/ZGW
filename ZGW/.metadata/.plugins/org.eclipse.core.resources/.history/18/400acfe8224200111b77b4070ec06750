@@ -1,0 +1,71 @@
+#ifndef DCM_H
+#define DCM_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* Limits */
+#define DCM_MAX_PDU_LEN      4095u
+#define DCM_CAN_FRAME_LEN    8u
+
+/* Return values */
+#define DCM_E_OK        0x00u
+#define DCM_E_PENDING   0x10u
+#define DCM_E_NOT_OK    0x01u
+
+/* NRC */
+#define DCM_NRC_GENERAL_REJECT              0x10u
+#define DCM_NRC_SERVICE_NOT_SUPPORTED       0x11u
+#define DCM_NRC_SUBFUNCTION_NOT_SUPPORTED   0x12u
+#define DCM_NRC_INCORRECT_LENGTH            0x13u
+#define DCM_NRC_RESPONSE_PENDING            0x78u
+
+/* OpStatus */
+#define DCM_INITIAL      0x00u
+#define DCM_PENDING      0x01u
+
+/* ISO-TP */
+#define ISOTP_SF 0x0u
+#define ISOTP_FF 0x1u
+#define ISOTP_CF 0x2u
+#define ISOTP_FC 0x3u
+#define DCM_SEC_LEVELS        3u
+#define DCM_SEC_MAX_ATTEMPTS  3u
+#define DCM_SEC_LOCK_TIME_MS  30000u
+
+typedef uint8_t Dcm_OpStatusType;
+
+/* Service callback */
+typedef uint8_t (*Dcm_ServiceHandlerType)(
+    Dcm_OpStatusType opStatus,
+    const uint8_t* reqData,
+    uint16_t reqLen,
+    uint8_t* respData,
+    uint16_t* respLen
+);
+
+typedef struct
+{
+    uint8_t sid;
+    Dcm_ServiceHandlerType handler;
+} Dcm_ServiceType;
+
+typedef struct
+{
+    const Dcm_ServiceType* serviceTable;
+    uint8_t numServices;
+} Dcm_ConfigType;
+
+/* API */
+void Dcm_Init(const Dcm_ConfigType* config);
+void Dcm_MainFunction(void);
+
+/* ISR entry */
+void Dcm_CanRxIndication(const uint8_t* data, uint8_t dlc);
+
+/* Low-level TX hook (user must implement) */
+void Dcm_CanTransmit(const uint8_t* data, uint8_t len);
+
+extern const Dcm_ConfigType Dcm_Config;
+
+#endif

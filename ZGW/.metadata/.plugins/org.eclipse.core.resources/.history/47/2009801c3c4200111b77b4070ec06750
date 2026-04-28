@@ -1,0 +1,219 @@
+#ifndef DCM_H
+#define DCM_H
+
+#include "Ifx_Types.h"
+
+#ifndef NULL_PTR
+#define NULL_PTR ((void*)0)
+#endif
+
+#ifndef TRUE
+#define TRUE  1u
+#endif
+
+#ifndef FALSE
+#define FALSE 0u
+#endif
+
+typedef uint8 Std_ReturnType;
+typedef uint8 boolean;
+
+#define E_OK      0u
+#define E_NOT_OK 1u
+
+typedef uint16 PduIdType;
+typedef uint16 PduLengthType;
+
+typedef struct
+{
+    uint8* SduDataPtr;
+    PduLengthType SduLength;
+} PduInfoType;
+
+typedef enum
+{
+    BUFREQ_OK       = 0u,
+    BUFREQ_E_NOT_OK = 1u,
+    BUFREQ_E_BUSY   = 2u,
+    BUFREQ_E_OVFL   = 3u
+} BufReq_ReturnType;
+
+typedef enum
+{
+    NTFRSLT_OK     = 0u,
+    NTFRSLT_E_NOT_OK = 1u,
+    NTFRSLT_E_TIMEOUT_A = 2u,
+    NTFRSLT_E_TIMEOUT_BS = 3u,
+    NTFRSLT_E_TIMEOUT_CR = 4u,
+    NTFRSLT_E_WRONG_SN = 5u,
+    NTFRSLT_E_INVALID_FS = 6u,
+    NTFRSLT_E_UNEXP_PDU = 7u
+} NotifResultType;
+
+#define DCM_MAX_PDU_LEN              4095u
+#define DCM_MAX_CONNECTIONS          8u
+#define DCM_MAX_SERVICES             24u
+#define DCM_MAX_SEC_LEVELS           3u
+
+#define DCM_MAIN_PERIOD_MS           1u
+#define DCM_P2_SERVER_MAX_MS         50u
+#define DCM_P2STAR_SERVER_MAX_MS     5000u
+#define DCM_S3_SERVER_MS             5000u
+#define DCM_RESPONSE_PENDING_PERIOD  45u
+
+#define DCM_INITIAL                  0u
+#define DCM_PENDING                  1u
+#define DCM_CANCEL                   2u
+
+typedef uint8 Dcm_OpStatusType;
+
+#define DCM_SUPPRESS_POS_RSP_MSG_INDICATION_BIT 0x80u
+
+#define DCM_NRC_GENERAL_REJECT                          0x10u
+#define DCM_NRC_SERVICE_NOT_SUPPORTED                   0x11u
+#define DCM_NRC_SUBFUNCTION_NOT_SUPPORTED               0x12u
+#define DCM_NRC_INCORRECT_MESSAGE_LENGTH_OR_FORMAT      0x13u
+#define DCM_NRC_RESPONSE_TOO_LONG                       0x14u
+#define DCM_NRC_BUSY_REPEAT_REQUEST                     0x21u
+#define DCM_NRC_CONDITIONS_NOT_CORRECT                  0x22u
+#define DCM_NRC_REQUEST_SEQUENCE_ERROR                  0x24u
+#define DCM_NRC_REQUEST_OUT_OF_RANGE                    0x31u
+#define DCM_NRC_SECURITY_ACCESS_DENIED                  0x33u
+#define DCM_NRC_INVALID_KEY                             0x35u
+#define DCM_NRC_EXCEED_NUMBER_OF_ATTEMPTS               0x36u
+#define DCM_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED         0x37u
+#define DCM_NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED            0x70u
+#define DCM_NRC_TRANSFER_DATA_SUSPENDED                 0x71u
+#define DCM_NRC_GENERAL_PROGRAMMING_FAILURE             0x72u
+#define DCM_NRC_WRONG_BLOCK_SEQUENCE_COUNTER            0x73u
+#define DCM_NRC_RESPONSE_PENDING                        0x78u
+#define DCM_NRC_SUBFUNCTION_NOT_SUPPORTED_IN_SESSION    0x7Eu
+#define DCM_NRC_SERVICE_NOT_SUPPORTED_IN_SESSION        0x7Fu
+#define DCM_NRC_REQUEST_CORRECTLY_RECEIVED_RCRRP        0x78u
+
+typedef enum
+{
+    DCM_ADDR_PHYSICAL = 0u,
+    DCM_ADDR_FUNCTIONAL = 1u
+} Dcm_AddressingType;
+
+typedef enum
+{
+    DCM_BUS_CAN_CLASSIC = 0u,
+    DCM_BUS_CANFD       = 1u,
+    DCM_BUS_LIN         = 2u,
+    DCM_BUS_ETHERNET    = 3u
+} Dcm_BusType;
+
+typedef enum
+{
+    DCM_SESSION_DEFAULT     = 0x01u,
+    DCM_SESSION_PROGRAMMING = 0x02u,
+    DCM_SESSION_EXTENDED    = 0x03u
+} Dcm_SessionType;
+
+typedef enum
+{
+    DCM_SERVICE_OK = 0u,
+    DCM_SERVICE_PENDING = 1u,
+    DCM_SERVICE_NOT_OK = 2u
+} Dcm_ServiceResultType;
+
+typedef struct
+{
+    PduIdType rxPduId;
+    PduIdType txPduId;
+    Dcm_BusType busType;
+    Dcm_AddressingType addressing;
+    uint16 testerId;
+    uint16 ecuId;
+    PduLengthType rxBufferSize;
+    PduLengthType txBufferSize;
+} Dcm_ConnectionConfigType;
+
+typedef Dcm_ServiceResultType (*Dcm_ServiceHandlerType)
+(
+    uint8 connId,
+    Dcm_OpStatusType opStatus,
+    const uint8* reqData,
+    PduLengthType reqLen,
+    uint8* respData,
+    PduLengthType* respLen,
+    uint8* nrc
+);
+
+typedef struct
+{
+    uint8 sid;
+    uint8 allowedInDefaultSession;
+    uint8 allowedInExtendedSession;
+    uint8 allowedInProgrammingSession;
+    Dcm_ServiceHandlerType handler;
+} Dcm_ServiceConfigType;
+
+typedef struct
+{
+    const Dcm_ConnectionConfigType* connectionList;
+    uint8 numberOfConnections;
+
+    const Dcm_ServiceConfigType* serviceList;
+    uint8 numberOfServices;
+} Dcm_ConfigType;
+
+typedef struct
+{
+    uint8 unlocked;
+    uint8 attempts;
+    uint8 seedValid;
+    uint8 seed[4];
+    uint32 delayTimerMs;
+} Dcm_SecurityStateType;
+
+void Dcm_Init(const Dcm_ConfigType* ConfigPtr);
+void Dcm_MainFunction(void);
+
+BufReq_ReturnType Dcm_StartOfReception
+(
+    PduIdType id,
+    const PduInfoType* info,
+    PduLengthType TpSduLength,
+    PduLengthType* bufferSizePtr
+);
+
+BufReq_ReturnType Dcm_CopyRxData
+(
+    PduIdType id,
+    const PduInfoType* info,
+    PduLengthType* bufferSizePtr
+);
+
+void Dcm_TpRxIndication(PduIdType id, NotifResultType result);
+
+BufReq_ReturnType Dcm_CopyTxData
+(
+    PduIdType id,
+    const PduInfoType* info,
+    const void* retry,
+    PduLengthType* availableDataPtr
+);
+
+void Dcm_TpTxConfirmation(PduIdType id, NotifResultType result);
+
+Std_ReturnType Dcm_Transmit(PduIdType TxPduId, const PduInfoType* PduInfoPtr);
+
+Dcm_SessionType Dcm_GetSession(uint8 connId);
+uint8 Dcm_GetSecurityLevel(uint8 level);
+
+/* Application hooks */
+Std_ReturnType Dcm_App_ReadDid(uint16 did, uint8* data, PduLengthType* len, uint8* nrc);
+Std_ReturnType Dcm_App_WriteDid(uint16 did, const uint8* data, PduLengthType len, uint8* nrc);
+Std_ReturnType Dcm_App_EcuReset(uint8 resetType, uint8* nrc);
+Std_ReturnType Dcm_App_CommControl(uint8 controlType, uint8 communicationType, uint8* nrc);
+Std_ReturnType Dcm_App_ControlDtcSetting(uint8 settingType, uint8* nrc);
+Std_ReturnType Dcm_App_RoutineControl(uint8 controlType, uint16 routineId, const uint8* req, PduLengthType reqLen, uint8* resp, PduLengthType* respLen, uint8* nrc);
+Std_ReturnType Dcm_App_TesterPresent(uint8 connId);
+Std_ReturnType Dcm_App_ReadDtcInformation(const uint8* req, PduLengthType reqLen, uint8* resp, PduLengthType* respLen, uint8* nrc);
+
+extern const Dcm_ConfigType Dcm_Config;
+
+#endif

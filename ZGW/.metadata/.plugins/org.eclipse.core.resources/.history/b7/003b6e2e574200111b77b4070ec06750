@@ -1,0 +1,18 @@
+/* PduR.h */
+#ifndef PDUR_H
+#define PDUR_H
+
+#include "CanTp.h"
+#include "Dcm.h"
+
+#define PDUR_CANTP_TO_DCM_CHANNELS 4u
+#define PDUR_DCM_TO_CANTP_CHANNELS 2u
+
+void PduR_Init(void);
+
+void PduR_CanTpRxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
+void PduR_CanTpTxConfirmation(PduIdType TxPduId, Std_ReturnType result);
+
+Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId, const uint8* data, PduLengthType len);
+
+#endif

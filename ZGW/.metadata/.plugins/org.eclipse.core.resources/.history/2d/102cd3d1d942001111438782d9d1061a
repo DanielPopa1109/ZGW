@@ -1,0 +1,57 @@
+#ifndef LINIF_H
+#define LINIF_H
+
+#include "Std_Types.h"
+#include "Lin.h"
+
+typedef uint16 LinIf_PduIdType;
+
+typedef enum
+{
+    LINIF_UNINIT = 0u,
+    LINIF_INIT,
+    LINIF_OPERATIONAL,
+    LINIF_SLEEP
+} LinIf_StatusType;
+
+typedef enum
+{
+    LINIF_FRAME_UNCONDITIONAL = 0u,
+    LINIF_FRAME_DIAG_MASTER_REQ,
+    LINIF_FRAME_DIAG_SLAVE_RESP
+} LinIf_FrameKindType;
+
+typedef struct
+{
+    LinIf_PduIdType pduId;
+    Lin_ChannelType channel;
+    uint8 linId;
+    uint8 dlc;
+    Lin_ChecksumType checksumType;
+    Lin_FrameResponseType responseType;
+    LinIf_FrameKindType frameKind;
+    uint16 delayTicks;
+    uint8 defaultData[LIN_MAX_FRAME_DATA_LEN];
+} LinIf_FrameConfigType;
+
+typedef struct
+{
+    const LinIf_FrameConfigType* frames;
+    uint16 numFrames;
+} LinIf_ConfigType;
+
+void LinIf_Init(const LinIf_ConfigType* ConfigPtr);
+Std_ReturnType LinIf_Transmit(LinIf_PduIdType TxPduId, const uint8* data, uint8 len);
+void LinIf_MainFunction(void);
+
+void LinIf_RxIndication(Lin_ChannelType Channel, uint8 LinId, const uint8* data, uint8 len);
+void LinIf_TxConfirmation(Lin_ChannelType Channel, uint8 LinId);
+void LinIf_ErrorIndication(Lin_ChannelType Channel, uint8 LinId);
+
+void LinIf_AppRxIndication(LinIf_PduIdType PduId, const uint8* data, uint8 len);
+void LinIf_AppTxConfirmation(LinIf_PduIdType PduId);
+void LinIf_AppErrorIndication(LinIf_PduIdType PduId);
+
+extern const LinIf_ConfigType LinIf_Config;
+
+#endif
