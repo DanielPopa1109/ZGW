@@ -1,2 +1,0 @@
-Cpu1_Main.o :	../Cpu1_Main.c
-../Cpu1_Main.c :

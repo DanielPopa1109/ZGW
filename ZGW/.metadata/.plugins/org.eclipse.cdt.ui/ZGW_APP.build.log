@@ -1,4 +1,4 @@
-13:28:21 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_APP ****
+13:30:24 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_APP ****
 amk -j12 clean 
 TASKING VX-toolset for AURIX Development Studio (non-commercial): program builder v1.1r8 Build 22011964
 rm -rf ./SCR/main.d ./SCR/main.o ./SCR/main.src
@@ -81,5 +81,5 @@ rm -rf ./Cpu0_Main.d ./Cpu0_Main.o ./Cpu0_Main.src ./Cpu1_Main.d ./Cpu1_Main.o .
 rm -rf ZGW_APP.siz ZGW_APP.elf
  
 
-13:28:21 Build Finished. 0 errors, 0 warnings. (took 392ms)
+13:30:24 Build Finished. 0 errors, 0 warnings. (took 352ms)
 
