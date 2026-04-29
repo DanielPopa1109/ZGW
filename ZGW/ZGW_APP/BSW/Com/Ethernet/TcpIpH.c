@@ -1,349 +1,224 @@
-/* TcpIp.c */
 #include "TcpIpH.h"
-
-#include "lwip/opt.h"
+#include "lwip_geth_private_phy_dp83825i.h"
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "lwip/errno.h"
 
-#include <string.h>
+#define TCPIP_MAX_SOCKETS 16u
 
-static int TcpIp_Initialized = 0;
-
-static void TcpIp_ToSockAddr(const TcpIp_SockAddrType *src, struct sockaddr_in *dst)
+typedef struct
 {
-    uint32_t ip;
+    TcpIp_SocketIdType sock;
+    uint8 used;
+    uint8 tcp;
+} TcpIp_SocketType;
 
-    memset(dst, 0, sizeof(*dst));
+static TcpIp_SocketType TcpIp_Sockets[TCPIP_MAX_SOCKETS];
 
-    ip = ((uint32_t)src->addr[0] << 24u) |
-         ((uint32_t)src->addr[1] << 16u) |
-         ((uint32_t)src->addr[2] << 8u)  |
-         ((uint32_t)src->addr[3]);
-
-    dst->sin_family = AF_INET;
-    dst->sin_port = htons(src->port);
-    dst->sin_addr.s_addr = htonl(ip);
-}
-
-static void TcpIp_FromSockAddr(const struct sockaddr_in *src, TcpIp_SockAddrType *dst)
+static uint8 TcpIp_IsLinkUp(void)
 {
-    uint32_t ip = ntohl(src->sin_addr.s_addr);
-
-    dst->addr[0] = (uint8_t)((ip >> 24u) & 0xFFu);
-    dst->addr[1] = (uint8_t)((ip >> 16u) & 0xFFu);
-    dst->addr[2] = (uint8_t)((ip >> 8u) & 0xFFu);
-    dst->addr[3] = (uint8_t)(ip & 0xFFu);
-    dst->port = ntohs(src->sin_port);
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+    return (uint8)lwip_geth_private_Phy_Dp83825i_is_link_up();
+#else
+    return 1u;
+#endif
 }
 
 void TcpIp_Init(void)
 {
-    TcpIp_Initialized = 1;
+    uint32 i;
+
+    for (i = 0u; i < TCPIP_MAX_SOCKETS; i++)
+    {
+        TcpIp_Sockets[i].sock = TCPIP_INVALID_SOCKET;
+        TcpIp_Sockets[i].used = 0u;
+        TcpIp_Sockets[i].tcp = 0u;
+    }
 }
 
-TcpIp_ReturnType TcpIp_CreateSocket(TcpIp_ProtocolType protocol,
-                                    TcpIp_SocketIdType *socketId)
+void TcpIp_MainFunction(void)
 {
-    int type;
-    int proto;
-    int s;
-    int opt = 1;
+    uint32 i;
 
-    if ((TcpIp_Initialized == 0) || (socketId == NULL))
+    if (TcpIp_IsLinkUp() == 0u)
     {
-        return TCPIP_PARAM_ERROR;
+        for (i = 0u; i < TCPIP_MAX_SOCKETS; i++)
+        {
+            if (TcpIp_Sockets[i].used != 0u)
+            {
+                lwip_close(TcpIp_Sockets[i].sock);
+                TcpIp_Sockets[i].sock = TCPIP_INVALID_SOCKET;
+                TcpIp_Sockets[i].used = 0u;
+            }
+        }
     }
-
-    if (protocol == TCPIP_PROTOCOL_TCP)
-    {
-        type = SOCK_STREAM;
-        proto = IPPROTO_TCP;
-    }
-    else
-    {
-        type = SOCK_DGRAM;
-        proto = IPPROTO_UDP;
-    }
-
-    s = lwip_socket(AF_INET, type, proto);
-    if (s < 0)
-    {
-        *socketId = TCPIP_INVALID_SOCKET;
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    (void)lwip_setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    *socketId = (TcpIp_SocketIdType)s;
-    return TCPIP_OK;
 }
 
-TcpIp_ReturnType TcpIp_SetNonBlocking(TcpIp_SocketIdType socketId)
+static TcpIp_SocketType *TcpIp_Alloc(void)
 {
-    int flags;
+    uint32 i;
 
-    if (socketId < 0)
+    for (i = 0u; i < TCPIP_MAX_SOCKETS; i++)
     {
-        return TCPIP_PARAM_ERROR;
+        if (TcpIp_Sockets[i].used == 0u)
+        {
+            TcpIp_Sockets[i].used = 1u;
+            return &TcpIp_Sockets[i];
+        }
     }
 
-    flags = lwip_fcntl((int)socketId, F_GETFL, 0);
-    if (flags < 0)
-    {
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    if (lwip_fcntl((int)socketId, F_SETFL, flags | O_NONBLOCK) < 0)
-    {
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    return TCPIP_OK;
+    return 0;
 }
 
-TcpIp_ReturnType TcpIp_Bind(TcpIp_SocketIdType socketId,
-                            const TcpIp_SockAddrType *localAddr)
+TcpIp_SocketIdType TcpIp_Create(uint8 tcp)
+{
+    TcpIp_SocketType *s;
+    sint32 type;
+
+    s = TcpIp_Alloc();
+
+    if (s == 0)
+    {
+        return TCPIP_INVALID_SOCKET;
+    }
+
+    type = (tcp != 0u) ? SOCK_STREAM : SOCK_DGRAM;
+
+    s->sock = (TcpIp_SocketIdType)lwip_socket(AF_INET, type, 0);
+
+    if (s->sock < 0)
+    {
+        s->used = 0u;
+        s->sock = TCPIP_INVALID_SOCKET;
+        return TCPIP_INVALID_SOCKET;
+    }
+
+    s->tcp = tcp;
+    (void)lwip_fcntl(s->sock, F_SETFL, O_NONBLOCK);
+
+    return s->sock;
+}
+
+sint32 TcpIp_Bind(TcpIp_SocketIdType sock, uint16 port)
 {
     struct sockaddr_in addr;
 
-    if ((socketId < 0) || (localAddr == NULL))
-    {
-        return TCPIP_PARAM_ERROR;
-    }
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = INADDR_ANY;
 
-    TcpIp_ToSockAddr(localAddr, &addr);
-
-    if (lwip_bind((int)socketId, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-    {
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    return TCPIP_OK;
+    return (sint32)lwip_bind(sock, (struct sockaddr *)&addr, sizeof(addr));
 }
 
-TcpIp_ReturnType TcpIp_Listen(TcpIp_SocketIdType socketId,
-                              uint8_t backlog)
+sint32 TcpIp_Listen(TcpIp_SocketIdType sock)
 {
-    if (socketId < 0)
-    {
-        return TCPIP_PARAM_ERROR;
-    }
-
-    if (lwip_listen((int)socketId, backlog) < 0)
-    {
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    return TCPIP_OK;
+    return (sint32)lwip_listen(sock, 4);
 }
 
-TcpIp_ReturnType TcpIp_Accept(TcpIp_SocketIdType listenSocket,
-                              TcpIp_SocketIdType *clientSocket,
-                              TcpIp_SockAddrType *remoteAddr)
+TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr)
 {
     struct sockaddr_in addr;
-    socklen_t addrLen = (socklen_t)sizeof(addr);
-    int s;
+    socklen_t len;
+    sint32 newSock;
 
-    if ((listenSocket < 0) || (clientSocket == NULL))
-    {
-        return TCPIP_PARAM_ERROR;
-    }
+    len = sizeof(addr);
+    newSock = lwip_accept(sock, (struct sockaddr *)&addr, &len);
 
-    s = lwip_accept((int)listenSocket, (struct sockaddr *)&addr, &addrLen);
-    if (s < 0)
+    if (newSock >= 0)
     {
-        if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+        (void)lwip_fcntl(newSock, F_SETFL, O_NONBLOCK);
+
+        if (remoteAddr != 0)
         {
-            return TCPIP_BUSY;
+            remoteAddr->addr = addr.sin_addr.s_addr;
+            remoteAddr->port = ntohs(addr.sin_port);
         }
-
-        return TCPIP_SOCKET_ERROR;
     }
 
-    if (remoteAddr != NULL)
-    {
-        TcpIp_FromSockAddr(&addr, remoteAddr);
-    }
-
-    *clientSocket = (TcpIp_SocketIdType)s;
-    return TCPIP_OK;
+    return (TcpIp_SocketIdType)newSock;
 }
 
-TcpIp_ReturnType TcpIp_Connect(TcpIp_SocketIdType socketId,
-                               const TcpIp_SockAddrType *remoteAddr)
+sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port)
 {
     struct sockaddr_in addr;
 
-    if ((socketId < 0) || (remoteAddr == NULL))
-    {
-        return TCPIP_PARAM_ERROR;
-    }
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = ip;
 
-    TcpIp_ToSockAddr(remoteAddr, &addr);
-
-    if (lwip_connect((int)socketId, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-    {
-        if ((errno == EINPROGRESS) || (errno == EALREADY))
-        {
-            return TCPIP_BUSY;
-        }
-
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    return TCPIP_OK;
+    return (sint32)lwip_connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 }
 
-TcpIp_ReturnType TcpIp_Send(TcpIp_SocketIdType socketId,
-                            const uint8_t *data,
-                            uint16_t len,
-                            uint16_t *sentLen)
+sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
 {
-    int ret;
-
-    if ((socketId < 0) || (data == NULL) || (sentLen == NULL))
+    if ((data == 0) || (len == 0u) || (TcpIp_IsLinkUp() == 0u))
     {
-        return TCPIP_PARAM_ERROR;
+        return -1;
     }
 
-    *sentLen = 0u;
-
-    ret = lwip_send((int)socketId, data, len, 0);
-    if (ret < 0)
-    {
-        if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-        {
-            return TCPIP_BUSY;
-        }
-
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    *sentLen = (uint16_t)ret;
-    return TCPIP_OK;
+    return (sint32)lwip_send(sock, data, len, 0);
 }
 
-TcpIp_ReturnType TcpIp_Recv(TcpIp_SocketIdType socketId,
-                            uint8_t *data,
-                            uint16_t maxLen,
-                            uint16_t *rxLen)
-{
-    int ret;
-
-    if ((socketId < 0) || (data == NULL) || (rxLen == NULL))
-    {
-        return TCPIP_PARAM_ERROR;
-    }
-
-    *rxLen = 0u;
-
-    ret = lwip_recv((int)socketId, data, maxLen, 0);
-    if (ret < 0)
-    {
-        if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-        {
-            return TCPIP_BUSY;
-        }
-
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    if (ret == 0)
-    {
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    *rxLen = (uint16_t)ret;
-    return TCPIP_OK;
-}
-
-TcpIp_ReturnType TcpIp_SendTo(TcpIp_SocketIdType socketId,
-                              const TcpIp_SockAddrType *remoteAddr,
-                              const uint8_t *data,
-                              uint16_t len,
-                              uint16_t *sentLen)
+sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
+                    const TcpIp_SockAddrType *remoteAddr,
+                    const uint8 *data,
+                    uint16 len)
 {
     struct sockaddr_in addr;
-    int ret;
 
-    if ((socketId < 0) || (remoteAddr == NULL) || (data == NULL) || (sentLen == NULL))
+    if ((remoteAddr == 0) || (data == 0) || (len == 0u) || (TcpIp_IsLinkUp() == 0u))
     {
-        return TCPIP_PARAM_ERROR;
+        return -1;
     }
 
-    *sentLen = 0u;
-    TcpIp_ToSockAddr(remoteAddr, &addr);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(remoteAddr->port);
+    addr.sin_addr.s_addr = remoteAddr->addr;
 
-    ret = lwip_sendto((int)socketId,
-                      data,
-                      len,
-                      0,
-                      (struct sockaddr *)&addr,
-                      sizeof(addr));
-
-    if (ret < 0)
-    {
-        if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-        {
-            return TCPIP_BUSY;
-        }
-
-        return TCPIP_SOCKET_ERROR;
-    }
-
-    *sentLen = (uint16_t)ret;
-    return TCPIP_OK;
+    return (sint32)lwip_sendto(sock, data, len, 0, (struct sockaddr *)&addr, sizeof(addr));
 }
 
-TcpIp_ReturnType TcpIp_RecvFrom(TcpIp_SocketIdType socketId,
-                                TcpIp_SockAddrType *remoteAddr,
-                                uint8_t *data,
-                                uint16_t maxLen,
-                                uint16_t *rxLen)
+sint32 TcpIp_Recv(TcpIp_SocketIdType sock, uint8 *data, uint16 len)
+{
+    if ((data == 0) || (len == 0u))
+    {
+        return -1;
+    }
+
+    return (sint32)lwip_recv(sock, data, len, 0);
+}
+
+sint32 TcpIp_RecvFrom(TcpIp_SocketIdType sock,
+                      TcpIp_SockAddrType *remoteAddr,
+                      uint8 *data,
+                      uint16 len)
 {
     struct sockaddr_in addr;
-    socklen_t addrLen = (socklen_t)sizeof(addr);
-    int ret;
+    socklen_t addrLen;
+    sint32 ret;
 
-    if ((socketId < 0) || (remoteAddr == NULL) || (data == NULL) || (rxLen == NULL))
+    if ((data == 0) || (len == 0u))
     {
-        return TCPIP_PARAM_ERROR;
+        return -1;
     }
 
-    *rxLen = 0u;
+    addrLen = sizeof(addr);
 
-    ret = lwip_recvfrom((int)socketId,
-                        data,
-                        maxLen,
-                        0,
-                        (struct sockaddr *)&addr,
-                        &addrLen);
+    ret = (sint32)lwip_recvfrom(sock, data, len, 0, (struct sockaddr *)&addr, &addrLen);
 
-    if (ret < 0)
+    if ((ret > 0) && (remoteAddr != 0))
     {
-        if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-        {
-            return TCPIP_BUSY;
-        }
-
-        return TCPIP_SOCKET_ERROR;
+        remoteAddr->addr = addr.sin_addr.s_addr;
+        remoteAddr->port = ntohs(addr.sin_port);
     }
 
-    TcpIp_FromSockAddr(&addr, remoteAddr);
-    *rxLen = (uint16_t)ret;
-
-    return TCPIP_OK;
+    return ret;
 }
 
-TcpIp_ReturnType TcpIp_Close(TcpIp_SocketIdType socketId)
+void TcpIp_Close(TcpIp_SocketIdType sock)
 {
-    if (socketId < 0)
+    if (sock != TCPIP_INVALID_SOCKET)
     {
-        return TCPIP_PARAM_ERROR;
+        (void)lwip_close(sock);
     }
-
-    (void)lwip_close((int)socketId);
-    return TCPIP_OK;
 }

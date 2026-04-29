@@ -46,10 +46,10 @@ typedef struct
 
 static const CanTp_ChannelConfigType CanTp_ChannelConfig[] =
 {
-    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, 0u, 0u, CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0xAAu },
-    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 1u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu },
-    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 2u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu },
-    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 3u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu }
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, 0u, 0u, CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
+    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 1u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 2u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
+    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 3u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON }
 };
 
 const CanTp_ConfigType CanTp_Config =
@@ -60,6 +60,91 @@ const CanTp_ConfigType CanTp_Config =
 
 static const CanTp_ConfigType* CanTp_ConfigPtr;
 static CanTp_ChannelStateType CanTp_Channel[CANTP_MAX_CHANNELS];
+
+static uint8 CanTp_GetAddrOffset(const CanTp_ChannelConfigType* cfg)
+{
+    if (cfg == NULL_PTR)
+    {
+        return 0u;
+    }
+
+    if ((cfg->addressFormat == CANTP_FORMAT_EXTENDED) ||
+        (cfg->addressFormat == CANTP_FORMAT_MIXED))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
+static uint8 CanTp_GetSfMaxPayload(const CanTp_ChannelConfigType* cfg)
+{
+    uint8 off;
+
+    off = CanTp_GetAddrOffset(cfg);
+
+    if (cfg->canDl <= 8u)
+    {
+        return (uint8)(7u - off);
+    }
+
+    return (uint8)(62u - off);
+}
+
+static uint8 CanTp_GetFfPayload(const CanTp_ChannelConfigType* cfg)
+{
+    return (uint8)(cfg->canDl - 2u - CanTp_GetAddrOffset(cfg));
+}
+
+static uint8 CanTp_GetCfPayload(const CanTp_ChannelConfigType* cfg)
+{
+    return (uint8)(cfg->canDl - 1u - CanTp_GetAddrOffset(cfg));
+}
+
+static void CanTp_ClearFrame(uint8* frame, uint8 len, uint8 padding)
+{
+    memset(frame, padding, len);
+}
+
+static uint8 CanTp_CheckRxAddress(const CanTp_ChannelConfigType* cfg,
+                                  const uint8* data,
+                                  PduLengthType len)
+{
+    if ((cfg == NULL_PTR) || (data == NULL_PTR) || (len == 0u))
+    {
+        return FALSE;
+    }
+
+    if ((cfg->addressFormat == CANTP_FORMAT_EXTENDED) ||
+        (cfg->addressFormat == CANTP_FORMAT_MIXED))
+    {
+        if (len < 2u)
+        {
+            return FALSE;
+        }
+
+        if (data[0] != cfg->nTa)
+        {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static uint8 CanTp_GetRxPciIndex(const CanTp_ChannelConfigType* cfg)
+{
+    return CanTp_GetAddrOffset(cfg);
+}
+
+static void CanTp_SetTxAddress(const CanTp_ChannelConfigType* cfg, uint8* frame)
+{
+    if ((cfg->addressFormat == CANTP_FORMAT_EXTENDED) ||
+        (cfg->addressFormat == CANTP_FORMAT_MIXED))
+    {
+        frame[0] = cfg->nTa;
+    }
+}
 
 static uint16 CanTp_GetTimerTicks(CanTp_TimerType timer)
 {
@@ -252,6 +337,7 @@ void CanTp_Init(const CanTp_ConfigType* ConfigPtr)
 static Std_ReturnType CanTp_SendFc(uint8 ch, uint8 fs)
 {
     uint8 frame[64u];
+    uint8 pci;
     const CanTp_ChannelConfigType* cfg;
 
     if ((CanTp_IsConfigValid() == FALSE) || (ch >= CanTp_ConfigPtr->numChannels))
@@ -260,12 +346,14 @@ static Std_ReturnType CanTp_SendFc(uint8 ch, uint8 fs)
     }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+    pci = CanTp_GetAddrOffset(cfg);
 
-    memset(frame, cfg->padding, sizeof(frame));
+    CanTp_ClearFrame(frame, cfg->canDl, cfg->padding);
+    CanTp_SetTxAddress(cfg, frame);
 
-    frame[0] = (uint8)(CANTP_NPCI_FC | fs);
-    frame[1] = cfg->blockSize;
-    frame[2] = cfg->stMinMs;
+    frame[pci + 0u] = (uint8)(CANTP_NPCI_FC | fs);
+    frame[pci + 1u] = cfg->blockSize;
+    frame[pci + 2u] = cfg->stMinMs;
 
     CanTp_Channel[ch].txBusy = TRUE;
     CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_FC;
@@ -275,8 +363,6 @@ static Std_ReturnType CanTp_SendFc(uint8 ch, uint8 fs)
 
     if (CanIf_Transmit(cfg->txPduId, frame, cfg->canDl) != E_OK)
     {
-        CanTp_Channel[ch].txBusy = FALSE;
-        CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
         CanTp_ResetChannel(ch);
         return E_NOT_OK;
     }
@@ -288,35 +374,38 @@ static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
 {
     uint8 frame[64u];
     uint8 len;
+    uint8 pci;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
     len = (uint8)CanTp_Channel[ch].txLen;
+    pci = CanTp_GetAddrOffset(cfg);
 
-    memset(frame, cfg->padding, sizeof(frame));
+    CanTp_ClearFrame(frame, cfg->canDl, cfg->padding);
+    CanTp_SetTxAddress(cfg, frame);
+
+    if (len > CanTp_GetSfMaxPayload(cfg))
+    {
+        return E_NOT_OK;
+    }
 
     if (cfg->canDl <= 8u)
     {
-        if (len > 7u)
-        {
-            return E_NOT_OK;
-        }
-
-        frame[0] = len & 0x0Fu;
-        memcpy(&frame[1], CanTp_Channel[ch].txBuffer, len);
+        frame[pci] = len & 0x0Fu;
+        memcpy(&frame[pci + 1u], CanTp_Channel[ch].txBuffer, len);
     }
     else
     {
         if (len <= 15u)
         {
-            frame[0] = len & 0x0Fu;
-            memcpy(&frame[1], CanTp_Channel[ch].txBuffer, len);
+            frame[pci] = len & 0x0Fu;
+            memcpy(&frame[pci + 1u], CanTp_Channel[ch].txBuffer, len);
         }
         else
         {
-            frame[0] = 0x00u;
-            frame[1] = len;
-            memcpy(&frame[2], CanTp_Channel[ch].txBuffer, len);
+            frame[pci] = 0x00u;
+            frame[pci + 1u] = len;
+            memcpy(&frame[pci + 2u], CanTp_Channel[ch].txBuffer, len);
         }
     }
 
@@ -339,23 +428,27 @@ static Std_ReturnType CanTp_SendFirstFrame(uint8 ch)
 {
     uint8 frame[64u];
     uint8 payloadInFf;
+    uint8 pci;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+    pci = CanTp_GetAddrOffset(cfg);
 
-    if ((CanTp_Channel[ch].txLen <= 7u) || (CanTp_Channel[ch].txLen > CANTP_MAX_PAYLOAD_LEN))
+    if ((CanTp_Channel[ch].txLen <= CanTp_GetSfMaxPayload(cfg)) ||
+        (CanTp_Channel[ch].txLen > CANTP_MAX_PAYLOAD_LEN))
     {
         return E_NOT_OK;
     }
 
-    memset(frame, cfg->padding, sizeof(frame));
+    CanTp_ClearFrame(frame, cfg->canDl, cfg->padding);
+    CanTp_SetTxAddress(cfg, frame);
 
-    frame[0] = (uint8)(CANTP_NPCI_FF | ((CanTp_Channel[ch].txLen >> 8u) & 0x0Fu));
-    frame[1] = (uint8)(CanTp_Channel[ch].txLen & 0xFFu);
+    frame[pci + 0u] = (uint8)(CANTP_NPCI_FF | ((CanTp_Channel[ch].txLen >> 8u) & 0x0Fu));
+    frame[pci + 1u] = (uint8)(CanTp_Channel[ch].txLen & 0xFFu);
 
-    payloadInFf = (uint8)(cfg->canDl - 2u);
+    payloadInFf = CanTp_GetFfPayload(cfg);
 
-    memcpy(&frame[2], CanTp_Channel[ch].txBuffer, payloadInFf);
+    memcpy(&frame[pci + 2u], CanTp_Channel[ch].txBuffer, payloadInFf);
 
     CanTp_Channel[ch].txOffset = payloadInFf;
     CanTp_Channel[ch].txSn = 1u;
@@ -380,26 +473,24 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
     PduLengthType remaining;
     uint8 payload;
     uint8 copy;
+    uint8 pci;
     const CanTp_ChannelConfigType* cfg;
 
-    if (CanTp_Channel[ch].txBusy == TRUE)
-    {
-        return E_NOT_OK;
-    }
-
-    if (CanTp_Channel[ch].txStTimer > 0u)
+    if ((CanTp_Channel[ch].txBusy == TRUE) || (CanTp_Channel[ch].txStTimer > 0u))
     {
         return E_NOT_OK;
     }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+    pci = CanTp_GetAddrOffset(cfg);
 
-    memset(frame, cfg->padding, sizeof(frame));
+    CanTp_ClearFrame(frame, cfg->canDl, cfg->padding);
+    CanTp_SetTxAddress(cfg, frame);
 
-    frame[0] = (uint8)(CANTP_NPCI_CF | (CanTp_Channel[ch].txSn & 0x0Fu));
+    frame[pci] = (uint8)(CANTP_NPCI_CF | (CanTp_Channel[ch].txSn & 0x0Fu));
 
     remaining = (PduLengthType)(CanTp_Channel[ch].txLen - CanTp_Channel[ch].txOffset);
-    payload = (uint8)(cfg->canDl - 1u);
+    payload = CanTp_GetCfPayload(cfg);
     copy = (remaining > payload) ? payload : (uint8)remaining;
 
     if (copy == 0u)
@@ -407,7 +498,7 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
         return E_NOT_OK;
     }
 
-    memcpy(&frame[1], &CanTp_Channel[ch].txBuffer[CanTp_Channel[ch].txOffset], copy);
+    memcpy(&frame[pci + 1u], &CanTp_Channel[ch].txBuffer[CanTp_Channel[ch].txOffset], copy);
 
     CanTp_Channel[ch].txBusy = TRUE;
     CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_CF;
@@ -464,7 +555,7 @@ Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLeng
     CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
     CanTp_Channel[ch].direction = CANTP_DIR_TX;
 
-    sfMax = (CanTp_ConfigPtr->channels[ch].canDl <= 8u) ? 7u : 62u;
+    sfMax = CanTp_GetSfMaxPayload(&CanTp_ConfigPtr->channels[ch]);
 
     if (len <= sfMax)
     {
@@ -481,6 +572,11 @@ static void CanTp_HandleSingleFrame(uint8 ch, const uint8* data, PduLengthType l
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+
+    uint8 pciBase;
+    pciBase = CanTp_GetRxPciIndex(cfg);
+    data = &data[pciBase];
+    len = (PduLengthType)(len - pciBase);
 
     if (cfg->canDl <= 8u)
     {
@@ -544,6 +640,11 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
 
     cfg = &CanTp_ConfigPtr->channels[ch];
 
+    uint8 pciBase;
+    pciBase = CanTp_GetRxPciIndex(cfg);
+    data = &data[pciBase];
+    len = (PduLengthType)(len - pciBase);
+
     if ((len < 3u) || (cfg->addressingType == CANTP_ADDR_FUNCTIONAL))
     {
         return;
@@ -551,7 +652,7 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
 
     totalLen = (PduLengthType)((((PduLengthType)data[0] & 0x0Fu) << 8u) | data[1]);
 
-    if ((totalLen <= 7u) || (totalLen > CANTP_MAX_PAYLOAD_LEN))
+    if ((totalLen <= CanTp_GetSfMaxPayload(cfg)) || (totalLen > CANTP_MAX_PAYLOAD_LEN))
     {
         (void)CanTp_SendFc(ch, CANTP_FS_OVFLW);
         return;
@@ -592,6 +693,11 @@ static void CanTp_HandleConsecutiveFrame(uint8 ch, const uint8* data, PduLengthT
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+
+    uint8 pciBase;
+    pciBase = CanTp_GetRxPciIndex(cfg);
+    data = &data[pciBase];
+    len = (PduLengthType)(len - pciBase);
 
     if ((CanTp_Channel[ch].state != CANTP_RX_IN_PROGRESS) || (len < 2u))
     {
@@ -653,6 +759,11 @@ static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType l
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
+
+    uint8 pciBase;
+    pciBase = CanTp_GetRxPciIndex(cfg);
+    data = &data[pciBase];
+    len = (PduLengthType)(len - pciBase);
 
     if (CanTp_Channel[ch].state != CANTP_TX_WAIT_FC)
     {
@@ -728,7 +839,13 @@ void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType
     }
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-    pci = data[0] & 0xF0u;
+
+    if (CanTp_CheckRxAddress(cfg, data, len) == FALSE)
+    {
+        return;
+    }
+
+    pci = data[CanTp_GetRxPciIndex(cfg)] & 0xF0u;
 
     if ((cfg->addressingType == CANTP_ADDR_FUNCTIONAL) && (pci != CANTP_NPCI_SF))
     {

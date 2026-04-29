@@ -56,7 +56,7 @@ static const SomeIpSd_OfferedServiceType OfferedServices[] =
 const SomeIpSd_ConfigType SomeIpSd_Config =
 {
     .sdUdpSoConId = SOAD_SOCON_SOMEIP_SD_UDP,
-    .multicastAddr = {{224u, 244u, 224u, 245u}, 30490u},
+    .multicastAddr = {0xE0F4E0F5u, 30490u},
     .services = OfferedServices,
     .serviceCount = sizeof(OfferedServices) / sizeof(OfferedServices[0]),
     .offerPeriodMs = 1000u
@@ -113,7 +113,7 @@ static const SoAd_SocketConnectionConfigType SoAdConnections[] =
 const SoAd_ConfigType SoAd_Config =
 {
     .connections = SoAdConnections,
-    .connectionCount = sizeof(SoAdConnections) / sizeof(SoAdConnections[0])
+    .numConnections  = sizeof(SoAdConnections) / sizeof(SoAdConnections[0])
 };
 
 const DoIP_ConfigType DoIP_Config =

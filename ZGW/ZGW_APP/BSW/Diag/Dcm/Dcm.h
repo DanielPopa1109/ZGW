@@ -90,6 +90,7 @@ typedef struct
 #define DCM_NRC_SUBFUNCTION_NOT_SUPPORTED_IN_SESSION    0x7Eu
 #define DCM_NRC_SERVICE_NOT_SUPPORTED_IN_SESSION        0x7Fu
 
+
 /* ===================== UDS SID ===================== */
 
 #define DCM_SID_DIAGNOSTIC_SESSION_CONTROL              0x10u

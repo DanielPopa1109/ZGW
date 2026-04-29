@@ -1,5 +1,8 @@
-/* Dcm_Cfg.h */
-#define DCM_DEFAULT_SERVICE_COUNT    16u
+#ifndef DCM_CFG_H_
+#define DCM_CFG_H_
+
+#define DCM_DEFAULT_SERVICE_COUNT    13u
+
 #define DCM_RX_CAN_PHYS      0u
 #define DCM_RX_CAN_FUNC      1u
 #define DCM_RX_CANFD_PHYS    2u
@@ -11,3 +14,8 @@
 #define DCM_TX_CANFD_PHYS    2u
 #define DCM_TX_CANFD_FUNC    3u
 #define DCM_TX_LIN_PHYS      4u
+
+#define DCM_RX_ETH_PHYS      5u
+#define DCM_TX_ETH_PHYS      5u
+
+#endif

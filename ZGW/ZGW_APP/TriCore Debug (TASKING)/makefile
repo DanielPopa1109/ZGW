@@ -137,7 +137,7 @@ all: main-build
 main-build: ZGW_APP.elf secondary-outputs
 
 dependents:
-	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) all
+	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) clean all
 
 # Tool invocations
 ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)/SCR_AURIX_TC3x" makefile $(OPTIONAL_TOOL_DEPS) .ZGW_APP.elf.opt

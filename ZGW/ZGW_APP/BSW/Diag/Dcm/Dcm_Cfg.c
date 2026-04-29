@@ -42,6 +42,14 @@ const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
         0x71Au,
         DCM_ADDR_PHYSICAL,
         DCM_BUS_LIN
+    },
+    {
+        DCM_RX_ETH_PHYS,
+        DCM_TX_ETH_PHYS,
+        0x0E00u,
+        0x1001u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_ETHERNET
     }
 };
 

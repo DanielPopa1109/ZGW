@@ -1,9 +1,0 @@
-#include "Dcm.h"
-#include "string.h"
-
-void Dcm_MainFunction(void);
-
-void Dcm_MainFunction(void)
-{
-
-}

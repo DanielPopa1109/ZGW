@@ -82,12 +82,43 @@ static Dcm_ConnectionStateType Dcm_Conn[DCM_MAX_CONNECTIONS];
 static uint8 Dcm_ActiveProtocolConnection = 0xFFu;
 
 /* ===================== Forward ===================== */
+static void Dcm_SendBusyRepeatIfPossible(uint8 connIdx, uint8 sid, Dcm_AddressingType addressing);
 static uint8 Dcm_CheckServiceAccess(uint8 connIdx, uint8 sid, uint8* nrc);
 static uint8 Dcm_FindRxConnection(Dcm_PduIdType rxPduId);
 static uint8 Dcm_FindTxConnection(Dcm_PduIdType txPduId);
 static void Dcm_ProcessConnection(uint8 connIdx);
 static void Dcm_LoadNextRequest(uint8 connIdx);
 static void Dcm_StartProcessing(uint8 connIdx, const uint8* req, Dcm_PduLengthType len, Dcm_AddressingType addressing);
+
+static uint8 Dcm_ShouldSuppressFunctionalNrc(uint8 nrc)
+{
+    if ((nrc == DCM_NRC_SERVICE_NOT_SUPPORTED) ||
+            (nrc == DCM_NRC_SUBFUNCTION_NOT_SUPPORTED) ||
+            (nrc == DCM_NRC_REQUEST_OUT_OF_RANGE) ||
+            (nrc == DCM_NRC_SERVICE_NOT_SUPPORTED_IN_SESSION) ||
+            (nrc == DCM_NRC_SUBFUNCTION_NOT_SUPPORTED_IN_SESSION) ||
+            (nrc == DCM_NRC_RESPONSE_PENDING))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void Dcm_BuildNegativeResponse(uint8 connIdx, uint8 sid, uint8 nrc)
+{
+    Dcm_ConnectionStateType* c;
+
+    c = &Dcm_Conn[connIdx];
+
+    c->txBuffer[0] = 0x7Fu;
+    c->txBuffer[1] = sid;
+    c->txBuffer[2] = nrc;
+    c->txLen = 3u;
+    c->txOffset = 0u;
+}
+
+
 static void Dcm_StartProcessing(
         uint8 connIdx,
         const uint8* req,
@@ -114,8 +145,9 @@ static void Dcm_StartProcessing(
     c->p2StarTimer = DCM_P2STAR_SERVER_TICKS;
     c->pendingTimer = DCM_RESPONSE_PENDING_PERIOD;
     c->pendingStarted = FALSE;
-    c->lastTimerTick = DCM_S3_SERVER_TICKS;
+    c->lastTimerTick = OS_Counter_core0;
     c->suppressPositiveResponse = FALSE;
+    c->s3Timer = DCM_S3_SERVER_TICKS;
 
     if (Dcm_ActiveProtocolConnection == 0xFFu)
     {
@@ -131,6 +163,32 @@ static void Dcm_UpdatePendingTimers(uint8 connIdx, uint16 elapsedTicks);
 static uint8 Dcm_IsConnectionActive(uint8 connIdx);
 static uint8 Dcm_CanStartProtocol(uint8 connIdx);
 static void Dcm_ReleaseProtocol(uint8 connIdx);
+
+static void Dcm_SendBusyRepeatIfPossible(uint8 connIdx, uint8 sid, Dcm_AddressingType addressing)
+{
+    Dcm_ConnectionStateType* c;
+
+    if (connIdx >= DCM_MAX_CONNECTIONS)
+    {
+        return;
+    }
+
+    if ((addressing == DCM_ADDR_FUNCTIONAL) &&
+            (Dcm_ShouldSuppressFunctionalNrc(DCM_NRC_BUSY_REPEAT_REQUEST) == TRUE))
+    {
+        return;
+    }
+
+    c = &Dcm_Conn[connIdx];
+
+    if ((c->state == DCM_CONN_IDLE) && (c->rxInProgress == FALSE))
+    {
+        Dcm_BuildNegativeResponse(connIdx, sid, DCM_NRC_BUSY_REPEAT_REQUEST);
+        c->service = NULL_PTR;
+        (void)Dcm_StartTx(connIdx);
+    }
+}
+
 static uint16 Dcm_ConsumeElapsedTicks(uint8 connIdx)
 {
     Dcm_ConnectionStateType* c;
@@ -469,11 +527,13 @@ BufReq_ReturnType Dcm_StartOfReception(
 
     if (Dcm_CanStartProtocol(connIdx) == FALSE)
     {
+        *bufferSizePtr = 0u;
         return BUFREQ_E_BUSY;
     }
 
     if ((c->state != DCM_CONN_IDLE) && (c->qCount >= DCM_RX_QUEUE_DEPTH))
     {
+        *bufferSizePtr = 0u;
         return BUFREQ_E_BUSY;
     }
 
@@ -566,6 +626,8 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
         return;
     }
 
+    c->s3Timer = DCM_S3_SERVER_TICKS;
+
     if (c->state == DCM_CONN_IDLE)
     {
         Dcm_StartProcessing(connIdx, c->rxBuffer, c->rxCopiedLen, Dcm_ConfigPtr->connections[connIdx].addressing);
@@ -587,6 +649,12 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
             }
 
             c->qCount++;
+        }
+        else
+        {
+            Dcm_SendBusyRepeatIfPossible(connIdx,
+                    c->rxBuffer[0],
+                    Dcm_ConfigPtr->connections[connIdx].addressing);
         }
     }
 
@@ -677,12 +745,13 @@ void Dcm_TpTxConfirmation(Dcm_PduIdType id, Dcm_NotifResultType result)
         return;
     }
 
-    if (c->service != NULL_PTR)
+    if ((c->service != NULL_PTR) && (c->pendingStarted == TRUE))
     {
         c->state = DCM_CONN_PROCESSING;
     }
     else
     {
+        c->service = NULL_PTR;
         c->state = DCM_CONN_IDLE;
         Dcm_LoadNextRequest(connIdx);
     }
@@ -725,19 +794,32 @@ static void Dcm_ProcessConnection(uint8 connIdx)
         {
             nrc = DCM_NRC_SERVICE_NOT_SUPPORTED;
 
-            if (Dcm_CheckServiceAccess(connIdx, c->sid, &nrc) == FALSE)
+            if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) &&
+                    (Dcm_ShouldSuppressFunctionalNrc(nrc) == TRUE))
             {
-                if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) && (Dcm_ShouldSuppressFunctionalNrc(nrc) == TRUE))
-                {
-                    Dcm_ClearProcessing(connIdx);
-                    return;
-                }
-
-                Dcm_BuildNegativeResponse(connIdx, c->sid, nrc);
-                c->service = NULL_PTR;
-                (void)Dcm_StartTx(connIdx);
+                Dcm_ClearProcessing(connIdx);
                 return;
             }
+
+            Dcm_BuildNegativeResponse(connIdx, c->sid, nrc);
+            c->service = NULL_PTR;
+            (void)Dcm_StartTx(connIdx);
+            return;
+        }
+
+        if (Dcm_CheckServiceAccess(connIdx, c->sid, &nrc) == FALSE)
+        {
+            if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) &&
+                    (Dcm_ShouldSuppressFunctionalNrc(nrc) == TRUE))
+            {
+                Dcm_ClearProcessing(connIdx);
+                return;
+            }
+
+            Dcm_BuildNegativeResponse(connIdx, c->sid, nrc);
+            c->service = NULL_PTR;
+            (void)Dcm_StartTx(connIdx);
+            return;
         }
     }
 
@@ -784,6 +866,8 @@ static void Dcm_ProcessConnection(uint8 connIdx)
 
         c->pendingTimer = DCM_RESPONSE_PENDING_PERIOD;
         c->pendingStarted = TRUE;
+        c->txLen = 0u;
+        c->txOffset = 0u;
 
         if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) &&
                 (Dcm_ShouldSuppressFunctionalNrc(DCM_NRC_RESPONSE_PENDING) == TRUE))
@@ -804,7 +888,7 @@ static void Dcm_ProcessConnection(uint8 connIdx)
             return;
         }
 
-        if ((respLen + 1u) > DCM_MAX_RESPONSE_LEN)
+        if (respLen > (DCM_MAX_RESPONSE_LEN - 1u))
         {
             Dcm_BuildNegativeResponse(connIdx, c->sid, DCM_NRC_RESPONSE_TOO_LONG);
             c->service = NULL_PTR;
@@ -816,6 +900,7 @@ static void Dcm_ProcessConnection(uint8 connIdx)
         c->txLen = (Dcm_PduLengthType)(respLen + 1u);
         c->txOffset = 0u;
         c->service = NULL_PTR;
+        c->pendingStarted = FALSE;
         (void)Dcm_StartTx(connIdx);
         return;
     }
@@ -917,33 +1002,6 @@ static Std_ReturnType Dcm_StartTx(uint8 connIdx)
     return ret;
 }
 
-static void Dcm_BuildNegativeResponse(uint8 connIdx, uint8 sid, uint8 nrc)
-{
-    Dcm_ConnectionStateType* c;
-
-    c = &Dcm_Conn[connIdx];
-
-    c->txBuffer[0] = 0x7Fu;
-    c->txBuffer[1] = sid;
-    c->txBuffer[2] = nrc;
-    c->txLen = 3u;
-    c->txOffset = 0u;
-}
-
-static uint8 Dcm_ShouldSuppressFunctionalNrc(uint8 nrc)
-{
-    if ((nrc == DCM_NRC_SERVICE_NOT_SUPPORTED) ||
-            (nrc == DCM_NRC_SUBFUNCTION_NOT_SUPPORTED) ||
-            (nrc == DCM_NRC_REQUEST_OUT_OF_RANGE) ||
-            (nrc == DCM_NRC_SERVICE_NOT_SUPPORTED_IN_SESSION) ||
-            (nrc == DCM_NRC_SUBFUNCTION_NOT_SUPPORTED_IN_SESSION) ||
-            (nrc == DCM_NRC_RESPONSE_PENDING))
-    {
-        return TRUE;
-    }
-
-    return FALSE;
-}
 
 static const Dcm_ServiceType* Dcm_FindService(uint8 sid)
 {
@@ -1038,12 +1096,12 @@ static uint8 Dcm_IsSuppressPosRspBitSet(uint8 rawSubFunction)
 /* ===================== Services ===================== */
 
 static Dcm_ReturnType Dcm_Service_0x10(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    const uint8* req,
-    Dcm_PduLengthType len,
-    uint8* resp,
-    Dcm_PduLengthType* respLen)
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
 {
     uint8 session;
     Dcm_ReturnType ret;
@@ -1057,8 +1115,8 @@ static Dcm_ReturnType Dcm_Service_0x10(
     Dcm_Conn[connIdx].suppressPositiveResponse = Dcm_IsSuppressPosRspBitSet(req[0]);
 
     if ((session != DCM_SESSION_DEFAULT) &&
-        (session != DCM_SESSION_PROGRAMMING) &&
-        (session != DCM_SESSION_EXTENDED))
+            (session != DCM_SESSION_PROGRAMMING) &&
+            (session != DCM_SESSION_EXTENDED))
     {
         return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
     }
@@ -1399,12 +1457,12 @@ static Dcm_ReturnType Dcm_Service_0x31(
 }
 
 static Dcm_ReturnType Dcm_Service_0x34(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    const uint8* req,
-    Dcm_PduLengthType len,
-    uint8* resp,
-    Dcm_PduLengthType* respLen)
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
 {
     Dcm_ReturnType ret;
 
@@ -1425,12 +1483,12 @@ static Dcm_ReturnType Dcm_Service_0x34(
 }
 
 static Dcm_ReturnType Dcm_Service_0x36(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    const uint8* req,
-    Dcm_PduLengthType len,
-    uint8* resp,
-    Dcm_PduLengthType* respLen)
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
 {
     Dcm_ReturnType ret;
     uint8 blockSequenceCounter;
@@ -1453,13 +1511,13 @@ static Dcm_ReturnType Dcm_Service_0x36(
     }
 
     ret = DcmAppl_TransferData(
-        connIdx,
-        opStatus,
-        blockSequenceCounter,
-        &req[1],
-        (Dcm_PduLengthType)(len - 1u),
-        &resp[1],
-        respLen
+            connIdx,
+            opStatus,
+            blockSequenceCounter,
+            &req[1],
+            (Dcm_PduLengthType)(len - 1u),
+            &resp[1],
+            respLen
     );
 
     if (ret == DCM_E_OK)
@@ -1473,12 +1531,12 @@ static Dcm_ReturnType Dcm_Service_0x36(
 }
 
 static Dcm_ReturnType Dcm_Service_0x37(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    const uint8* req,
-    Dcm_PduLengthType len,
-    uint8* resp,
-    Dcm_PduLengthType* respLen)
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
 {
     Dcm_ReturnType ret;
 
@@ -1499,12 +1557,12 @@ static Dcm_ReturnType Dcm_Service_0x37(
 }
 
 static Dcm_ReturnType Dcm_Service_0x3E(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    const uint8* req,
-    Dcm_PduLengthType len,
-    uint8* resp,
-    Dcm_PduLengthType* respLen)
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
 {
     uint8 zeroSub;
 

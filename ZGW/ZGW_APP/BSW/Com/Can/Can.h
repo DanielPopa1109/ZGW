@@ -45,6 +45,20 @@
 
 #define CAN_TX_BUDGET_PER_MAIN 8u
 
+#define CAN_BUSOFF_RECOVERY_TIME_MS     100u
+#define CAN_BUSOFF_RECOVERY_TICKS       (CAN_BUSOFF_RECOVERY_TIME_MS / CAN_MAINFUNCTION_PERIOD_MS)
+
+#define CAN_ERROR_WARNING_LIMIT         96u
+#define CAN_ERROR_PASSIVE_LIMIT         128u
+
+typedef enum
+{
+    CAN_ERROR_ACTIVE = 0u,
+    CAN_ERROR_WARNING,
+    CAN_ERROR_PASSIVE,
+    CAN_ERROR_BUS_OFF
+} Can_ErrorStateType;
+
 typedef enum
 {
     CAN_UNINIT = 0u,
@@ -93,5 +107,11 @@ Std_ReturnType Can_GetControllerTxErrorCounter(uint8 Controller, uint8* TxErrorC
 
 void Can_EnableControllerInterrupts(uint8 Controller);
 void Can_DisableControllerInterrupts(uint8 Controller);
+
+Can_ErrorStateType Can_GetControllerErrorState(uint8 Controller);
+void Can_MainFunction_BusOff(void);
+void Can_MainFunction_Mode(void);
+void Can_MainFunction_Read(void);
+void Can_MainFunction_Write(void);
 
 #endif

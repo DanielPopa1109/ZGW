@@ -1,381 +1,273 @@
-/* SoAd.c */
 #include "SoAd.h"
-#include <string.h>
 
 typedef struct
 {
+    SoAd_StateType state;
+    TcpIp_SocketIdType listenSock;
+    TcpIp_SocketIdType activeSock;
+    TcpIp_SockAddrType remoteAddr;
     const SoAd_SocketConnectionConfigType *cfg;
-    TcpIp_SocketIdType socketId;
-    TcpIp_SocketIdType acceptedSocketId;
-    SoAd_SoConModeType mode;
-    uint8_t rxBuffer[SOAD_MAX_RX_BUFFER_LEN];
-} SoAd_RuntimeType;
+} SoAd_SoConRuntimeType;
 
-static const SoAd_ConfigType *SoAd_ConfigPtr = 0;
-static SoAd_RuntimeType SoAd_Runtime[SOAD_MAX_SOCKET_CONNECTIONS];
+static SoAd_SoConRuntimeType SoAd_Runtime[SOAD_MAX_CONNECTIONS];
+static const SoAd_ConfigType *SoAd_Cfg;
 
-static SoAd_RuntimeType *SoAd_GetRuntime(SoAd_SoConIdType soConId)
+static uint32 SoAd_Ip4ToU32(const uint8 ip[4])
 {
-    uint8_t i;
+    return ((uint32)ip[0] << 24u) |
+           ((uint32)ip[1] << 16u) |
+           ((uint32)ip[2] << 8u) |
+           ((uint32)ip[3]);
+}
 
-    if (SoAd_ConfigPtr == 0)
+static const SoAd_SocketConnectionConfigType *SoAd_FindConfig(SoAd_SoConIdType id)
+{
+    uint8 i;
+
+    if (SoAd_Cfg == 0)
     {
         return 0;
     }
 
-    for (i = 0u; i < SoAd_ConfigPtr->connectionCount; i++)
+    for (i = 0u; i < SoAd_Cfg->numConnections; i++)
     {
-        if (SoAd_Runtime[i].cfg->soConId == soConId)
+        if (SoAd_Cfg->connections[i].soConId == id)
         {
-            return &SoAd_Runtime[i];
+            return &SoAd_Cfg->connections[i];
         }
     }
 
     return 0;
 }
 
-void SoAd_Init(const SoAd_ConfigType *config)
+void SoAd_Init(const SoAd_ConfigType *cfg)
 {
-    uint8_t i;
+    uint8 i;
 
-    SoAd_ConfigPtr = config;
+    SoAd_Cfg = cfg;
 
-    memset(SoAd_Runtime, 0, sizeof(SoAd_Runtime));
+    for (i = 0u; i < SOAD_MAX_CONNECTIONS; i++)
+    {
+        SoAd_Runtime[i].state = SOAD_SOCON_CLOSED;
+        SoAd_Runtime[i].listenSock = TCPIP_INVALID_SOCKET;
+        SoAd_Runtime[i].activeSock = TCPIP_INVALID_SOCKET;
+        SoAd_Runtime[i].remoteAddr.addr = 0u;
+        SoAd_Runtime[i].remoteAddr.port = 0u;
+        SoAd_Runtime[i].cfg = 0;
+    }
+}
 
-    if (config == 0)
+uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
+{
+    SoAd_SoConRuntimeType *rt;
+    const SoAd_SocketConnectionConfigType *cfg;
+    uint8 isTcp;
+
+    if (id >= SOAD_MAX_CONNECTIONS)
+    {
+        return 0u;
+    }
+
+    cfg = SoAd_FindConfig(id);
+
+    if (cfg == 0)
+    {
+        return 0u;
+    }
+
+    rt = &SoAd_Runtime[id];
+
+    if (rt->state != SOAD_SOCON_CLOSED)
+    {
+        return 1u;
+    }
+
+    rt->cfg = cfg;
+    isTcp = (cfg->protocol == TCPIP_PROTOCOL_TCP) ? 1u : 0u;
+
+    rt->listenSock = TcpIp_Create(isTcp);
+
+    if (rt->listenSock == TCPIP_INVALID_SOCKET)
+    {
+        return 0u;
+    }
+
+    if (TcpIp_Bind(rt->listenSock, cfg->localAddr.port) != 0)
+    {
+        TcpIp_Close(rt->listenSock);
+        rt->listenSock = TCPIP_INVALID_SOCKET;
+        return 0u;
+    }
+
+    if (isTcp != 0u)
+    {
+        if (TcpIp_Listen(rt->listenSock) != 0)
+        {
+            TcpIp_Close(rt->listenSock);
+            rt->listenSock = TCPIP_INVALID_SOCKET;
+            return 0u;
+        }
+    }
+    else
+    {
+        rt->activeSock = rt->listenSock;
+        rt->remoteAddr.addr = SoAd_Ip4ToU32(cfg->remoteAddr.addr);
+        rt->remoteAddr.port = cfg->remoteAddr.port;
+    }
+
+    rt->state = SOAD_SOCON_OPEN;
+
+    return 1u;
+}
+
+void SoAd_CloseSoCon(SoAd_SoConIdType id)
+{
+    SoAd_SoConRuntimeType *rt;
+
+    if (id >= SOAD_MAX_CONNECTIONS)
     {
         return;
     }
 
-    for (i = 0u; (i < config->connectionCount) && (i < SOAD_MAX_SOCKET_CONNECTIONS); i++)
+    rt = &SoAd_Runtime[id];
+
+    if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
+        (rt->activeSock != rt->listenSock))
     {
-        SoAd_Runtime[i].cfg = &config->connections[i];
-        SoAd_Runtime[i].socketId = TCPIP_INVALID_SOCKET;
-        SoAd_Runtime[i].acceptedSocketId = TCPIP_INVALID_SOCKET;
-        SoAd_Runtime[i].mode = SOAD_SOCON_OFFLINE;
+        TcpIp_Close(rt->activeSock);
+    }
+
+    if (rt->listenSock != TCPIP_INVALID_SOCKET)
+    {
+        TcpIp_Close(rt->listenSock);
+    }
+
+    if ((rt->cfg != 0) && (rt->cfg->tcpDisconnected != 0))
+    {
+        rt->cfg->tcpDisconnected(id);
+    }
+
+    rt->listenSock = TCPIP_INVALID_SOCKET;
+    rt->activeSock = TCPIP_INVALID_SOCKET;
+    rt->state = SOAD_SOCON_CLOSED;
+    rt->cfg = 0;
+}
+
+void SoAd_MainFunction(void)
+{
+    uint8 id;
+    uint8 buffer[512];
+    sint32 len;
+    TcpIp_SockAddrType remote;
+    SoAd_SoConRuntimeType *rt;
+
+    for (id = 0u; id < SOAD_MAX_CONNECTIONS; id++)
+    {
+        rt = &SoAd_Runtime[id];
+
+        if ((rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
+        {
+            continue;
+        }
+
+        if (rt->cfg->protocol == TCPIP_PROTOCOL_TCP)
+        {
+            if (rt->state == SOAD_SOCON_OPEN)
+            {
+                rt->activeSock = TcpIp_Accept(rt->listenSock, &rt->remoteAddr);
+
+                if (rt->activeSock >= 0)
+                {
+                    rt->state = SOAD_SOCON_CONNECTED;
+
+                    if (rt->cfg->tcpConnected != 0)
+                    {
+                        rt->cfg->tcpConnected(id);
+                    }
+                }
+            }
+            else if (rt->state == SOAD_SOCON_CONNECTED)
+            {
+                len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
+
+                if (len == 0)
+                {
+                    if (rt->cfg->tcpDisconnected != 0)
+                    {
+                        rt->cfg->tcpDisconnected(id);
+                    }
+
+                    TcpIp_Close(rt->activeSock);
+                    rt->activeSock = TCPIP_INVALID_SOCKET;
+                    rt->state = SOAD_SOCON_OPEN;
+                }
+                else if (len > 0)
+                {
+                    if (rt->cfg->rxIndication != 0)
+                    {
+                        rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, (uint16)len);
+                    }
+                }
+            }
+        }
+        else
+        {
+            len = TcpIp_RecvFrom(rt->listenSock, &remote, buffer, (uint16)sizeof(buffer));
+
+            if (len > 0)
+            {
+                rt->remoteAddr = remote;
+
+                if (rt->cfg->rxIndication != 0)
+                {
+                    rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
+                }
+            }
+        }
     }
 }
 
-SoAd_ReturnType SoAd_OpenSoCon(SoAd_SoConIdType soConId)
+sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len)
 {
-    SoAd_RuntimeType *rt;
-    TcpIp_ReturnType ret;
+    return (SoAd_IfTransmit(id, 0, data, len) == SOAD_OK) ? (sint32)len : -1;
+}
 
-    rt = SoAd_GetRuntime(soConId);
-    if (rt == 0)
-    {
-        return SOAD_PARAM_ERROR;
-    }
+SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
+                                const TcpIp_SockAddrType *remoteAddr,
+                                const uint8 *data,
+                                uint16 len)
+{
+    SoAd_SoConRuntimeType *rt;
+    const TcpIp_SockAddrType *dst;
 
-    if ((rt->mode == SOAD_SOCON_ONLINE) || (rt->mode == SOAD_SOCON_LISTENING))
+    if ((id >= SOAD_MAX_CONNECTIONS) || (data == 0) || (len == 0u))
     {
-        return SOAD_OK;
-    }
-
-    ret = TcpIp_CreateSocket(rt->cfg->protocol, &rt->socketId);
-    if (ret != TCPIP_OK)
-    {
-        rt->mode = SOAD_SOCON_OFFLINE;
         return SOAD_NOT_OK;
     }
 
-    (void)TcpIp_SetNonBlocking(rt->socketId);
+    rt = &SoAd_Runtime[id];
 
-    ret = TcpIp_Bind(rt->socketId, &rt->cfg->localAddr);
-    if (ret != TCPIP_OK)
+    if ((rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
     {
-        (void)TcpIp_Close(rt->socketId);
-        rt->socketId = TCPIP_INVALID_SOCKET;
-        rt->mode = SOAD_SOCON_OFFLINE;
         return SOAD_NOT_OK;
     }
 
     if (rt->cfg->protocol == TCPIP_PROTOCOL_TCP)
     {
-        if (rt->cfg->isServer != 0u)
+        if ((rt->state != SOAD_SOCON_CONNECTED) || (rt->activeSock == TCPIP_INVALID_SOCKET))
         {
-            ret = TcpIp_Listen(rt->socketId, 2u);
-            if (ret != TCPIP_OK)
-            {
-                (void)TcpIp_Close(rt->socketId);
-                rt->socketId = TCPIP_INVALID_SOCKET;
-                rt->mode = SOAD_SOCON_OFFLINE;
-                return SOAD_NOT_OK;
-            }
-
-            rt->mode = SOAD_SOCON_LISTENING;
-        }
-        else
-        {
-            ret = TcpIp_Connect(rt->socketId, &rt->cfg->remoteAddr);
-            if ((ret == TCPIP_OK) || (ret == TCPIP_BUSY))
-            {
-                rt->mode = SOAD_SOCON_RECONNECT;
-            }
-            else
-            {
-                (void)TcpIp_Close(rt->socketId);
-                rt->socketId = TCPIP_INVALID_SOCKET;
-                rt->mode = SOAD_SOCON_OFFLINE;
-                return SOAD_NOT_OK;
-            }
-        }
-    }
-    else
-    {
-        rt->mode = SOAD_SOCON_ONLINE;
-    }
-
-    return SOAD_OK;
-}
-
-SoAd_ReturnType SoAd_CloseSoCon(SoAd_SoConIdType soConId)
-{
-    SoAd_RuntimeType *rt;
-
-    rt = SoAd_GetRuntime(soConId);
-    if (rt == 0)
-    {
-        return SOAD_PARAM_ERROR;
-    }
-
-    if (rt->acceptedSocketId != TCPIP_INVALID_SOCKET)
-    {
-        (void)TcpIp_Close(rt->acceptedSocketId);
-        rt->acceptedSocketId = TCPIP_INVALID_SOCKET;
-    }
-
-    if (rt->socketId != TCPIP_INVALID_SOCKET)
-    {
-        (void)TcpIp_Close(rt->socketId);
-        rt->socketId = TCPIP_INVALID_SOCKET;
-    }
-
-    rt->mode = SOAD_SOCON_OFFLINE;
-
-    if (rt->cfg->tcpDisconnected != 0)
-    {
-        rt->cfg->tcpDisconnected(soConId);
-    }
-
-    return SOAD_OK;
-}
-
-SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType soConId,
-                                const TcpIp_SockAddrType *remoteAddr,
-                                const uint8_t *data,
-                                uint16_t len)
-{
-    SoAd_RuntimeType *rt;
-    uint16_t sentLen;
-    TcpIp_ReturnType ret;
-    TcpIp_SocketIdType txSocket;
-
-    rt = SoAd_GetRuntime(soConId);
-    if ((rt == 0) || (data == 0) || (len == 0u))
-    {
-        return SOAD_PARAM_ERROR;
-    }
-
-    if (rt->mode != SOAD_SOCON_ONLINE)
-    {
-        return SOAD_BUSY;
-    }
-
-    if (rt->cfg->protocol == TCPIP_PROTOCOL_UDP)
-    {
-        if (remoteAddr == 0)
-        {
-            remoteAddr = &rt->cfg->remoteAddr;
+            return SOAD_NOT_OK;
         }
 
-        ret = TcpIp_SendTo(rt->socketId, remoteAddr, data, len, &sentLen);
+        return (TcpIp_Send(rt->activeSock, data, len) == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
     }
-    else
+
+    if (rt->listenSock == TCPIP_INVALID_SOCKET)
     {
-        txSocket = (rt->acceptedSocketId != TCPIP_INVALID_SOCKET) ? rt->acceptedSocketId : rt->socketId;
-        ret = TcpIp_Send(txSocket, data, len, &sentLen);
+        return SOAD_NOT_OK;
     }
 
-    if ((ret != TCPIP_OK) || (sentLen != len))
-    {
-        return SOAD_BUSY;
-    }
+    dst = (remoteAddr != 0) ? remoteAddr : &rt->remoteAddr;
 
-    return SOAD_OK;
-}
-
-SoAd_SoConModeType SoAd_GetSoConMode(SoAd_SoConIdType soConId)
-{
-    SoAd_RuntimeType *rt;
-
-    rt = SoAd_GetRuntime(soConId);
-    if (rt == 0)
-    {
-        return SOAD_SOCON_OFFLINE;
-    }
-
-    return rt->mode;
-}
-
-static void SoAd_MainTcpServer(SoAd_RuntimeType *rt)
-{
-    TcpIp_SocketIdType clientSocket;
-    TcpIp_SockAddrType remoteAddr;
-    TcpIp_ReturnType ret;
-    uint16_t rxLen;
-
-    if (rt->mode == SOAD_SOCON_LISTENING)
-    {
-        ret = TcpIp_Accept(rt->socketId, &clientSocket, &remoteAddr);
-        if (ret == TCPIP_OK)
-        {
-            if (rt->acceptedSocketId != TCPIP_INVALID_SOCKET)
-            {
-                (void)TcpIp_Close(rt->acceptedSocketId);
-            }
-
-            rt->acceptedSocketId = clientSocket;
-            (void)TcpIp_SetNonBlocking(rt->acceptedSocketId);
-            //rt->cfg->remoteAddr = remoteAddr.addr; //todo
-            rt->mode = SOAD_SOCON_ONLINE;
-
-            if (rt->cfg->tcpConnected != 0)
-            {
-                rt->cfg->tcpConnected(rt->cfg->soConId);
-            }
-        }
-    }
-
-    if ((rt->mode == SOAD_SOCON_ONLINE) && (rt->acceptedSocketId != TCPIP_INVALID_SOCKET))
-    {
-        ret = TcpIp_Recv(rt->acceptedSocketId,
-                         rt->rxBuffer,
-                         SOAD_MAX_RX_BUFFER_LEN,
-                         &rxLen);
-
-        if ((ret == TCPIP_OK) && (rxLen > 0u))
-        {
-            if (rt->cfg->rxIndication != 0)
-            {
-                rt->cfg->rxIndication(rt->cfg->soConId,
-                                      &rt->cfg->remoteAddr,
-                                      rt->rxBuffer,
-                                      rxLen);
-            }
-        }
-        else if (ret == TCPIP_SOCKET_ERROR)
-        {
-            (void)TcpIp_Close(rt->acceptedSocketId);
-            rt->acceptedSocketId = TCPIP_INVALID_SOCKET;
-            rt->mode = SOAD_SOCON_LISTENING;
-
-            if (rt->cfg->tcpDisconnected != 0)
-            {
-                rt->cfg->tcpDisconnected(rt->cfg->soConId);
-            }
-        }
-    }
-}
-
-static void SoAd_MainTcpClient(SoAd_RuntimeType *rt)
-{
-    TcpIp_ReturnType ret;
-    uint16_t rxLen;
-
-    if (rt->mode == SOAD_SOCON_RECONNECT)
-    {
-        rt->mode = SOAD_SOCON_ONLINE;
-
-        if (rt->cfg->tcpConnected != 0)
-        {
-            rt->cfg->tcpConnected(rt->cfg->soConId);
-        }
-    }
-
-    if (rt->mode == SOAD_SOCON_ONLINE)
-    {
-        ret = TcpIp_Recv(rt->socketId,
-                         rt->rxBuffer,
-                         SOAD_MAX_RX_BUFFER_LEN,
-                         &rxLen);
-
-        if ((ret == TCPIP_OK) && (rxLen > 0u))
-        {
-            if (rt->cfg->rxIndication != 0)
-            {
-                rt->cfg->rxIndication(rt->cfg->soConId,
-                                      &rt->cfg->remoteAddr,
-                                      rt->rxBuffer,
-                                      rxLen);
-            }
-        }
-        else if (ret == TCPIP_SOCKET_ERROR)
-        {
-            (void)SoAd_CloseSoCon(rt->cfg->soConId);
-        }
-    }
-}
-
-static void SoAd_MainUdp(SoAd_RuntimeType *rt)
-{
-    TcpIp_ReturnType ret;
-    TcpIp_SockAddrType remoteAddr;
-    uint16_t rxLen;
-
-    if (rt->mode != SOAD_SOCON_ONLINE)
-    {
-        return;
-    }
-
-    ret = TcpIp_RecvFrom(rt->socketId,
-                         &remoteAddr,
-                         rt->rxBuffer,
-                         SOAD_MAX_RX_BUFFER_LEN,
-                         &rxLen);
-
-    if ((ret == TCPIP_OK) && (rxLen > 0u))
-    {
-        if (rt->cfg->rxIndication != 0)
-        {
-            rt->cfg->rxIndication(rt->cfg->soConId,
-                                  &remoteAddr,
-                                  rt->rxBuffer,
-                                  rxLen);
-        }
-    }
-}
-
-void SoAd_MainFunction(void)
-{
-    uint8_t i;
-
-    if (SoAd_ConfigPtr == 0)
-    {
-        return;
-    }
-
-    for (i = 0u; i < SoAd_ConfigPtr->connectionCount; i++)
-    {
-        if (SoAd_Runtime[i].cfg == 0)
-        {
-            continue;
-        }
-
-        if (SoAd_Runtime[i].cfg->protocol == TCPIP_PROTOCOL_UDP)
-        {
-            SoAd_MainUdp(&SoAd_Runtime[i]);
-        }
-        else
-        {
-            if (SoAd_Runtime[i].cfg->isServer != 0u)
-            {
-                SoAd_MainTcpServer(&SoAd_Runtime[i]);
-            }
-            else
-            {
-                SoAd_MainTcpClient(&SoAd_Runtime[i]);
-            }
-        }
-    }
+    return (TcpIp_SendTo(rt->listenSock, dst, data, len) == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
 }

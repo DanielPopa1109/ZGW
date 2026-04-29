@@ -1,0 +1,201 @@
+#include "SoAd.h"
+
+typedef struct
+{
+    SoAd_StateType state;
+    TcpIp_SocketIdType listenSock;
+    TcpIp_SocketIdType activeSock;
+    TcpIp_SockAddrType remoteAddr;
+} SoAd_SoConType;
+
+static SoAd_SoConType SoAd_Connections[SOAD_MAX_CONNECTIONS];
+static const SoAd_ConfigType *SoAd_Cfg;
+
+void SoAd_Init(const SoAd_ConfigType *cfg)
+{
+    uint32 i;
+
+    SoAd_Cfg = cfg;
+
+    for (i = 0u; i < SOAD_MAX_CONNECTIONS; i++)
+    {
+        SoAd_Connections[i].state = SOAD_SOCON_CLOSED;
+        SoAd_Connections[i].listenSock = TCPIP_INVALID_SOCKET;
+        SoAd_Connections[i].activeSock = TCPIP_INVALID_SOCKET;
+        SoAd_Connections[i].remoteAddr.addr = 0u;
+        SoAd_Connections[i].remoteAddr.port = 0u;
+    }
+}
+
+uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
+{
+    SoAd_SoConType *c;
+
+    if ((SoAd_Cfg == 0) || (id >= SOAD_MAX_CONNECTIONS))
+    {
+        return 0u;
+    }
+
+    c = &SoAd_Connections[id];
+
+    if (c->state != SOAD_SOCON_CLOSED)
+    {
+        return 1u;
+    }
+
+    c->listenSock = TcpIp_Create(SoAd_Cfg[id].isTcp);
+
+    if (c->listenSock == TCPIP_INVALID_SOCKET)
+    {
+        return 0u;
+    }
+
+    if (TcpIp_Bind(c->listenSock, SoAd_Cfg[id].port) != 0)
+    {
+        TcpIp_Close(c->listenSock);
+        c->listenSock = TCPIP_INVALID_SOCKET;
+        return 0u;
+    }
+
+    if (SoAd_Cfg[id].isTcp != 0u)
+    {
+        if (TcpIp_Listen(c->listenSock) != 0)
+        {
+            TcpIp_Close(c->listenSock);
+            c->listenSock = TCPIP_INVALID_SOCKET;
+            return 0u;
+        }
+    }
+    else
+    {
+        c->activeSock = c->listenSock;
+    }
+
+    c->state = SOAD_SOCON_OPEN;
+
+    return 1u;
+}
+
+void SoAd_CloseSoCon(SoAd_SoConIdType id)
+{
+    SoAd_SoConType *c;
+
+    if (id >= SOAD_MAX_CONNECTIONS)
+    {
+        return;
+    }
+
+    c = &SoAd_Connections[id];
+
+    if ((c->activeSock != TCPIP_INVALID_SOCKET) &&
+        (c->activeSock != c->listenSock))
+    {
+        TcpIp_Close(c->activeSock);
+    }
+
+    if (c->listenSock != TCPIP_INVALID_SOCKET)
+    {
+        TcpIp_Close(c->listenSock);
+    }
+
+    c->listenSock = TCPIP_INVALID_SOCKET;
+    c->activeSock = TCPIP_INVALID_SOCKET;
+    c->state = SOAD_SOCON_CLOSED;
+}
+
+void SoAd_MainFunction(void)
+{
+    uint32 i;
+    uint8 buffer[512];
+    sint32 len;
+    TcpIp_SockAddrType remote;
+
+    for (i = 0u; i < SOAD_MAX_CONNECTIONS; i++)
+    {
+        SoAd_SoConType *c = &SoAd_Connections[i];
+
+        if (c->state == SOAD_SOCON_OPEN)
+        {
+            if (SoAd_Cfg[i].isTcp != 0u)
+            {
+                c->activeSock = TcpIp_Accept(c->listenSock, &c->remoteAddr);
+
+                if (c->activeSock >= 0)
+                {
+                    c->state = SOAD_SOCON_CONNECTED;
+                }
+            }
+            else
+            {
+                len = TcpIp_RecvFrom(c->listenSock, &remote, buffer, (uint16)sizeof(buffer));
+
+                if (len > 0)
+                {
+                    c->remoteAddr = remote;
+                }
+            }
+        }
+        else if (c->state == SOAD_SOCON_CONNECTED)
+        {
+            len = TcpIp_Recv(c->activeSock, buffer, (uint16)sizeof(buffer));
+
+            if (len == 0)
+            {
+                if (c->activeSock != TCPIP_INVALID_SOCKET)
+                {
+                    TcpIp_Close(c->activeSock);
+                }
+
+                c->activeSock = TCPIP_INVALID_SOCKET;
+                c->state = SOAD_SOCON_OPEN;
+            }
+        }
+    }
+}
+
+sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len)
+{
+    if (SoAd_IfTransmit(id, 0, data, len) == SOAD_OK)
+    {
+        return len;
+    }
+
+    return -1;
+}
+
+SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
+                                const TcpIp_SockAddrType *remoteAddr,
+                                const uint8 *data,
+                                uint16 len)
+{
+    SoAd_SoConType *c;
+
+    if ((id >= SOAD_MAX_CONNECTIONS) || (data == 0) || (len == 0u))
+    {
+        return SOAD_NOT_OK;
+    }
+
+    c = &SoAd_Connections[id];
+
+    if (SoAd_Cfg[id].isTcp != 0u)
+    {
+        if ((c->state != SOAD_SOCON_CONNECTED) || (c->activeSock == TCPIP_INVALID_SOCKET))
+        {
+            return SOAD_NOT_OK;
+        }
+
+        return (TcpIp_Send(c->activeSock, data, len) == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
+    }
+
+    if (c->listenSock == TCPIP_INVALID_SOCKET)
+    {
+        return SOAD_NOT_OK;
+    }
+
+    if (remoteAddr != 0)
+    {
+        return (TcpIp_SendTo(c->listenSock, remoteAddr, data, len) == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
+    }
+
+    return (TcpIp_SendTo(c->listenSock, &c->remoteAddr, data, len) == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
+}

@@ -4,6 +4,10 @@
 #include "Com.h"
 #include <string.h>
 
+static uint8 CanIf_BusOffState[CAN_NUM_CONTROLLERS];
+static uint8 CanIf_ErrorPassiveState[CAN_NUM_CONTROLLERS];
+static uint8 CanIf_ErrorWarningState[CAN_NUM_CONTROLLERS];
+
 static const CanIf_RxPduConfigType CanIf_RxPduConfig[] =
 {
     { CANIF_PDU_CLASSIC_PHYS_RX, CAN_CONTROLLER_CLASSIC, 0x710u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 1u, 8u,  CANIF_RX_TARGET_CANTP },
@@ -61,6 +65,9 @@ void CanIf_Init(const CanIf_ConfigType* ConfigPtr)
     for (i = 0u; i < CAN_NUM_CONTROLLERS; i++)
     {
         CanIf_PduMode[i] = CANIF_PDU_MODE_ONLINE;
+        CanIf_BusOffState[i] = FALSE;
+        CanIf_ErrorPassiveState[i] = FALSE;
+        CanIf_ErrorWarningState[i] = FALSE;
     }
 }
 
@@ -103,6 +110,11 @@ Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLeng
     }
 
     if (cfg->controllerId >= CAN_NUM_CONTROLLERS)
+    {
+        return E_NOT_OK;
+    }
+
+    if (CanIf_BusOffState[cfg->controllerId] != FALSE)
     {
         return E_NOT_OK;
     }
@@ -210,12 +222,76 @@ void CanIf_ControllerBusOff(uint8 ControllerId)
         return;
     }
 
+    CanIf_BusOffState[ControllerId] = TRUE;
+    CanIf_ErrorPassiveState[ControllerId] = FALSE;
+    CanIf_ErrorWarningState[ControllerId] = FALSE;
+
     (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_OFFLINE);
+
     CanSM_ControllerBusOff(ControllerId);
     CanIf_AppBusOff(ControllerId);
 }
 
+void CanIf_ControllerRecovered(uint8 ControllerId)
+{
+    if (ControllerId >= CAN_NUM_CONTROLLERS)
+    {
+        return;
+    }
+
+    CanIf_BusOffState[ControllerId] = FALSE;
+    CanIf_ErrorPassiveState[ControllerId] = FALSE;
+    CanIf_ErrorWarningState[ControllerId] = FALSE;
+
+    (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_ONLINE);
+
+    CanIf_AppControllerRecovered(ControllerId);
+}
+
+void CanIf_ControllerErrorPassive(uint8 ControllerId)
+{
+    if (ControllerId >= CAN_NUM_CONTROLLERS)
+    {
+        return;
+    }
+
+    CanIf_ErrorPassiveState[ControllerId] = TRUE;
+    CanIf_ErrorWarningState[ControllerId] = FALSE;
+
+    CanIf_AppErrorPassive(ControllerId);
+}
+
+void CanIf_ControllerErrorWarning(uint8 ControllerId)
+{
+    if (ControllerId >= CAN_NUM_CONTROLLERS)
+    {
+        return;
+    }
+
+    if (CanIf_ErrorPassiveState[ControllerId] == FALSE)
+    {
+        CanIf_ErrorWarningState[ControllerId] = TRUE;
+    }
+
+    CanIf_AppErrorWarning(ControllerId);
+}
+
 __attribute__((weak)) void CanIf_AppBusOff(uint8 ControllerId)
+{
+    (void)ControllerId;
+}
+
+__attribute__((weak)) void CanIf_AppControllerRecovered(uint8 ControllerId)
+{
+    (void)ControllerId;
+}
+
+__attribute__((weak)) void CanIf_AppErrorPassive(uint8 ControllerId)
+{
+    (void)ControllerId;
+}
+
+__attribute__((weak)) void CanIf_AppErrorWarning(uint8 ControllerId)
 {
     (void)ControllerId;
 }

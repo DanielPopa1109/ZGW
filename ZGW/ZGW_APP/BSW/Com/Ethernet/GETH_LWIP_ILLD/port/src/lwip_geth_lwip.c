@@ -75,7 +75,7 @@
 #define IFX_LWIP_DHCP_COARSE_PERIOD         (DHCP_COARSE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_DHCP_FINE_PERIOD           (DHCP_FINE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
-#define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  ( ( portTickType ) 100 )
+#define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  100
 #if LWIP_IPV4 && LWIP_ACD
 #define IFX_LWIP_ACD_PERIOD                 (ACD_TMR_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
 #endif
@@ -91,14 +91,14 @@
 #endif
 
 #define Ifx_Lwip_timerIncr(var, PERIOD, FLAG) \
-{                                             \
-  var += 1;                                   \
-  if (var >= PERIOD)                          \
-  {                                           \
-    var         = 0;                          \
-    timerFlags |= FLAG;                       \
-  }                                           \
-}
+        {                                             \
+    var += 1;                                   \
+    if (var >= PERIOD)                          \
+    {                                           \
+        var         = 0;                          \
+        timerFlags |= FLAG;                       \
+    }                                           \
+        }
 
 /***********************************************************************************************************************
  * PRIVATE VARIABLES
@@ -117,209 +117,179 @@ uint8           channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUF
 /** \brief Timer interrupt callback */
 void lwip_geth_Lwip_onTimerTick(void)
 {
-  Ifx_Lwip *lwip       = &g_Lwip;
-  uint16    timerFlags = lwip->timerFlags;
+    Ifx_Lwip *lwip       = &g_Lwip;
+    uint16    timerFlags = lwip->timerFlags;
 
-  Ifx_Lwip_timerIncr(lwip->timer.arp, IFX_LWIP_ARP_PERIOD, IFX_LWIP_FLAG_ARP);
+    Ifx_Lwip_timerIncr(lwip->timer.arp, IFX_LWIP_ARP_PERIOD, IFX_LWIP_FLAG_ARP);
 
-  Ifx_Lwip_timerIncr(lwip->timer.tcp_fast, IFX_LWIP_TCP_FAST_PERIOD, IFX_LWIP_FLAG_TCP_FAST);
-  Ifx_Lwip_timerIncr(lwip->timer.tcp_slow, IFX_LWIP_TCP_SLOW_PERIOD, IFX_LWIP_FLAG_TCP_SLOW);
+    Ifx_Lwip_timerIncr(lwip->timer.tcp_fast, IFX_LWIP_TCP_FAST_PERIOD, IFX_LWIP_FLAG_TCP_FAST);
+    Ifx_Lwip_timerIncr(lwip->timer.tcp_slow, IFX_LWIP_TCP_SLOW_PERIOD, IFX_LWIP_FLAG_TCP_SLOW);
 
 #if LWIP_DHCP
-  Ifx_Lwip_timerIncr(lwip->timer.dhcp_coarse, IFX_LWIP_DHCP_COARSE_PERIOD, IFX_LWIP_FLAG_DHCP_COARSE);
-  Ifx_Lwip_timerIncr(lwip->timer.dhcp_fine, IFX_LWIP_DHCP_FINE_PERIOD, IFX_LWIP_FLAG_DHCP_FINE);
+    Ifx_Lwip_timerIncr(lwip->timer.dhcp_coarse, IFX_LWIP_DHCP_COARSE_PERIOD, IFX_LWIP_FLAG_DHCP_COARSE);
+    Ifx_Lwip_timerIncr(lwip->timer.dhcp_fine, IFX_LWIP_DHCP_FINE_PERIOD, IFX_LWIP_FLAG_DHCP_FINE);
 #endif
 
-  Ifx_Lwip_timerIncr(lwip->timer.link, IFX_LWIP_LINK_PERIOD, IFX_LWIP_FLAG_LINK);
+    Ifx_Lwip_timerIncr(lwip->timer.link, IFX_LWIP_LINK_PERIOD, IFX_LWIP_FLAG_LINK);
 #if LWIP_IPV4 && LWIP_ACD
-  Ifx_Lwip_timerIncr(lwip->timer.acd, IFX_LWIP_ACD_PERIOD, IFX_LWIP_FLAG_ACD);
+    Ifx_Lwip_timerIncr(lwip->timer.acd, IFX_LWIP_ACD_PERIOD, IFX_LWIP_FLAG_ACD);
 #endif
 
-  lwip->timerFlags = timerFlags;
+    lwip->timerFlags = timerFlags;
+}
+
+static void lwip_geth_Lwip_applyLinkStatus(void)
+{
+    Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
+    IfxGeth_Eth *ethernetif = g_Lwip.netif.state;
+
+    if (ethernetif == NULL_PTR)
+    {
+        return;
+    }
+
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+    lwip_geth_private_Phy_Dp83825i_mainFunction_100ms();
+    ctrl_status.U = lwip_geth_private_Phy_Dp83825i_link_status();
+#else
+    ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
+#endif
+
+    if (ctrl_status.B.LNKSTS == 0u)
+    {
+        netif_set_link_down(&g_Lwip.netif);
+        return;
+    }
+
+    if (ctrl_status.B.LNKMOD == 1u)
+    {
+        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+    }
+    else
+    {
+        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
+    }
+
+    if (ctrl_status.B.LNKSPEED == 0u)
+    {
+        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+    }
+    else
+    {
+        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+    }
+
+    netif_set_link_up(&g_Lwip.netif);
 }
 
 /** \brief Polling the timer event flags */
 void lwip_geth_Lwip_pollTimerFlags(void)
 {
-  Ifx_Lwip *lwip = &g_Lwip;
-  uint16    timerFlags;
+    Ifx_Lwip *lwip = &g_Lwip;
+    uint16    timerFlags;
 
-  /* disable interrupts */
-  boolean interruptState = IfxCpu_disableInterrupts();
+    /* disable interrupts */
+    boolean interruptState = IfxCpu_disableInterrupts();
 
-  timerFlags       = lwip->timerFlags;
-  lwip->timerFlags = 0;
+    timerFlags       = lwip->timerFlags;
+    lwip->timerFlags = 0;
 
-  /* enable interrupts again */
-  IfxCpu_restoreInterrupts(interruptState);
+    /* enable interrupts again */
+    IfxCpu_restoreInterrupts(interruptState);
 
 #if LWIP_DHCP
-  if (timerFlags & IFX_LWIP_FLAG_DHCP_COARSE)
-  {
-    /* only if we have a link we will check the dhcp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+    if (timerFlags & IFX_LWIP_FLAG_DHCP_COARSE)
     {
-      dhcp_coarse_tmr();
+        /* only if we have a link we will check the dhcp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+        {
+            dhcp_coarse_tmr();
+        }
     }
-  }
 
-  if (timerFlags & IFX_LWIP_FLAG_DHCP_FINE)
-  {
-    /* only if we have a link we will check the dhcp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+    if (timerFlags & IFX_LWIP_FLAG_DHCP_FINE)
     {
-      dhcp_fine_tmr();
+        /* only if we have a link we will check the dhcp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+        {
+            dhcp_fine_tmr();
+        }
     }
-  }
 #endif
 
-  if (timerFlags & IFX_LWIP_FLAG_TCP_FAST)
-  {
-    /* only if we have a link we will check the tcp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+    if (timerFlags & IFX_LWIP_FLAG_TCP_FAST)
     {
-      tcp_fasttmr();
-    }
-  }
-
-  if (timerFlags & IFX_LWIP_FLAG_TCP_SLOW)
-  {
-    /* only if we have a link we will check the tcp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
-    {
-      tcp_slowtmr();
-    }
-  }
-
-  if (timerFlags & IFX_LWIP_FLAG_ARP)
-  {
-    /* only if we have a link we will check the arp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
-    {
-      etharp_tmr();
-    }
-  }
-
-  if (timerFlags & IFX_LWIP_FLAG_LINK)
-  {
-    Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
-    ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
-    if (ctrl_status.B.LNKSTS == 0)
-    {
-      netif_set_link_down(&g_Lwip.netif);
-    }
-    else
-    {
-      IfxGeth_Eth *ethernetif = g_Lwip.netif.state;
-      /* we set the correct duplexMode */
-      if (ctrl_status.B.LNKMOD == 1)
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
-      }
-      else
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
-      }
-      /* we set the correct speed */
-      if (ctrl_status.B.LNKSPEED == 0)
-      {
-        /* 10MBit speed */
-        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
-      }
-      else
-      {
-        if (ctrl_status.B.LNKSPEED == 1)
+        /* only if we have a link we will check the tcp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
         {
-          /* 100MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+            tcp_fasttmr();
         }
-        else
-        {
-          /* 1000MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
-        }
-      }
-      netif_set_link_up(&g_Lwip.netif);
     }
-  }
+
+    if (timerFlags & IFX_LWIP_FLAG_TCP_SLOW)
+    {
+        /* only if we have a link we will check the tcp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+        {
+            tcp_slowtmr();
+        }
+    }
+
+    if (timerFlags & IFX_LWIP_FLAG_ARP)
+    {
+        /* only if we have a link we will check the arp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+        {
+            etharp_tmr();
+        }
+    }
+
+    if (timerFlags & IFX_LWIP_FLAG_LINK)
+    {
+        lwip_geth_Lwip_applyLinkStatus();
+    }
+
 #if LWIP_IPV4 && LWIP_ACD
-  if (timerFlags & IFX_LWIP_FLAG_ACD)
-  {
-    /* only if we have a link we will check the arp */
-    if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+    if (timerFlags & IFX_LWIP_FLAG_ACD)
     {
-      acd_tmr();
+        /* only if we have a link we will check the arp */
+        if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
+        {
+            acd_tmr();
+        }
     }
-  }
 #endif
 }
 
 /** \brief Polling the ETH receive event flags */
 void lwip_geth_Lwip_pollReceiveFlags(void)
 {
-  /**
-   * We are assuming that the only interrupt source is an incoming packet
-   */
-  lwip_geth_netif_input(&g_Lwip.netif);
+    /**
+     * We are assuming that the only interrupt source is an incoming packet
+     */
+    lwip_geth_netif_input(&g_Lwip.netif);
 }
 
 #if LWIP_GETH_RTOS_ENABLED
 void lwip_geth_Lwip_WaitForInput( void )
 {
-  /* Just wait until we are signled from an ISR that data is available, or
-   * we simply time out.
-   */
-    //ulTaskGenericNotifyTake_core2(pdFALSE_core2, IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT); //todo
+    /* Just wait until we are signled from an ISR that data is available, or
+     * we simply time out.
+     */
+    (void)ulTaskNotifyTake_core2(0, 100);
 }
 #endif
 
 #if LWIP_GETH_RTOS_ENABLED
 void lwip_geth_LinkStatus(void *pvParameter)
 {
-  Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
+    (void)pvParameter;
 
-  for (;;)
-  {
-    ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
-    if (ctrl_status.B.LNKSTS == 0)
+    for (;;)
     {
-      netif_set_link_down(&g_Lwip.netif);
+        lwip_geth_Lwip_applyLinkStatus();
+        vTaskDelay_core2(pdMS_TO_TICKS_core2(100u));
     }
-    else
-    {
-      IfxGeth_Eth *ethernetif = g_Lwip.netif.state;
-      /* we set the correct duplexMode */
-      if (ctrl_status.B.LNKMOD == 1)
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
-      }
-      else
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
-      }
-      /* we set the correct speed */
-      if (ctrl_status.B.LNKSPEED == 0)
-      {
-        /* 10MBit speed */
-        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
-      }
-      else
-      {
-        if (ctrl_status.B.LNKSPEED == 1)
-        {
-          /* 100MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
-        }
-        else
-        {
-          /* 1000MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
-        }
-      }
-      netif_set_link_up(&g_Lwip.netif);
-    }
-    vTaskDelay_core2(1000);  /* Check every second the Link (Cable Plugged or not) */
-  }
 }
 #endif
 
@@ -328,97 +298,97 @@ static netif_ext_callback_t g_extCallback;
 
 void netif_state_changed(struct netif* netif, netif_nsc_reason_t reason, const netif_ext_callback_args_t* args)
 {
-  if (reason | LWIP_NSC_IPV4_ADDRESS_CHANGED)
-  {
-    LWIP_DEBUGF(NETIF_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE,
+    if (reason | LWIP_NSC_IPV4_ADDRESS_CHANGED)
+    {
+        LWIP_DEBUGF(NETIF_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE,
                 ("netif: new ip address assigned: %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
-                 ip4_addr1_16(netif_ip4_addr(netif)),
-                 ip4_addr2_16(netif_ip4_addr(netif)),
-                 ip4_addr3_16(netif_ip4_addr(netif)),
-                 ip4_addr4_16(netif_ip4_addr(netif))));
-  }
+                        ip4_addr1_16(netif_ip4_addr(netif)),
+                        ip4_addr2_16(netif_ip4_addr(netif)),
+                        ip4_addr3_16(netif_ip4_addr(netif)),
+                        ip4_addr4_16(netif_ip4_addr(netif))));
+    }
 }
 #endif
 
 /** \brief LWIP initialization function */
 void lwip_geth_Lwip_init()
 {
-  ip_addr_t default_ipaddr, default_netmask, default_gw;
+    ip_addr_t default_ipaddr, default_netmask, default_gw;
 #if LWIP_DHCP
-  IP4_ADDR(&default_gw, 0, 0, 0, 0);
-  IP4_ADDR(&default_ipaddr, 0, 0, 0, 0);
-  IP4_ADDR(&default_netmask, 0, 0, 0, 0);
+    IP4_ADDR(&default_gw, 0, 0, 0, 0);
+    IP4_ADDR(&default_ipaddr, 0, 0, 0, 0);
+    IP4_ADDR(&default_netmask, 0, 0, 0, 0);
 #else
-  IP4_ADDR(&default_gw, GW_ADDR0,GW_ADDR1, GW_ADDR2,GW_ADDR3);
-  IP4_ADDR(&default_ipaddr, IP_ADDR0, IP_ADDR1, IP_ADDR2, IP_ADDR3);
-  IP4_ADDR(&default_netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
+    IP4_ADDR(&default_gw, GW_ADDR0,GW_ADDR1, GW_ADDR2,GW_ADDR3);
+    IP4_ADDR(&default_ipaddr, IP_ADDR0, IP_ADDR1, IP_ADDR2, IP_ADDR3);
+    IP4_ADDR(&default_netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
 #endif
 
-  LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init start!\n"));
+    LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init start!\n"));
 
-  /** - initialise LWIP (lwip_init()) */
+    /** - initialise LWIP (lwip_init()) */
 #if !LWIP_GETH_RTOS_ENABLED
-  lwip_init();
+    lwip_init();
 #endif
-  /** - initialise and add a \ref netif */
-  g_Lwip.eth_addr = *(eth_addr_t *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress;
+    /** - initialise and add a \ref netif */
+    g_Lwip.eth_addr = *(eth_addr_t *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress;
 
 #if LWIP_GETH_RTOS_ENABLED
-  netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+    netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
             (void *)0, lwip_geth_netif_init, tcpip_input);
-  /* Create a Task for checking the Link */
-  xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
-  /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
-  xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
+    /* Create a Task for checking the Link */
+    xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
+    /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
+    xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
 #else
-  netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+    netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
             (void *)0, lwip_geth_netif_init, ethernet_input);
 #endif
 
-  netif_set_default(&g_Lwip.netif);
+    netif_set_default(&g_Lwip.netif);
 
 #if LWIP_NETIF_STATUS_CALLBACK == 1 /* If callback enabled */
-  /* Initialize interface status change callback */
-  netif_set_status_callback(&g_Lwip.netif, LWIP_GETH_NETIF_STATUS_CB_FUNCTION);
+    /* Initialize interface status change callback */
+    netif_set_status_callback(&g_Lwip.netif, LWIP_GETH_NETIF_STATUS_CB_FUNCTION);
 #endif
-  netif_set_up(&g_Lwip.netif);
+    netif_set_up(&g_Lwip.netif);
 
 #if LWIP_NETIF_HOSTNAME
-  g_Lwip.netif.hostname = lwip_geth_handle->app_config->hostname;
+    g_Lwip.netif.hostname = lwip_geth_handle->app_config->hostname;
 #endif
 
 #if LWIP_DHCP
-  /** - assign \ref dhcp to \ref netif */
-  dhcp_set_struct(&g_Lwip.netif, &g_Lwip.dhcp);
+    /** - assign \ref dhcp to \ref netif */
+    dhcp_set_struct(&g_Lwip.netif, &g_Lwip.dhcp);
 
-  /* we start the dhcp always here also when we don't have a link here */
-  dhcp_start(&g_Lwip.netif);
+    /* we start the dhcp always here also when we don't have a link here */
+    dhcp_start(&g_Lwip.netif);
 #endif
 
 #if LWIP_NETIF_EXT_STATUS_CALLBACK
-  netif_add_ext_callback(&g_extCallback, netif_state_changed);
+    netif_add_ext_callback(&g_extCallback, netif_state_changed);
 #endif
-  LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init end!\n"));
+    LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init end!\n"));
 }
 
 /** Returns the current time in milliseconds, may be the same as sys_jiffies or at least based on it. */
 #if !LWIP_GETH_RTOS_ENABLED
 inline u32_t sys_now(void)
 {
-  return g_TickCount_1ms;
+    return g_TickCount_1ms;
 }
 #endif
 
 /** Increase the system time in milliseconds. */
 void lwip_geth_UpdateTickCount(void)
 {
-  g_TickCount_1ms++;
+    g_TickCount_1ms++;
 }
 
 /** This interrupt is raised by the ethernet tx. The initialization is done by IfxGeth_Eth_init(). */
 IFX_INTERRUPT(ISR_Geth_Tx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_TX)
 {
-  isrTxCount++;
+    isrTxCount++;
 }
 
 /** This interrupt is raised by the ethernet rx. The initialization is done by IfxGeth_Eth_init(). */
@@ -426,19 +396,19 @@ IFX_INTERRUPT(ISR_Geth_Tx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_TX)
 IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
 {
 #if !LWIP_GETH_RTOS_ENABLED
-  lwip_geth_netif_input(&g_Lwip.netif);
+    lwip_geth_netif_input(&g_Lwip.netif);
 #else
-  portBASE_TYPE_core2 xHigherPriorityTaskWoken = pdFALSE_core2;
-  vTaskNotifyGiveFromISR_core2( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );
+    portBASE_TYPE_core2 xHigherPriorityTaskWoken = pdFALSE_core2;
+    vTaskNotifyGiveFromISR_core2( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );
 
-  /* If a task was woken by either a frame being received then we may need to
-   * switch to another task.  If the unblocked task was of higher priority then
-   * the interrupted task it will then execute immediately that the ISR
-   * completes.
-   */
-  portYIELD_FROM_ISR_core2(xHigherPriorityTaskWoken);
+    /* If a task was woken by either a frame being received then we may need to
+     * switch to another task.  If the unblocked task was of higher priority then
+     * the interrupted task it will then execute immediately that the ISR
+     * completes.
+     */
+    portYIELD_FROM_ISR_core2(xHigherPriorityTaskWoken);
 #endif
-  isrRxCount++;
+    isrRxCount++;
 }
 #endif
 

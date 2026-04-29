@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value=""/>
+		<item key="selection" value="Lin_CalcChecksum"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="LWIP_HAVE_SLIPIF"/>
-			<item value="#define LWIP_HAVE_SLIPI"/>
-			<item value="#define LWIP_HAVE_SLIPIF 0"/>
-			<item value="socklen_t addrLen = (socklen_t)sizeof(addr);"/>
-			<item value="recvfrom"/>
-			<item value="configSUPPORT_DYNAMIC_ALLOCATION"/>
-			<item value="_core2"/>
-			<item value="SoAd_RuntimeType"/>
-			<item value="CanTp_StartTimer"/>
-			<item value="Dcm_DefaultConnections"/>
-			<item value="CanTp_MainFunction"/>
-			<item value="LIN_PIN_PAD_DRIVER"/>
-			<item value="setresponse"/>
-			<item value="PduR_DcmTxRoutes"/>
-			<item value="PduR_LinTpRxRoutes"/>
+			<item value="Lin_CalcChecksum"/>
+			<item value="Lin_LowLevel_EnableRx"/>
+			<item value="Lin_LowLevel_SendByte"/>
+			<item value="Lin_LowLevel_SendBreak"/>
+			<item value="LINSM_GOTO_SLEEP"/>
+			<item value="LinSM_MainFunction"/>
+			<item value="LinIf_State.busy = TRUE;"/>
+			<item value="if (LinIf_State.busy == TRUE)"/>
+			<item value="LinIf_MainFunction"/>
+			<item value="LinIf_State.diagState = LINIF_DIAG_ERROR;"/>
+			<item value="LinIf_DiagFrameDone(FALSE)"/>
+			<item value="LinIf_DiagFrameDone"/>
+			<item value="LinIf_SetDiagRequest"/>
+			<item value="Lin_Wakeup"/>
+			<item value="Lin_IsrTxDone"/>
 		</list>
 		<list key="replacehistory">
 		</list>

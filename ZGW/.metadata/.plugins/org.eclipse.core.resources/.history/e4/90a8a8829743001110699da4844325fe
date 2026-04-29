@@ -1,0 +1,43 @@
+#ifndef SOAD_H
+#define SOAD_H
+
+#include "Ifx_Types.h"
+#include "TcpIpH.h"
+
+#define SOAD_MAX_CONNECTIONS 8u
+
+typedef uint8 SoAd_SoConIdType;
+
+typedef enum
+{
+    SOAD_NOT_OK = 0,
+    SOAD_OK = 1
+} SoAd_ReturnType;
+
+typedef enum
+{
+    SOAD_SOCON_CLOSED = 0,
+    SOAD_SOCON_OPEN,
+    SOAD_SOCON_CONNECTED
+} SoAd_StateType;
+
+typedef struct
+{
+    uint16 port;
+    uint8 isTcp;
+} SoAd_ConfigType;
+
+void SoAd_Init(const SoAd_ConfigType *cfg);
+void SoAd_MainFunction(void);
+
+uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
+void SoAd_CloseSoCon(SoAd_SoConIdType id);
+
+sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
+
+SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
+                                const TcpIp_SockAddrType *remoteAddr,
+                                const uint8 *data,
+                                uint16 len);
+
+#endif

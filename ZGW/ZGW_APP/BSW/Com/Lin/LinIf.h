@@ -6,6 +6,17 @@
 #define LINIF_SCHED_NORMAL    0u
 #define LINIF_SCHED_DIAG_REQ  1u
 #define LINIF_SCHED_DIAG_RESP 2u
+#define LINIF_DIAG_TIMEOUT_TICKS 100u
+
+typedef enum
+{
+    LINIF_CHANNEL_IDLE = 0u,
+    LINIF_CHANNEL_BUSY,
+    LINIF_CHANNEL_ERROR
+} LinIf_ChannelStateType;
+
+LinIf_ChannelStateType LinIf_GetChannelState(void);
+void LinIf_ResetDiagnostic(void);
 
 typedef enum
 {

@@ -1,8 +1,19 @@
-/* SomeIp.c */
 #include "SomeIp.h"
 #include <string.h>
 
+typedef struct
+{
+    uint8_t stream[SOMEIP_TCP_STREAM_BUF_LEN];
+    uint16_t streamLen;
+    uint32_t rxCnt;
+    uint32_t txCnt;
+    uint32_t parseErrCnt;
+    uint32_t unknownSvcCnt;
+    uint32_t unknownMethodCnt;
+} SomeIp_RuntimeType;
+
 static const SomeIp_ConfigType *SomeIp_Cfg;
+static SomeIp_RuntimeType SomeIp_Rt;
 
 static uint16_t rd16(const uint8_t *p)
 {
@@ -31,30 +42,31 @@ static void wr32(uint8_t *p, uint32_t v)
     p[3] = (uint8_t)v;
 }
 
-void SomeIp_Init(const SomeIp_ConfigType *config)
-{
-    SomeIp_Cfg = config;
-}
-
-static uint8_t SomeIp_Parse(const uint8_t *data, uint16_t len, SomeIp_MessageType *msg)
+static uint8_t SomeIp_ParseOne(const uint8_t *data,
+                               uint32_t len,
+                               SomeIp_MessageType *msg,
+                               uint32_t *consumedLen)
 {
     uint32_t lengthField;
+    uint32_t totalLen;
 
-    if ((data == 0) || (msg == 0) || (len < SOMEIP_HEADER_LEN))
+    if ((data == 0) || (msg == 0) || (consumedLen == 0) || (len < SOMEIP_HEADER_LEN))
     {
         return 0u;
     }
 
     lengthField = rd32(&data[4]);
 
-    if (lengthField < 8u)
+    if ((lengthField < 8u) || (lengthField > (SOMEIP_MAX_PAYLOAD_LEN + 8u)))
     {
         return 0u;
     }
 
-    if ((lengthField + 8u) > len)
+    totalLen = lengthField + 8u;
+
+    if (len < totalLen)
     {
-        return 0u;
+        return 2u;
     }
 
     msg->serviceId = rd16(&data[0]);
@@ -67,6 +79,8 @@ static uint8_t SomeIp_Parse(const uint8_t *data, uint16_t len, SomeIp_MessageTyp
     msg->returnCode = data[15];
     msg->payload = &data[16];
     msg->payloadLen = lengthField - 8u;
+
+    *consumedLen = totalLen;
 
     return 1u;
 }
@@ -88,7 +102,7 @@ static uint16_t SomeIp_Build(uint8_t *buf,
     wr16(&buf[8], clientId);
     wr16(&buf[10], sessionId);
 
-    buf[12] = 0x01u;
+    buf[12] = SOMEIP_PROTOCOL_VERSION;
     buf[13] = interfaceVersion;
     buf[14] = messageType;
     buf[15] = returnCode;
@@ -107,19 +121,150 @@ static void SomeIp_SendError(SoAd_SoConIdType soConId,
                              uint8_t errorCode)
 {
     uint8_t tx[SOMEIP_HEADER_LEN];
+    uint16_t len;
 
-    uint16_t len = SomeIp_Build(tx,
-                                request->serviceId,
-                                request->methodId,
-                                request->clientId,
-                                request->sessionId,
-                                request->interfaceVersion,
-                                SOMEIP_MSG_ERROR,
-                                errorCode,
-                                0,
-                                0u);
+    if (request == 0)
+    {
+        return;
+    }
+
+    len = SomeIp_Build(tx,
+                       request->serviceId,
+                       request->methodId,
+                       request->clientId,
+                       request->sessionId,
+                       request->interfaceVersion,
+                       SOMEIP_MSG_ERROR,
+                       errorCode,
+                       0,
+                       0u);
 
     (void)SoAd_IfTransmit(soConId, remoteAddr, tx, len);
+}
+
+static void SomeIp_Dispatch(SoAd_SoConIdType soConId,
+                            const TcpIp_SockAddrType *remoteAddr,
+                            const SomeIp_MessageType *msg)
+{
+    uint16_t i;
+    uint8_t serviceSeen = 0u;
+
+    if ((SomeIp_Cfg == 0) || (msg == 0))
+    {
+        return;
+    }
+
+    if (msg->protocolVersion != SOMEIP_PROTOCOL_VERSION)
+    {
+        SomeIp_SendError(soConId, remoteAddr, msg, SOMEIP_RET_WRONG_PROTOCOL_VERSION);
+        return;
+    }
+
+    if ((msg->messageType != SOMEIP_MSG_REQUEST) &&
+        (msg->messageType != SOMEIP_MSG_REQUEST_NO_RET) &&
+        (msg->messageType != SOMEIP_MSG_NOTIFICATION))
+    {
+        SomeIp_SendError(soConId, remoteAddr, msg, SOMEIP_RET_MALFORMED_MESSAGE);
+        return;
+    }
+
+    for (i = 0u; i < SomeIp_Cfg->methodCount; i++)
+    {
+        const SomeIp_MethodConfigType *m = &SomeIp_Cfg->methods[i];
+
+        if (m->serviceId == msg->serviceId)
+        {
+            serviceSeen = 1u;
+        }
+
+        if ((m->serviceId == msg->serviceId) &&
+            (m->methodId == msg->methodId) &&
+            (m->interfaceVersion == msg->interfaceVersion))
+        {
+            if (m->handler != 0)
+            {
+                SomeIp_Rt.rxCnt++;
+                m->handler(soConId, remoteAddr, msg);
+                return;
+            }
+
+            SomeIp_SendError(soConId, remoteAddr, msg, SOMEIP_RET_NOT_READY);
+            return;
+        }
+    }
+
+    if (serviceSeen == 0u)
+    {
+        SomeIp_Rt.unknownSvcCnt++;
+        SomeIp_SendError(soConId, remoteAddr, msg, SOMEIP_RET_UNKNOWN_SERVICE);
+    }
+    else
+    {
+        SomeIp_Rt.unknownMethodCnt++;
+        SomeIp_SendError(soConId, remoteAddr, msg, SOMEIP_RET_UNKNOWN_METHOD);
+    }
+}
+
+static void SomeIp_ProcessTcpStream(SoAd_SoConIdType soConId,
+                                    const TcpIp_SockAddrType *remoteAddr)
+{
+    SomeIp_MessageType msg;
+    uint32_t consumed;
+    uint8_t ret;
+
+    while (SomeIp_Rt.streamLen >= SOMEIP_HEADER_LEN)
+    {
+        ret = SomeIp_ParseOne(SomeIp_Rt.stream,
+                              SomeIp_Rt.streamLen,
+                              &msg,
+                              &consumed);
+
+        if (ret == 2u)
+        {
+            return;
+        }
+
+        if (ret == 0u)
+        {
+            SomeIp_Rt.streamLen = 0u;
+            SomeIp_Rt.parseErrCnt++;
+            return;
+        }
+
+        SomeIp_Dispatch(soConId, remoteAddr, &msg);
+
+        if (SomeIp_Rt.streamLen > consumed)
+        {
+            memmove(&SomeIp_Rt.stream[0],
+                    &SomeIp_Rt.stream[consumed],
+                    SomeIp_Rt.streamLen - consumed);
+        }
+
+        SomeIp_Rt.streamLen = (uint16_t)(SomeIp_Rt.streamLen - consumed);
+    }
+}
+
+void SomeIp_Init(const SomeIp_ConfigType *config)
+{
+    SomeIp_Cfg = config;
+    memset(&SomeIp_Rt, 0, sizeof(SomeIp_Rt));
+}
+
+void SomeIp_MainFunction(uint32 elapsedMs)
+{
+    (void)elapsedMs;
+}
+
+void SomeIp_SoAdTcpConnected(SoAd_SoConIdType soConId)
+{
+    (void)soConId;
+    SomeIp_Rt.streamLen = 0u;
+}
+
+void SomeIp_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
+{
+    (void)soConId;
+    SomeIp_Rt.streamLen = 0u;
 }
 
 void SomeIp_SoAdRxIndication(SoAd_SoConIdType soConId,
@@ -128,38 +273,47 @@ void SomeIp_SoAdRxIndication(SoAd_SoConIdType soConId,
                              uint16_t len)
 {
     SomeIp_MessageType msg;
-    uint16_t i;
+    uint32_t consumed;
+    uint8_t ret;
 
-    if ((SomeIp_Cfg == 0) || (SomeIp_Parse(data, len, &msg) == 0u))
+    if ((SomeIp_Cfg == 0) || (data == 0) || (len == 0u))
     {
         return;
     }
 
-    for (i = 0u; i < SomeIp_Cfg->methodCount; i++)
+    if (soConId == SomeIp_Cfg->tcpSoConId)
     {
-        const SomeIp_MethodConfigType *m = &SomeIp_Cfg->methods[i];
-
-        if ((m->serviceId == msg.serviceId) &&
-            (m->methodId == msg.methodId) &&
-            (m->interfaceVersion == msg.interfaceVersion))
+        if ((uint32_t)SomeIp_Rt.streamLen + len > SOMEIP_TCP_STREAM_BUF_LEN)
         {
-            if (m->handler != 0)
-            {
-                m->handler(soConId, remoteAddr, &msg);
-            }
+            SomeIp_Rt.streamLen = 0u;
+            SomeIp_Rt.parseErrCnt++;
             return;
         }
+
+        memcpy(&SomeIp_Rt.stream[SomeIp_Rt.streamLen], data, len);
+        SomeIp_Rt.streamLen = (uint16_t)(SomeIp_Rt.streamLen + len);
+
+        SomeIp_ProcessTcpStream(soConId, remoteAddr);
+        return;
     }
 
-    SomeIp_SendError(soConId, remoteAddr, &msg, SOMEIP_RET_UNKNOWN_METHOD);
+    ret = SomeIp_ParseOne(data, len, &msg, &consumed);
+
+    if ((ret != 1u) || (consumed != len))
+    {
+        SomeIp_Rt.parseErrCnt++;
+        return;
+    }
+
+    SomeIp_Dispatch(soConId, remoteAddr, &msg);
 }
 
 uint8_t SomeIp_SendResponse(SoAd_SoConIdType soConId,
                             const TcpIp_SockAddrType *remoteAddr,
                             const SomeIp_MessageType *request,
-                            const uint8_t *payload,
-                            uint32_t payloadLen,
-                            uint8_t returnCode)
+                            const uint8 *payload,
+                            uint32 payloadLen,
+                            uint8 returnCode)
 {
     uint8_t tx[SOMEIP_HEADER_LEN + SOMEIP_MAX_PAYLOAD_LEN];
     uint16_t len;
@@ -180,18 +334,24 @@ uint8_t SomeIp_SendResponse(SoAd_SoConIdType soConId,
                        payload,
                        payloadLen);
 
-    return (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK) ? 1u : 0u;
+    if (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
+    {
+        SomeIp_Rt.txCnt++;
+        return 1u;
+    }
+
+    return 0u;
 }
 
 uint8_t SomeIp_SendNotification(SoAd_SoConIdType soConId,
                                 const TcpIp_SockAddrType *remoteAddr,
-                                uint16_t serviceId,
-                                uint16_t eventId,
-                                uint16_t clientId,
-                                uint16_t sessionId,
-                                uint8_t interfaceVersion,
-                                const uint8_t *payload,
-                                uint32_t payloadLen)
+                                uint16 serviceId,
+                                uint16 eventId,
+                                uint16 clientId,
+                                uint16 sessionId,
+                                uint8 interfaceVersion,
+                                const uint8 *payload,
+                                uint32 payloadLen)
 {
     uint8_t tx[SOMEIP_HEADER_LEN + SOMEIP_MAX_PAYLOAD_LEN];
     uint16_t len;
@@ -212,5 +372,11 @@ uint8_t SomeIp_SendNotification(SoAd_SoConIdType soConId,
                        payload,
                        payloadLen);
 
-    return (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK) ? 1u : 0u;
+    if (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
+    {
+        SomeIp_Rt.txCnt++;
+        return 1u;
+    }
+
+    return 0u;
 }

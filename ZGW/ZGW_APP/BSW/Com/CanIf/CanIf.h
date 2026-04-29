@@ -77,6 +77,14 @@ void CanIf_ControllerBusOff(uint8 ControllerId);
 
 void CanIf_AppBusOff(uint8 ControllerId);
 
+void CanIf_ControllerRecovered(uint8 ControllerId);
+void CanIf_ControllerErrorPassive(uint8 ControllerId);
+void CanIf_ControllerErrorWarning(uint8 ControllerId);
+
+void CanIf_AppControllerRecovered(uint8 ControllerId);
+void CanIf_AppErrorPassive(uint8 ControllerId);
+void CanIf_AppErrorWarning(uint8 ControllerId);
+
 extern const CanIf_ConfigType CanIf_Config;
 
 #endif

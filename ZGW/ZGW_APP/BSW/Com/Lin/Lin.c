@@ -18,6 +18,12 @@ typedef struct
     uint16 timeout;
     uint16 wakeupTimer;
     uint8 sleepAfterTx;
+    uint16 configuredTimeout;
+    uint32 timeoutCounter;
+    uint32 checksumErrorCounter;
+    uint32 framingErrorCounter;
+    uint32 wakeupCounter;
+    uint32 sleepCounter;
 } Lin_ChannelType;
 
 static Lin_ChannelType Lin_Ch;
@@ -27,6 +33,7 @@ void Lin_Init(void)
     memset(&Lin_Ch, 0, sizeof(Lin_Ch));
     Lin_Ch.state = LIN_IDLE;
     Lin_Ch.result = LIN_RES_OK;
+    Lin_Ch.configuredTimeout = LIN_RESPONSE_TIMEOUT_TICKS;
 
     Lin_LowLevel_Init();
 }
@@ -58,7 +65,7 @@ Std_ReturnType Lin_SendFrame(uint8 Channel, const Lin_PduType* PduInfoPtr)
 
     Lin_Ch.rxCnt = 0u;
     Lin_Ch.txCnt = 0u;
-    Lin_Ch.timeout = LIN_RESPONSE_TIMEOUT_TICKS;
+    Lin_Ch.timeout = Lin_Ch.configuredTimeout;
     Lin_Ch.result = LIN_RES_NO_RESPONSE;
     Lin_Ch.state = LIN_TX_BREAK;
 
@@ -133,6 +140,7 @@ void Lin_IsrTxDone(uint8 Channel)
             if (Lin_Ch.sleepAfterTx != FALSE)
             {
                 Lin_Ch.sleepAfterTx = FALSE;
+                Lin_Ch.sleepCounter++;
                 Lin_Ch.state = LIN_SLEEP;
             }
             else
@@ -167,7 +175,15 @@ void Lin_IsrRxByte(uint8 Channel, uint8 byte)
                                     Lin_Ch.activePdu.dlc,
                                     Lin_Ch.activePdu.checksumType);
 
-        Lin_Ch.result = (checksum == Lin_Ch.rxBuf[Lin_Ch.activePdu.dlc]) ? LIN_RES_OK : LIN_RES_CHECKSUM_ERROR;
+        if (checksum == Lin_Ch.rxBuf[Lin_Ch.activePdu.dlc])
+        {
+            Lin_Ch.result = LIN_RES_OK;
+        }
+        else
+        {
+            Lin_Ch.result = LIN_RES_CHECKSUM_ERROR;
+            Lin_Ch.checksumErrorCounter++;
+        }
 
         Lin_LowLevel_DisableRx(Channel);
         Lin_Ch.state = LIN_IDLE;
@@ -179,8 +195,14 @@ void Lin_IsrError(uint8 Channel, Lin_ResultType error)
     (void)Channel;
 
     Lin_Ch.result = error;
+
+    if (error == LIN_RES_FRAMING_ERROR)
+    {
+        Lin_Ch.framingErrorCounter++;
+    }
+
     Lin_Ch.sleepAfterTx = FALSE;
-    Lin_Ch.state = LIN_IDLE;
+    Lin_Ch.state = LIN_ERROR;
 }
 
 void Lin_MainFunction(void)
@@ -198,7 +220,9 @@ void Lin_MainFunction(void)
         else
         {
             Lin_Ch.result = LIN_RES_TIMEOUT;
+            Lin_Ch.timeoutCounter++;
             Lin_Ch.sleepAfterTx = FALSE;
+            Lin_LowLevel_DisableRx(LIN_CHANNEL_0);
             Lin_Ch.state = LIN_IDLE;
         }
     }
@@ -214,6 +238,12 @@ void Lin_MainFunction(void)
             Lin_Ch.state = LIN_IDLE;
             Lin_Ch.result = LIN_RES_OK;
         }
+    }
+
+    if (Lin_Ch.state == LIN_ERROR)
+    {
+        Lin_LowLevel_DisableRx(LIN_CHANNEL_0);
+        Lin_Ch.state = LIN_IDLE;
     }
 }
 
@@ -248,6 +278,18 @@ Std_ReturnType Lin_GoToSleep(uint8 Channel)
     return E_OK;
 }
 
+void Lin_SetResponseTimeout(uint16 timeoutTicks)
+{
+    if (timeoutTicks == 0u)
+    {
+        Lin_Ch.configuredTimeout = LIN_RESPONSE_TIMEOUT_TICKS;
+    }
+    else
+    {
+        Lin_Ch.configuredTimeout = timeoutTicks;
+    }
+}
+
 Std_ReturnType Lin_Wakeup(uint8 Channel)
 {
     if (Lin_Ch.state != LIN_SLEEP)
@@ -256,6 +298,7 @@ Std_ReturnType Lin_Wakeup(uint8 Channel)
     }
 
     Lin_LowLevel_WakeupPulse(Channel);
+    Lin_Ch.wakeupCounter++;
     Lin_Ch.state = LIN_WAKEUP;
     Lin_Ch.wakeupTimer = LIN_WAKEUP_TICKS;
 

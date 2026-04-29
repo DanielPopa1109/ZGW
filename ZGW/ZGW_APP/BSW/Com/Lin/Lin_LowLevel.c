@@ -10,7 +10,7 @@ static uint8 Lin_LastPid;
 static uint8 Lin_ResponseLen;
 static uint8 Lin_RxEnabled;
 
-#define LIN_PIN_PAD_DRIVER 0u
+#define LIN_PIN_OUTPUT_IDX   IfxPort_OutputIdx_general
 
 void Lin_LowLevel_Init(void)
 {
@@ -35,7 +35,18 @@ void Lin_LowLevel_Init(void)
 
 void Lin_LowLevel_SendBreak(uint8 Channel)
 {
+    uint8 id;
+
     (void)Channel;
+
+    /*
+     * iLLD LIN API sends break+sync+PID through sendHeader().
+     * Upper Lin state machine still models BREAK/SYNC/PID logically.
+     */
+    id = 0u;
+    (void)id;
+
+    Lin_IsrTxDone(LIN_CHANNEL_0);
 }
 
 void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
@@ -66,6 +77,13 @@ void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
         return;
     }
 
+    if (txLen >= sizeof(txData))
+    {
+        txLen = 0u;
+        Lin_IsrError(LIN_CHANNEL_0, LIN_RES_NOT_OK);
+        return;
+    }
+
     txData[txLen] = byte;
     txLen++;
 
@@ -79,7 +97,7 @@ void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
 
 void Lin_LowLevel_EnableRx(uint8 Channel)
 {
-    uint8 rx[8u];
+    uint8 rx[LIN_MAX_DATA_LEN + 1u];
     uint32 i;
 
     (void)Channel;
@@ -115,9 +133,9 @@ void Lin_LowLevel_WakeupPulse(uint8 Channel)
     (void)Channel;
 
     IfxPort_setPinModeOutput(LIN_TX_PORT,
-                             LIN_TX_PIN_INDEX,
-                             IfxPort_OutputMode_pushPull,
-                             LIN_PIN_PAD_DRIVER);
+            LIN_TX_PIN_INDEX,
+            IfxPort_OutputMode_pushPull,
+            LIN_PIN_OUTPUT_IDX);
 
     IfxPort_setPinLow(LIN_TX_PORT, LIN_TX_PIN_INDEX);
 

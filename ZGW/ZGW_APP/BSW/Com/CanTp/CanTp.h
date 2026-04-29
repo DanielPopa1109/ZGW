@@ -30,6 +30,13 @@
 #define CANTP_N_CS_TICKS         CANTP_MS_TO_TICKS(1000u)
 #define CANTP_N_CR_TICKS         CANTP_MS_TO_TICKS(1000u)
 
+#define CANTP_FORMAT_NORMAL      0u
+#define CANTP_FORMAT_EXTENDED    1u
+#define CANTP_FORMAT_MIXED       2u
+
+#define CANTP_PADDING_OFF        0u
+#define CANTP_PADDING_ON         1u
+
 typedef enum
 {
     CANTP_IDLE = 0u,
@@ -62,6 +69,10 @@ typedef struct
     uint8 blockSize;
     uint8 stMinMs;
     uint8 padding;
+
+    uint8 addressFormat;
+    uint8 nTa;
+    uint8 paddingActivation;
 } CanTp_ChannelConfigType;
 
 typedef struct

@@ -1,86 +1,83 @@
-/* SoAd.h */
-#ifndef SOAD_H_
-#define SOAD_H_
+#ifndef SOAD_H
+#define SOAD_H
 
-#include <stdint.h>
-#include <TcpIpH.h>
+#include "Ifx_Types.h"
+#include "TcpIpH.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define SOAD_MAX_CONNECTIONS 8u
 
-#define SOAD_MAX_SOCKET_CONNECTIONS   12u
-#define SOAD_MAX_RX_BUFFER_LEN        2048u
-
-typedef uint8_t SoAd_SoConIdType;
+typedef uint8 SoAd_SoConIdType;
 
 typedef enum
 {
-    SOAD_OK = 0,
-    SOAD_NOT_OK,
-    SOAD_BUSY,
-    SOAD_PARAM_ERROR
+    SOAD_NOT_OK = 0,
+    SOAD_OK = 1
 } SoAd_ReturnType;
 
 typedef enum
 {
-    SOAD_SOCON_OFFLINE = 0,
-    SOAD_SOCON_RECONNECT,
-    SOAD_SOCON_ONLINE,
-    SOAD_SOCON_LISTENING
-} SoAd_SoConModeType;
+    SOAD_SOCON_CLOSED = 0,
+    SOAD_SOCON_OPEN,
+    SOAD_SOCON_CONNECTED
+} SoAd_StateType;
 
 typedef enum
 {
-    SOAD_UPPER_DOIP = 0,
+    TCPIP_PROTOCOL_UDP = 0,
+    TCPIP_PROTOCOL_TCP = 1
+} TcpIp_ProtocolType;
+
+typedef enum
+{
+    SOAD_UPPER_NONE = 0,
+    SOAD_UPPER_DOIP,
     SOAD_UPPER_SOMEIP,
-    SOAD_UPPER_SOMEIP_SD,
-    SOAD_UPPER_USER
+    SOAD_UPPER_SOMEIP_SD
 } SoAd_UpperLayerType;
+
+typedef struct
+{
+    uint8 addr[4];
+    uint16 port;
+} SoAd_SockAddrType;
 
 typedef void (*SoAd_RxIndicationFct)(SoAd_SoConIdType soConId,
                                      const TcpIp_SockAddrType *remoteAddr,
-                                     const uint8_t *data,
-                                     uint16_t len);
+                                     const uint8 *data,
+                                     uint16 len);
 
-typedef void (*SoAd_TcpConnectedFct)(SoAd_SoConIdType soConId);
-
-typedef void (*SoAd_TcpDisconnectedFct)(SoAd_SoConIdType soConId);
+typedef void (*SoAd_TcpConnectionFct)(SoAd_SoConIdType soConId);
 
 typedef struct
 {
     SoAd_SoConIdType soConId;
     SoAd_UpperLayerType upperLayer;
     TcpIp_ProtocolType protocol;
-    uint8_t isServer;
-    TcpIp_SockAddrType localAddr;
-    TcpIp_SockAddrType remoteAddr;
+    uint8 isServer;
+    SoAd_SockAddrType localAddr;
+    SoAd_SockAddrType remoteAddr;
     SoAd_RxIndicationFct rxIndication;
-    SoAd_TcpConnectedFct tcpConnected;
-    SoAd_TcpDisconnectedFct tcpDisconnected;
+    SoAd_TcpConnectionFct tcpConnected;
+    SoAd_TcpConnectionFct tcpDisconnected;
 } SoAd_SocketConnectionConfigType;
 
 typedef struct
 {
     const SoAd_SocketConnectionConfigType *connections;
-    uint8_t connectionCount;
+    uint8 numConnections;
 } SoAd_ConfigType;
 
-void SoAd_Init(const SoAd_ConfigType *config);
+void SoAd_Init(const SoAd_ConfigType *cfg);
 void SoAd_MainFunction(void);
 
-SoAd_ReturnType SoAd_OpenSoCon(SoAd_SoConIdType soConId);
-SoAd_ReturnType SoAd_CloseSoCon(SoAd_SoConIdType soConId);
+uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
+void SoAd_CloseSoCon(SoAd_SoConIdType id);
 
-SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType soConId,
+sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
+
+SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
                                 const TcpIp_SockAddrType *remoteAddr,
-                                const uint8_t *data,
-                                uint16_t len);
-
-SoAd_SoConModeType SoAd_GetSoConMode(SoAd_SoConIdType soConId);
-
-#ifdef __cplusplus
-}
-#endif
+                                const uint8 *data,
+                                uint16 len);
 
 #endif

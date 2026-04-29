@@ -1,0 +1,551 @@
+#include "SomeIpSd.h"
+#include <string.h>
+
+static const SomeIpSd_ConfigType *SomeIpSd_Cfg;
+static uint32_t SomeIpSd_TimerMs;
+static SomeIpSd_SubscriptionType SomeIpSd_Subscriptions[SOMEIPSD_MAX_SUBSCRIPTIONS];
+
+static uint16_t rd16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8u) | p[1]);
+}
+
+static uint32_t rd24(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 16u) |
+           ((uint32_t)p[1] << 8u) |
+           p[2];
+}
+
+static uint32_t rd32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24u) |
+           ((uint32_t)p[1] << 16u) |
+           ((uint32_t)p[2] << 8u) |
+           p[3];
+}
+
+static void wr16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8u);
+    p[1] = (uint8_t)v;
+}
+
+static void wr24(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 16u);
+    p[1] = (uint8_t)(v >> 8u);
+    p[2] = (uint8_t)v;
+}
+
+static void wr32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 24u);
+    p[1] = (uint8_t)(v >> 16u);
+    p[2] = (uint8_t)(v >> 8u);
+    p[3] = (uint8_t)v;
+}
+
+static uint16_t SomeIpSd_BuildHeader(uint8_t *buf)
+{
+    uint16_t idx = 0u;
+
+    wr16(&buf[idx], SOMEIPSD_SERVICE_ID); idx += 2u;
+    wr16(&buf[idx], SOMEIPSD_METHOD_ID); idx += 2u;
+
+    idx += 4u;
+
+    wr16(&buf[idx], 0x0000u); idx += 2u;
+    wr16(&buf[idx], 0x0001u); idx += 2u;
+
+    buf[idx++] = 0x01u;
+    buf[idx++] = 0x01u;
+    buf[idx++] = 0x02u;
+    buf[idx++] = 0x00u;
+
+    buf[idx++] = 0xC0u;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x00u;
+
+    return idx;
+}
+
+static void SomeIpSd_FinalizeHeader(uint8_t *buf, uint16_t totalLen)
+{
+    wr32(&buf[4], (uint32_t)(totalLen - 8u));
+}
+
+static uint16 SomeIpSd_AppendIpv4EndpointOption(uint8 *buf,
+                                                uint16 idx,
+                                                uint8 proto,
+                                                uint16 port,
+                                                uint32 ipAddr)
+{
+    wr16(&buf[idx], 0x0009u);
+    idx += 2u;
+
+    buf[idx++] = 0x04u;
+    buf[idx++] = 0x00u;
+
+    buf[idx++] = (uint8)(ipAddr >> 24u);
+    buf[idx++] = (uint8)(ipAddr >> 16u);
+    buf[idx++] = (uint8)(ipAddr >> 8u);
+    buf[idx++] = (uint8)ipAddr;
+
+    buf[idx++] = 0x00u;
+    buf[idx++] = proto;
+
+    wr16(&buf[idx], port);
+    idx += 2u;
+
+    return idx;
+}
+
+static uint16_t SomeIpSd_BuildOffer(uint8_t *buf,
+                                    const SomeIpSd_OfferedServiceType *svc,
+                                    uint32_t ttl)
+{
+    uint16_t idx;
+    uint16_t entriesLenPos;
+    uint16_t optionsLenPos;
+
+    idx = SomeIpSd_BuildHeader(buf);
+
+    entriesLenPos = idx;
+    idx += 4u;
+
+    buf[idx++] = SOMEIPSD_ENTRY_OFFER_SERVICE;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x01u;
+
+    wr16(&buf[idx], svc->serviceId); idx += 2u;
+    wr16(&buf[idx], svc->instanceId); idx += 2u;
+
+    buf[idx++] = svc->majorVersion;
+    wr24(&buf[idx], ttl); idx += 3u;
+
+    wr32(&buf[idx], 0x00000000u);
+    idx += 4u;
+
+    optionsLenPos = idx;
+    idx += 4u;
+
+    idx = SomeIpSd_AppendIpv4EndpointOption(buf,
+                                            idx,
+                                            0x11u,
+                                            svc->udpPort,
+                                            0xC0A8000Au);
+
+    wr32(&buf[entriesLenPos], 16u);
+    wr32(&buf[optionsLenPos], 12u);
+
+    SomeIpSd_FinalizeHeader(buf, idx);
+
+    return idx;
+}
+
+static uint16_t SomeIpSd_BuildSubscribeAck(uint8_t *buf,
+                                           uint16_t serviceId,
+                                           uint16_t instanceId,
+                                           uint8_t majorVersion,
+                                           uint32_t ttl,
+                                           uint16_t eventgroupId)
+{
+    uint16_t idx;
+    uint16_t entriesLenPos;
+    uint16_t optionsLenPos;
+
+    idx = SomeIpSd_BuildHeader(buf);
+
+    entriesLenPos = idx;
+    idx += 4u;
+
+    buf[idx++] = SOMEIPSD_ENTRY_SUBSCRIBE_ACK;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x00u;
+    buf[idx++] = 0x00u;
+
+    wr16(&buf[idx], serviceId); idx += 2u;
+    wr16(&buf[idx], instanceId); idx += 2u;
+
+    buf[idx++] = majorVersion;
+    wr24(&buf[idx], ttl); idx += 3u;
+
+    wr16(&buf[idx], 0x0000u); idx += 2u;
+    wr16(&buf[idx], eventgroupId); idx += 2u;
+
+    optionsLenPos = idx;
+    idx += 4u;
+
+    wr32(&buf[entriesLenPos], 16u);
+    wr32(&buf[optionsLenPos], 0u);
+
+    SomeIpSd_FinalizeHeader(buf, idx);
+
+    return idx;
+}
+
+static const SomeIpSd_OfferedServiceType *SomeIpSd_FindService(uint16_t serviceId,
+                                                               uint16_t instanceId)
+{
+    uint8_t i;
+
+    if (SomeIpSd_Cfg == 0)
+    {
+        return 0;
+    }
+
+    for (i = 0u; i < SomeIpSd_Cfg->serviceCount; i++)
+    {
+        const SomeIpSd_OfferedServiceType *svc = &SomeIpSd_Cfg->services[i];
+
+        if ((svc->serviceId == serviceId) &&
+            ((svc->instanceId == instanceId) || (instanceId == 0xFFFFu)))
+        {
+            return svc;
+        }
+    }
+
+    return 0;
+}
+
+static void SomeIpSd_SendOfferTo(const TcpIp_SockAddrType *remoteAddr,
+                                 const SomeIpSd_OfferedServiceType *svc,
+                                 uint32_t ttl)
+{
+    uint8_t tx[SOMEIPSD_MAX_PACKET_LEN];
+    uint16_t len;
+
+    if ((SomeIpSd_Cfg == 0) || (svc == 0))
+    {
+        return;
+    }
+
+    len = SomeIpSd_BuildOffer(tx, svc, ttl);
+
+    (void)SoAd_IfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
+                          remoteAddr,
+                          tx,
+                          len);
+}
+
+static void SomeIpSd_SendAllOffers(void)
+{
+    uint8_t i;
+
+    if (SomeIpSd_Cfg == 0)
+    {
+        return;
+    }
+
+    for (i = 0u; i < SomeIpSd_Cfg->serviceCount; i++)
+    {
+        SomeIpSd_SendOfferTo(&SomeIpSd_Cfg->multicastAddr,
+                             &SomeIpSd_Cfg->services[i],
+                             SomeIpSd_Cfg->services[i].ttl);
+    }
+}
+
+static void SomeIpSd_SendSubscribeAck(const TcpIp_SockAddrType *remoteAddr,
+                                      const SomeIpSd_OfferedServiceType *svc,
+                                      uint16_t eventgroupId,
+                                      uint32_t ttl)
+{
+    uint8_t tx[SOMEIPSD_MAX_PACKET_LEN];
+    uint16_t len;
+
+    len = SomeIpSd_BuildSubscribeAck(tx,
+                                     svc->serviceId,
+                                     svc->instanceId,
+                                     svc->majorVersion,
+                                     ttl,
+                                     eventgroupId);
+
+    (void)SoAd_IfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
+                          remoteAddr,
+                          tx,
+                          len);
+}
+
+static void SomeIpSd_RemoveSubscription(uint16_t serviceId,
+                                        uint16_t instanceId,
+                                        uint16_t eventgroupId,
+                                        const TcpIp_SockAddrType *remoteAddr)
+{
+    uint8_t i;
+
+    for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
+    {
+        SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
+
+        if ((s->active != 0u) &&
+            (s->serviceId == serviceId) &&
+            (s->instanceId == instanceId) &&
+            (s->eventgroupId == eventgroupId))
+        {
+            if ((remoteAddr == 0) ||
+                (memcmp(&s->remoteAddr, remoteAddr, sizeof(TcpIp_SockAddrType)) == 0))
+            {
+                memset(s, 0, sizeof(*s));
+            }
+        }
+    }
+}
+
+static void SomeIpSd_AddSubscription(uint16_t serviceId,
+                                     uint16_t instanceId,
+                                     uint16_t eventgroupId,
+                                     uint32_t ttl,
+                                     const TcpIp_SockAddrType *remoteAddr)
+{
+    uint8_t i;
+
+    if ((ttl == 0u) || (remoteAddr == 0))
+    {
+        SomeIpSd_RemoveSubscription(serviceId, instanceId, eventgroupId, remoteAddr);
+        return;
+    }
+
+    for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
+    {
+        SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
+
+        if ((s->active != 0u) &&
+            (s->serviceId == serviceId) &&
+            (s->instanceId == instanceId) &&
+            (s->eventgroupId == eventgroupId) &&
+            (memcmp(&s->remoteAddr, remoteAddr, sizeof(TcpIp_SockAddrType)) == 0))
+        {
+            s->ttlMs = ttl * 1000u;
+            return;
+        }
+    }
+
+    for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
+    {
+        SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
+
+        if (s->active == 0u)
+        {
+            s->active = 1u;
+            s->remoteAddr = *remoteAddr;
+            s->serviceId = serviceId;
+            s->instanceId = instanceId;
+            s->eventgroupId = eventgroupId;
+            s->ttlMs = ttl * 1000u;
+            return;
+        }
+    }
+}
+
+static void SomeIpSd_HandleFindService(const TcpIp_SockAddrType *remoteAddr,
+                                       uint16 serviceId,
+                                       uint16 instanceId)
+{
+    uint8 i;
+    const SomeIpSd_OfferedServiceType *svc;
+
+    if (SomeIpSd_Cfg == 0)
+    {
+        return;
+    }
+
+    if (serviceId == 0xFFFFu)
+    {
+        for (i = 0u; i < SomeIpSd_Cfg->serviceCount; i++)
+        {
+            SomeIpSd_SendOfferTo(remoteAddr,
+                                 &SomeIpSd_Cfg->services[i],
+                                 SomeIpSd_Cfg->services[i].ttl);
+        }
+
+        return;
+    }
+
+    svc = SomeIpSd_FindService(serviceId, instanceId);
+
+    if (svc != 0)
+    {
+        SomeIpSd_SendOfferTo(remoteAddr, svc, svc->ttl);
+    }
+}
+
+static void SomeIpSd_HandleSubscribe(const TcpIp_SockAddrType *remoteAddr,
+                                     uint16_t serviceId,
+                                     uint16_t instanceId,
+                                     uint8_t majorVersion,
+                                     uint32_t ttl,
+                                     uint16_t eventgroupId)
+{
+    const SomeIpSd_OfferedServiceType *svc;
+
+    svc = SomeIpSd_FindService(serviceId, instanceId);
+
+    if (svc == 0)
+    {
+        return;
+    }
+
+    if ((majorVersion != svc->majorVersion) && (majorVersion != 0xFFu))
+    {
+        return;
+    }
+
+    if (ttl == 0u)
+    {
+        SomeIpSd_RemoveSubscription(serviceId, instanceId, eventgroupId, remoteAddr);
+        SomeIpSd_SendSubscribeAck(remoteAddr, svc, eventgroupId, 0u);
+    }
+    else
+    {
+        SomeIpSd_AddSubscription(serviceId, instanceId, eventgroupId, ttl, remoteAddr);
+        SomeIpSd_SendSubscribeAck(remoteAddr, svc, eventgroupId, ttl);
+    }
+}
+
+static void SomeIpSd_ProcessEntry(const TcpIp_SockAddrType *remoteAddr,
+                                  const uint8_t *e)
+{
+    uint8_t type;
+    uint16_t serviceId;
+    uint16_t instanceId;
+    uint8_t majorVersion;
+    uint32_t ttl;
+    uint16_t eventgroupId;
+
+    type = e[0];
+    serviceId = rd16(&e[4]);
+    instanceId = rd16(&e[6]);
+    majorVersion = e[8];
+    ttl = rd24(&e[9]);
+
+    if (type == SOMEIPSD_ENTRY_FIND_SERVICE)
+    {
+        SomeIpSd_HandleFindService(remoteAddr, serviceId, instanceId);
+    }
+    else if (type == SOMEIPSD_ENTRY_SUBSCRIBE_EVENTGROUP)
+    {
+        eventgroupId = rd16(&e[14]);
+        SomeIpSd_HandleSubscribe(remoteAddr,
+                                 serviceId,
+                                 instanceId,
+                                 majorVersion,
+                                 ttl,
+                                 eventgroupId);
+    }
+    else
+    {
+    }
+}
+
+void SomeIpSd_Init(const SomeIpSd_ConfigType *config)
+{
+    SomeIpSd_Cfg = config;
+    SomeIpSd_TimerMs = 0u;
+    memset(SomeIpSd_Subscriptions, 0, sizeof(SomeIpSd_Subscriptions));
+}
+
+void SomeIpSd_MainFunction(uint32_t elapsedMs)
+{
+    uint8_t i;
+
+    if (SomeIpSd_Cfg == 0)
+    {
+        return;
+    }
+
+    SomeIpSd_TimerMs += elapsedMs;
+
+    if (SomeIpSd_TimerMs >= SomeIpSd_Cfg->offerPeriodMs)
+    {
+        SomeIpSd_TimerMs = 0u;
+        SomeIpSd_SendAllOffers();
+    }
+
+    for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
+    {
+        SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
+
+        if (s->active != 0u)
+        {
+            if (s->ttlMs > elapsedMs)
+            {
+                s->ttlMs -= elapsedMs;
+            }
+            else
+            {
+                memset(s, 0, sizeof(*s));
+            }
+        }
+    }
+}
+
+void SomeIpSd_SoAdRxIndication(SoAd_SoConIdType soConId,
+                               const TcpIp_SockAddrType *remoteAddr,
+                               const uint8_t *data,
+                               uint16_t len)
+{
+    uint32_t someIpLen;
+    uint32_t entriesLen;
+    uint32_t optionsLen;
+    uint32_t entriesPos;
+    uint32_t optionsPos;
+    uint32_t i;
+
+    (void)soConId;
+
+    if ((SomeIpSd_Cfg == 0) || (remoteAddr == 0) || (data == 0) || (len < 28u))
+    {
+        return;
+    }
+
+    if ((rd16(&data[0]) != SOMEIPSD_SERVICE_ID) ||
+        (rd16(&data[2]) != SOMEIPSD_METHOD_ID) ||
+        (data[12] != 0x01u))
+    {
+        return;
+    }
+
+    someIpLen = rd32(&data[4]);
+
+    if ((someIpLen + 8u) != len)
+    {
+        return;
+    }
+
+    entriesPos = 20u;
+    entriesLen = rd32(&data[entriesPos]);
+    entriesPos += 4u;
+
+    if ((entriesLen % 16u) != 0u)
+    {
+        return;
+    }
+
+    optionsPos = entriesPos + entriesLen;
+
+    if ((optionsPos + 4u) > len)
+    {
+        return;
+    }
+
+    optionsLen = rd32(&data[optionsPos]);
+    optionsPos += 4u;
+
+    if ((optionsPos + optionsLen) > len)
+    {
+        return;
+    }
+
+    for (i = 0u; i < entriesLen; i += 16u)
+    {
+        SomeIpSd_ProcessEntry(remoteAddr, &data[entriesPos + i]);
+    }
+}
+
+const SomeIpSd_SubscriptionType *SomeIpSd_GetSubscriptions(void)
+{
+    return SomeIpSd_Subscriptions;
+}

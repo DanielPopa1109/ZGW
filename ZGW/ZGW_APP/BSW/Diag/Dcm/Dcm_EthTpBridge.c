@@ -1,22 +1,22 @@
-/* Dcm_EthTpBridge.c */
 #include "Dcm_EthTpBridge.h"
 #include "DoIP.h"
 #include <string.h>
 
-#define DCM_ETHTP_RX_LEN 4095u
+typedef struct
+{
+    uint8_t rxBuf[DCM_ETHTP_MAX_PAYLOAD_LEN];
+    uint16_t rxLen;
+    uint16_t sourceAddress;
+    uint16_t targetAddress;
+    volatile uint8_t rxPending;
+    volatile uint8_t rxOverflow;
+} Dcm_EthTpRuntimeType;
 
-static uint8_t DcmEth_RxBuf[DCM_ETHTP_RX_LEN];
-static uint16_t DcmEth_RxLen;
-static uint16_t DcmEth_SourceAddress;
-static uint16_t DcmEth_TargetAddress;
-static volatile uint8_t DcmEth_RxPending;
+static Dcm_EthTpRuntimeType DcmEth;
 
 void Dcm_EthTp_Init(void)
 {
-    DcmEth_RxLen = 0u;
-    DcmEth_SourceAddress = 0u;
-    DcmEth_TargetAddress = 0u;
-    DcmEth_RxPending = 0u;
+    memset(&DcmEth, 0, sizeof(DcmEth));
 }
 
 void Dcm_EthTp_RxIndication(uint16_t sourceAddress,
@@ -24,17 +24,23 @@ void Dcm_EthTp_RxIndication(uint16_t sourceAddress,
                             const uint8_t *data,
                             uint16_t len)
 {
-    if ((data == 0) || (len > DCM_ETHTP_RX_LEN))
+    if ((data == 0) || (len == 0u) || (len > DCM_ETHTP_MAX_PAYLOAD_LEN))
     {
         return;
     }
 
-    memcpy(DcmEth_RxBuf, data, len);
+    if (DcmEth.rxPending != 0u)
+    {
+        DcmEth.rxOverflow = 1u;
+        return;
+    }
 
-    DcmEth_RxLen = len;
-    DcmEth_SourceAddress = sourceAddress;
-    DcmEth_TargetAddress = targetAddress;
-    DcmEth_RxPending = 1u;
+    memcpy(DcmEth.rxBuf, data, len);
+
+    DcmEth.rxLen = len;
+    DcmEth.sourceAddress = sourceAddress;
+    DcmEth.targetAddress = targetAddress;
+    DcmEth.rxPending = 1u;
 }
 
 uint8_t Dcm_EthTp_GetRx(uint16_t *sourceAddress,
@@ -43,36 +49,49 @@ uint8_t Dcm_EthTp_GetRx(uint16_t *sourceAddress,
                         uint16_t *len,
                         uint16_t maxLen)
 {
-    if ((sourceAddress == 0) || (targetAddress == 0) || (data == 0) || (len == 0))
+    if ((sourceAddress == 0) ||
+        (targetAddress == 0) ||
+        (data == 0) ||
+        (len == 0))
     {
         return 0u;
     }
 
-    if (DcmEth_RxPending == 0u)
+    if (DcmEth.rxPending == 0u)
     {
         return 0u;
     }
 
-    if (DcmEth_RxLen > maxLen)
+    if (DcmEth.rxLen > maxLen)
     {
         return 0u;
     }
 
-    memcpy(data, DcmEth_RxBuf, DcmEth_RxLen);
+    memcpy(data, DcmEth.rxBuf, DcmEth.rxLen);
 
-    *sourceAddress = DcmEth_SourceAddress;
-    *targetAddress = DcmEth_TargetAddress;
-    *len = DcmEth_RxLen;
+    *sourceAddress = DcmEth.sourceAddress;
+    *targetAddress = DcmEth.targetAddress;
+    *len = DcmEth.rxLen;
 
-    DcmEth_RxPending = 0u;
+    DcmEth.rxPending = 0u;
 
     return 1u;
 }
 
 void Dcm_EthTp_SendResponse(const uint8_t *data, uint16_t len)
 {
-    (void)DoIP_SendDiagnosticResponse(DcmEth_TargetAddress,
-                                      DcmEth_SourceAddress,
+    if ((data == 0) || (len == 0u))
+    {
+        return;
+    }
+
+    (void)DoIP_SendDiagnosticResponse(DcmEth.targetAddress,
+                                      DcmEth.sourceAddress,
                                       data,
                                       len);
+}
+
+uint8_t Dcm_EthTp_HasPendingRx(void)
+{
+    return DcmEth.rxPending;
 }

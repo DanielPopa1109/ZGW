@@ -50,6 +50,11 @@ typedef struct
     uint8 diagResp[8];
     uint8 diagRespValid;
     LinIf_DiagStateType diagState;
+
+    uint16 diagTimer;
+    LinIf_ChannelStateType channelState;
+    uint32 scheduleErrorCounter;
+    uint32 diagTimeoutCounter;
 } LinIf_StateType;
 
 static LinIf_StateType LinIf_State;
@@ -60,6 +65,7 @@ void LinIf_Init(void)
 
     LinIf_State.activeSchedule = LINIF_SCHED_NORMAL;
     LinIf_State.diagState = LINIF_DIAG_IDLE;
+    LinIf_State.channelState = LINIF_CHANNEL_IDLE;
 
     Lin_Init();
 }
@@ -96,6 +102,7 @@ Std_ReturnType LinIf_SetDiagRequest(const uint8 data[8])
     memcpy(LinIf_State.diagReq, data, 8u);
     LinIf_State.diagRespValid = FALSE;
     LinIf_State.diagState = LINIF_DIAG_MRF_PENDING;
+    LinIf_State.diagTimer = LINIF_DIAG_TIMEOUT_TICKS;
 
     return LinIf_SwitchSchedule(LINIF_SCHED_DIAG_REQ);
 }
@@ -123,6 +130,9 @@ void LinIf_DiagFrameDone(uint8 success)
     if (success == FALSE)
     {
         LinIf_State.diagState = LINIF_DIAG_ERROR;
+        LinIf_State.channelState = LINIF_CHANNEL_ERROR;
+        LinIf_State.scheduleErrorCounter++;
+        (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
         return;
     }
 
@@ -187,6 +197,25 @@ void LinIf_MainFunction(void)
 
     Lin_MainFunction();
 
+    if ((LinIf_State.diagState != LINIF_DIAG_IDLE) &&
+        (LinIf_State.diagState != LINIF_DIAG_DONE) &&
+        (LinIf_State.diagState != LINIF_DIAG_ERROR))
+    {
+        if (LinIf_State.diagTimer > 0u)
+        {
+            LinIf_State.diagTimer--;
+        }
+        else
+        {
+            LinIf_State.diagTimeoutCounter++;
+            LinIf_State.diagState = LINIF_DIAG_ERROR;
+            LinIf_State.busy = FALSE;
+            LinIf_State.channelState = LINIF_CHANNEL_ERROR;
+            (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
+            return;
+        }
+    }
+
     if (LinIf_State.busy == TRUE)
     {
         if (Lin_GetState(LIN_CHANNEL_0) == LIN_IDLE)
@@ -224,6 +253,7 @@ void LinIf_MainFunction(void)
             }
 
             LinIf_State.busy = FALSE;
+            LinIf_State.channelState = LINIF_CHANNEL_IDLE;
             LinIf_State.index++;
 
             sched = &LinIf_Schedules[LinIf_State.activeSchedule];
@@ -261,5 +291,19 @@ void LinIf_MainFunction(void)
     {
         LinIf_State.timer = entry->delayTicks;
         LinIf_State.busy = TRUE;
+        LinIf_State.channelState = LINIF_CHANNEL_BUSY;
+        Lin_SetResponseTimeout(entry->frame->responseTimeoutTicks);
     }
+}
+
+LinIf_ChannelStateType LinIf_GetChannelState(void)
+{
+    return LinIf_State.channelState;
+}
+
+void LinIf_ResetDiagnostic(void)
+{
+    LinIf_State.diagRespValid = FALSE;
+    LinIf_State.diagState = LINIF_DIAG_IDLE;
+    LinIf_State.diagTimer = 0u;
 }

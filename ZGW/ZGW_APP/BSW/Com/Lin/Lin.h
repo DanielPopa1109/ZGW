@@ -17,8 +17,10 @@ typedef enum
     LIN_TX_RESPONSE,
     LIN_RX_RESPONSE,
     LIN_SLEEP_PENDING,
+    LIN_TX_SLEEP,
     LIN_SLEEP,
-    LIN_WAKEUP
+    LIN_WAKEUP,
+    LIN_ERROR
 } Lin_StateType;
 
 typedef enum
@@ -46,7 +48,7 @@ Std_ReturnType Lin_Wakeup(uint8 Channel);
 
 Lin_StateType Lin_GetState(uint8 Channel);
 Lin_ResultType Lin_GetStatus(uint8 Channel, uint8* dataOut, uint8* lenOut);
-
+void Lin_SetResponseTimeout(uint16 timeoutTicks);
 void Lin_IsrTxDone(uint8 Channel);
 void Lin_IsrRxByte(uint8 Channel, uint8 byte);
 void Lin_IsrError(uint8 Channel, Lin_ResultType error);

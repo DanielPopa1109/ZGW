@@ -37,6 +37,7 @@ Std_ReturnType LinSM_RequestComMode(uint8 Channel, LinSM_StateType RequestedStat
             }
             else
             {
+                LinIf_Init();
                 LinSM_State[Channel] = LINSM_FULL_COMMUNICATION;
                 (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
             }
@@ -46,11 +47,13 @@ Std_ReturnType LinSM_RequestComMode(uint8 Channel, LinSM_StateType RequestedStat
             if (Lin_GoToSleep(Channel) == E_OK)
             {
                 LinSM_State[Channel] = LINSM_GOTO_SLEEP;
+                LinSM_Timer[Channel] = LINSM_WAKEUP_TICKS;
                 return E_OK;
             }
             return E_NOT_OK;
 
         case LINSM_NO_COMMUNICATION:
+            LinIf_ResetDiagnostic();
             LinSM_State[Channel] = LINSM_NO_COMMUNICATION;
             return E_OK;
 
@@ -92,6 +95,17 @@ void LinSM_MainFunction(void)
             {
                 LinSM_State[ch] = LINSM_FULL_COMMUNICATION;
                 (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
+            }
+        }
+        else
+        {
+            if (LinSM_Timer[ch] > 0u)
+            {
+                LinSM_Timer[ch]--;
+            }
+            else
+            {
+                LinSM_State[ch] = LINSM_SLEEP;
             }
         }
     }

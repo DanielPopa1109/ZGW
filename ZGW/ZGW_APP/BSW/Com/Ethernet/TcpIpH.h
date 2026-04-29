@@ -1,97 +1,42 @@
-/* TcpIp.h */
-#ifndef TCPIPH_H_
-#define TCPIPH_H_
+#ifndef TCPIPH_H
+#define TCPIPH_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "Ifx_Types.h"
+#include "lwip/sockets.h"
+#include "lwip/inet.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define TCPIP_MAX_PAYLOAD_LEN     1500u
-#define TCPIP_INVALID_SOCKET      (-1)
-
-typedef int32_t TcpIp_SocketIdType;
-
-typedef enum
-{
-    TCPIP_OK = 0,
-    TCPIP_NOT_OK,
-    TCPIP_BUSY,
-    TCPIP_TIMEOUT,
-    TCPIP_PARAM_ERROR,
-    TCPIP_SOCKET_ERROR
-} TcpIp_ReturnType;
-
-typedef enum
-{
-    TCPIP_PROTOCOL_TCP = 0,
-    TCPIP_PROTOCOL_UDP
-} TcpIp_ProtocolType;
-
-typedef enum
-{
-    TCPIP_SOCKET_CLOSED = 0,
-    TCPIP_SOCKET_CREATED,
-    TCPIP_SOCKET_BOUND,
-    TCPIP_SOCKET_LISTENING,
-    TCPIP_SOCKET_CONNECTED,
-    TCPIP_SOCKET_ERROR_STATE
-} TcpIp_SocketStateType;
+typedef sint32 TcpIp_SocketIdType;
 
 typedef struct
 {
-    uint8_t addr[4];
-    uint16_t port;
+    uint32 addr;
+    uint16 port;
 } TcpIp_SockAddrType;
 
+#define TCPIP_INVALID_SOCKET   ((TcpIp_SocketIdType)-1)
+
 void TcpIp_Init(void);
+void TcpIp_MainFunction(void);
 
-TcpIp_ReturnType TcpIp_CreateSocket(TcpIp_ProtocolType protocol,
-                                    TcpIp_SocketIdType *socketId);
+TcpIp_SocketIdType TcpIp_Create(uint8 tcp);
+sint32 TcpIp_Bind(TcpIp_SocketIdType sock, uint16 port);
+sint32 TcpIp_Listen(TcpIp_SocketIdType sock);
+TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr);
 
-TcpIp_ReturnType TcpIp_SetNonBlocking(TcpIp_SocketIdType socketId);
+sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port);
 
-TcpIp_ReturnType TcpIp_Bind(TcpIp_SocketIdType socketId,
-                            const TcpIp_SockAddrType *localAddr);
+sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len);
+sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
+                    const TcpIp_SockAddrType *remoteAddr,
+                    const uint8 *data,
+                    uint16 len);
 
-TcpIp_ReturnType TcpIp_Listen(TcpIp_SocketIdType socketId,
-                              uint8_t backlog);
+sint32 TcpIp_Recv(TcpIp_SocketIdType sock, uint8 *data, uint16 len);
+sint32 TcpIp_RecvFrom(TcpIp_SocketIdType sock,
+                      TcpIp_SockAddrType *remoteAddr,
+                      uint8 *data,
+                      uint16 len);
 
-TcpIp_ReturnType TcpIp_Accept(TcpIp_SocketIdType listenSocket,
-                              TcpIp_SocketIdType *clientSocket,
-                              TcpIp_SockAddrType *remoteAddr);
-
-TcpIp_ReturnType TcpIp_Connect(TcpIp_SocketIdType socketId,
-                               const TcpIp_SockAddrType *remoteAddr);
-
-TcpIp_ReturnType TcpIp_Send(TcpIp_SocketIdType socketId,
-                            const uint8_t *data,
-                            uint16_t len,
-                            uint16_t *sentLen);
-
-TcpIp_ReturnType TcpIp_Recv(TcpIp_SocketIdType socketId,
-                            uint8_t *data,
-                            uint16_t maxLen,
-                            uint16_t *rxLen);
-
-TcpIp_ReturnType TcpIp_SendTo(TcpIp_SocketIdType socketId,
-                              const TcpIp_SockAddrType *remoteAddr,
-                              const uint8_t *data,
-                              uint16_t len,
-                              uint16_t *sentLen);
-
-TcpIp_ReturnType TcpIp_RecvFrom(TcpIp_SocketIdType socketId,
-                                TcpIp_SockAddrType *remoteAddr,
-                                uint8_t *data,
-                                uint16_t maxLen,
-                                uint16_t *rxLen);
-
-TcpIp_ReturnType TcpIp_Close(TcpIp_SocketIdType socketId);
-
-#ifdef __cplusplus
-}
-#endif
+void TcpIp_Close(TcpIp_SocketIdType sock);
 
 #endif
