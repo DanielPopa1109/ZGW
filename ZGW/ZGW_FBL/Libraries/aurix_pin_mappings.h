@@ -42,12 +42,33 @@
 #define IFXCFG_P20_7_IO_CONFIG                  { &IfxPort_P20_7, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
 #define IFXCFG_P20_8_IO_CONFIG                  { &IfxPort_P20_8, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 
+// can0_node1
+#define IFXCFG_P33_9_IO_CONFIG                  { &IfxPort_P33_9, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P33_10_IO_CONFIG                 { &IfxPort_P33_10, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+
+// rmii0
+#define IFXCFG_P11_2_IO_CONFIG                  { &IfxPort_P11_2, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P11_3_IO_CONFIG                  { &IfxPort_P11_3, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P11_6_IO_CONFIG                  { &IfxPort_P11_6, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P11_9_IO_CONFIG                  { &IfxPort_P11_9, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_P11_10_IO_CONFIG                 { &IfxPort_P11_10, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_P11_11_IO_CONFIG                 { &IfxPort_P11_11, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_P11_12_IO_CONFIG                 { &IfxPort_P11_12, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_P14_4_IO_CONFIG                  { &IfxPort_P14_4, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P21_2_IO_CONFIG                  { &IfxPort_P21_2, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P21_3_IO_CONFIG                  { &IfxPort_P21_3, IfxPort_Mode_outputPushPullGeneral, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P21_3_IO_CONFIG_IN               { &IfxPort_P21_3, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+
 
 /* Initialization routines */
 
 extern void gpio_init_pins(void);
 
 extern void can0_node0_init_pins(void);
+
+extern void can0_node1_init_pins(void);
+
+extern void rmii0_init_pins(void);
 
 
 #endif /* AURIX_PIN_MAPPINGS_H_ */

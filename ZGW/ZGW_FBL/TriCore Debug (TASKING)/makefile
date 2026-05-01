@@ -8,8 +8,10 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
+-include TIMER_STM/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/_PinMap/TC37x/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/_Impl/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Stm/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Src/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Scu/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Port/Std/subdir.mk
@@ -17,6 +19,8 @@ RM := rm -rf
 -include Libraries/iLLD/TC3xx/Tricore/Pms/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Mtu/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Gtm/Std/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Geth/Std/subdir.mk
+-include Libraries/iLLD/TC3xx/Tricore/Geth/Eth/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Flash/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Trap/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Std/subdir.mk
@@ -26,6 +30,15 @@ RM := rm -rf
 -include Libraries/Infra/Ssw/TC3xx/Tricore/subdir.mk
 -include Libraries/Infra/Platform/Tricore/Compilers/subdir.mk
 -include Libraries/subdir.mk
+-include LWIP_GETH/port/src/subdir.mk
+-include LWIP_GETH/lwip/src/netif/ppp/polarssl/subdir.mk
+-include LWIP_GETH/lwip/src/netif/ppp/subdir.mk
+-include LWIP_GETH/lwip/src/netif/subdir.mk
+-include LWIP_GETH/lwip/src/core/ipv6/subdir.mk
+-include LWIP_GETH/lwip/src/core/ipv4/subdir.mk
+-include LWIP_GETH/lwip/src/core/subdir.mk
+-include LWIP_GETH/lwip/src/api/subdir.mk
+-include LWIP_GETH/subdir.mk
 -include Configurations/Debug/subdir.mk
 -include Configurations/subdir.mk
 -include subdir.mk

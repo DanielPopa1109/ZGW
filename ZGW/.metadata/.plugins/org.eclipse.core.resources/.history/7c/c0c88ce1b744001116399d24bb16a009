@@ -1,0 +1,760 @@
+/* Cpu0_Main.c - AURIX TC375 single-core FBL control layer
+ * Lab-grade baseline: CAN-FD ISO-TP + Ethernet DoIP-style update routing.
+ * Toolchain: TASKING + iLLD 4.0.4.
+ * No OS. CPU0 only.
+ *
+ * Flash layout:
+ *   FBL: 0xA0000000 - 0xA001FFFF, 128 KiB
+ *   APP: 0xA0020000 - 0xA07FFFFF
+ *
+ * Update transport selection:
+ *   g_FblTransportSelect = 1 => CAN-FD ISO-TP
+ *   g_FblTransportSelect = 2 => Ethernet DoIP/TCP
+ *
+ * Ethernet note:
+ *   This file implements DoIP framing and UDS routing.
+ *   Board-specific GETH/lwIP bring-up is isolated behind FblEth_* hooks.
+ */
+
+#include <string.h>
+#include "Ifx_Types.h"
+#include "IfxCpu.h"
+#include "IfxScuWdt.h"
+#include "IfxScuRcu.h"
+#include "IfxFlash.h"
+#include "IfxCan_Can.h"
+#include "aurix_pin_mappings.h"
+
+/* ============================== Build switches ============================== */
+#define FBL_ENABLE_CANFD                 1u
+#define FBL_ENABLE_ETHERNET              1u
+#define FBL_ENABLE_FBL_UPDATE            1u
+
+/* ============================== Flash layout ============================== */
+#define FBL_START_CACHED                 0x80000000u
+#define FBL_START_NCACHED                0xA0000000u
+#define FBL_END_NCACHED                  0xA001FFFFu
+#define FBL_SIZE_BYTES                   0x00020000u
+
+#define APP_START_CACHED                 0x80020000u
+#define APP_START_NCACHED                0xA0020000u
+#define APP_END_NCACHED                  0xA07FFFFFu
+
+#define PFLASH_BANK_A_START              0xA0000000u
+#define PFLASH_BANK_A_END                0xA03FFFFFu
+#define PFLASH_BANK_B_START              0xA0400000u
+#define PFLASH_BANK_B_END                0xA07FFFFFu
+#define PFLASH_PAGE_SIZE                 32u
+#define PFLASH_SECTOR_SIZE               0x4000u
+
+#define FLASH_MODULE                     0u
+#define PROGRAM_FLASH_BANK_A             3u
+#define PROGRAM_FLASH_BANK_B             4u
+
+/* ============================== Shared state ============================== */
+#define FBL_TRANSPORT_CANFD              1u
+#define FBL_TRANSPORT_ETH                2u
+#define FBL_UPDATE_TARGET_APP            1u
+#define FBL_UPDATE_TARGET_FBL            2u
+
+/* TODO: replace with .no_clear section after LSL section is created. */
+volatile uint32 g_FblTransportSelect = FBL_TRANSPORT_CANFD;
+volatile uint32 g_FblForceStay       = 1u;
+volatile uint32 g_FblUpdateTarget    = FBL_UPDATE_TARGET_APP;
+
+/* ============================== CAN-FD config ============================== */
+#define FBL_CAN_REQ_ID                   0x710u
+#define FBL_CAN_RES_ID                   0x709u
+#define FBL_CAN_MAX_DLC                  64u
+#define FBL_ISOTP_MAX_PAYLOAD            4095u
+#define FBL_CAN_RX_IRQ_PRIO              1u
+
+/* ============================== UDS config ============================== */
+#define UDS_SID_DSC                      0x10u
+#define UDS_SID_ECU_RESET                0x11u
+#define UDS_SID_RDBI                     0x22u
+#define UDS_SID_ROUTINE                  0x31u
+#define UDS_SID_REQUEST_DOWNLOAD         0x34u
+#define UDS_SID_TRANSFER_DATA            0x36u
+#define UDS_SID_TRANSFER_EXIT            0x37u
+#define UDS_SID_TESTER_PRESENT           0x3Eu
+#define UDS_NEG_RESP                     0x7Fu
+
+#define UDS_NRC_GENERAL_REJECT           0x10u
+#define UDS_NRC_INCORRECT_LEN            0x13u
+#define UDS_NRC_CONDITIONS_NOT_CORRECT   0x22u
+#define UDS_NRC_REQUEST_OUT_OF_RANGE     0x31u
+#define UDS_NRC_UPLOAD_DOWNLOAD_FAIL     0x70u
+#define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
+
+#define UDS_RID_ERASE                    0xFF00u
+#define UDS_RID_CRC_CHECK                0xFF01u
+#define UDS_DID_ACTIVE_SESSION           0xF186u
+
+/* ============================== DoIP config ============================== */
+#define DOIP_TCP_PORT                    13400u
+#define DOIP_UDP_PORT                    13400u
+#define DOIP_PROTOCOL_VERSION            0x02u
+#define DOIP_INV_PROTOCOL_VERSION        0xFDu
+#define DOIP_PT_VEHICLE_ID_REQ           0x0001u
+#define DOIP_PT_VEHICLE_ID_RES           0x0004u
+#define DOIP_PT_ROUTING_ACT_REQ          0x0005u
+#define DOIP_PT_ROUTING_ACT_RES          0x0006u
+#define DOIP_PT_DIAG_MSG                 0x8001u
+#define DOIP_PT_DIAG_POS_ACK             0x8002u
+#define DOIP_PT_DIAG_NEG_ACK             0x8003u
+#define DOIP_TESTER_SA                   0x0E00u
+#define DOIP_ECU_TA                      0x1000u
+
+/* ============================== RAM updater interface ============================== */
+typedef struct
+{
+    uint32 targetStart;
+    uint32 targetEnd;
+    uint32 expectedCrc;
+    uint32 calculatedCrc;
+    uint32 programmedBytes;
+    uint32 status;
+} Fbl_UpdateContextType;
+
+extern void FblRamUpdater_Init(void);
+extern uint32 FblRamUpdater_EraseRange(uint32 startAddress, uint32 lengthBytes);
+extern uint32 FblRamUpdater_Program(uint32 address, const uint8 *data, uint32 length);
+extern uint32 FblRamUpdater_Crc32(uint32 address, uint32 lengthBytes);
+extern void FblRamUpdater_JumpToApplication(uint32 appStartAddress);
+extern void FblRamUpdater_Reset(void);
+
+/* ============================== CAN globals ============================== */
+typedef struct
+{
+    IfxCan_Can_Config canConfig;
+    IfxCan_Can canModule;
+    IfxCan_Can_Node canNode;
+    IfxCan_Can_NodeConfig nodeConfig;
+    IfxCan_Filter filter;
+    IfxCan_Message rxMsg;
+    IfxCan_Message txMsg;
+    uint8 rxData[FBL_CAN_MAX_DLC];
+    uint8 txData[FBL_CAN_MAX_DLC];
+} FblCanType;
+
+static FblCanType g_can;
+
+/* ============================== ISO-TP state ============================== */
+typedef enum
+{
+    ISOTP_IDLE = 0,
+    ISOTP_RX_IN_PROGRESS,
+    ISOTP_TX_IN_PROGRESS,
+    ISOTP_TX_WAIT_FC
+} IsoTpStateType;
+
+typedef struct
+{
+    IsoTpStateType state;
+    uint8 rxBuf[FBL_ISOTP_MAX_PAYLOAD];
+    uint8 txBuf[FBL_ISOTP_MAX_PAYLOAD];
+    uint16 rxLen;
+    uint16 rxIndex;
+    uint16 txLen;
+    uint16 txIndex;
+    uint8 nextSn;
+    uint8 txSn;
+    uint8 blockSize;
+    uint8 stMin;
+    uint8 rxComplete;
+} IsoTpContextType;
+
+static IsoTpContextType g_iso;
+static Fbl_UpdateContextType g_upd;
+
+/* ============================== Ethernet hook API ============================== */
+typedef struct
+{
+    uint8 data[1500];
+    uint16 len;
+} FblEthPacketType;
+
+/* Implement these on top of your TC375 GETH + lwIP port. Weak stubs keep build isolated. */
+IFX_WEAK void FblEth_Init(void) {}
+IFX_WEAK void FblEth_MainFunction(void) {}
+IFX_WEAK uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len) { (void)buf; (void)len; return 0u; }
+IFX_WEAK uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len) { (void)buf; (void)len; return 0u; }
+IFX_WEAK void FblEth_TcpSend(const uint8 *buf, uint16 len) { (void)buf; (void)len; }
+IFX_WEAK void FblEth_UdpSend(const uint8 *buf, uint16 len) { (void)buf; (void)len; }
+
+/* ============================== Prototypes ============================== */
+IFX_INTERRUPT(FblCan_RxIsr, 0u, FBL_CAN_RX_IRQ_PRIO);
+static void Fbl_PlatformInit(void);
+static void Fbl_CanFdInit(void);
+static void Fbl_CanFdSend(const uint8 *data, uint8 len);
+static void Fbl_CanFdRxIndication(void);
+static void Fbl_IsoTpInit(void);
+static void Fbl_IsoTpRxFrame(const uint8 *data, uint8 len);
+static void Fbl_IsoTpSendPayload(const uint8 *payload, uint16 len);
+static void Fbl_IsoTpMainFunction(void);
+static void Fbl_UdsDispatch(const uint8 *req, uint16 reqLen, uint8 sourceTransport);
+static void Fbl_SendUdsResponse(const uint8 *payload, uint16 len, uint8 sourceTransport);
+static void Fbl_SendNegative(uint8 sid, uint8 nrc, uint8 sourceTransport);
+static void Fbl_DoIpMainFunction(void);
+static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len);
+static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len);
+static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen);
+static uint8 Fbl_IsRangeValid(uint32 address, uint32 length);
+static uint32 Fbl_ParseU32(const uint8 *p);
+static void Fbl_StoreU32(uint8 *p, uint32 v);
+
+/* ============================== Main ============================== */
+void core0_main(void)
+{
+    Fbl_PlatformInit();
+    FblRamUpdater_Init();
+    Fbl_IsoTpInit();
+
+    if(g_FblTransportSelect == FBL_TRANSPORT_CANFD)
+    {
+        Fbl_CanFdInit();
+    }
+    else if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
+    {
+        FblEth_Init();
+    }
+    else
+    {
+        g_FblTransportSelect = FBL_TRANSPORT_CANFD;
+        Fbl_CanFdInit();
+    }
+
+    if(g_FblForceStay == 0u)
+    {
+        FblRamUpdater_JumpToApplication(APP_START_NCACHED);
+    }
+
+    while(1)
+    {
+        if(g_FblTransportSelect == FBL_TRANSPORT_CANFD)
+        {
+            Fbl_IsoTpMainFunction();
+        }
+        else
+        {
+            FblEth_MainFunction();
+            Fbl_DoIpMainFunction();
+        }
+    }
+}
+
+/* ============================== Platform ============================== */
+static void Fbl_PlatformInit(void)
+{
+    IfxCpu_disableInterrupts();
+    IfxScuWdt_disableCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
+    IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
+    gpio_init_pins();
+    can0_node0_init_pins();
+    IfxCpu_enableInterrupts();
+}
+
+/* ============================== CAN-FD ============================== */
+static void Fbl_CanFdInit(void)
+{
+    memset(&g_can, 0, sizeof(g_can));
+
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN0);
+    IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
+    IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
+
+    IfxScuCcu_setMcanFrequency(40000000.0f);
+    g_can.nodeConfig.nodeId = IfxCan_NodeId_0;
+    g_can.nodeConfig.baudRate.baudrate = 500000u;
+    g_can.nodeConfig.baudRate.prescaler = 3u;
+    g_can.nodeConfig.baudRate.samplePoint = 8000u;
+    g_can.nodeConfig.baudRate.timeSegment1 = 14u;
+    g_can.nodeConfig.baudRate.timeSegment2 = 3u;
+    g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
+    g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
+    g_can.nodeConfig.fastBaudRate.prescaler = 1u;
+    g_can.nodeConfig.fastBaudRate.samplePoint = 7000u;
+    g_can.nodeConfig.fastBaudRate.timeSegment1 = 13u;
+    g_can.nodeConfig.fastBaudRate.timeSegment2 = 6u;
+    g_can.nodeConfig.fastBaudRate.syncJumpWidth = 2u;
+    g_can.nodeConfig.calculateBitTimingValues = FALSE;
+
+    g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
+    g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
+    g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
+    g_can.nodeConfig.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_dedicatedBuffers;
+    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
+
+    g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x000u;
+    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x120u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0x520u;
+
+    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_can.nodeConfig.filterConfig.standardListSize = 1u;
+    g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
+    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
+
+    g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
+    g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_IRQ_PRIO;
+    g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
+    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0;
+
+    IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
+
+    g_can.filter.number = 0u;
+    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+    g_can.filter.id1 = FBL_CAN_REQ_ID;
+    g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
+    IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
+
+    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+}
+
+void FblCan_RxIsr(void)
+{
+    Fbl_CanFdRxIndication();
+}
+
+static void Fbl_CanFdRxIndication(void)
+{
+    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_messageStoredToDedicatedRxBuffer);
+    g_can.rxMsg.bufferNumber = 0u;
+
+    if(IfxCan_Can_isNewDataReceived(&g_can.canNode, 0u) != 0u)
+    {
+        IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32*)g_can.rxData);
+        if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
+        {
+            Fbl_IsoTpRxFrame(g_can.rxData, FBL_CAN_MAX_DLC);
+        }
+        IfxCan_Node_clearRxBufferNewDataFlag(g_can.canNode.node, 0u);
+    }
+}
+
+static void Fbl_CanFdSend(const uint8 *data, uint8 len)
+{
+    memset(g_can.txData, 0, sizeof(g_can.txData));
+    memcpy(g_can.txData, data, len);
+    IfxCan_Can_initMessage(&g_can.txMsg);
+    g_can.txMsg.messageId = FBL_CAN_RES_ID;
+    g_can.txMsg.dataLengthCode = IfxCan_DataLengthCode_64;
+    g_can.txMsg.frameMode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
+    (void)IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32*)g_can.txData);
+}
+
+/* ============================== ISO-TP over CAN-FD ============================== */
+static void Fbl_IsoTpInit(void)
+{
+    memset(&g_iso, 0, sizeof(g_iso));
+}
+
+static void Fbl_IsoTpRxFrame(const uint8 *data, uint8 len)
+{
+    uint8 pciType = data[0] >> 4u;
+    uint16 payloadLen;
+    uint8 fc[3] = {0x30u, 0x00u, 0x00u};
+
+    (void)len;
+
+    if(pciType == 0x0u)
+    {
+        payloadLen = data[0] & 0x0Fu;
+        if(payloadLen > 0u && payloadLen <= 63u)
+        {
+            memcpy(g_iso.rxBuf, &data[1], payloadLen);
+            Fbl_UdsDispatch(g_iso.rxBuf, payloadLen, FBL_TRANSPORT_CANFD);
+        }
+    }
+    else if(pciType == 0x1u)
+    {
+        payloadLen = ((uint16)(data[0] & 0x0Fu) << 8u) | data[1];
+        if(payloadLen <= FBL_ISOTP_MAX_PAYLOAD)
+        {
+            g_iso.rxLen = payloadLen;
+            g_iso.rxIndex = 0u;
+            g_iso.nextSn = 1u;
+            g_iso.state = ISOTP_RX_IN_PROGRESS;
+            memcpy(&g_iso.rxBuf[0], &data[2], 62u);
+            g_iso.rxIndex = 62u;
+            Fbl_CanFdSend(fc, 3u);
+        }
+    }
+    else if(pciType == 0x2u)
+    {
+        uint8 sn = data[0] & 0x0Fu;
+        uint16 remaining;
+        uint8 copyLen;
+
+        if((g_iso.state == ISOTP_RX_IN_PROGRESS) && (sn == g_iso.nextSn))
+        {
+            remaining = g_iso.rxLen - g_iso.rxIndex;
+            copyLen = (remaining > 63u) ? 63u : (uint8)remaining;
+            memcpy(&g_iso.rxBuf[g_iso.rxIndex], &data[1], copyLen);
+            g_iso.rxIndex += copyLen;
+            g_iso.nextSn = (g_iso.nextSn + 1u) & 0x0Fu;
+
+            if(g_iso.rxIndex >= g_iso.rxLen)
+            {
+                g_iso.state = ISOTP_IDLE;
+                Fbl_UdsDispatch(g_iso.rxBuf, g_iso.rxLen, FBL_TRANSPORT_CANFD);
+            }
+        }
+    }
+    else if(pciType == 0x3u)
+    {
+        if(g_iso.state == ISOTP_TX_WAIT_FC)
+        {
+            g_iso.blockSize = data[1];
+            g_iso.stMin = data[2];
+            g_iso.state = ISOTP_TX_IN_PROGRESS;
+        }
+    }
+}
+
+static void Fbl_IsoTpSendPayload(const uint8 *payload, uint16 len)
+{
+    uint8 frame[FBL_CAN_MAX_DLC];
+
+    if(len <= 63u)
+    {
+        memset(frame, 0, sizeof(frame));
+        frame[0] = (uint8)len;
+        memcpy(&frame[1], payload, len);
+        Fbl_CanFdSend(frame, 64u);
+    }
+    else
+    {
+        memset(&g_iso.txBuf[0], 0, sizeof(g_iso.txBuf));
+        memcpy(g_iso.txBuf, payload, len);
+        g_iso.txLen = len;
+        g_iso.txIndex = 62u;
+        g_iso.txSn = 1u;
+        g_iso.state = ISOTP_TX_WAIT_FC;
+
+        memset(frame, 0, sizeof(frame));
+        frame[0] = 0x10u | ((len >> 8u) & 0x0Fu);
+        frame[1] = (uint8)len;
+        memcpy(&frame[2], payload, 62u);
+        Fbl_CanFdSend(frame, 64u);
+    }
+}
+
+static void Fbl_IsoTpMainFunction(void)
+{
+    uint8 frame[FBL_CAN_MAX_DLC];
+    uint16 remaining;
+    uint8 copyLen;
+
+    if(g_iso.state == ISOTP_TX_IN_PROGRESS)
+    {
+        remaining = g_iso.txLen - g_iso.txIndex;
+        copyLen = (remaining > 63u) ? 63u : (uint8)remaining;
+        memset(frame, 0, sizeof(frame));
+        frame[0] = 0x20u | (g_iso.txSn & 0x0Fu);
+        memcpy(&frame[1], &g_iso.txBuf[g_iso.txIndex], copyLen);
+        Fbl_CanFdSend(frame, 64u);
+        g_iso.txIndex += copyLen;
+        g_iso.txSn = (g_iso.txSn + 1u) & 0x0Fu;
+        if(g_iso.txIndex >= g_iso.txLen)
+        {
+            g_iso.state = ISOTP_IDLE;
+        }
+    }
+}
+
+/* ============================== UDS ============================== */
+static void Fbl_UdsDispatch(const uint8 *req, uint16 reqLen, uint8 sourceTransport)
+{
+    uint8 res[64];
+    uint8 sid;
+    uint32 addr;
+    uint32 len;
+    uint32 crc;
+    uint16 rid;
+
+    if(reqLen == 0u)
+    {
+        return;
+    }
+
+    sid = req[0];
+    memset(res, 0, sizeof(res));
+
+    switch(sid)
+    {
+        case UDS_SID_DSC:
+            if(reqLen < 2u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+            res[0] = sid + 0x40u;
+            res[1] = req[1];
+            res[2] = 0x00u; res[3] = 0x32u; res[4] = 0x01u; res[5] = 0xF4u;
+            Fbl_SendUdsResponse(res, 6u, sourceTransport);
+            break;
+
+        case UDS_SID_TESTER_PRESENT:
+            res[0] = sid + 0x40u;
+            res[1] = 0x00u;
+            Fbl_SendUdsResponse(res, 2u, sourceTransport);
+            break;
+
+        case UDS_SID_RDBI:
+            if(reqLen < 3u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+            if((((uint16)req[1] << 8u) | req[2]) == UDS_DID_ACTIVE_SESSION)
+            {
+                res[0] = sid + 0x40u; res[1] = req[1]; res[2] = req[2]; res[3] = 0x02u;
+                Fbl_SendUdsResponse(res, 4u, sourceTransport);
+            }
+            else
+            {
+                Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport);
+            }
+            break;
+
+        case UDS_SID_REQUEST_DOWNLOAD:
+            if(reqLen < 11u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+            addr = Fbl_ParseU32(&req[3]);
+            len = Fbl_ParseU32(&req[7]);
+            if(Fbl_IsRangeValid(addr, len) == 0u)
+            {
+                Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport);
+                break;
+            }
+            g_upd.targetStart = addr;
+            g_upd.targetEnd = addr + len - 1u;
+            g_upd.programmedBytes = 0u;
+            g_upd.status = 0u;
+            res[0] = sid + 0x40u;
+            res[1] = 0x20u; /* maxNumberOfBlockLength length = 2 bytes */
+            res[2] = 0x0Fu; res[3] = 0x00u; /* 3840 byte max UDS block payload */
+            Fbl_SendUdsResponse(res, 4u, sourceTransport);
+            break;
+
+        case UDS_SID_TRANSFER_DATA:
+            if(reqLen < 3u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+            addr = g_upd.targetStart + g_upd.programmedBytes;
+            len = reqLen - 2u;
+            if(Fbl_IsRangeValid(addr, len) == 0u)
+            {
+                Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport);
+                break;
+            }
+            if(FblRamUpdater_Program(addr, &req[2], len) != 0u)
+            {
+                Fbl_SendNegative(sid, UDS_NRC_UPLOAD_DOWNLOAD_FAIL, sourceTransport);
+                break;
+            }
+            g_upd.programmedBytes += len;
+            res[0] = sid + 0x40u;
+            res[1] = req[1];
+            Fbl_SendUdsResponse(res, 2u, sourceTransport);
+            break;
+
+        case UDS_SID_TRANSFER_EXIT:
+            res[0] = sid + 0x40u;
+            Fbl_SendUdsResponse(res, 1u, sourceTransport);
+            break;
+
+        case UDS_SID_ROUTINE:
+            if(reqLen < 4u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+            rid = ((uint16)req[2] << 8u) | req[3];
+            if(rid == UDS_RID_ERASE)
+            {
+                if(reqLen < 12u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+                addr = Fbl_ParseU32(&req[4]);
+                len = Fbl_ParseU32(&req[8]);
+                if(Fbl_IsRangeValid(addr, len) == 0u) { Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport); break; }
+                if(FblRamUpdater_EraseRange(addr, len) != 0u) { Fbl_SendNegative(sid, UDS_NRC_UPLOAD_DOWNLOAD_FAIL, sourceTransport); break; }
+                res[0] = sid + 0x40u; res[1] = req[1]; res[2] = req[2]; res[3] = req[3]; res[4] = 0x00u;
+                Fbl_SendUdsResponse(res, 5u, sourceTransport);
+            }
+            else if(rid == UDS_RID_CRC_CHECK)
+            {
+                if(reqLen < 12u) { Fbl_SendNegative(sid, UDS_NRC_INCORRECT_LEN, sourceTransport); break; }
+                addr = Fbl_ParseU32(&req[4]);
+                len = Fbl_ParseU32(&req[8]);
+                crc = FblRamUpdater_Crc32(addr, len);
+                res[0] = sid + 0x40u; res[1] = req[1]; res[2] = req[2]; res[3] = req[3];
+                Fbl_StoreU32(&res[4], crc);
+                Fbl_SendUdsResponse(res, 8u, sourceTransport);
+            }
+            else
+            {
+                Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport);
+            }
+            break;
+
+        case UDS_SID_ECU_RESET:
+            res[0] = sid + 0x40u; res[1] = req[1];
+            Fbl_SendUdsResponse(res, 2u, sourceTransport);
+            for(volatile uint32 i = 0u; i < 1000000u; i++) {}
+            FblRamUpdater_Reset();
+            break;
+
+        default:
+            Fbl_SendNegative(sid, UDS_NRC_REQUEST_OUT_OF_RANGE, sourceTransport);
+            break;
+    }
+}
+
+static void Fbl_SendUdsResponse(const uint8 *payload, uint16 len, uint8 sourceTransport)
+{
+    if(sourceTransport == FBL_TRANSPORT_CANFD)
+    {
+        Fbl_IsoTpSendPayload(payload, len);
+    }
+    else
+    {
+        Fbl_DoIpSendDiag(payload, len);
+    }
+}
+
+static void Fbl_SendNegative(uint8 sid, uint8 nrc, uint8 sourceTransport)
+{
+    uint8 res[3];
+    res[0] = UDS_NEG_RESP;
+    res[1] = sid;
+    res[2] = nrc;
+    Fbl_SendUdsResponse(res, 3u, sourceTransport);
+}
+
+/* ============================== DoIP minimal ============================== */
+static void Fbl_DoIpMainFunction(void)
+{
+    uint8 buf[1500];
+    uint16 len;
+
+    len = sizeof(buf);
+    if(FblEth_UdpReceive(buf, &len) != 0u)
+    {
+        Fbl_DoIpHandleUdp(buf, len);
+    }
+
+    len = sizeof(buf);
+    if(FblEth_TcpReceive(buf, &len) != 0u)
+    {
+        Fbl_DoIpHandleTcp(buf, len);
+    }
+}
+
+static void Fbl_DoIpHeader(uint8 *buf, uint16 payloadType, uint32 payloadLen)
+{
+    buf[0] = DOIP_PROTOCOL_VERSION;
+    buf[1] = DOIP_INV_PROTOCOL_VERSION;
+    buf[2] = (uint8)(payloadType >> 8u);
+    buf[3] = (uint8)payloadType;
+    Fbl_StoreU32(&buf[4], payloadLen);
+}
+
+static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len)
+{
+    uint8 res[40];
+    uint16 pt;
+
+    if(len < 8u) { return; }
+    if((buf[0] != DOIP_PROTOCOL_VERSION) || (buf[1] != DOIP_INV_PROTOCOL_VERSION)) { return; }
+    pt = ((uint16)buf[2] << 8u) | buf[3];
+
+    if(pt == DOIP_PT_VEHICLE_ID_REQ)
+    {
+        memset(res, 0, sizeof(res));
+        Fbl_DoIpHeader(res, DOIP_PT_VEHICLE_ID_RES, 32u);
+        /* VIN placeholder, 17 bytes */
+        memcpy(&res[8], "TC375FBL000000000", 17u);
+        res[25] = (uint8)(DOIP_ECU_TA >> 8u);
+        res[26] = (uint8)DOIP_ECU_TA;
+        res[27] = 0x00u;
+        FblEth_UdpSend(res, 40u);
+    }
+}
+
+static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
+{
+    uint16 pt;
+    uint32 payloadLen;
+    uint16 sa;
+    uint16 ta;
+    uint8 ack[13];
+
+    if(len < 8u) { return; }
+    if((buf[0] != DOIP_PROTOCOL_VERSION) || (buf[1] != DOIP_INV_PROTOCOL_VERSION)) { return; }
+
+    pt = ((uint16)buf[2] << 8u) | buf[3];
+    payloadLen = Fbl_ParseU32(&buf[4]);
+    if((payloadLen + 8u) > len) { return; }
+
+    if(pt == DOIP_PT_ROUTING_ACT_REQ)
+    {
+        memset(ack, 0, sizeof(ack));
+        Fbl_DoIpHeader(ack, DOIP_PT_ROUTING_ACT_RES, 5u);
+        ack[8] = buf[8]; ack[9] = buf[9];
+        ack[10] = (uint8)(DOIP_ECU_TA >> 8u); ack[11] = (uint8)DOIP_ECU_TA;
+        ack[12] = 0x10u;
+        FblEth_TcpSend(ack, 13u);
+    }
+    else if(pt == DOIP_PT_DIAG_MSG)
+    {
+        if(payloadLen < 5u) { return; }
+        sa = ((uint16)buf[8] << 8u) | buf[9];
+        ta = ((uint16)buf[10] << 8u) | buf[11];
+        if((sa == DOIP_TESTER_SA) && (ta == DOIP_ECU_TA))
+        {
+            memset(ack, 0, sizeof(ack));
+            Fbl_DoIpHeader(ack, DOIP_PT_DIAG_POS_ACK, 5u);
+            ack[8] = buf[8]; ack[9] = buf[9]; ack[10] = buf[10]; ack[11] = buf[11]; ack[12] = 0x00u;
+            FblEth_TcpSend(ack, 13u);
+            Fbl_UdsDispatch(&buf[12], (uint16)(payloadLen - 4u), FBL_TRANSPORT_ETH);
+        }
+    }
+}
+
+static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen)
+{
+    uint8 buf[1500];
+    Fbl_DoIpHeader(buf, DOIP_PT_DIAG_MSG, (uint32)udsLen + 4u);
+    buf[8] = (uint8)(DOIP_ECU_TA >> 8u); buf[9] = (uint8)DOIP_ECU_TA;
+    buf[10] = (uint8)(DOIP_TESTER_SA >> 8u); buf[11] = (uint8)DOIP_TESTER_SA;
+    memcpy(&buf[12], uds, udsLen);
+    FblEth_TcpSend(buf, (uint16)(udsLen + 12u));
+}
+
+/* ============================== Helpers ============================== */
+static uint8 Fbl_IsRangeValid(uint32 address, uint32 length)
+{
+    uint32 end;
+
+    if(length == 0u) { return 0u; }
+    end = address + length - 1u;
+    if(end < address) { return 0u; }
+
+    if(g_FblUpdateTarget == FBL_UPDATE_TARGET_APP)
+    {
+        return ((address >= APP_START_NCACHED) && (end <= APP_END_NCACHED)) ? 1u : 0u;
+    }
+
+#if FBL_ENABLE_FBL_UPDATE
+    if(g_FblUpdateTarget == FBL_UPDATE_TARGET_FBL)
+    {
+        return ((address >= FBL_START_NCACHED) && (end <= FBL_END_NCACHED)) ? 1u : 0u;
+    }
+#endif
+
+    return 0u;
+}
+
+static uint32 Fbl_ParseU32(const uint8 *p)
+{
+    return ((uint32)p[0] << 24u) | ((uint32)p[1] << 16u) | ((uint32)p[2] << 8u) | (uint32)p[3];
+}
+
+static void Fbl_StoreU32(uint8 *p, uint32 v)
+{
+    p[0] = (uint8)(v >> 24u);
+    p[1] = (uint8)(v >> 16u);
+    p[2] = (uint8)(v >> 8u);
+    p[3] = (uint8)v;
+}

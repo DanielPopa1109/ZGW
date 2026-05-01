@@ -7,6 +7,25 @@
 #include "aurix_pin_mappings.h"
 
 
+/* GPIO pin configuration */
+
+static const IfxPort_Io_ConfigPin gpio_pin_table[] = 
+{
+    IFXCFG_P20_6_IO_CONFIG
+};
+
+static const IfxPort_Io_Config gpio_io_config_table = 
+{
+    sizeof(gpio_pin_table)/sizeof(IfxPort_Io_ConfigPin),
+    (IfxPort_Io_ConfigPin*)gpio_pin_table
+};
+
+extern void gpio_init_pins(void)
+{
+    IfxPort_Io_initModule(&gpio_io_config_table);
+}
+
+
 /* ASCLIN1 pin configuration */
 
 static const IfxPort_Io_ConfigPin asclin1_pin_table[] = 
@@ -64,5 +83,33 @@ static const IfxPort_Io_Config can0_node1_io_config_table =
 extern void can0_node1_init_pins(void)
 {
     IfxPort_Io_initModule(&can0_node1_io_config_table);
+}
+
+
+/* RMII0 pin configuration */
+
+static const IfxPort_Io_ConfigPin rmii0_pin_table[] = 
+{
+    IFXCFG_P11_2_IO_CONFIG,
+    IFXCFG_P11_3_IO_CONFIG,
+    IFXCFG_P11_6_IO_CONFIG,
+    IFXCFG_P11_9_IO_CONFIG,
+    IFXCFG_P11_10_IO_CONFIG,
+    IFXCFG_P11_11_IO_CONFIG,
+    IFXCFG_P11_12_IO_CONFIG,
+    IFXCFG_P14_4_IO_CONFIG,
+    IFXCFG_P21_2_IO_CONFIG,
+    IFXCFG_P21_3_IO_CONFIG
+};
+
+static const IfxPort_Io_Config rmii0_io_config_table = 
+{
+    sizeof(rmii0_pin_table)/sizeof(IfxPort_Io_ConfigPin),
+    (IfxPort_Io_ConfigPin*)rmii0_pin_table
+};
+
+extern void rmii0_init_pins(void)
+{
+    IfxPort_Io_initModule(&rmii0_io_config_table);
 }
 

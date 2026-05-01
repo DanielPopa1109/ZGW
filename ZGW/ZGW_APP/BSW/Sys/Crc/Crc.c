@@ -1,38 +1,39 @@
 #include "Crc.h"
-#include "IfxCpu.h"
 
-fceCrc g_fceCrc2; /* Structure to store information */
+#define CRC32_POLY_REFLECTED (0xEDB88320u)
+#define CRC32_INIT_VALUE     (0xFFFFFFFFu)
 
-void Crc_Init(void);
-uint32 Crc_Calculate(uint32 *crcData, uint16 crcDataLength, uint32 crcStartValue);
-/* Initialization of FCE
- * This function is called from main during initialization phase
- */
-void Crc_Init(void)
+uint32 Crc_CalculateCRC32(const uint8 *Crc_DataPtr,
+                          uint32 Crc_Length,
+                          uint32 Crc_StartValue32,
+                          boolean Crc_IsFirstCall)
 {
-    /* Create FCE module configuration */
-    IfxFce_Crc_Config fceConfig;
-    IfxFce_Crc_initModuleConfig(&fceConfig, &MODULE_FCE);
-    /* Initialize module */
-    IfxFce_Crc_initModule(&g_fceCrc2.fce, &fceConfig);
-    /* Initialize CRC kernel with default configuration */
-    IfxFce_Crc_CrcConfig crcConfig;
-    IfxFce_Crc_initCrcConfig(&crcConfig, &g_fceCrc2.fce);
-    /* Initialize FCE CRC */
-    crcConfig.crcKernel = IfxFce_CrcKernel_0;
-    crcConfig.fceChannelId = IfxDma_ChannelId_1;
-    IfxFce_Crc_initCrc(&g_fceCrc2.fceCrc, &crcConfig);
-}
+    uint32 crc;
+    uint32 i;
+    uint8 bit;
 
-uint32 Crc_Calculate(uint32 *crcData, uint16 crcDataLength, uint32 crcStartValue)
-{
-    uint32 crcRet = 0u;
+    if (Crc_DataPtr == NULL_PTR)
+    {
+        return 0u;
+    }
 
-    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-    crcRet =  IfxFce_Crc_calculateCrc(&g_fceCrc2.fceCrc, crcData, crcDataLength, crcStartValue);
-    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    crc = (Crc_IsFirstCall == TRUE) ? CRC32_INIT_VALUE : (~Crc_StartValue32);
 
-    return crcRet;
+    for (i = 0u; i < Crc_Length; i++)
+    {
+        crc ^= (uint32)Crc_DataPtr[i];
+        for (bit = 0u; bit < 8u; bit++)
+        {
+            if ((crc & 1u) != 0u)
+            {
+                crc = (crc >> 1u) ^ CRC32_POLY_REFLECTED;
+            }
+            else
+            {
+                crc >>= 1u;
+            }
+        }
+    }
+
+    return ~crc;
 }

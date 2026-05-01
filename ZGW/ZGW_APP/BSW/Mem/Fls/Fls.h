@@ -1,13 +1,30 @@
+#ifndef FLS_H
+#define FLS_H
 
-#define DFLASH_PAGE_LENGTH          IFXFLASH_DFLASH_PAGE_LENGTH
-#define DFLASH_STARTING_ADDRESS     0xAF000000u
-#define MEM(address)                *((uint32 *)(address))
-#define FLASH_MODULE                0u
-#define DFLASH_PAGE_LENGTH          IFXFLASH_DFLASH_PAGE_LENGTH
-#define DFLASH_STARTING_ADDRESS     0xAF000000u
-#define DFLASH_SECOND_SECTOR_ADDRESS 0xAF020000U
+#include "Std_Types.h"
+#include "MemIf.h"
+#include "Fls_Cfg.h"
 
-extern void Fls_WriteBlock(uint32 BlockAddress, uint32 *BlockData, uint32 DataLength);
-extern void Fls_ReadBlock(uint32 BlockAddress, uint32 *BlockData, uint32 DataLength);
-extern void Fls_Erase(void);
+typedef uint32 Fls_AddressType;
+typedef uint32 Fls_LengthType;
 
+typedef struct
+{
+    uint32 baseAddress;
+    uint32 totalSize;
+    uint32 sectorSize;
+    uint32 pageSize;
+} Fls_ConfigType;
+
+void Fls_Init(const Fls_ConfigType *ConfigPtr);
+Std_ReturnType Fls_Erase(Fls_AddressType TargetAddress, Fls_LengthType Length);
+Std_ReturnType Fls_Write(Fls_AddressType TargetAddress, const uint8 *SourceAddressPtr, Fls_LengthType Length);
+Std_ReturnType Fls_Read(Fls_AddressType SourceAddress, uint8 *TargetAddressPtr, Fls_LengthType Length);
+void Fls_Cancel(void);
+MemIf_StatusType Fls_GetStatus(void);
+MemIf_JobResultType Fls_GetJobResult(void);
+void Fls_SetMode(MemIf_ModeType Mode);
+void Fls_MainFunction(void);
+uint32 Fls_GetPhysicalAddress(Fls_AddressType Address);
+
+#endif /* FLS_H */

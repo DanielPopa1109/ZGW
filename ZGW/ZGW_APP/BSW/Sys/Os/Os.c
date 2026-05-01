@@ -16,6 +16,24 @@
 #include "task_core0.h"
 #include "task_core1.h"
 #include "task_core2.h"
+#include "CanIf.h"
+#include "CanTp.h"
+#include "Dcm_Cfg.h"
+#include "LinIf.h"
+#include "LinSM.h"
+#include "PduR.h"
+#include "Com.h"
+#include "CanSM.h"
+#include "LinTp.h"
+#include "DoIP.h"
+#include "SoAd.h"
+#include "SomeIp.h"
+#include "SomeIpSd.h"
+#include "TcpIpH.h"
+#include "Fee.h"
+#include "Nvm.h"
+#include "Fls.h"
+#include "Dem.h"
 
 void Os_Init_C0(void);
 void Os_Init_C1(void);
@@ -219,7 +237,16 @@ void ASILD_APPL_MainCycle_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASILD_APPL_MainCycle_Task_C0 && (2u == SysMgr_EcuState || 3u == SysMgr_EcuState))
         {
             Alarm5ms_Flag_ASILD_APPL_MainCycle_Task_C0 = 0u;
-
+            Can_MainFunction();
+            Dcm_MainFunction();
+            CanTp_MainFunction();
+            LinSM_MainFunction();
+            LinIf_MainFunction();
+            LinTp_MainFunction();
+            NvM_MainFunction();
+            Fee_MainFunction();
+            Fls_MainFunction();
+            Dem_MainFunction();
         }
         else
         {
@@ -290,8 +317,6 @@ void QM_BSW_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_QM_BSW_Task_C0 && (2u == SysMgr_EcuState || 3u == SysMgr_EcuState))
         {
             Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
-            Dcm_MainFunction();
-            Can_MainFunction();
         }
         else
         {
@@ -360,6 +385,11 @@ void ASILD_BSW_Task_C2(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASILD_BSW_Task_C2)
         {
             Alarm5ms_Flag_ASILD_BSW_Task_C2 = 0u;
+            TcpIp_MainFunction();
+            SoAd_MainFunction();
+            DoIP_MainFunction(5);
+            SomeIp_MainFunction(5);
+            SomeIpSd_MainFunction(5);
         }
         else
         {

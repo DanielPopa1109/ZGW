@@ -46,11 +46,11 @@ void SysMgr_ProcessResetDtc(void)
                 0xDFDFu != McuSm_LastResetReason &&
                 0u != McuSm_LastResetReason)
         {
-            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 1u, 5u);
+//            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 1u, 5u);
         }
         else
         {
-            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 0u, 5u);
+//            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 0u, 5u);
         }
     }
     else

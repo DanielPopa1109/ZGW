@@ -17,6 +17,18 @@
 #include "SafetyKit_Main.h"
 #include "aurix_pin_mappings.h"
 #include "SCR.h"
+#include "CanIf.h"
+#include "CanTp.h"
+#include "Dcm_Cfg.h"
+#include "LinIf.h"
+#include "LinSM.h"
+#include "PduR.h"
+#include "Com.h"
+#include "CanSM.h"
+#include "LinTp.h"
+#include "EthStack.h"
+#include "Dem.h"
+
 uint8 OsInit_C0 = 0u;
 
 extern void Ssw_StartCores(void);
@@ -27,34 +39,59 @@ void core0_main(void)
     IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+
     IfxScr_init(0u);
     IfxScr_copyProgram();
     IfxScr_disableSCR();
     IfxMtu_clearSram(IfxMtu_MbistSel_scrXram);
     IfxMtu_clearSram(IfxMtu_MbistSel_scrIram);
+
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+
     runSafeAppSwStartup();
-    /* Start core 1 and core 2. */
+
     Ssw_StartCores();
+
     SysMgr_EcuState = SYSMGR_STARTUP;
+
     McuSm_InitializeBusMpu();
+
     Ain_FilteringInit();
-    Crc_Init();
-    //gpio_init_pins();
-    //can0_node0_init_pins();
+
+    gpio_init_pins();
+    can0_node0_init_pins();
+
     Can_Init();
+    CanIf_Init(&CanIf_Config);
+    PduR_Init();
+    Com_Init();
+    CanTp_Init(&CanTp_Config);
+    CanSM_Init();
+    Dcm_Init(&Dcm_Config);
+    LinSM_Init();
+    LinIf_Init();
+    LinTp_Init(1); //todo
+
     Dem_PreInit();
-    Nvm_ReadAll();
-    Dem_Init();
+    NvM_ReadAll();
+    Dem_Init(NULL_PTR);
+
     SysMgr_ProcessResetDtc();
+
     Os_Init_C0();
+
     IfxCpu_enableInterrupts();
+
     OsInit_C0 = 1u;
+
     initCpuWatchdog(0u);
     initSafetyWatchdog();
+
     serviceCpuWatchdog();
     serviceSafetyWatchdog();
+
     initSafetyKit();
+
     vTaskStartScheduler_core0();
 }

@@ -23,14 +23,10 @@ RM := rm -rf
 -include Libraries/iLLD/TC3xx/Tricore/Geth/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Geth/Eth/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Flash/Std/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Fce/Std/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Fce/Crc/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Evadc/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Evadc/Adc/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Dts/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Dts/Dts/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Dma/Std/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Dma/Dma/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Trap/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Irq/subdir.mk
@@ -59,7 +55,10 @@ RM := rm -rf
 -include BSW/Sys/FreeRTOS_core0/subdir.mk
 -include BSW/Sys/Crc/subdir.mk
 -include BSW/Mem/Nvm/subdir.mk
+-include BSW/Mem/MemStack/subdir.mk
+-include BSW/Mem/MemIf/subdir.mk
 -include BSW/Mem/Fls/subdir.mk
+-include BSW/Mem/Fee/subdir.mk
 -include BSW/Io/Irq/subdir.mk
 -include BSW/Io/Ain/subdir.mk
 -include BSW/Diag/Dem/subdir.mk
@@ -137,7 +136,7 @@ all: main-build
 main-build: ZGW_APP.elf secondary-outputs
 
 dependents:
-	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) clean all
+	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) all
 
 # Tool invocations
 ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)/SCR_AURIX_TC3x" makefile $(OPTIONAL_TOOL_DEPS) .ZGW_APP.elf.opt
@@ -148,7 +147,7 @@ ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SD
 	@echo ' '
 
 .ZGW_APP.elf.opt:
-	@argfile .ZGW_APP.elf.opt --lsl-file="../Lcf_Tasking_Tricore_Tc.lsl" -Wl-Oc -Wl-OL -Wl-Ot -Wl-Ox -Wl-Oy -Wl--map-file="ZGW_APP.map" -Wl-mc -Wl-mf -Wl-mi -Wl-mk -Wl-ml -Wl-mm -Wl-md -Wl-mr -Wl-mu --no-warnings= -Wl--error-limit=42 --fp-model=3 -lrt --lsl-core=vtc --exceptions --strict --anachronisms --force-c++ -Ctc37x -o"ZGW_APP.elf" -Wl-o"ZGW_APP.hex:IHEX" $(OBJS)
+	@argfile .ZGW_APP.elf.opt --lsl-file="../Lcf_Tasking_Tricore_Tc.lsl" -Wl-Oc -Wl-OL -Wl-Ot -Wl-Ox -Wl-Oy -Wl--map-file="ZGW_APP.map" -Wl-mc -Wl-mf -Wl-mi -Wl-mk -Wl-ml -Wl-mm -Wl-md -Wl-mn -Wl-mo -Wl-mq -Wl-mr -Wl-ms -Wl-mu --no-warnings= -Wl--error-limit=42 --fp-model=3 -lrt --lsl-core=vtc --exceptions --strict --anachronisms --force-c++ -Ctc37x -o"ZGW_APP.elf" -Wl-o"ZGW_APP.hex:IHEX" $(OBJS)
 
 .PHONY: .ZGW_APP.elf.opt
 

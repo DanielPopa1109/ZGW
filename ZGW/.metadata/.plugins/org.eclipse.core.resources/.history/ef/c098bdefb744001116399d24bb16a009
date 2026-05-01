@@ -1,0 +1,272 @@
+/* Fbl_RamUpdater.c - AURIX TC375 PSPR/RAM flash updater
+ * This file must be linked/copied to PSPR/RAM or its callable flash-critical
+ * functions must be copied to PSPR before use.
+ * No interrupts are allowed while erase/program is active.
+ */
+
+#include <string.h>
+#include "Ifx_Types.h"
+#include "IfxCpu.h"
+#include "IfxFlash.h"
+#include "IfxScuWdt.h"
+#include "IfxScuRcu.h"
+
+#define FLASH_MODULE                     0u
+#define PROGRAM_FLASH_BANK_A             3u
+#define PROGRAM_FLASH_BANK_B             4u
+
+#define PFLASH_BANK_A_START              0xA0000000u
+#define PFLASH_BANK_A_END                0xA03FFFFFu
+#define PFLASH_BANK_B_START              0xA0400000u
+#define PFLASH_BANK_B_END                0xA07FFFFFu
+#define PFLASH_PAGE_SIZE                 32u
+#define PFLASH_SECTOR_SIZE               0x4000u
+
+#define FBL_START_NCACHED                0xA0000000u
+#define FBL_END_NCACHED                  0xA001FFFFu
+#define APP_START_NCACHED                0xA0020000u
+#define APP_END_NCACHED                  0xA07FFFFFu
+
+#define RELOCATION_START_ADDR            0x70100000u
+#define ERASESECTOR_LEN                  160u
+#define WAITUNBUSY_LEN                   160u
+#define ENTERPAGEMODE_LEN                160u
+#define LOADPAGE2X32_LEN                 160u
+#define WRITEPAGE_LEN                    160u
+
+#define ERASESECTOR_ADDR                 (RELOCATION_START_ADDR)
+#define WAITUNBUSY_ADDR                  (ERASESECTOR_ADDR + ERASESECTOR_LEN)
+#define ENTERPAGEMODE_ADDR               (WAITUNBUSY_ADDR + WAITUNBUSY_LEN)
+#define LOAD2X32_ADDR                    (ENTERPAGEMODE_ADDR + ENTERPAGEMODE_LEN)
+#define WRITEPAGE_ADDR                   (LOAD2X32_ADDR + LOADPAGE2X32_LEN)
+
+typedef struct
+{
+    void (*eraseSectors)(uint32 sectorAddr, uint32 numSector);
+    uint8 (*waitUnbusy)(uint32 flash, IfxFlash_FlashType flashType);
+    uint8 (*enterPageMode)(uint32 pageAddr);
+    void (*load2X32bits)(uint32 pageAddr, uint32 wordL, uint32 wordU);
+    void (*writePage)(uint32 pageAddr);
+} FblFlashCommandType;
+
+static FblFlashCommandType g_cmd;
+static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
+static uint32 g_pageBufAddr = 0xFFFFFFFFu;
+static uint32 g_pageBufFill = 0u;
+
+static IfxFlash_FlashType FblRam_GetBank(uint32 address);
+static uint32 FblRam_AlignDown(uint32 value, uint32 align);
+static uint32 FblRam_AlignUp(uint32 value, uint32 align);
+static uint32 FblRam_ReadU32Le(const uint8 *p);
+static uint32 FblRam_FlushPage(void);
+static uint32 FblRam_ProgramPage(uint32 pageAddress, const uint8 *pageData);
+
+void FblRamUpdater_Init(void)
+{
+    memcpy((void *)ERASESECTOR_ADDR, (const void *)IfxFlash_eraseMultipleSectors, ERASESECTOR_LEN);
+    g_cmd.eraseSectors = (void *)ERASESECTOR_ADDR;
+
+    memcpy((void *)WAITUNBUSY_ADDR, (const void *)IfxFlash_waitUnbusy, WAITUNBUSY_LEN);
+    g_cmd.waitUnbusy = (void *)WAITUNBUSY_ADDR;
+
+    memcpy((void *)ENTERPAGEMODE_ADDR, (const void *)IfxFlash_enterPageMode, ENTERPAGEMODE_LEN);
+    g_cmd.enterPageMode = (void *)ENTERPAGEMODE_ADDR;
+
+    memcpy((void *)LOAD2X32_ADDR, (const void *)IfxFlash_loadPage2X32, LOADPAGE2X32_LEN);
+    g_cmd.load2X32bits = (void *)LOAD2X32_ADDR;
+
+    memcpy((void *)WRITEPAGE_ADDR, (const void *)IfxFlash_writePage, WRITEPAGE_LEN);
+    g_cmd.writePage = (void *)WRITEPAGE_ADDR;
+
+    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    g_pageBufAddr = 0xFFFFFFFFu;
+    g_pageBufFill = 0u;
+}
+
+uint32 FblRamUpdater_EraseRange(uint32 startAddress, uint32 lengthBytes)
+{
+    uint32 eraseStart;
+    uint32 eraseEnd;
+    uint32 sectorCount;
+    uint16 pw;
+    boolean irqState;
+    IfxFlash_FlashType bank;
+
+    if(lengthBytes == 0u) { return 1u; }
+
+    eraseStart = FblRam_AlignDown(startAddress, PFLASH_SECTOR_SIZE);
+    eraseEnd = FblRam_AlignUp(startAddress + lengthBytes, PFLASH_SECTOR_SIZE);
+    sectorCount = (eraseEnd - eraseStart) / PFLASH_SECTOR_SIZE;
+    bank = FblRam_GetBank(eraseStart);
+
+    irqState = IfxCpu_disableInterrupts();
+    pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
+    IfxScuWdt_clearSafetyEndinitInline(pw);
+    g_cmd.eraseSectors(eraseStart, sectorCount);
+    IfxScuWdt_setSafetyEndinitInline(pw);
+    g_cmd.waitUnbusy(FLASH_MODULE, bank);
+    IfxCpu_restoreInterrupts(irqState);
+
+    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    g_pageBufAddr = 0xFFFFFFFFu;
+    g_pageBufFill = 0u;
+    return 0u;
+}
+
+uint32 FblRamUpdater_Program(uint32 address, const uint8 *data, uint32 length)
+{
+    uint32 i;
+    uint32 pageAddr;
+    uint32 offset;
+
+    for(i = 0u; i < length; i++)
+    {
+        pageAddr = FblRam_AlignDown(address + i, PFLASH_PAGE_SIZE);
+        offset = (address + i) - pageAddr;
+
+        if(g_pageBufAddr == 0xFFFFFFFFu)
+        {
+            g_pageBufAddr = pageAddr;
+            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            g_pageBufFill = 0u;
+        }
+        else if(g_pageBufAddr != pageAddr)
+        {
+            if(FblRam_FlushPage() != 0u) { return 1u; }
+            g_pageBufAddr = pageAddr;
+            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            g_pageBufFill = 0u;
+        }
+
+        g_pageBuf[offset] = data[i];
+        if((offset + 1u) > g_pageBufFill)
+        {
+            g_pageBufFill = offset + 1u;
+        }
+
+        if(g_pageBufFill >= PFLASH_PAGE_SIZE)
+        {
+            if(FblRam_FlushPage() != 0u) { return 1u; }
+        }
+    }
+
+    return 0u;
+}
+
+uint32 FblRamUpdater_Crc32(uint32 address, uint32 lengthBytes)
+{
+    uint32 crc = 0xFFFFFFFFu;
+    uint32 i;
+    uint8 byte;
+    uint8 bit;
+    volatile const uint8 *p = (volatile const uint8 *)address;
+
+    (void)FblRam_FlushPage();
+
+    for(i = 0u; i < lengthBytes; i++)
+    {
+        byte = p[i];
+        crc ^= byte;
+        for(bit = 0u; bit < 8u; bit++)
+        {
+            if((crc & 1u) != 0u)
+            {
+                crc = (crc >> 1u) ^ 0xEDB88320u;
+            }
+            else
+            {
+                crc >>= 1u;
+            }
+        }
+    }
+
+    return crc ^ 0xFFFFFFFFu;
+}
+
+void FblRamUpdater_JumpToApplication(uint32 appStartAddress)
+{
+    IfxCpu_disableInterrupts();
+
+    __asm("isync");
+    __asm("mov.aa a15,%0" : : "a" (appStartAddress));
+    __asm("ji a15");
+}
+
+void FblRamUpdater_Reset(void)
+{
+    IfxCpu_disableInterrupts();
+    IfxScuRcu_performReset(2u, 0u);
+    while(1) {}
+}
+
+static uint32 FblRam_FlushPage(void)
+{
+    uint32 ret = 0u;
+
+    if(g_pageBufAddr != 0xFFFFFFFFu)
+    {
+        ret = FblRam_ProgramPage(g_pageBufAddr, g_pageBuf);
+        g_pageBufAddr = 0xFFFFFFFFu;
+        g_pageBufFill = 0u;
+        memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    }
+
+    return ret;
+}
+
+static uint32 FblRam_ProgramPage(uint32 pageAddress, const uint8 *pageData)
+{
+    uint32 w[8];
+    uint16 pw;
+    boolean irqState;
+    IfxFlash_FlashType bank;
+
+    bank = FblRam_GetBank(pageAddress);
+
+    for(uint32 i = 0u; i < 8u; i++)
+    {
+        w[i] = FblRam_ReadU32Le(&pageData[i * 4u]);
+    }
+
+    irqState = IfxCpu_disableInterrupts();
+    pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
+    IfxScuWdt_clearSafetyEndinitInline(pw);
+
+    g_cmd.enterPageMode(pageAddress);
+    g_cmd.waitUnbusy(FLASH_MODULE, bank);
+    g_cmd.load2X32bits(pageAddress, w[0], w[1]);
+    g_cmd.load2X32bits(pageAddress, w[2], w[3]);
+    g_cmd.load2X32bits(pageAddress, w[4], w[5]);
+    g_cmd.load2X32bits(pageAddress, w[6], w[7]);
+    g_cmd.writePage(pageAddress);
+    g_cmd.waitUnbusy(FLASH_MODULE, bank);
+
+    IfxScuWdt_setSafetyEndinitInline(pw);
+    IfxCpu_restoreInterrupts(irqState);
+
+    return 0u;
+}
+
+static IfxFlash_FlashType FblRam_GetBank(uint32 address)
+{
+    if((address >= PFLASH_BANK_B_START) && (address <= PFLASH_BANK_B_END))
+    {
+        return (IfxFlash_FlashType)PROGRAM_FLASH_BANK_B;
+    }
+    return (IfxFlash_FlashType)PROGRAM_FLASH_BANK_A;
+}
+
+static uint32 FblRam_AlignDown(uint32 value, uint32 align)
+{
+    return value & ~(align - 1u);
+}
+
+static uint32 FblRam_AlignUp(uint32 value, uint32 align)
+{
+    return (value + align - 1u) & ~(align - 1u);
+}
+
+static uint32 FblRam_ReadU32Le(const uint8 *p)
+{
+    return ((uint32)p[0]) | ((uint32)p[1] << 8u) | ((uint32)p[2] << 16u) | ((uint32)p[3] << 24u);
+}

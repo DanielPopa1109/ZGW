@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="Lin_CalcChecksum"/>
+		<item key="selection" value="__ram_code_start"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="Lin_CalcChecksum"/>
-			<item value="Lin_LowLevel_EnableRx"/>
-			<item value="Lin_LowLevel_SendByte"/>
-			<item value="Lin_LowLevel_SendBreak"/>
-			<item value="LINSM_GOTO_SLEEP"/>
-			<item value="LinSM_MainFunction"/>
-			<item value="LinIf_State.busy = TRUE;"/>
-			<item value="if (LinIf_State.busy == TRUE)"/>
-			<item value="LinIf_MainFunction"/>
-			<item value="LinIf_State.diagState = LINIF_DIAG_ERROR;"/>
-			<item value="LinIf_DiagFrameDone(FALSE)"/>
-			<item value="LinIf_DiagFrameDone"/>
-			<item value="LinIf_SetDiagRequest"/>
-			<item value="Lin_Wakeup"/>
-			<item value="Lin_IsrTxDone"/>
+			<item value="__ram_code_start"/>
+			<item value="ram"/>
+			<item value="RAM_CODE_GROUP "/>
+			<item value="ram_buff"/>
+			<item value="linear"/>
+			<item value="mpe:vtc:linear"/>
+			<item value="BootManager_PFLASH"/>
+			<item value="psram0"/>
+			<item value="code_psram0"/>
+			<item value="interface_const "/>
+			<item value="fill"/>
+			<item value="LCF_INTVEC0_START"/>
+			<item value="LCF_STARTPTR_CPU0"/>
+			<item value="LCF_STARTPTR_CPU0    "/>
+			<item value="Ram_EraseRange"/>
 		</list>
 		<list key="replacehistory">
 		</list>
 	</section>
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
-		<item key="DIALOG_X_ORIGIN" value="807"/>
+		<item key="DIALOG_X_ORIGIN" value="645"/>
 		<item key="DIALOG_Y_ORIGIN" value="264"/>
 		<item key="DIALOG_WIDTH" value="322"/>
 		<item key="DIALOG_HEIGHT" value="391"/>

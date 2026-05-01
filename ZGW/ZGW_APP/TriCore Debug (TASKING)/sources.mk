@@ -51,7 +51,10 @@ BSW/Diag/Dcm \
 BSW/Diag/Dem \
 BSW/Io/Ain \
 BSW/Io/Irq \
+BSW/Mem/Fee \
 BSW/Mem/Fls \
+BSW/Mem/MemIf \
+BSW/Mem/MemStack \
 BSW/Mem/Nvm \
 BSW/Sys/Crc \
 BSW/Sys/FreeRTOS_core0 \
@@ -81,14 +84,10 @@ Libraries/iLLD/TC3xx/Tricore/Can/Std \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Irq \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Std \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Trap \
-Libraries/iLLD/TC3xx/Tricore/Dma/Dma \
-Libraries/iLLD/TC3xx/Tricore/Dma/Std \
 Libraries/iLLD/TC3xx/Tricore/Dts/Dts \
 Libraries/iLLD/TC3xx/Tricore/Dts/Std \
 Libraries/iLLD/TC3xx/Tricore/Evadc/Adc \
 Libraries/iLLD/TC3xx/Tricore/Evadc/Std \
-Libraries/iLLD/TC3xx/Tricore/Fce/Crc \
-Libraries/iLLD/TC3xx/Tricore/Fce/Std \
 Libraries/iLLD/TC3xx/Tricore/Flash/Std \
 Libraries/iLLD/TC3xx/Tricore/Geth/Eth \
 Libraries/iLLD/TC3xx/Tricore/Geth/Std \

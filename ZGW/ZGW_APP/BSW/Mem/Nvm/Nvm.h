@@ -1,41 +1,49 @@
-#include "Ifx_Types.h"
+#ifndef NVM_H
+#define NVM_H
 
-#define NVM_NO_BLOCKS               5U //+1, first is not used
-#define NVM_SIZE_HEADER_BYTES       8U // Data-flash write done in 8 bytes at a time
+#include "Std_Types.h"
+#include "MemIf.h"
+#include "NvM_Cfg.h"
+#include "MemStack_Error.h"
+
+typedef enum
+{
+    NVM_REQ_OK = 0,
+    NVM_REQ_NOT_OK,
+    NVM_REQ_PENDING,
+    NVM_REQ_INTEGRITY_FAILED,
+    NVM_REQ_BLOCK_SKIPPED,
+    NVM_REQ_NV_INVALIDATED,
+    NVM_REQ_RESTORED_FROM_ROM
+} NvM_RequestResultType;
+
+typedef enum
+{
+    NVM_UNINIT = 0,
+    NVM_IDLE,
+    NVM_BUSY,
+    NVM_BUSY_INTERNAL
+} NvM_StatusType;
 
 typedef struct
 {
-        uint8 blockId;
-        uint16 blockSize;
-        uint8 padding1;
-        uint32 padding2;
-}Nvm_Header_t;
+    const NvM_BlockDescriptorType *blockDescriptor;
+    uint16 blockCount;
+} NvM_ConfigType;
 
-typedef struct
-{
-        uint16 blockSize;
-        uint32 blockAddress;
-        uint16 padding1;
-}Nvm_NvStat_t;
+void NvM_Init(const NvM_ConfigType *ConfigPtr);
+Std_ReturnType NvM_ReadBlock(NvM_BlockIdType BlockId, void *NvM_DstPtr);
+Std_ReturnType NvM_WriteBlock(NvM_BlockIdType BlockId, const void *NvM_SrcPtr);
+Std_ReturnType NvM_RestoreBlockDefaults(NvM_BlockIdType BlockId, void *NvM_DestPtr);
+Std_ReturnType NvM_EraseNvBlock(NvM_BlockIdType BlockId);
+Std_ReturnType NvM_InvalidateNvBlock(NvM_BlockIdType BlockId);
+Std_ReturnType NvM_ReadAll(void);
+Std_ReturnType NvM_WriteAll(void);
+Std_ReturnType NvM_CancelJobs(void);
+Std_ReturnType NvM_SetRamBlockStatus(NvM_BlockIdType BlockId, boolean BlockChanged);
+Std_ReturnType NvM_GetErrorStatus(NvM_BlockIdType BlockId, NvM_RequestResultType *RequestResultPtr);
+NvM_StatusType NvM_GetStatus(void);
+void NvM_MainFunction(void);
+void NvM_SetErrorCallback(MemStack_ErrorCallbackType callback);
 
-typedef struct
-{
-        uint32* data;
-        uint32 crc;
-}Nvm_Block_t;
-
-extern uint32 Nvm_CurrentAddress;
-extern uint32 Nvm_SectorSwitchActivated;
-extern uint32 Nvm_CurrentSector;
-extern Nvm_Header_t Nvm_HeaderArr[NVM_NO_BLOCKS];
-extern Nvm_NvStat_t Nvm_NvStatArr[NVM_NO_BLOCKS];
-extern Nvm_Block_t Nvm_BlockDataList[NVM_NO_BLOCKS];
-extern Nvm_Block_t Nvm_RomDefaults_BlockDataList[NVM_NO_BLOCKS];
-extern uint8 Nvm_WriteAllFinished;
-extern uint8 Nvm_ReadAllFinished;
-
-extern void Nvm_SectorSwitch(void);
-extern void Nvm_WriteBlock(uint16 blockId, uint32 *data);
-extern void Nvm_FindCurrentAddress();
-extern void Nvm_ReadAll(void);
-extern void Nvm_WriteAll(void);
+#endif /* NVM_H */

@@ -41,21 +41,3 @@ void EthStack_Init(void)
 
     EthStack_Initialized = 1u;
 }
-
-void EthStack_Task(void *arg)
-{
-    (void)arg;
-
-    EthStack_Init();
-
-    for (;;)
-    {
-        TcpIp_MainFunction();
-        SoAd_MainFunction();
-        DoIP_MainFunction(5u);
-        SomeIp_MainFunction(5u);
-        SomeIpSd_MainFunction(5u);
-
-        vTaskDelay_core2(pdMS_TO_TICKS_core2(5u));
-    }
-}

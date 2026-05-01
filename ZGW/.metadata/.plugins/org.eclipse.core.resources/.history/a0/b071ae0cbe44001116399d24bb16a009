@@ -1,0 +1,996 @@
+#include <string.h>
+#include "Ifx_Types.h"
+#include "IfxCpu.h"
+#include "IfxScuWdt.h"
+#include "IfxScuRcu.h"
+#include "IfxFlash.h"
+#include "IfxCan_Can.h"
+#include "aurix_pin_mappings.h"
+
+#define FBL_TRANSPORT_CANFD              1u
+#define FBL_TRANSPORT_ETH                2u
+
+#define FBL_START_NCACHED                0xA0000000u
+#define FBL_END_NCACHED                  0xA001FFFFu
+#define FBL_SIZE_BYTES                   0x00020000u
+
+#define FBL_IMAGE_RAM_ADDR               0xB0100000u
+#define FBL_IMAGE_RAM_SIZE               FBL_SIZE_BYTES
+
+#define PFLASH_BANK_A_START              0xA0000000u
+#define PFLASH_BANK_A_END                0xA03FFFFFu
+#define PFLASH_BANK_B_START              0xA0400000u
+#define PFLASH_BANK_B_END                0xA07FFFFFu
+
+#define PFLASH_PAGE_SIZE                 32u
+#define PFLASH_SECTOR_SIZE               0x4000u
+
+#define FLASH_MODULE                     0u
+#define PROGRAM_FLASH_BANK_A             IfxFlash_FlashType_P0
+#define PROGRAM_FLASH_BANK_B             IfxFlash_FlashType_P1
+
+#define FBL_CAN_REQ_ID                   0x710u
+#define FBL_CAN_RES_ID                   0x709u
+#define FBL_CAN_RX_PRIO                  2u
+#define FBL_CAN_MAX_DL                   64u
+#define FBL_ISOTP_MAX_PAYLOAD            4095u
+
+#define UDS_SID_SESSION                  0x10u
+#define UDS_SID_RESET                    0x11u
+#define UDS_SID_ROUTINE                  0x31u
+#define UDS_SID_REQ_DOWNLOAD             0x34u
+#define UDS_SID_TRANSFER_DATA            0x36u
+#define UDS_SID_TRANSFER_EXIT            0x37u
+#define UDS_NEG_RESP                     0x7Fu
+
+#define UDS_NRC_INCORRECT_LEN            0x13u
+#define UDS_NRC_COND_NOT_CORRECT         0x22u
+#define UDS_NRC_OUT_OF_RANGE             0x31u
+#define UDS_NRC_TRANSFER_FAIL            0x70u
+#define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
+
+#define UDS_RID_COMMIT_FBL               0x0156u
+
+#define DOIP_PROTO_VER                   0x02u
+#define DOIP_INV_PROTO_VER               0xFDu
+#define DOIP_PT_VID_REQ                  0x0001u
+#define DOIP_PT_VID_RES                  0x0004u
+#define DOIP_PT_ROUTING_ACT_REQ          0x0005u
+#define DOIP_PT_ROUTING_ACT_RES          0x0006u
+#define DOIP_PT_DIAG_MSG                 0x8001u
+#define DOIP_PT_DIAG_ACK                 0x8002u
+#define DOIP_TESTER_ADDR                 0x0E00u
+#define DOIP_ECU_ADDR                    0x1000u
+
+#define RAM_FLASH_FUNC_BASE              0x70100000u
+#define RAM_FLASH_FUNC_LEN               192u
+#define RAM_FLASH_ERASE_ADDR             (RAM_FLASH_FUNC_BASE)
+#define RAM_FLASH_WAIT_ADDR              (RAM_FLASH_ERASE_ADDR + RAM_FLASH_FUNC_LEN)
+#define RAM_FLASH_ENTER_ADDR             (RAM_FLASH_WAIT_ADDR + RAM_FLASH_FUNC_LEN)
+#define RAM_FLASH_LOAD_ADDR              (RAM_FLASH_ENTER_ADDR + RAM_FLASH_FUNC_LEN)
+#define RAM_FLASH_WRITE_ADDR             (RAM_FLASH_LOAD_ADDR + RAM_FLASH_FUNC_LEN)
+#define RAM_RESET_FUNC_ADDR              (RAM_FLASH_WRITE_ADDR + RAM_FLASH_FUNC_LEN)
+
+extern volatile uint32 g_FblTransportSelect;
+
+extern void FblEth_Init(void);
+extern void FblEth_MainFunction(void);
+extern uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len);
+extern uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len);
+extern void FblEth_TcpSend(const uint8 *buf, uint16 len);
+extern void FblEth_UdpSend(const uint8 *buf, uint16 len);
+
+typedef struct
+{
+    IfxCan_Can_Config canConfig;
+    IfxCan_Can canModule;
+    IfxCan_Can_Node canNode;
+    IfxCan_Can_NodeConfig nodeConfig;
+    IfxCan_Filter filter;
+    IfxCan_Message rxMsg;
+    IfxCan_Message txMsg;
+    uint8 rxData[FBL_CAN_MAX_DL];
+    uint8 txData[FBL_CAN_MAX_DL];
+} RamCan_Type;
+
+typedef struct
+{
+    uint8 rxBuf[FBL_ISOTP_MAX_PAYLOAD];
+    uint16 rxLen;
+    uint16 rxIdx;
+    uint8 nextSn;
+    uint8 rxReady;
+} RamIso_Type;
+
+typedef struct
+{
+    void (*eraseSectors)(uint32 sectorAddr, uint32 numSector);
+    uint8 (*waitUnbusy)(uint32 flash, IfxFlash_FlashType flashType);
+    uint8 (*enterPageMode)(uint32 pageAddr);
+    void (*load2X32)(uint32 pageAddr, uint32 wordL, uint32 wordU);
+    void (*writePage)(uint32 pageAddr);
+    void (*reset)(uint8 resetType, uint16 userInfo);
+} RamFlashCmd_Type;
+
+typedef struct
+{
+    uint8 active;
+    uint32 targetAddr;
+    uint32 length;
+    uint32 received;
+    uint32 expectedCrc;
+    uint8 expectedCrcValid;
+    uint8 nextBlock;
+} RamDownload_Type;
+
+static RamCan_Type g_can;
+static RamIso_Type g_iso;
+static RamFlashCmd_Type g_cmd;
+static RamDownload_Type g_dl;
+static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
+static uint32 g_pageAddr = 0xFFFFFFFFu;
+static uint32 g_pageFill = 0u;
+
+IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
+
+static void Ram_CanInit(void);
+static void Ram_CanSend(const uint8 *data, uint8 len);
+static uint8 Ram_DlcFromLen(uint8 len);
+static uint8 Ram_LenFromDlc(uint8 dlc);
+static void Ram_IsoRx(const uint8 *data, uint8 len);
+static void Ram_IsoSend(const uint8 *data, uint16 len);
+static void Ram_IsoSendFc(void);
+static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
+static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport);
+static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
+static void Ram_DoIpMain(void);
+static void Ram_DoIpUdp(const uint8 *buf, uint16 len);
+static void Ram_DoIpTcp(const uint8 *buf, uint16 len);
+static void Ram_DoIpSendDiag(const uint8 *uds, uint16 udsLen);
+static void Ram_FlashInit(void);
+static uint32 Ram_CommitFblImage(void);
+static uint32 Ram_EraseRange(uint32 addr, uint32 len);
+static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len);
+static uint32 Ram_FlushPage(void);
+static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data);
+static IfxFlash_FlashType Ram_Bank(uint32 addr);
+static uint32 Ram_Crc32(uint32 addr, uint32 len);
+static uint8 Ram_FblRangeValid(uint32 addr, uint32 len);
+static uint32 Ram_Rd32(const uint8 *p);
+static uint16 Ram_Rd16(const uint8 *p);
+static void Ram_Wr16(uint8 *p, uint16 v);
+static void Ram_Wr32(uint8 *p, uint32 v);
+static void Ram_Reset(void);
+
+void FblRamUpdater_Entry(void)
+{
+    IfxCpu_disableInterrupts();
+
+    Ram_FlashInit();
+
+    memset(&g_iso, 0u, sizeof(g_iso));
+    memset(&g_dl, 0u, sizeof(g_dl));
+    memset((void *)FBL_IMAGE_RAM_ADDR, 0x36, FBL_IMAGE_RAM_SIZE);
+
+    IfxCpu_enableInterrupts();
+
+    if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
+    {
+        FblEth_Init();
+    }
+    else
+    {
+        g_FblTransportSelect = FBL_TRANSPORT_CANFD;
+        Ram_CanInit();
+    }
+
+    while(1)
+    {
+        if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
+        {
+            Ram_DoIpMain();
+        }
+
+        if(g_iso.rxReady != 0u)
+        {
+            g_iso.rxReady = 0u;
+            Ram_UdsHandle(g_iso.rxBuf, g_iso.rxLen, FBL_TRANSPORT_CANFD);
+        }
+    }
+}
+
+static void Ram_CanInit(void)
+{
+    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+
+    can0_node0_init_pins();
+
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN0);
+    IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
+    IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
+
+    IfxScuCcu_setMcanFrequency(40000000.0f);
+
+    g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
+    g_can.nodeConfig.baudRate.baudrate = 500000u;
+    g_can.nodeConfig.baudRate.prescaler = 3u;
+    g_can.nodeConfig.baudRate.timeSegment1 = 14u;
+    g_can.nodeConfig.baudRate.timeSegment2 = 3u;
+    g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
+    g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
+    g_can.nodeConfig.fastBaudRate.prescaler = 1u;
+    g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
+    g_can.nodeConfig.fastBaudRate.timeSegment2 = 5u;
+    g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+    g_can.nodeConfig.calculateBitTimingValues = FALSE;
+
+    g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
+    g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
+    g_can.nodeConfig.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
+
+    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_dedicatedBuffers;
+    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
+
+    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_can.nodeConfig.filterConfig.standardListSize = 1u;
+    g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
+    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
+
+    g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
+    g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_PRIO;
+    g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
+    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0;
+
+    g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x000u;
+    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x100u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0x500u;
+
+    IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
+
+    g_can.filter.number = 0u;
+    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+    g_can.filter.id1 = FBL_CAN_REQ_ID;
+    g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
+    IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
+
+    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+
+    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+}
+
+void FblRam_CanRxIsr(void)
+{
+    uint8 len;
+
+    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_messageStoredToDedicatedRxBuffer);
+    g_can.rxMsg.bufferNumber = 0u;
+
+    if(IfxCan_Can_isNewDataReceived(&g_can.canNode, 0u) != 0u)
+    {
+        IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32 *)g_can.rxData);
+
+        if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
+        {
+            len = Ram_LenFromDlc((uint8)g_can.rxMsg.dataLengthCode);
+            Ram_IsoRx(g_can.rxData, len);
+        }
+
+        IfxCan_Node_clearRxBufferNewDataFlag(g_can.canNode.node, 0u);
+    }
+}
+
+static void Ram_CanSend(const uint8 *data, uint8 len)
+{
+    memset(g_can.txData, 0u, sizeof(g_can.txData));
+    memcpy(g_can.txData, data, len);
+
+    IfxCan_Can_initMessage(&g_can.txMsg);
+    g_can.txMsg.messageId = FBL_CAN_RES_ID;
+    g_can.txMsg.frameMode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_can.txMsg.dataLengthCode = Ram_DlcFromLen(len);
+    g_can.txMsg.bufferNumber = 0u;
+
+    while(IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32 *)g_can.txData) == IfxCan_Status_notSentBusy)
+    {
+    }
+}
+
+static uint8 Ram_DlcFromLen(uint8 len)
+{
+    if(len <= 8u) { return len; }
+    if(len <= 12u) { return 9u; }
+    if(len <= 16u) { return 10u; }
+    if(len <= 20u) { return 11u; }
+    if(len <= 24u) { return 12u; }
+    if(len <= 32u) { return 13u; }
+    if(len <= 48u) { return 14u; }
+    return 15u;
+}
+
+static uint8 Ram_LenFromDlc(uint8 dlc)
+{
+    static const uint8 map[16] = {0u,1u,2u,3u,4u,5u,6u,7u,8u,12u,16u,20u,24u,32u,48u,64u};
+    return map[dlc & 0x0Fu];
+}
+
+static void Ram_IsoSendFc(void)
+{
+    uint8 fc[3] = {0x30u, 0x00u, 0x00u};
+    Ram_CanSend(fc, 3u);
+}
+
+static void Ram_IsoRx(const uint8 *data, uint8 len)
+{
+    uint8 pci;
+    uint16 ffLen;
+    uint8 copy;
+    uint8 sn;
+
+    if(len == 0u) { return; }
+
+    pci = data[0u] & 0xF0u;
+
+    if(pci == 0x00u)
+    {
+        uint8 sfLen = data[0u] & 0x0Fu;
+        uint8 off = 1u;
+
+        if(sfLen == 0u)
+        {
+            if(len < 2u) { return; }
+            sfLen = data[1u];
+            off = 2u;
+        }
+
+        if((sfLen <= (len - off)) && (sfLen <= FBL_ISOTP_MAX_PAYLOAD))
+        {
+            memcpy(g_iso.rxBuf, &data[off], sfLen);
+            g_iso.rxLen = sfLen;
+            g_iso.rxReady = 1u;
+        }
+    }
+    else if(pci == 0x10u)
+    {
+        ffLen = (((uint16)(data[0u] & 0x0Fu)) << 8u) | data[1u];
+
+        if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
+
+        copy = (uint8)(len - 2u);
+        if(copy > ffLen) { copy = (uint8)ffLen; }
+
+        memcpy(g_iso.rxBuf, &data[2u], copy);
+        g_iso.rxLen = ffLen;
+        g_iso.rxIdx = copy;
+        g_iso.nextSn = 1u;
+        Ram_IsoSendFc();
+    }
+    else if(pci == 0x20u)
+    {
+        sn = data[0u] & 0x0Fu;
+
+        if(sn != g_iso.nextSn) { return; }
+
+        copy = (uint8)(len - 1u);
+        if((g_iso.rxIdx + copy) > g_iso.rxLen)
+        {
+            copy = (uint8)(g_iso.rxLen - g_iso.rxIdx);
+        }
+
+        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[1u], copy);
+        g_iso.rxIdx += copy;
+        g_iso.nextSn = (uint8)((g_iso.nextSn + 1u) & 0x0Fu);
+
+        if(g_iso.rxIdx >= g_iso.rxLen)
+        {
+            g_iso.rxReady = 1u;
+        }
+    }
+}
+
+static void Ram_IsoSend(const uint8 *data, uint16 len)
+{
+    uint8 frame[64];
+    uint8 chunk;
+    uint16 idx;
+    uint8 sn;
+
+    if(len <= 7u)
+    {
+        memset(frame, 0u, sizeof(frame));
+        frame[0u] = (uint8)len;
+        memcpy(&frame[1u], data, len);
+        Ram_CanSend(frame, (uint8)(len + 1u));
+        return;
+    }
+
+    memset(frame, 0u, sizeof(frame));
+    frame[0u] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
+    frame[1u] = (uint8)(len & 0xFFu);
+    chunk = 62u;
+    memcpy(&frame[2u], data, chunk);
+    Ram_CanSend(frame, 64u);
+
+    idx = chunk;
+    sn = 1u;
+
+    while(idx < len)
+    {
+        memset(frame, 0u, sizeof(frame));
+        frame[0u] = (uint8)(0x20u | (sn & 0x0Fu));
+
+        chunk = 63u;
+        if((idx + chunk) > len)
+        {
+            chunk = (uint8)(len - idx);
+        }
+
+        memcpy(&frame[1u], &data[idx], chunk);
+        Ram_CanSend(frame, (uint8)(chunk + 1u));
+        idx += chunk;
+        sn = (uint8)((sn + 1u) & 0x0Fu);
+    }
+}
+
+static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
+{
+    uint8 res[64];
+    uint8 sid;
+    uint32 addr;
+    uint32 size;
+    uint16 dataLen;
+    uint16 rid;
+    uint8 *img;
+
+    if(len == 0u) { return; }
+    sid = req[0u];
+    img = (uint8 *)FBL_IMAGE_RAM_ADDR;
+
+    if(sid == UDS_SID_SESSION)
+    {
+        if(len < 2u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        res[0u] = 0x50u;
+        res[1u] = req[1u];
+        res[2u] = 0x00u;
+        res[3u] = 0x32u;
+        res[4u] = 0x01u;
+        res[5u] = 0xF4u;
+        Ram_UdsSend(res, 6u, transport);
+    }
+    else if(sid == UDS_SID_REQ_DOWNLOAD)
+    {
+        if((len < 12u) || (req[3u] != 0x44u))
+        {
+            Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        addr = Ram_Rd32(&req[4u]);
+        size = Ram_Rd32(&req[8u]);
+
+        if(Ram_FblRangeValid(addr, size) == 0u)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+            return;
+        }
+
+        memset(img, 0x36, FBL_IMAGE_RAM_SIZE);
+
+        g_dl.active = 1u;
+        g_dl.targetAddr = addr;
+        g_dl.length = size;
+        g_dl.received = 0u;
+        g_dl.expectedCrcValid = 0u;
+        g_dl.expectedCrc = 0u;
+        g_dl.nextBlock = 1u;
+
+        res[0u] = 0x74u;
+        res[1u] = 0x20u;
+        res[2u] = 0x0Fu;
+        res[3u] = 0xFFu;
+        Ram_UdsSend(res, 4u, transport);
+    }
+    else if(sid == UDS_SID_TRANSFER_DATA)
+    {
+        if((g_dl.active == 0u) || (len < 2u))
+        {
+            Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
+            return;
+        }
+
+        if(req[1u] != g_dl.nextBlock)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_WRONG_BLOCK_SEQUENCE, transport);
+            return;
+        }
+
+        dataLen = (uint16)(len - 2u);
+
+        if((g_dl.received + dataLen) > g_dl.length)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+            return;
+        }
+
+        memcpy(&img[g_dl.received], &req[2u], dataLen);
+        g_dl.received += dataLen;
+        g_dl.nextBlock++;
+
+        res[0u] = 0x76u;
+        res[1u] = req[1u];
+        Ram_UdsSend(res, 2u, transport);
+    }
+    else if(sid == UDS_SID_TRANSFER_EXIT)
+    {
+        if(g_dl.active == 0u)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
+            return;
+        }
+
+        if(g_dl.received != g_dl.length)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+            return;
+        }
+
+        if(len >= 5u)
+        {
+            g_dl.expectedCrc = Ram_Rd32(&req[1u]);
+            g_dl.expectedCrcValid = 1u;
+
+            if(Ram_Crc32(FBL_IMAGE_RAM_ADDR, g_dl.length) != g_dl.expectedCrc)
+            {
+                Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                return;
+            }
+        }
+
+        res[0u] = 0x77u;
+        Ram_UdsSend(res, 1u, transport);
+    }
+    else if(sid == UDS_SID_ROUTINE)
+    {
+        if(len < 4u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        rid = Ram_Rd16(&req[2u]);
+
+        if((req[1u] == 0x01u) && (rid == UDS_RID_COMMIT_FBL))
+        {
+            if((g_dl.active == 0u) || (g_dl.received != g_dl.length))
+            {
+                Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
+                return;
+            }
+
+            if(Ram_CommitFblImage() != 0u)
+            {
+                Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                return;
+            }
+
+            res[0u] = 0x71u;
+            res[1u] = 0x01u;
+            res[2u] = 0x01u;
+            res[3u] = 0x56u;
+            res[4u] = 0x00u;
+            Ram_UdsSend(res, 5u, transport);
+
+            for(volatile uint32 i = 0u; i < 200000u; i++) {}
+            Ram_Reset();
+        }
+        else
+        {
+            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+        }
+    }
+    else if(sid == UDS_SID_RESET)
+    {
+        res[0u] = 0x51u;
+        res[1u] = (len >= 2u) ? req[1u] : 0x01u;
+        Ram_UdsSend(res, 2u, transport);
+
+        for(volatile uint32 i = 0u; i < 200000u; i++) {}
+        Ram_Reset();
+    }
+    else
+    {
+        Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+    }
+}
+
+static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport)
+{
+    if(transport == FBL_TRANSPORT_ETH)
+    {
+        Ram_DoIpSendDiag(res, len);
+    }
+    else
+    {
+        Ram_IsoSend(res, len);
+    }
+}
+
+static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
+{
+    uint8 res[3];
+
+    res[0u] = UDS_NEG_RESP;
+    res[1u] = sid;
+    res[2u] = nrc;
+
+    Ram_UdsSend(res, 3u, transport);
+}
+
+static void Ram_DoIpMain(void)
+{
+    uint8 buf[1600];
+    uint16 len;
+
+    FblEth_MainFunction();
+
+    while(FblEth_UdpReceive(buf, &len) != 0u)
+    {
+        Ram_DoIpUdp(buf, len);
+    }
+
+    while(FblEth_TcpReceive(buf, &len) != 0u)
+    {
+        Ram_DoIpTcp(buf, len);
+    }
+}
+
+static void Ram_DoIpUdp(const uint8 *buf, uint16 len)
+{
+    uint8 res[64];
+    uint16 type;
+
+    if(len < 8u) { return; }
+    if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER)) { return; }
+
+    type = Ram_Rd16(&buf[2u]);
+
+    if(type == DOIP_PT_VID_REQ)
+    {
+        res[0u] = DOIP_PROTO_VER;
+        res[1u] = DOIP_INV_PROTO_VER;
+        Ram_Wr16(&res[2u], DOIP_PT_VID_RES);
+        Ram_Wr32(&res[4u], 17u);
+        memcpy(&res[8u], "AURIXTC375RAM0001", 17u);
+        FblEth_UdpSend(res, 25u);
+    }
+}
+
+static void Ram_DoIpTcp(const uint8 *buf, uint16 len)
+{
+    uint8 res[32];
+    uint16 type;
+    uint32 payLen;
+
+    if(len < 8u) { return; }
+    if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER)) { return; }
+
+    type = Ram_Rd16(&buf[2u]);
+    payLen = Ram_Rd32(&buf[4u]);
+
+    if((payLen + 8u) > len) { return; }
+
+    if(type == DOIP_PT_ROUTING_ACT_REQ)
+    {
+        res[0u] = DOIP_PROTO_VER;
+        res[1u] = DOIP_INV_PROTO_VER;
+        Ram_Wr16(&res[2u], DOIP_PT_ROUTING_ACT_RES);
+        Ram_Wr32(&res[4u], 9u);
+        res[8u] = buf[8u];
+        res[9u] = buf[9u];
+        Ram_Wr16(&res[10u], DOIP_ECU_ADDR);
+        res[12u] = 0x10u;
+        res[13u] = 0x00u;
+        res[14u] = 0x00u;
+        res[15u] = 0x00u;
+        res[16u] = 0x00u;
+        FblEth_TcpSend(res, 17u);
+    }
+    else if(type == DOIP_PT_DIAG_MSG)
+    {
+        if(payLen < 4u) { return; }
+
+        res[0u] = DOIP_PROTO_VER;
+        res[1u] = DOIP_INV_PROTO_VER;
+        Ram_Wr16(&res[2u], DOIP_PT_DIAG_ACK);
+        Ram_Wr32(&res[4u], 5u);
+        res[8u] = buf[8u];
+        res[9u] = buf[9u];
+        res[10u] = buf[10u];
+        res[11u] = buf[11u];
+        res[12u] = 0x00u;
+        FblEth_TcpSend(res, 13u);
+
+        Ram_UdsHandle(&buf[12u], (uint16)(payLen - 4u), FBL_TRANSPORT_ETH);
+    }
+}
+
+static void Ram_DoIpSendDiag(const uint8 *uds, uint16 udsLen)
+{
+    uint8 buf[512];
+
+    if((udsLen + 12u) > sizeof(buf)) { return; }
+
+    buf[0u] = DOIP_PROTO_VER;
+    buf[1u] = DOIP_INV_PROTO_VER;
+    Ram_Wr16(&buf[2u], DOIP_PT_DIAG_MSG);
+    Ram_Wr32(&buf[4u], (uint32)udsLen + 4u);
+    Ram_Wr16(&buf[8u], DOIP_ECU_ADDR);
+    Ram_Wr16(&buf[10u], DOIP_TESTER_ADDR);
+    memcpy(&buf[12u], uds, udsLen);
+
+    FblEth_TcpSend(buf, (uint16)(udsLen + 12u));
+}
+
+static void Ram_FlashInit(void)
+{
+    memcpy((void *)RAM_FLASH_ERASE_ADDR, (const void *)IfxFlash_eraseMultipleSectors, RAM_FLASH_FUNC_LEN);
+    memcpy((void *)RAM_FLASH_WAIT_ADDR, (const void *)IfxFlash_waitUnbusy, RAM_FLASH_FUNC_LEN);
+    memcpy((void *)RAM_FLASH_ENTER_ADDR, (const void *)IfxFlash_enterPageMode, RAM_FLASH_FUNC_LEN);
+    memcpy((void *)RAM_FLASH_LOAD_ADDR, (const void *)IfxFlash_loadPage2X32, RAM_FLASH_FUNC_LEN);
+    memcpy((void *)RAM_FLASH_WRITE_ADDR, (const void *)IfxFlash_writePage, RAM_FLASH_FUNC_LEN);
+    memcpy((void *)RAM_RESET_FUNC_ADDR, (const void *)IfxScuRcu_performReset, RAM_FLASH_FUNC_LEN);
+
+    g_cmd.eraseSectors = (void *)RAM_FLASH_ERASE_ADDR;
+    g_cmd.waitUnbusy = (void *)RAM_FLASH_WAIT_ADDR;
+    g_cmd.enterPageMode = (void *)RAM_FLASH_ENTER_ADDR;
+    g_cmd.load2X32 = (void *)RAM_FLASH_LOAD_ADDR;
+    g_cmd.writePage = (void *)RAM_FLASH_WRITE_ADDR;
+    g_cmd.reset = (void *)RAM_RESET_FUNC_ADDR;
+
+    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    g_pageAddr = 0xFFFFFFFFu;
+    g_pageFill = 0u;
+}
+
+static uint32 Ram_CommitFblImage(void)
+{
+    uint32 crc;
+
+    if(g_dl.expectedCrcValid != 0u)
+    {
+        crc = Ram_Crc32(FBL_IMAGE_RAM_ADDR, g_dl.length);
+
+        if(crc != g_dl.expectedCrc)
+        {
+            return 1u;
+        }
+    }
+
+    IfxCpu_disableInterrupts();
+
+    if(Ram_EraseRange(FBL_START_NCACHED, FBL_SIZE_BYTES) != 0u)
+    {
+        return 1u;
+    }
+
+    if(Ram_Program(FBL_START_NCACHED, (const uint8 *)FBL_IMAGE_RAM_ADDR, FBL_SIZE_BYTES) != 0u)
+    {
+        return 1u;
+    }
+
+    if(Ram_FlushPage() != 0u)
+    {
+        return 1u;
+    }
+
+    if(g_dl.expectedCrcValid != 0u)
+    {
+        crc = Ram_Crc32(FBL_START_NCACHED, g_dl.length);
+
+        if(crc != g_dl.expectedCrc)
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
+static uint32 Ram_EraseRange(uint32 addr, uint32 len)
+{
+    uint32 start;
+    uint32 end;
+    uint32 count;
+    uint16 pw;
+    IfxFlash_FlashType bank;
+
+    start = addr & ~(PFLASH_SECTOR_SIZE - 1u);
+    end = (addr + len + PFLASH_SECTOR_SIZE - 1u) & ~(PFLASH_SECTOR_SIZE - 1u);
+
+    while(start < end)
+    {
+        uint32 subEnd = end;
+
+        if((start <= PFLASH_BANK_A_END) && (subEnd > (PFLASH_BANK_A_END + 1u)))
+        {
+            subEnd = PFLASH_BANK_A_END + 1u;
+        }
+
+        count = (subEnd - start) / PFLASH_SECTOR_SIZE;
+        bank = Ram_Bank(start);
+
+        pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
+        IfxScuWdt_clearSafetyEndinitInline(pw);
+        g_cmd.eraseSectors(start, count);
+        IfxScuWdt_setSafetyEndinitInline(pw);
+        g_cmd.waitUnbusy(FLASH_MODULE, bank);
+
+        start = subEnd;
+    }
+
+    return 0u;
+}
+
+static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len)
+{
+    uint32 i;
+    uint32 page;
+    uint32 off;
+
+    for(i = 0u; i < len; i++)
+    {
+        page = (addr + i) & ~(PFLASH_PAGE_SIZE - 1u);
+        off = (addr + i) - page;
+
+        if(g_pageAddr == 0xFFFFFFFFu)
+        {
+            g_pageAddr = page;
+            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            g_pageFill = 0u;
+        }
+        else if(g_pageAddr != page)
+        {
+            if(Ram_FlushPage() != 0u) { return 1u; }
+
+            g_pageAddr = page;
+            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            g_pageFill = 0u;
+        }
+
+        g_pageBuf[off] = data[i];
+
+        if((off + 1u) > g_pageFill)
+        {
+            g_pageFill = off + 1u;
+        }
+
+        if(g_pageFill >= PFLASH_PAGE_SIZE)
+        {
+            if(Ram_FlushPage() != 0u) { return 1u; }
+        }
+    }
+
+    return 0u;
+}
+
+static uint32 Ram_FlushPage(void)
+{
+    uint32 ret = 0u;
+
+    if(g_pageAddr != 0xFFFFFFFFu)
+    {
+        ret = Ram_ProgramPage(g_pageAddr, g_pageBuf);
+        g_pageAddr = 0xFFFFFFFFu;
+        g_pageFill = 0u;
+        memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    }
+
+    return ret;
+}
+
+static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data)
+{
+    uint32 w[8];
+    uint16 pw;
+    IfxFlash_FlashType bank;
+
+    for(uint32 i = 0u; i < 8u; i++)
+    {
+        w[i] = Ram_Rd32(&data[i * 4u]);
+    }
+
+    bank = Ram_Bank(addr);
+
+    pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
+    IfxScuWdt_clearSafetyEndinitInline(pw);
+
+    g_cmd.enterPageMode(addr);
+    g_cmd.waitUnbusy(FLASH_MODULE, bank);
+    g_cmd.load2X32(addr, w[0u], w[1u]);
+    g_cmd.load2X32(addr, w[2u], w[3u]);
+    g_cmd.load2X32(addr, w[4u], w[5u]);
+    g_cmd.load2X32(addr, w[6u], w[7u]);
+    g_cmd.writePage(addr);
+    g_cmd.waitUnbusy(FLASH_MODULE, bank);
+
+    IfxScuWdt_setSafetyEndinitInline(pw);
+
+    return 0u;
+}
+
+static IfxFlash_FlashType Ram_Bank(uint32 addr)
+{
+    if((addr >= PFLASH_BANK_B_START) && (addr <= PFLASH_BANK_B_END))
+    {
+        return PROGRAM_FLASH_BANK_B;
+    }
+
+    return PROGRAM_FLASH_BANK_A;
+}
+
+static uint32 Ram_Crc32(uint32 addr, uint32 len)
+{
+    volatile const uint8 *p = (volatile const uint8 *)addr;
+    uint32 crc = 0xFFFFFFFFu;
+
+    for(uint32 i = 0u; i < len; i++)
+    {
+        crc ^= p[i];
+
+        for(uint8 b = 0u; b < 8u; b++)
+        {
+            if((crc & 1u) != 0u)
+            {
+                crc = (crc >> 1u) ^ 0xEDB88320u;
+            }
+            else
+            {
+                crc >>= 1u;
+            }
+        }
+    }
+
+    return crc ^ 0xFFFFFFFFu;
+}
+
+static uint8 Ram_FblRangeValid(uint32 addr, uint32 len)
+{
+    if(len == 0u) { return 0u; }
+    if(addr < FBL_START_NCACHED) { return 0u; }
+    if((addr + len - 1u) > FBL_END_NCACHED) { return 0u; }
+    if((addr + len) < addr) { return 0u; }
+    return 1u;
+}
+
+static uint32 Ram_Rd32(const uint8 *p)
+{
+    return (((uint32)p[0u]) << 24u) | (((uint32)p[1u]) << 16u) | (((uint32)p[2u]) << 8u) | ((uint32)p[3u]);
+}
+
+static uint16 Ram_Rd16(const uint8 *p)
+{
+    return (uint16)((((uint16)p[0u]) << 8u) | ((uint16)p[1u]));
+}
+
+static void Ram_Wr16(uint8 *p, uint16 v)
+{
+    p[0u] = (uint8)(v >> 8u);
+    p[1u] = (uint8)v;
+}
+
+static void Ram_Wr32(uint8 *p, uint32 v)
+{
+    p[0u] = (uint8)(v >> 24u);
+    p[1u] = (uint8)(v >> 16u);
+    p[2u] = (uint8)(v >> 8u);
+    p[3u] = (uint8)v;
+}
+
+static void Ram_Reset(void)
+{
+    IfxCpu_disableInterrupts();
+    g_cmd.reset(2u, 0u);
+    while(1) {}
+}

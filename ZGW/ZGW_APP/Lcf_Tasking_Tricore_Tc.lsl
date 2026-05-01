@@ -58,19 +58,19 @@
 #define LCF_HEAP1_OFFSET    (LCF_USTACK1_OFFSET - LCF_HEAP_SIZE)
 #define LCF_HEAP2_OFFSET    (LCF_USTACK2_OFFSET - LCF_HEAP_SIZE)
 
-#define LCF_INTVEC0_START 0x802FE000
-#define LCF_INTVEC1_START 0x805FC000
-#define LCF_INTVEC2_START 0x805FE000
+#define LCF_INTVEC0_START 0x80032000
+#define LCF_INTVEC1_START 0x803FC000
+#define LCF_INTVEC2_START 0x803FE000
 
-#define LCF_TRAPVEC0_START 0x80000100
+#define LCF_TRAPVEC0_START 0x80030060
 #define LCF_TRAPVEC1_START 0x80300000
 #define LCF_TRAPVEC2_START 0x80300100
 
-#define LCF_STARTPTR_CPU0 0x80000000
+#define LCF_STARTPTR_CPU0 0x80030000
 #define LCF_STARTPTR_CPU1 0x80300200
 #define LCF_STARTPTR_CPU2 0x80300220
 
-#define LCF_STARTPTR_NC_CPU0 0xA0000000
+#define LCF_STARTPTR_NC_CPU0 0xA0030000
 #define LCF_STARTPTR_NC_CPU1 0xA0300200
 #define LCF_STARTPTR_NC_CPU2 0xA0300220
 
@@ -82,6 +82,10 @@
 #define TRAPTAB2            (LCF_TRAPVEC2_START)
 
 #define RESET LCF_STARTPTR_NC_CPU0
+#define APP_PFLASH0_START 0x80020000
+#define APP_PFLASH0_NC_START 0xA0020000
+#define APP_PFLASH0_SIZE 2944k
+#define FLASH_UNUSED_FILL_VALUE 0x36
 
 #include "tc1v1_6_2.lsl"
 
@@ -185,22 +189,27 @@ derivative tc37
         map (dest=bus:sri, dest_offset=0x70100000, size=64k);
     }
 
+    /* APP PFLASH0 starts after the 128 KB FBL window: 0x80020000..0x802FFFFF cached / 0xA0020000..0xA02FFFFF non-cached. */
     memory pfls0
     {
         mau = 8;
-        size = 3M;
+        size = 2880K;   /* 0x2D0000 bytes */
         type = rom;
-        map     cached (dest=bus:sri, dest_offset=0x80000000,           size=3M);
-        map not_cached (dest=bus:sri, dest_offset=0xa0000000, reserved, size=3M);
+        fill = 0x36;
+    
+        map cached     (dest=bus:sri, dest_offset=0x80030000, size=2880K);
+        map not_cached (dest=bus:sri, dest_offset=0xA0030000, reserved, size=2880K);
     }
-
+    
     memory pfls1
     {
         mau = 8;
-        size = 3M;
+        size = 3M;      /* 0x300000 bytes */
         type = rom;
-        map     cached (dest=bus:sri, dest_offset=0x80300000,           size=3M);
-        map not_cached (dest=bus:sri, dest_offset=0xa0300000, reserved, size=3M);
+        fill = 0x36;
+    
+        map cached     (dest=bus:sri, dest_offset=0x80300000, size=3M);
+        map not_cached (dest=bus:sri, dest_offset=0xA0300000, reserved, size=3M);
     }
 
     memory dfls0
@@ -364,7 +373,7 @@ derivative tc37
         {
             group reset (run_addr=RESET)
             {
-                section "reset" (size = 0x20, fill = 0x0800, attributes = r)
+                section "reset" (size = 0x20, fill = 0x3636, attributes = r)
                 {
                     select ".text.start";
                 }
@@ -383,21 +392,21 @@ derivative tc37
         {
             group trapvec_tc0 (align = 8, run_addr=LCF_TRAPVEC0_START)
             {
-                section "trapvec_tc0" (size=0x100, attributes=rx, fill=0)
+                section "trapvec_tc0" (size=0x100, attributes=rx, fill=0x36)
                 {
                     select "(.text.traptab_cpu0*)";
                 }
             }
             group trapvec_tc1 (align = 8, run_addr=LCF_TRAPVEC1_START)
             {
-                section "trapvec_tc1" (size=0x100, attributes=rx, fill=0)
+                section "trapvec_tc1" (size=0x100, attributes=rx, fill=0x36)
                 {
                     select "(.text.traptab_cpu1*)";
                 }
             }
             group trapvec_tc2 (align = 8, run_addr=LCF_TRAPVEC2_START)
             {
-                section "trapvec_tc2" (size=0x100, attributes=rx, fill=0)
+                section "trapvec_tc2" (size=0x100, attributes=rx, fill=0x36)
                 {
                     select "(.text.traptab_cpu2*)";
                 }
@@ -415,7 +424,7 @@ derivative tc37
             }
             group start_tc1 (run_addr=LCF_STARTPTR_NC_CPU1)
             {
-                section "start_tc1" (size=0x20, attributes=rx, fill=0)
+                section "start_tc1" (size=0x20, attributes=rx, fill=0x36)
                 {
                     select "(.text.start_cpu1*)";
                 }
