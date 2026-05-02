@@ -1,3 +1,10 @@
+Console.highWaterMark=88000
+StringVariablePreferencePage=144,120,120,95,
 eclipse.preferences.version=1
+org.eclipse.debug.ui.MemoryView.orientation=0
+org.eclipse.debug.ui.PREF_FILTER_TYPE_LIST=org.eclipse.ui.externaltools.ProgramLaunchConfigurationType,org.eclipse.tcf.debug.LaunchConfigurationType,
 org.eclipse.debug.ui.PREF_LAUNCH_PERSPECTIVES=<?xml version\="1.0" encoding\="UTF-8" standalone\="no"?>\r\n<launchPerspectives>\r\n    <launchPerspective configurationType\="com.rt.hightec.agent.launcher.launchConfigurationType" delegate\="com.rt.hightec.agent.launcher.launchConfigurationType" mode\="debug" perspective\="com.infineon.aurix.buildsystem.debug.perspective"/>\r\n    <launchPerspective configurationType\="com.rt.hightec.agent.launcher.launchConfigurationType" mode\="debug" perspective\="com.infineon.aurix.buildsystem.debug.perspective"/>\r\n</launchPerspectives>\r\n
+org.eclipse.debug.ui.switch_perspective_on_suspend=always
+pref_state_memento.org.eclipse.debug.ui.DebugVieworg.eclipse.debug.ui.DebugView=<?xml version\="1.0" encoding\="UTF-8"?>\r\n<DebugViewMemento org.eclipse.debug.ui.BREADCRUMB_DROPDOWN_AUTO_EXPAND\="false"/>
+preferredDetailPanes=DefaultDetailPane\:DefaultDetailPane|
 preferredTargets=org.eclipse.cdt.debug.ui.toggleCBreakpointTarget,org.eclipse.cdt.debug.ui.toggleCDynamicPrintfTarget\:org.eclipse.cdt.debug.ui.toggleCBreakpointTarget|

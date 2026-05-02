@@ -9,7 +9,6 @@
 #include "Can.h"
 #include "SysMgr.h"
 #include "Dcm.h"
-#include "Ain.h"
 #include "timers_core0.h"
 #include "timers_core1.h"
 #include "timers_core2.h"
@@ -98,36 +97,36 @@ void Os_Init_C0(void)
     xTaskCreate_core0(ASILD_BSW_Task_C0, "ASILD_BSW_Task_C0", configMINIMAL_STACK_SIZE_core0, NULL, 28u, &ASILD_BSW_Task_C0_THandle);
     xTaskCreate_core0(ASILB_BSW_Task_C0, "ASILB_BSW_Task_C0", configMINIMAL_STACK_SIZE_core0, NULL, 27u, &ASILB_BSW_Task_C0_THandle);
     xTaskCreate_core0(QM_BSW_Task_C0, "QM_BSW_Task_C0", configMINIMAL_STACK_SIZE_core0, NULL, 26u, &QM_BSW_Task_C0_THandle);
-    Handler_Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0",
-            pdMS_TO_TICKS_core0(5u),
-            1u,
-            NULL,
-            Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0);
-    Handler_Alarm5ms_Callback_ASILD_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILD_BSW_Task_C0",
-            pdMS_TO_TICKS_core0(5u),
-            1u,
-            NULL,
-            Alarm5ms_Callback_ASILD_BSW_Task_C0);
-    Handler_Alarm5ms_Callback_ASILB_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILB_BSW_Task_C0",
-            pdMS_TO_TICKS_core0(5u),
-            1u,
-            NULL,
-            Alarm5ms_Callback_ASILB_BSW_Task_C0);
-    Handler_Alarm5ms_Callback_QM_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_QM_BSW_Task_C0",
-            pdMS_TO_TICKS_core0(5u),
-            1u,
-            NULL,
-            Alarm5ms_Callback_QM_BSW_Task_C0);
-    Handler_Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0",
-            pdMS_TO_TICKS_core0(5u),
-            1u,
-            NULL,
-            Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0);
-    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0, pdMS_TO_TICKS_core0(5u));
-    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILD_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
-    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILB_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
-    xTimerStart_core0(Handler_Alarm5ms_Callback_QM_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
-    xTimerStart_core0(Handler_Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0, 5u);
+//    Handler_Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0",
+//            pdMS_TO_TICKS_core0(5u),
+//            1u,
+//            NULL,
+//            Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0);
+//    Handler_Alarm5ms_Callback_ASILD_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILD_BSW_Task_C0",
+//            pdMS_TO_TICKS_core0(5u),
+//            1u,
+//            NULL,
+//            Alarm5ms_Callback_ASILD_BSW_Task_C0);
+//    Handler_Alarm5ms_Callback_ASILB_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASILB_BSW_Task_C0",
+//            pdMS_TO_TICKS_core0(5u),
+//            1u,
+//            NULL,
+//            Alarm5ms_Callback_ASILB_BSW_Task_C0);
+//    Handler_Alarm5ms_Callback_QM_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_QM_BSW_Task_C0",
+//            pdMS_TO_TICKS_core0(5u),
+//            1u,
+//            NULL,
+//            Alarm5ms_Callback_QM_BSW_Task_C0);
+//    Handler_Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0",
+//            pdMS_TO_TICKS_core0(5u),
+//            1u,
+//            NULL,
+//            Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0);
+//    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILD_APPL_MainCycle_Task_C0, pdMS_TO_TICKS_core0(5u));
+//    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILD_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
+//    xTimerStart_core0(Handler_Alarm5ms_Callback_ASILB_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
+//    xTimerStart_core0(Handler_Alarm5ms_Callback_QM_BSW_Task_C0, pdMS_TO_TICKS_core0(5u));
+//    xTimerStart_core0(Handler_Alarm5ms_Callback_QM_APPL_MainCycle_Task_C0, 5u);
 }
 
 void Os_Init_C1(void)
@@ -234,7 +233,7 @@ void ASILD_APPL_MainCycle_Task_C0(void *pvParameters)
 {
     for(;;)
     {
-        if(1u == Alarm5ms_Flag_ASILD_APPL_MainCycle_Task_C0 && (2u == SysMgr_EcuState || 3u == SysMgr_EcuState))
+        if(1u == Alarm5ms_Flag_ASILD_APPL_MainCycle_Task_C0 )
         {
             Alarm5ms_Flag_ASILD_APPL_MainCycle_Task_C0 = 0u;
             Can_MainFunction();
@@ -299,7 +298,6 @@ void ASILB_BSW_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASILB_BSW_Task_C0 && 2u == SysMgr_EcuState)
         {
             Alarm5ms_Flag_ASILB_BSW_Task_C0 = 0u;
-            Ain_MainFunction();
         }
         else
         {

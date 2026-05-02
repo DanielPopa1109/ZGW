@@ -6,7 +6,7 @@
 #include "IfxPort.h"
 
 #define LIN_ASCLIN_MODULE       MODULE_ASCLIN1
-#define LIN_DEFAULT_BAUDRATE    19200.0f
+#define LIN_DEFAULT_BAUDRATE    57600.0f
 
 #define LIN_PINS                Lin_Pins
 

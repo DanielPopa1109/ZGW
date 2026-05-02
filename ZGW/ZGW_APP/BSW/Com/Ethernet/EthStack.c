@@ -4,6 +4,7 @@
 #include "SomeIp.h"
 #include "SomeIpSd.h"
 #include "Dcm_EthTpBridge.h"
+#include "PduR.h"
 
 #include "FreeRTOS_core2.h"
 #include "task_core2.h"
@@ -29,15 +30,16 @@ void EthStack_Init(void)
     Dcm_EthTp_Init();
 
     DoIP_Init(&DoIP_Config);
-    DoIP_SetDcmRxIndication(Dcm_EthTp_RxIndication);
+    DoIP_SetDcmRxIndication(PduR_DoIPRxIndication);
 
     SomeIp_Init(&SomeIp_Config);
     SomeIpSd_Init(&SomeIpSd_Config);
 
-    (void)SoAd_OpenSoCon(0u);
-    (void)SoAd_OpenSoCon(1u);
-    (void)SoAd_OpenSoCon(2u);
-    (void)SoAd_OpenSoCon(3u);
+    //(void)SoAd_OpenSoCon(0u);
+   // (void)SoAd_OpenSoCon(1u);
+    //(void)SoAd_OpenSoCon(2u);
+    //(void)SoAd_OpenSoCon(3u);
+    //(void)SoAd_OpenSoCon(4u);
 
     EthStack_Initialized = 1u;
 }

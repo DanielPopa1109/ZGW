@@ -1,6 +1,8 @@
 #include "LinIf.h"
 #include "LinTp.h"
+#include "PduR.h"
 #include <string.h>
+#include "SysMgr.h"
 
 static const Lin_FrameConfigType LinIf_Frame_MRF =
 {
@@ -12,14 +14,20 @@ static const Lin_FrameConfigType LinIf_Frame_SRF =
     0x3Du, LIN_PID_SLAVE_RESPONSE, 8u, LIN_CS_CLASSIC, LIN_FRM_DIAGNOSTIC_SRF, 20u
 };
 
-static const Lin_FrameConfigType LinIf_Frame_App10 =
+static const Lin_FrameConfigType LinIf_Frame_App10_Rx =
 {
     0x10u, 0u, 8u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
+static const Lin_FrameConfigType LinIf_Frame_App11_Tx =
+{
+    0x11u, 0u, 8u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
 static const LinIf_ScheduleEntryType LinIf_NormalEntries[] =
 {
-    { &LinIf_Frame_App10, 10u, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_App10_Rx, 10u, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_App11_Tx, 10u, LIN_MASTER_RESPONSE }
 };
 
 static const LinIf_ScheduleEntryType LinIf_DiagReqEntries[] =
@@ -34,10 +42,23 @@ static const LinIf_ScheduleEntryType LinIf_DiagRespEntries[] =
 
 static const LinIf_ScheduleTableType LinIf_Schedules[] =
 {
-    { LinIf_NormalEntries,   1u, FALSE },
-    { LinIf_DiagReqEntries,  1u, TRUE  },
-    { LinIf_DiagRespEntries, 1u, TRUE  }
+    { LinIf_NormalEntries,   (uint8)(sizeof(LinIf_NormalEntries) / sizeof(LinIf_NormalEntries[0])),   FALSE },
+    { LinIf_DiagReqEntries,  (uint8)(sizeof(LinIf_DiagReqEntries) / sizeof(LinIf_DiagReqEntries[0])),  TRUE  },
+    { LinIf_DiagRespEntries, (uint8)(sizeof(LinIf_DiagRespEntries) / sizeof(LinIf_DiagRespEntries[0])), TRUE  }
 };
+
+typedef struct
+{
+    PduIdType pduId;
+    uint8 frameId;
+    uint8 dlc;
+} LinIf_AppPduConfigType;
+
+typedef struct
+{
+    uint8 data[LIN_MAX_DATA_LEN];
+    uint8 valid;
+} LinIf_AppTxRuntimeType;
 
 typedef struct
 {
@@ -57,11 +78,68 @@ typedef struct
     uint32 diagTimeoutCounter;
 } LinIf_StateType;
 
+static const LinIf_AppPduConfigType LinIf_AppTxPduCfg[] =
+{
+    { LINIF_PDU_APP11_TX, 0x11u, 8u }
+};
+
+static const LinIf_AppPduConfigType LinIf_AppRxPduCfg[] =
+{
+    { LINIF_PDU_APP10_RX, 0x10u, 8u }
+};
+
 static LinIf_StateType LinIf_State;
+static LinIf_AppTxRuntimeType LinIf_AppTxRt[sizeof(LinIf_AppTxPduCfg) / sizeof(LinIf_AppTxPduCfg[0])];
+
+static uint8 LinIf_FindTxPdu(PduIdType pduId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(LinIf_AppTxPduCfg) / sizeof(LinIf_AppTxPduCfg[0])); i++)
+    {
+        if (LinIf_AppTxPduCfg[i].pduId == pduId)
+        {
+            return i;
+        }
+    }
+
+    return 0xFFu;
+}
+
+static uint8 LinIf_FindTxPduByFrameId(uint8 frameId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(LinIf_AppTxPduCfg) / sizeof(LinIf_AppTxPduCfg[0])); i++)
+    {
+        if (LinIf_AppTxPduCfg[i].frameId == frameId)
+        {
+            return i;
+        }
+    }
+
+    return 0xFFu;
+}
+
+static uint8 LinIf_FindRxPduByFrameId(uint8 frameId)
+{
+    uint8 i;
+
+    for (i = 0u; i < (uint8)(sizeof(LinIf_AppRxPduCfg) / sizeof(LinIf_AppRxPduCfg[0])); i++)
+    {
+        if (LinIf_AppRxPduCfg[i].frameId == frameId)
+        {
+            return i;
+        }
+    }
+
+    return 0xFFu;
+}
 
 void LinIf_Init(void)
 {
     memset(&LinIf_State, 0, sizeof(LinIf_State));
+    memset(LinIf_AppTxRt, 0, sizeof(LinIf_AppTxRt));
 
     LinIf_State.activeSchedule = LINIF_SCHED_NORMAL;
     LinIf_State.diagState = LINIF_DIAG_IDLE;
@@ -81,6 +159,35 @@ Std_ReturnType LinIf_SwitchSchedule(uint8 scheduleId)
     LinIf_State.index = 0u;
     LinIf_State.timer = 0u;
     LinIf_State.busy = FALSE;
+
+    return E_OK;
+}
+
+Std_ReturnType LinIf_Transmit(PduIdType LinIfTxPduId,
+                              const uint8* data,
+                              PduLengthType len)
+{
+    uint8 txIdx;
+
+    if ((data == NULL_PTR) || (len == 0u) || (len > LIN_MAX_DATA_LEN))
+    {
+        return E_NOT_OK;
+    }
+
+    txIdx = LinIf_FindTxPdu(LinIfTxPduId);
+
+    if (txIdx == 0xFFu)
+    {
+        return E_NOT_OK;
+    }
+
+    if (len != LinIf_AppTxPduCfg[txIdx].dlc)
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(LinIf_AppTxRt[txIdx].data, data, len);
+    LinIf_AppTxRt[txIdx].valid = TRUE;
 
     return E_OK;
 }
@@ -148,40 +255,58 @@ void LinIf_DiagFrameDone(uint8 success)
     }
 }
 
-static Std_ReturnType LinIf_TransmitFrame(const Lin_FrameConfigType* frame)
+static Std_ReturnType LinIf_TransmitFrame(const LinIf_ScheduleEntryType* entry)
 {
     Lin_PduType pdu;
+    uint8 txIdx;
 
-    if (frame == NULL_PTR)
+    if ((entry == NULL_PTR) || (entry->frame == NULL_PTR))
     {
         return E_NOT_OK;
     }
 
     memset(&pdu, 0, sizeof(pdu));
 
-    pdu.pid = frame->pid;
-    pdu.dlc = frame->dlc;
-    pdu.checksumType = frame->checksumType;
+    pdu.pid = entry->frame->pid;
+    pdu.dlc = entry->frame->dlc;
+    pdu.checksumType = entry->frame->checksumType;
 
-    if ((pdu.pid == 0u) && (frame->id <= 0x3Fu))
+    if ((pdu.pid == 0u) && (entry->frame->id <= 0x3Fu))
     {
-        pdu.pid = Lin_MakePid(frame->id);
+        pdu.pid = Lin_MakePid(entry->frame->id);
     }
 
-    if (frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
+    if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
     {
         pdu.direction = LIN_MASTER_RESPONSE;
         memcpy(pdu.data, LinIf_State.diagReq, 8u);
         LinIf_State.diagState = LINIF_DIAG_MRF_ACTIVE;
     }
-    else if (frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
+    else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
     {
         pdu.direction = LIN_SLAVE_RESPONSE;
         LinIf_State.diagState = LINIF_DIAG_SRF_ACTIVE;
     }
     else
     {
-        pdu.direction = LIN_SLAVE_RESPONSE;
+        pdu.direction = entry->direction;
+
+        if (entry->direction == LIN_MASTER_RESPONSE)
+        {
+            txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
+
+            if (txIdx != 0xFFu)
+            {
+                if (LinIf_AppTxRt[txIdx].valid != FALSE)
+                {
+                    memcpy(pdu.data, LinIf_AppTxRt[txIdx].data, entry->frame->dlc);
+                }
+                else
+                {
+                    memset(pdu.data, 0u, entry->frame->dlc);
+                }
+            }
+        }
     }
 
     return Lin_SendFrame(LIN_CHANNEL_0, &pdu);
@@ -193,6 +318,8 @@ void LinIf_MainFunction(void)
     const LinIf_ScheduleEntryType* entry;
     uint8 rx[8];
     uint8 len;
+    uint8 rxIdx;
+    uint8 txIdx;
     Lin_ResultType res;
 
     Lin_MainFunction();
@@ -220,11 +347,13 @@ void LinIf_MainFunction(void)
     {
         if (Lin_GetState(LIN_CHANNEL_0) == LIN_IDLE)
         {
+            entry = &LinIf_Schedules[LinIf_State.activeSchedule].entries[LinIf_State.index];
             res = Lin_GetStatus(LIN_CHANNEL_0, rx, &len);
 
             if (res == LIN_RES_OK)
             {
-                entry = &LinIf_Schedules[LinIf_State.activeSchedule].entries[LinIf_State.index];
+                SysMgr_BusActivityCounter = 400u;
+                SysMgr_NoBusActivity = 1u;
 
                 if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
                 {
@@ -239,17 +368,49 @@ void LinIf_MainFunction(void)
                     LinTp_RxSlaveResponse(rx);
                     LinIf_DiagFrameDone(TRUE);
                 }
+                else if (entry->frame->frameClass == LIN_FRM_UNCONDITIONAL)
+                {
+                    if (entry->direction == LIN_SLAVE_RESPONSE)
+                    {
+                        rxIdx = LinIf_FindRxPduByFrameId(entry->frame->id);
+
+                        if (rxIdx != 0xFFu)
+                        {
+                            PduR_LinIfRxIndication(LinIf_AppRxPduCfg[rxIdx].pduId, rx, (PduLengthType)len);
+                        }
+                    }
+                    else if (entry->direction == LIN_MASTER_RESPONSE)
+                    {
+                        txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
+
+                        if (txIdx != 0xFFu)
+                        {
+                            PduR_LinIfTxConfirmation(LinIf_AppTxPduCfg[txIdx].pduId);
+                        }
+                    }
+                }
             }
             else
             {
-                entry = &LinIf_Schedules[LinIf_State.activeSchedule].entries[LinIf_State.index];
-
                 if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
                 {
                     LinTp_TxFrameConfirmation(FALSE);
+                    LinIf_DiagFrameDone(FALSE);
                 }
+                else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
+                {
+                    LinIf_DiagFrameDone(FALSE);
+                }
+                else if ((entry->frame->frameClass == LIN_FRM_UNCONDITIONAL) &&
+                         (entry->direction == LIN_MASTER_RESPONSE))
+                {
+                    txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
 
-                LinIf_DiagFrameDone(FALSE);
+                    if (txIdx != 0xFFu)
+                    {
+                        PduR_LinIfTxConfirmation(LinIf_AppTxPduCfg[txIdx].pduId);
+                    }
+                }
             }
 
             LinIf_State.busy = FALSE;
@@ -287,7 +448,7 @@ void LinIf_MainFunction(void)
     sched = &LinIf_Schedules[LinIf_State.activeSchedule];
     entry = &sched->entries[LinIf_State.index];
 
-    if (LinIf_TransmitFrame(entry->frame) == E_OK)
+    if (LinIf_TransmitFrame(entry) == E_OK)
     {
         LinIf_State.timer = entry->delayTicks;
         LinIf_State.busy = TRUE;

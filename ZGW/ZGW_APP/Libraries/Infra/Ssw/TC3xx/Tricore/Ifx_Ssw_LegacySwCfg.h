@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_LegacySwCfg.h
  * \brief Startup Software to support legacy controller options.
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2017 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE

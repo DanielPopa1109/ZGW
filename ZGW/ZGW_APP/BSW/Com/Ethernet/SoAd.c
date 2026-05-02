@@ -1,4 +1,5 @@
 #include "SoAd.h"
+#include "SysMgr.h"
 
 typedef struct
 {
@@ -206,6 +207,8 @@ void SoAd_MainFunction(void)
                     if (rt->cfg->rxIndication != 0)
                     {
                         rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, (uint16)len);
+                        SysMgr_BusActivityCounter = 400u;
+                        SysMgr_NoBusActivity = 1u;
                     }
                 }
             }
@@ -221,6 +224,8 @@ void SoAd_MainFunction(void)
                 if (rt->cfg->rxIndication != 0)
                 {
                     rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
+                    SysMgr_BusActivityCounter = 400u;
+                    SysMgr_NoBusActivity = 1u;
                 }
             }
         }

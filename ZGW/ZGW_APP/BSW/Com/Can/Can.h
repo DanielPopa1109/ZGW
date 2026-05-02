@@ -6,18 +6,6 @@
 #include "IfxCan.h"
 #include "IfxPort.h"
 
-#ifndef TRUE
-#define TRUE  1u
-#endif
-
-#ifndef FALSE
-#define FALSE 0u
-#endif
-
-#ifndef NULL_PTR
-#define NULL_PTR ((void*)0)
-#endif
-
 #define CAN_MAINFUNCTION_PERIOD_MS 5u
 
 #define CAN_CONTROLLER_CLASSIC 0u

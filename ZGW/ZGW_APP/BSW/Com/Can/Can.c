@@ -1,53 +1,58 @@
 #include "Can.h"
 #include "CanIf.h"
-#include "Irq.h"
 #include <string.h>
 #include "IfxCpu.h"
+#include "SysMgr.h"
+
+#define CAN_IRQ_PRIO_RX_CLASSIC       40u
+#define CAN_IRQ_PRIO_RX_FD            41u
+#define CAN_IRQ_PRIO_BUSOFF_CLASSIC   42u
+#define CAN_IRQ_PRIO_BUSOFF_FD        43u
 
 typedef struct
 {
-    Can_ErrorStateType errorState;
-    uint8 busOffPending;
-    uint16 busOffRecoveryTicks;
-    uint32 busOffCounter;
-    uint32 recoveredCounter;
-    uint32 rxOverflowCounter;
-    uint32 txOverflowCounter;
-    uint32 txFailCounter;
-    uint8 rxErrorCounter;
-    uint8 txErrorCounter;
+        Can_ErrorStateType errorState;
+        uint8 busOffPending;
+        uint16 busOffRecoveryTicks;
+        uint32 busOffCounter;
+        uint32 recoveredCounter;
+        uint32 rxOverflowCounter;
+        uint32 txOverflowCounter;
+        uint32 txFailCounter;
+        uint8 rxErrorCounter;
+        uint8 txErrorCounter;
 } Can_ControllerRuntimeType;
 
 typedef struct
 {
-    IfxCan_Can_Config moduleConfig;
-    IfxCan_Can module;
+        IfxCan_Can_Config moduleConfig;
+        IfxCan_Can module;
 
-    IfxCan_Can_NodeConfig nodeConfigClassic;
-    IfxCan_Can_NodeConfig nodeConfigFd;
+        IfxCan_Can_NodeConfig nodeConfigClassic;
+        IfxCan_Can_NodeConfig nodeConfigFd;
 
-    IfxCan_Can_Node nodeClassic;
-    IfxCan_Can_Node nodeFd;
+        IfxCan_Can_Node nodeClassic;
+        IfxCan_Can_Node nodeFd;
 
-    IfxCan_Filter filter;
-    IfxCan_Message txMsg;
-    IfxCan_Message rxMsg;
+        IfxCan_Filter filter;
+        IfxCan_Message txMsg;
+        IfxCan_Message rxMsg;
 
-    uint32 txWords[16];
-    uint32 rxWords[16];
+        uint32 txWords[16];
+        uint32 rxWords[16];
 } Can_HwType;
 
 typedef struct
 {
-    Can_PduType pdu;
-    uint8 data[CAN_MAX_DLC];
-    uint8 used;
+        Can_PduType pdu;
+        uint8 data[CAN_MAX_DLC];
+        uint8 used;
 } Can_TxQueueElementType;
 
 typedef struct
 {
-    Can_FrameType frame;
-    uint8 used;
+        Can_FrameType frame;
+        uint8 used;
 } Can_RxQueueElementType;
 
 static Can_HwType Can_Hw;
@@ -71,8 +76,8 @@ static uint8 Can_DlcToBytes(uint8 dlc)
 {
     static const uint8 map[16] =
     {
-        0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u,
-        8u, 12u, 16u, 20u, 24u, 32u, 48u, 64u
+            0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u,
+            8u, 12u, 16u, 20u, 24u, 32u, 48u, 64u
     };
 
     return map[dlc & 0x0Fu];
@@ -403,11 +408,11 @@ static void Can_InitClassicNode(void)
     Can_Hw.nodeConfigClassic.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
 
     Can_Hw.nodeConfigClassic.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
-    Can_Hw.nodeConfigClassic.interruptConfig.rxf0n.priority = IRQ_CANRX_CHANNEL;
+    Can_Hw.nodeConfigClassic.interruptConfig.rxf0n.priority = CAN_IRQ_PRIO_RX_CLASSIC       ;
     Can_Hw.nodeConfigClassic.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_0;
 
     Can_Hw.nodeConfigClassic.interruptConfig.busOffStatusEnabled = TRUE;
-    Can_Hw.nodeConfigClassic.interruptConfig.boff.priority = ISR_PRIORITY_CAN_BOFF;
+    Can_Hw.nodeConfigClassic.interruptConfig.boff.priority = CAN_IRQ_PRIO_BUSOFF_CLASSIC   ;
     Can_Hw.nodeConfigClassic.interruptConfig.boff.interruptLine = IfxCan_InterruptLine_3;
 
     Can_Hw.nodeConfigClassic.messageRAM.baseAddress = (uint32)Can_Hw.nodeConfigClassic.can;
@@ -419,13 +424,16 @@ static void Can_InitClassicNode(void)
     IfxCan_Can_initNode(&Can_Hw.nodeClassic, &Can_Hw.nodeConfigClassic);
 
     IfxCan_Node_initRxPin(Can_Hw.nodeClassic.node,
-                          &IfxCan_RXD00B_P20_7_IN,
-                          IfxPort_Mode_inputPullUp,
-                          IfxPort_PadDriver_cmosAutomotiveSpeed1);
+            &IfxCan_RXD00B_P20_7_IN,
+            IfxPort_Mode_inputPullUp,
+            IfxPort_PadDriver_cmosAutomotiveSpeed1);
 
     IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT,
-                          IfxPort_OutputMode_pushPull,
-                          IfxPort_PadDriver_cmosAutomotiveSpeed4);
+            IfxPort_OutputMode_pushPull,
+            IfxPort_PadDriver_cmosAutomotiveSpeed4);
+
+    IfxPort_setPinModeOutput(&MODULE_P20, 6, IfxPort_OutputMode_pushPull, IfxPort_OutputIdx_general);
+    IfxPort_setPinLow(&MODULE_P20, 6);
 
     Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
 
@@ -473,11 +481,11 @@ static void Can_InitFdNode(void)
     Can_Hw.nodeConfigFd.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
 
     Can_Hw.nodeConfigFd.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
-    Can_Hw.nodeConfigFd.interruptConfig.rxf0n.priority = IRQ_CANRX_CHANNEL + 1u;
+    Can_Hw.nodeConfigFd.interruptConfig.rxf0n.priority = CAN_IRQ_PRIO_RX_FD             ;
     Can_Hw.nodeConfigFd.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_1;
 
     Can_Hw.nodeConfigFd.interruptConfig.busOffStatusEnabled = TRUE;
-    Can_Hw.nodeConfigFd.interruptConfig.boff.priority = ISR_PRIORITY_CAN_BOFF + 1u;
+    Can_Hw.nodeConfigFd.interruptConfig.boff.priority = CAN_IRQ_PRIO_BUSOFF_FD        ;
     Can_Hw.nodeConfigFd.interruptConfig.boff.interruptLine = IfxCan_InterruptLine_4;
 
     Can_Hw.nodeConfigFd.messageRAM.baseAddress = (uint32)Can_Hw.nodeConfigFd.can;
@@ -488,16 +496,14 @@ static void Can_InitFdNode(void)
 
     IfxCan_Can_initNode(&Can_Hw.nodeFd, &Can_Hw.nodeConfigFd);
 
-#if defined(CAN_FD_USE_PINS)
     IfxCan_Node_initRxPin(Can_Hw.nodeFd.node,
-                          CAN_FD_RX_PIN,
-                          IfxPort_Mode_inputPullUp,
-                          IfxPort_PadDriver_cmosAutomotiveSpeed1);
+            &IfxCan_RXD01D_P33_10_IN,
+            IfxPort_Mode_inputPullUp,
+            IfxPort_PadDriver_cmosAutomotiveSpeed1);
 
-    IfxCan_Node_initTxPin(CAN_FD_TX_PIN,
-                          IfxPort_OutputMode_pushPull,
-                          IfxPort_PadDriver_cmosAutomotiveSpeed4);
-#endif
+    IfxCan_Node_initTxPin(&IfxCan_TXD01_P33_9_OUT,
+            IfxPort_OutputMode_pushPull,
+            IfxPort_PadDriver_cmosAutomotiveSpeed4);
 
     Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
 
@@ -699,7 +705,7 @@ static void Can_ProcessTx(void)
         }
 
         if ((pdu.controllerId >= CAN_NUM_CONTROLLERS) ||
-            (Can_ControllerState[pdu.controllerId] != CAN_READY))
+                (Can_ControllerState[pdu.controllerId] != CAN_READY))
         {
             return;
         }
@@ -720,10 +726,10 @@ static void Can_ProcessTx(void)
         Can_Hw.txMsg.dataLengthCode = Can_BytesToDlc(pdu.dlc);
 
         Can_Hw.txMsg.messageIdLength =
-            (pdu.idType == CAN_ID_EXTENDED) ? IfxCan_MessageIdLength_extended : IfxCan_MessageIdLength_standard;
+                (pdu.idType == CAN_ID_EXTENDED) ? IfxCan_MessageIdLength_extended : IfxCan_MessageIdLength_standard;
 
         Can_Hw.txMsg.frameMode =
-            (pdu.frameType == CAN_FRAME_FD) ? IfxCan_FrameMode_fdLongAndFast : IfxCan_FrameMode_standard;
+                (pdu.frameType == CAN_FRAME_FD) ? IfxCan_FrameMode_fdLongAndFast : IfxCan_FrameMode_standard;
 
         if (IfxCan_Can_sendMessage(node, &Can_Hw.txMsg, Can_Hw.txWords) == TRUE)
         {
@@ -763,13 +769,13 @@ void Can_MainFunction(void)
 void Can_MainFunction_BusOff(void)
 {
     if ((Can_ControllerState[CAN_CONTROLLER_CLASSIC] == CAN_READY) &&
-        (IfxCan_Node_getBusOffStatus(Can_Hw.nodeClassic.node) != 0u))
+            (IfxCan_Node_getBusOffStatus(Can_Hw.nodeClassic.node) != 0u))
     {
         Can_EnterBusOff(CAN_CONTROLLER_CLASSIC);
     }
 
     if ((Can_ControllerState[CAN_CONTROLLER_FD] == CAN_READY) &&
-        (IfxCan_Node_getBusOffStatus(Can_Hw.nodeFd.node) != 0u))
+            (IfxCan_Node_getBusOffStatus(Can_Hw.nodeFd.node) != 0u))
     {
         Can_EnterBusOff(CAN_CONTROLLER_FD);
     }
@@ -785,7 +791,7 @@ void Can_MainFunction_Mode(void)
     for (controller = 0u; controller < CAN_NUM_CONTROLLERS; controller++)
     {
         if ((Can_ControllerState[controller] == CAN_BUS_OFF) &&
-            (Can_Runtime[controller].busOffPending != FALSE))
+                (Can_Runtime[controller].busOffPending != FALSE))
         {
             if (Can_Runtime[controller].busOffRecoveryTicks > 0u)
             {
@@ -998,4 +1004,32 @@ void Can_DisableControllerInterrupts(uint8 Controller)
     {
         Can_InterruptsEnabled[Controller] = FALSE;
     }
+}
+
+IFX_INTERRUPT(Can_IrqRxClassic, 0, CAN_IRQ_PRIO_RX_CLASSIC);
+void Can_IrqRxClassic(void)
+{
+    Can_IsrRxClassic();
+    SysMgr_BusActivityCounter = 400u;
+    SysMgr_NoBusActivity = 1u;
+}
+
+IFX_INTERRUPT(Can_IrqRxFd, 0, CAN_IRQ_PRIO_RX_FD);
+void Can_IrqRxFd(void)
+{
+    Can_IsrRxFd();
+    SysMgr_BusActivityCounter = 400u;
+    SysMgr_NoBusActivity = 1u;
+}
+
+IFX_INTERRUPT(Can_IrqBusOffClassic, 0, CAN_IRQ_PRIO_BUSOFF_CLASSIC);
+void Can_IrqBusOffClassic(void)
+{
+    Can_IsrBusOffClassic();
+}
+
+IFX_INTERRUPT(Can_IrqBusOffFd, 0, CAN_IRQ_PRIO_BUSOFF_FD);
+void Can_IrqBusOffFd(void)
+{
+    Can_IsrBusOffFd();
 }

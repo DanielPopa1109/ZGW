@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_CompilersTasking.h
  * \brief Startup Software for Tasking compiler options
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2018 Infineon Technologies AG. All rights reserved.
  *
  *                                 IMPORTANT NOTICE
  *
@@ -58,17 +58,7 @@
     __asm("\t .extern _SMALL_DATA_, _LITERAL_DATA_, _A8_DATA_, _A9_DATA_"); \
     extern unsigned int __START0[];     /**< Pointer to the startup code */ \
     extern unsigned int __START1[];     /**< Pointer to the startup code */ \
-    extern unsigned int __START2[];     /**< Pointer to the startup code */ \
-    extern unsigned int __START3[];     /**< Pointer to the startup code */ \
-    extern unsigned int __START4[];     /**< Pointer to the startup code */ \
-    extern unsigned int __START5[];     /**< Pointer to the startup code */	\
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU0;        /**< Enable Individual C init CPU0 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU1;        /**< Enable Individual C init CPU1 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU2;        /**< Enable Individual C init CPU2 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU3;        /**< Enable Individual C init CPU3 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU4;        /**< Enable Individual C init CPU4 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU5;        /**< Enable Individual C init CPU5 */
-
+    extern unsigned int __START2[];     /**< Pointer to the startup code */
 /*End: Common definitions ************************************************ */
 
 /*Start: Core 0 definitions ********************************************** */
@@ -115,15 +105,7 @@
 #define IFX_SSW_NULL_PTR ((void *)0x0U)
 
 #define IFX_SSW_WEAK     __attribute__ ((weak))
-#define Ifx_Ssw_Start(stackPtr, funcPtr) __Ifx_Ssw_Start(stackPtr, funcPtr)
 
-#define __Ifx_Ssw_Start(stackPtr, funcPtr) \
-	    __asm("movh.a a10,#@his("#stackPtr")\n" \
-	          "\tlea a10,[a10]@los("#stackPtr") \n " \
-	          "\tdsync\n" \
-			  "\tmovh.a a15,#@his("#funcPtr")\n" \
-			  "\tlea a15,[a15]@los("#funcPtr")\n" \
-			  "\tji a15");
 /******************************************************************************/
 /*----------------------------   GNU Intrinsics  -----------------------------*/
 /******************************************************************************/
@@ -196,7 +178,7 @@ IFX_SSW_INLINE void Ifx_Ssw_jumpBackToLink(void)
 
 IFX_SSW_INLINE void Ifx_Ssw_infiniteLoop(void)
 {
-    __asm("1: loopu\t 1p");
+    __asm("x: loopu\t x");
 }
 
 IFX_SSW_INLINE void Ifx_Ssw_C_InitInline(void)

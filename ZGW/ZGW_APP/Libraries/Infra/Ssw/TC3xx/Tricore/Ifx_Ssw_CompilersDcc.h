@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_CompilersDcc.h
  * \brief Startup Software for DCC compiler options
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2018 Infineon Technologies AG. All rights reserved.
  *
  *                                 IMPORTANT NOTICE
  *
@@ -80,14 +80,7 @@
     extern unsigned int __START2[];     /**< Pointer to the startup code */   \
     extern unsigned int __START3[];     /**< Pointer to the startup code */   \
     extern unsigned int __START4[];     /**< Pointer to the startup code */   \
-    extern unsigned int __START5[];     /**< Pointer to the startup code */   \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU0;        /**< Enable Individual C init CPU0 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU1;        /**< Enable Individual C init CPU1 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU2;        /**< Enable Individual C init CPU2 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU3;        /**< Enable Individual C init CPU3 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU4;        /**< Enable Individual C init CPU4 */ \
-	extern unsigned int __ENABLE_INDIVIDUAL_C_INIT_CPU5;        /**< Enable Individual C init CPU5 */
-
+    extern unsigned int __START5[];     /**< Pointer to the startup code */
 
 /*Wrapper macros for the tool specific definitions */
 #if defined(IFX_USE_SW_MANAGED_INT)
@@ -110,21 +103,7 @@
 #define IFX_SSW_NULL_PTR ((void *)0x0U)
 
 #define IFX_SSW_WEAK     __attribute__ ((weak))
-#define STRINGIFY(x)    #x
 
-/* Assembly function to configure the Stack pointer and jump to core start */
-#define Ifx_Ssw_Start(stackPtr, funcPtr) __Ifx_Ssw_Start(stackPtr, funcPtr)
-
-#define __Ifx_Ssw_Start(stackPtr, funcPtr)           \
-    {__asm("#$$bp");                               \
-     __asm("  movh.a\t %a10, "#stackPtr"@ha\n");   \
-     __asm("  lea\t %a10, [%a10]"#stackPtr"@l\n"); \
-     __asm("  dsync \n");                          \
-     __asm("  movh.a\t %a15, "#funcPtr"@ha\n");    \
-	 __asm("  lea\t %a15, [%a15]"#funcPtr"@l\n");  \
-     __asm("  ji %a15");                           \
-     __asm("#$$noadjust");                         \
-     __asm("#$$ep"); }
 /******************************************************************************/
 /*--------------------------------   Typedefs  -------------------------------*/
 /******************************************************************************/
@@ -203,8 +182,7 @@ IFX_SSW_INLINE void Ifx_Ssw_C_InitInline(void)
 
 IFX_SSW_INLINE void Ifx_Ssw_infiniteLoop(void)
 {
-    /* Local label is not recognized by Diab llopt */
-    while(1);
+    __asm("x: loopu\t x");
 }
 
 #endif /* IFX_SSW_COMPILERSDCC_H_ */

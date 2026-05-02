@@ -6,7 +6,7 @@
 #define COM_FALSE 0u
 
 #define COM_TX_PDU_APP_STATUS  2u
-#define COM_RX_PDU_APP_STATUS  0u
+#define COM_RX_PDU_APP_STATUS  4u
 
 typedef struct
 {

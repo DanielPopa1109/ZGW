@@ -2,8 +2,8 @@
  * \file Ifx_Ssw.h
  * \brief Startup Software configuration. Can configure which core to be enabled.
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2018 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -50,39 +50,19 @@
 
 /******************************************************************************/
 /*                          Macros                                            */
-/******************************************************************************/  
+/******************************************************************************/
 
 #ifndef IFX_CFG_SSW_ENABLE_TRICORE0
 #define IFX_CFG_SSW_ENABLE_TRICORE0 (1U)
 #endif
 
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC36X) || defined(DEVICE_TC35X) || defined(DEVICE_TC33XED)
 #ifndef IFX_CFG_SSW_ENABLE_TRICORE1
 #define IFX_CFG_SSW_ENABLE_TRICORE1 (1U)
 #endif
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC36X) || defined(DEVICE_TC35X) || defined(DEVICE_TC33XED) */
 
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X)
 #ifndef IFX_CFG_SSW_ENABLE_TRICORE2
 #define IFX_CFG_SSW_ENABLE_TRICORE2 (1U)
 #endif
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X) */
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-#ifndef IFX_CFG_SSW_ENABLE_TRICORE3
-#define IFX_CFG_SSW_ENABLE_TRICORE3 (1U)
-#endif
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) */
-
-#if defined(DEVICE_TC39XB)
-#ifndef IFX_CFG_SSW_ENABLE_TRICORE4
-#define IFX_CFG_SSW_ENABLE_TRICORE4 (1U)
-#endif
-
-#ifndef IFX_CFG_SSW_ENABLE_TRICORE5
-#define IFX_CFG_SSW_ENABLE_TRICORE5 (1U)
-#endif
-#endif /* #if defined(DEVICE_TC39XB) */
 
 #ifndef IFX_CFG_SSW_PSW_DEFAULT
 #define IFX_CFG_SSW_PSW_DEFAULT     (0x00000980u)
@@ -126,22 +106,7 @@ typedef struct
 /******************************************************************************/
 /*                         Exported prototypes                                */
 /******************************************************************************/
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC36X) || defined(DEVICE_TC35X) || defined(DEVICE_TC33XED)
 void __Core1_start(void);
-#endif
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X)
 void __Core2_start(void);
-#endif
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-void __Core3_start(void);
-#endif
-
-#if defined(DEVICE_TC39XB)
-void __Core4_start(void);
-void __Core5_start(void);
-#endif
 
 #endif /* IFX_SSW_H_ */

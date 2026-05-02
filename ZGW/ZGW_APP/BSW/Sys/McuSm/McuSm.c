@@ -1,6 +1,5 @@
 #include "McuSm.h"
 #include "IfxScuLbist.h"
-#include "Irq.h"
 #include "IfxCpu_IntrinsicsTasking.h"
 #include "IfxCpu_reg.h"
 
@@ -22,6 +21,9 @@ void McuSm_TRAP7(IfxCpu_Trap trapInfo);
 
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 {
+    while(1){__debug();}
+
+
     if(0u != resetReason)
     {
         McuSm_LastResetReason = resetReason;

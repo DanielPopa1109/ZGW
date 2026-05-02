@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_Tc0.c
  * \brief Startup Software for Core0
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2018 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -85,14 +85,12 @@
 #define IFX_CFG_SSW_CALLOUT_SMU()
 #endif
 
-#if defined(DEVICE_TC33XED) || defined(DEVICE_TC37XED) || defined(DEVICE_TC39XB) || defined(DEVICE_TC35X)
-#ifndef IFX_CFG_SSW_CALLOUT_EMEM_INIT
-#define IFX_CFG_SSW_CALLOUT_EMEM_INIT()
-#endif
-#endif
-
 #define IFX_SSW_INIT_CONTEXT()                                                   \
     {                                                                            \
+        /* Load user stack pointer */                                            \
+        Ifx_Ssw_setAddressReg(a10, __USTACK(0));                                 \
+        Ifx_Ssw_DSYNC();                                                         \
+                                                                                 \
         /*Initialize the context save area for CPU0. Function Calls Possible */  \
         /* Setup the context save area linked list */                            \
         Ifx_Ssw_initCSA((unsigned int *)__CSA(0), (unsigned int *)__CSA_END(0)); \
@@ -105,15 +103,16 @@
 /** !IMPORTANT: The SSW Configuration shall be defined at Application SW Configuration
  * Please refer to iLLD demos for startup sw configuration (Ifx_Cfg_Ssw.c and .h)
  */
-IFX_SSW_USED static void __StartUpSoftware(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase2(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase3ApplicationResetPath(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase3PowerOnResetPath(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase4(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase5(void);
-IFX_SSW_USED static void __StartUpSoftware_Phase6(void);
-IFX_SSW_USED static void __Core0_start(void);
-IFX_SSW_COMMON_LINKER_SYMBOLS();
+static void __StartUpSoftware(void);
+static void __StartUpSoftware_Phase2(void);
+static void __StartUpSoftware_Phase3ApplicationResetPath(void);
+static void __StartUpSoftware_Phase3PowerOnResetPath(void);
+static void __StartUpSoftware_Phase4(void);
+static void __StartUpSoftware_Phase5(void);
+static void __StartUpSoftware_Phase6(void);
+void Ssw_StartCores(void);
+static void __Core0_start(void);
+IFX_SSW_COMMON_LINKER_SYMBOLS(); // @suppress("Unused variable declaration in file scope")
 IFX_SSW_CORE_LINKER_SYMBOLS(0);
 
 /*******************************************************************************
@@ -127,11 +126,17 @@ __asm("\t .extern core0_main");
 /*Add options to eliminate usage of stack pointers unnecessarily*/
 #if defined(__TASKING__)
 #pragma optimize R
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
 #endif
+
+IFX_SSW_WEAK void hardware_init_hook(void)
+{}
+
+IFX_SSW_WEAK void software_init_hook(void)
+{}
 
 void Ssw_StartCores(void)
 {
@@ -143,12 +148,6 @@ static void __StartUpSoftware(void)
 {
     /* Initialize A1 pointer to use the global constants with small data addressing */
     Ifx_Ssw_setAddressReg(a1, __SDATA2(0));
-    /* Set A0 Pointer to access global variables with small data addressing */
-    Ifx_Ssw_setAddressReg(a0, __SDATA1(0));
-
-    /* These to be un commented if A8 and A9 are required to be initialized */
-    Ifx_Ssw_setAddressReg(a8, __SDATA3(0));
-    Ifx_Ssw_setAddressReg(a9, __SDATA4(0));
 
     /* Set the PSW to its reset value in case of a warm start,clear PSW.IS */
     Ifx_Ssw_MTCR(CPU_PSW, IFX_CFG_SSW_PSW_DEFAULT);
@@ -164,30 +163,18 @@ static void __StartUpSoftware(void)
     }
 }
 
-#if defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang optimize off
-#endif
+
 static void __StartUpSoftware_Phase2(void)
 {
     /* Power and EVRC configurations */
     IFX_CFG_SSW_CALLOUT_PMS_INIT();
-
-    /* LBIST Tests and evaluation */
-    IFX_CFG_SSW_CALLOUT_LBIST();
-
-    /* MONBIST Tests and evaluation */
-    IFX_CFG_SSW_CALLOUT_MONBIST();
-
     Ifx_Ssw_jumpToFunction(__StartUpSoftware_Phase3PowerOnResetPath);
 }
-#if defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang optimize on
-#endif
+
 
 static void __StartUpSoftware_Phase3PowerOnResetPath(void)
 {
     IFX_SSW_INIT_CONTEXT();
-
     Ifx_Ssw_jumpToFunction(__StartUpSoftware_Phase4);
 }
 
@@ -195,107 +182,38 @@ static void __StartUpSoftware_Phase3PowerOnResetPath(void)
 static void __StartUpSoftware_Phase3ApplicationResetPath(void)
 {
     IFX_SSW_INIT_CONTEXT();
-
     Ifx_Ssw_jumpToFunction(__StartUpSoftware_Phase5);
 }
 
-
 static void __StartUpSoftware_Phase4(void)
 {
-    /* This is for ADAS chip, where clock is provided by MMIC chip. This has to be
-     * implemented according the board.
-     */
-    IFX_CFG_SSW_CALLOUT_MMIC_CHECK();
-
-    {
-        /* Update safety and cpu watchdog reload value*/
-        unsigned short cpuWdtPassword    = Ifx_Ssw_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[0]);
-        unsigned short safetyWdtPassword = Ifx_Ssw_getSafetyWatchdogPasswordInline();
-
-        /* servicing watchdog timers */
-        Ifx_Ssw_serviceCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
-        Ifx_Ssw_serviceSafetyWatchdog(safetyWdtPassword);
-    }
-
+    /* Update safety and cpu watchdog reload value*/
+    unsigned short cpuWdtPassword    = Ifx_Ssw_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[0]);
+    unsigned short safetyWdtPassword = Ifx_Ssw_getSafetyWatchdogPasswordInline();
+    /* servicing watchdog timers */
+    Ifx_Ssw_serviceCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
+    Ifx_Ssw_serviceSafetyWatchdog(safetyWdtPassword);
     /* Initialize the clock system */
     IFX_CFG_SSW_CALLOUT_PLL_INIT();
-
-    /* MBIST Tests and evaluation */
-    IFX_CFG_SSW_CALLOUT_MBIST();
-
     Ifx_Ssw_jumpToFunction(__StartUpSoftware_Phase5);
 }
 
 
 static void __StartUpSoftware_Phase5(void)
 {
-    /* Disable safety and cpu watchdog*/
-    unsigned short cpuWdtPassword	= Ifx_Ssw_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[0]);
-    unsigned short safetyWdtPassword = Ifx_Ssw_getSafetyWatchdogPasswordInline();
-    Ifx_Ssw_disableCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
-    Ifx_Ssw_disableSafetyWatchdog(safetyWdtPassword);
-
-    /* Initialization of C runtime variables and CPP constructors and destructors */
-	(void)Ifx_Ssw_doCppInit();
-	
-    /* Enable safety and cpu watchdog*/
-    Ifx_Ssw_enableSafetyWatchdog(safetyWdtPassword);
-    Ifx_Ssw_enableCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
-
-    /* SMU alarm handling */
-    IFX_CFG_SSW_CALLOUT_SMU();
-
     Ifx_Ssw_jumpToFunction(__StartUpSoftware_Phase6);
 }
 
+
 static void __StartUpSoftware_Phase6(void)
 {
-    /* Start remaining cores as a daisy-chain */
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC36X) || defined(DEVICE_TC35X) || defined(DEVICE_TC33XED)
-#if (IFX_CFG_SSW_ENABLE_TRICORE1 != 0)
-    Ifx_Ssw_startCore(&MODULE_CPU1, (unsigned int)__START(1));           /*The status returned by function call is ignored */
-#endif /* #if (IFX_CFG_CPU_CSTART_ENABLE_TRICORE1 != 0) */
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC36X) || defined(DEVICE_TC35X) || defined(DEVICE_TC33XED) */
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X)
-#if (IFX_CFG_SSW_ENABLE_TRICORE1 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE2 != 0)
-    Ifx_Ssw_startCore(&MODULE_CPU2, (unsigned int)__START(2));           /*The status returned by function call is ignored */
-#endif /* (IFX_CFG_SSW_ENABLE_TRICORE2 != 0) */
-
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-#if (IFX_CFG_SSW_ENABLE_TRICORE2 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE3 != 0)
-    Ifx_Ssw_startCore(&MODULE_CPU3, (unsigned int)__START(3));           /*The status returned by function call is ignored */
-#endif /* (IFX_CFG_SSW_ENABLE_TRICORE3 != 0) */ 
-
-#if defined(DEVICE_TC39XB)
-#if (IFX_CFG_SSW_ENABLE_TRICORE3 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE4 != 0)
-    Ifx_Ssw_startCore(&MODULE_CPU4, (unsigned int)__START(4));           /*The status returned by function call is ignored */
-#endif /* (IFX_CFG_SSW_ENABLE_TRICORE4 != 0) */
-
-#if (IFX_CFG_SSW_ENABLE_TRICORE4 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE5 != 0)
-    Ifx_Ssw_startCore(&MODULE_CPU5, (unsigned int)__START(5));           /*The status returned by function call is ignored */
-#endif /* (IFX_CFG_SSW_ENABLE_TRICORE5 != 0) */
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE4 == 0) */
-
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE3 == 0) */
-#endif /* #if defined(DEVICE_TC39XB) */
-
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE2 == 0) */
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) */
-
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE1 == 0) */
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X) */
-
     Ifx_Ssw_jumpToFunction(__Core0_start);
 }
 
-
 static void __Core0_start(void)
 {
+    /* Enable MTU clock */
+    IfxMtu_enableModule();
     /* Update safety and cpu/safety watchdog reload values */
     /* Password value is read again, because there is chance that local variables may be overridden. */
     unsigned short cpuWdtPassword    = Ifx_Ssw_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[0]);
@@ -320,6 +238,13 @@ static void __Core0_start(void)
         Ifx_Ssw_ISYNC();
     }
 
+    /* Set A0 Pointer to access global variables with small data addressing */
+    Ifx_Ssw_setAddressReg(a0, __SDATA1(0));
+
+    /* These to be un commented if A8 and A9 are required to be initialized */
+    Ifx_Ssw_setAddressReg(a8, __SDATA3(0));
+    Ifx_Ssw_setAddressReg(a9, __SDATA4(0));
+
     /* Trap vector table initialization is necessary if it is not same as default value */
     Ifx_Ssw_MTCR(CPU_BTV, (unsigned int)__TRAPTAB(0));
     /* Base interrupt vector table initialized */
@@ -327,10 +252,6 @@ static void __Core0_start(void)
     /* Interrupt stack pointer is configured */
     Ifx_Ssw_MTCR(CPU_ISP, (unsigned int)__ISTACK(0));
 
-#if defined(DEVICE_TC33XED) || defined(DEVICE_TC37XED) || defined(DEVICE_TC39XB) || defined(DEVICE_TC35X)
-    /* EMEM Initialization */
-    IFX_CFG_SSW_CALLOUT_EMEM_INIT();
-#endif /*#if defined(DEVICE_TC33XED) || defined(DEVICE_TC37XED) || defined(DEVICE_TC39XB) || defined(DEVICE_TC35X)*/
     Ifx_Ssw_setCpuEndinitInline(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
 
     /* CPU and safety watchdogs are enabled by default,
@@ -340,17 +261,20 @@ static void __Core0_start(void)
     Ifx_Ssw_disableSafetyWatchdog(safetyWdtPassword);
 
     /* Hook functions to initialize application specific HW extensions */
-	//hardware_init_hook();
+	hardware_init_hook();
+
+	/* Initialization of C runtime variables and CPP constructors and destructors */
+	(void)Ifx_Ssw_doCppInit();
 
 	/* Hook functions to initialize application specific SW extensions */
-	//software_init_hook();
+	software_init_hook();
 
     Ifx_Ssw_enableSafetyWatchdog(safetyWdtPassword);
 
 #if (IFX_CFG_SSW_ENABLE_TRICORE0 == 0)
     /* Set the CPU 0 to Idle mode, if it is not needed to be enabled */
     Ifx_Ssw_setCpu0Idle();
-#endif /*(IFX_CFG_SSW_ENABLE_TRICORE0 == 0)*/
+#endif
 
     Ifx_Ssw_enableCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
 
@@ -377,11 +301,9 @@ static void __Core0_start(void)
 #if defined(__TASKING__)
 #pragma protect on
 #pragma section code "start"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
 #pragma section ".start" x
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".start"
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #pragma section ".start" x
@@ -393,7 +315,7 @@ static void __Core0_start(void)
 
 void _START(void)
 {
-	Ifx_Ssw_Start(__USTACK(0), __StartUpSoftware);
+    Ifx_Ssw_jumpToFunction(__StartUpSoftware);
 }
 
 
@@ -401,10 +323,8 @@ void _START(void)
 #if defined(__TASKING__)
 #pragma protect restore
 #pragma section code restore
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=""
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #elif defined(__DCC__)
@@ -416,7 +336,7 @@ void _START(void)
 /*Restore the options to command line provided ones*/
 #if defined(__TASKING__)
 #pragma endoptimize
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma GCC reset_options
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC reset_options

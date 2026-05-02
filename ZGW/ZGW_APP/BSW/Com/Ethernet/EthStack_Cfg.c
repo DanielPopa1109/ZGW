@@ -4,11 +4,13 @@
 #include "SomeIp.h"
 #include "SomeIpSd.h"
 #include "Dcm_EthTpBridge.h"
+#include "PduR.h"
 
 #define SOAD_SOCON_DOIP_UDP        0u
 #define SOAD_SOCON_DOIP_TCP        1u
 #define SOAD_SOCON_SOMEIP_SD_UDP   2u
 #define SOAD_SOCON_SOMEIP_UDP      3u
+#define SOAD_SOCON_PDUR_IF_UDP      4u
 
 static void Demo_MethodHandler(SoAd_SoConIdType soConId,
                                const TcpIp_SockAddrType *remoteAddr,
@@ -105,6 +107,17 @@ static const SoAd_SocketConnectionConfigType SoAdConnections[] =
         .localAddr = {{192u, 168u, 0u, 10u}, 30500u},
         .remoteAddr = {{0u, 0u, 0u, 0u}, 0u},
         .rxIndication = SomeIp_SoAdRxIndication,
+        .tcpConnected = 0,
+        .tcpDisconnected = 0
+    },
+    {
+        .soConId = SOAD_SOCON_PDUR_IF_UDP,
+        .upperLayer = SOAD_UPPER_NONE,
+        .protocol = TCPIP_PROTOCOL_UDP,
+        .isServer = 1u,
+        .localAddr = {{192u, 168u, 0u, 10u}, 30600u},
+        .remoteAddr = {{192u, 168u, 0u, 255u}, 30600u},
+        .rxIndication = PduR_SoAdIfRxIndication,
         .tcpConnected = 0,
         .tcpDisconnected = 0
     }

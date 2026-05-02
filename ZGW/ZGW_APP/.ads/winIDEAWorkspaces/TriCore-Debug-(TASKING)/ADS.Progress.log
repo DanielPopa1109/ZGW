@@ -1,0 +1,666 @@
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+PROGRAMMING	Infineon TC3xx_UCB_24kB (8 sectors)
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+
+
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+
+
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	WARNING Can't check SoC identification
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+SoC	Detected device: TC370 series, rev. AA
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	END - Not attempting cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex
+LOADING	C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\TriCore Debug (TASKING)\ZGW_APP.hex
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+PROGRAMMING 	6295456 bytes
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+Image checker	Startup address check is disabled.
+ERASING	Infineon TC37x_PFLASH_6MB
+PROGRAMMING	Infineon TC37x_PFLASH_6MB (384 sectors)
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
+EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Initialization script (if any) done
+EMULATION	Final debug frequency set
+EMULATION	SoC identification match OK
+SoC	Detected device: TC370 series, rev. AA
+EMULATION	STARTED
+EMULATION	END - Without cleanup

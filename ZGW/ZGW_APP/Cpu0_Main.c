@@ -3,7 +3,6 @@
 #include "IfxCpu.h"
 #include "IfxScuWdt.h"
 #include "Os.h"
-#include "Ain_Filtering.h"
 #include "Can.h"
 #include "Dem.h"
 #include "Dcm.h"
@@ -53,14 +52,12 @@ void core0_main(void)
 
     Ssw_StartCores();
 
-    SysMgr_EcuState = SYSMGR_STARTUP;
-
-    McuSm_InitializeBusMpu();
-
-    Ain_FilteringInit();
+   // McuSm_InitializeBusMpu(); //todo
 
     gpio_init_pins();
     can0_node0_init_pins();
+    can0_node1_init_pins();
+    asclin1_init_pins();
 
     Can_Init();
     CanIf_Init(&CanIf_Config);
@@ -71,13 +68,11 @@ void core0_main(void)
     Dcm_Init(&Dcm_Config);
     LinSM_Init();
     LinIf_Init();
-    LinTp_Init(1); //todo
+    LinTp_Init(1);
 
     Dem_PreInit();
     NvM_ReadAll();
     Dem_Init(NULL_PTR);
-
-    SysMgr_ProcessResetDtc();
 
     Os_Init_C0();
 

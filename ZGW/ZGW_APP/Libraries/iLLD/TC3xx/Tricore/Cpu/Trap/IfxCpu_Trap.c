@@ -3,8 +3,8 @@
  * \brief This file contains the APIs for Trap related functions.
  *
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2012 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -114,8 +114,6 @@
 *******************************************************************************/
 IFX_INLINE IfxCpu_Trap IfxCpu_Trap_extractTrapInfo(uint8 trapClass, uint32 tin)
 {
-	/* Extracts trap information for a given trap class and ID */
-
     IfxCpu_Trap trapInfo;
     trapInfo.tAddr  = (unsigned int)__getA11();
     trapInfo.tClass = trapClass;
@@ -124,207 +122,157 @@ IFX_INLINE IfxCpu_Trap IfxCpu_Trap_extractTrapInfo(uint8 trapClass, uint32 tin)
     return trapInfo;
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_memoryManagementError(uint32 tin)
 {
-	/* Handles memory management traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about the memory management trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_memoryManagement, tin);
-    /* Invokes the configured hook for memory management trap handling */
     IFX_CFG_CPU_TRAP_MME_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_internalProtectionError(uint32 tin)
 {
-	/* Handles internal protection traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about internal protection trap event*/
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_internalProtection, tin);
-    /* Invokes the configured hook for internal protection trap handling */
     IFX_CFG_CPU_TRAP_IPE_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_instructionError(uint32 tin)
 {
-    /* Handles instruction errors traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about instruction errors trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_instructionErrors, tin);
-    /* Invokes the configured hook for instruction errors trap handling */
     IFX_CFG_CPU_TRAP_IE_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_contextManagementError(uint32 tin)
 {
-    /* Handles context management traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about context management trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_contextManagement, tin);
-    /* Invokes the configured hook for context management trap handling */
     IFX_CFG_CPU_TRAP_CME_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-	#if defined(__HIGHTEC__) && defined(__clang__)
-    #else
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
     __asm("rfe");
-    #endif
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_busError(uint32 tin)
 {
-    /* Handles bus errors traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about bus errors trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_bus, tin);
-    /* Invokes the configured hook for bus errors trap handling */
     IFX_CFG_CPU_TRAP_BE_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
-IFX_TRAP_HANDLER
+
 void IfxCpu_Trap_assertion(uint32 tin)
 {
-    /* Handles assertion traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about assertion trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_assertion, tin);
-    /* Invokes the configured hook for assertion trap handling */
     IFX_CFG_CPU_TRAP_ASSERT_HOOK(trapWatch);
     IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu0(uint32 tin)
 {
-    /* Handles system call traps for CPU0 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU0 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU0_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
 #if IFXCPU_NUM_MODULES >= 2
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu1(uint32 tin)
 {
-    /* Handles system call traps for CPU1 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU1 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU1_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 3
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu2(uint32 tin)
 {
-    /* Handles system call traps for CPU2 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU2 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU2_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 4
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu3(uint32 tin)
 {
-    /* Handles system call traps for CPU3 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU3 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU3_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 5
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu4(uint32 tin)
 {
-    /* Handles system call traps for CPU4 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU4 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU4_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 6
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu5(uint32 tin)
 {
-    /* Handles system call traps for CPU5 */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about system call trap event for CPU5 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
     IFX_CFG_CPU_TRAP_SYSCALL_CPU5_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 #endif
 
-IFX_TRAP_HANDLER
 void IfxCpu_Trap_nonMaskableInterrupt(uint32 tin)
 {
-    /* Handles non-maskable interrupt traps */
-
     volatile IfxCpu_Trap trapWatch;
-    /* Retrieves details about non-maskable interrupt trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_nonMaskableInterrupt, tin);
-    /* Invokes the configured hook for non-maskable interrupt trap handling */
-    IFX_CFG_CPU_TRAP_NMI_HOOK(trapWatch);    
-    IFX_TRAP_RET;
+    IFX_CFG_CPU_TRAP_NMI_HOOK(trapWatch);
+    //IFX_CFG_CPU_TRAP_DEBUG;
+    __asm("rslcx"); /* Restore lower context before returning. lower context was stored in the trap vector */
+    __asm("rfe");
 }
 
 
 #if defined(__TASKING__)
 #pragma protect on
 #pragma section code "traptab_cpu0"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu0" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu0"
-IFX_USED void IfxCpu_Trap_vectorTable0(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu0" awx
+#pragma GCC optimize ("O2")
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu0" ax
+#pragma section ".traptab_cpu0" awx
 #pragma GCC optimize ("O2")
 #elif defined(__DCC__)
 #pragma section
@@ -335,23 +283,13 @@ IFX_USED void IfxCpu_Trap_vectorTable0(void) __attribute__((naked,aligned(256)))
 #endif
 void IfxCpu_Trap_vectorTable0(void)
 {
-	/* Sets up the trap service routines for CPU0 */
-
-	/* Map Memory Management Error trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
-    /* Map Internal Protection Error trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
-    /* Map Instruction Error trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
-    /*  Map Context Management Error trap to its handler for CPU0 */
     IfxCpu_Tsr_CallCSATSR(IfxCpu_Trap_contextManagementError);
-    /* Map Bus Error trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_busError);
-    /* Map Assertion trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_assertion);
-    /* Map System Call trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_systemCall_Cpu0);
-    /* Map Non-Maskable Interrupt trap to its handler for CPU0 */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_nonMaskableInterrupt);
 }
 
@@ -359,15 +297,12 @@ void IfxCpu_Trap_vectorTable0(void)
 #if IFXCPU_NUM_MODULES >= 2
 #if defined(__TASKING__)
 #pragma section code "traptab_cpu1"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu1" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu1"
-IFX_USED void IfxCpu_Trap_vectorTable1(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu1" awx
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu1" ax
+#pragma section ".traptab_cpu1" awx
 #elif defined(__DCC__)
 #pragma section
 #pragma section CODE ".traptab_cpu1" X
@@ -377,9 +312,6 @@ IFX_USED void IfxCpu_Trap_vectorTable1(void) __attribute__((naked,aligned(256)))
 #endif
 void IfxCpu_Trap_vectorTable1(void)
 {
-	/* Sets up the trap service routines for CPU1 */
-
-	/* Mapping each trap class to its handler */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
@@ -396,15 +328,12 @@ void IfxCpu_Trap_vectorTable1(void)
 #if IFXCPU_NUM_MODULES >= 3
 #if defined(__TASKING__)
 #pragma section code "traptab_cpu2"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu2" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu2"
-IFX_USED void IfxCpu_Trap_vectorTable2(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu2" awx
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu2" ax
+#pragma section ".traptab_cpu2" awx
 #elif defined(__DCC__)
 #pragma section
 #pragma section CODE ".traptab_cpu2" X
@@ -415,9 +344,6 @@ IFX_USED void IfxCpu_Trap_vectorTable2(void) __attribute__((naked,aligned(256)))
 
 void IfxCpu_Trap_vectorTable2(void)
 {
-	/* Sets up the trap service routines for CPU2 */
-
-	/* Mapping each trap class to its handler */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
@@ -434,15 +360,12 @@ void IfxCpu_Trap_vectorTable2(void)
 #if IFXCPU_NUM_MODULES >= 4
 #if defined(__TASKING__)
 #pragma section code "traptab_cpu3"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu3" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu3"
-IFX_USED void IfxCpu_Trap_vectorTable3(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu3" awx
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu3" ax
+#pragma section ".traptab_cpu3" awx
 #elif defined(__DCC__)
 #pragma section
 #pragma section CODE ".traptab_cpu3" X
@@ -454,9 +377,6 @@ IFX_USED void IfxCpu_Trap_vectorTable3(void) __attribute__((naked,aligned(256)))
 
 void IfxCpu_Trap_vectorTable3(void)
 {
-	/* Sets up the trap service routines for CPU3 */
-
-	/* Mapping each trap class to its handler */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
@@ -473,15 +393,12 @@ void IfxCpu_Trap_vectorTable3(void)
 #if IFXCPU_NUM_MODULES >= 5
 #if defined(__TASKING__)
 #pragma section code "traptab_cpu4"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu4" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu4"
-IFX_USED void IfxCpu_Trap_vectorTable4(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu4" awx
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu4" ax
+#pragma section ".traptab_cpu4" awx
 #elif defined(__DCC__)
 #pragma section
 #pragma section CODE ".traptab_cpu4" X
@@ -492,9 +409,6 @@ IFX_USED void IfxCpu_Trap_vectorTable4(void) __attribute__((naked,aligned(256)))
 
 void IfxCpu_Trap_vectorTable4(void)
 {
-	/* Sets up the trap service routines for CPU4 */
-
-	/* Mapping each trap class to its handler */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
@@ -511,15 +425,12 @@ void IfxCpu_Trap_vectorTable4(void)
 #if IFXCPU_NUM_MODULES >= 6
 #if defined(__TASKING__)
 #pragma section code "traptab_cpu5"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu5" ax
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".traptab_cpu5"
-IFX_USED void IfxCpu_Trap_vectorTable5(void) __attribute__((naked,aligned(256)));
+#pragma section ".traptab_cpu5" awx
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
-#pragma section ".traptab_cpu5" ax
+#pragma section ".traptab_cpu5" awx
 #elif defined(__DCC__)
 #pragma section
 #pragma section CODE ".traptab_cpu5" X
@@ -530,9 +441,6 @@ IFX_USED void IfxCpu_Trap_vectorTable5(void) __attribute__((naked,aligned(256)))
 
 void IfxCpu_Trap_vectorTable5(void)
 {
-	/* Sets up the trap service routines for CPU5 */
-
-	/* Mapping each trap class to its handler */
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_memoryManagementError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_internalProtectionError);
     IfxCpu_Tsr_CallTSR(IfxCpu_Trap_instructionError);
@@ -548,10 +456,8 @@ void IfxCpu_Trap_vectorTable5(void)
 
 #if defined(__TASKING__)
 #pragma endprotect
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=""
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #elif defined(__DCC__)

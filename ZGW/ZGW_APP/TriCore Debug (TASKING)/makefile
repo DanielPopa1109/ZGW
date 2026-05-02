@@ -23,8 +23,6 @@ RM := rm -rf
 -include Libraries/iLLD/TC3xx/Tricore/Geth/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Geth/Eth/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Flash/Std/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Evadc/Std/subdir.mk
--include Libraries/iLLD/TC3xx/Tricore/Evadc/Adc/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Dts/Std/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Dts/Dts/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Cpu/Trap/subdir.mk
@@ -59,8 +57,6 @@ RM := rm -rf
 -include BSW/Mem/MemIf/subdir.mk
 -include BSW/Mem/Fls/subdir.mk
 -include BSW/Mem/Fee/subdir.mk
--include BSW/Io/Irq/subdir.mk
--include BSW/Io/Ain/subdir.mk
 -include BSW/Diag/Dem/subdir.mk
 -include BSW/Diag/Dcm/subdir.mk
 -include BSW/Com/PduR/subdir.mk

@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_Infra.h
  * \brief Startup Software support functions.
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2021 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -55,7 +55,7 @@
 
 /** \brief PowerOn Reset Mask
  */
-#define IFX_SSW_POWERONRESET_MASK                                             \
+#define IFX_SSW_POWERONRESET_MASK                               \
     (((unsigned int)IFX_SCU_RSTSTAT_STBYR_MSK << IFX_SCU_RSTSTAT_STBYR_OFF) | \
      ((unsigned int)IFX_SCU_RSTSTAT_SWD_MSK << IFX_SCU_RSTSTAT_SWD_OFF) |     \
      ((unsigned int)IFX_SCU_RSTSTAT_EVR33_MSK << IFX_SCU_RSTSTAT_EVR33_OFF) | \
@@ -66,32 +66,7 @@
 
 /** \brief Application Reset Mask
  */
-#if defined(DEVICE_TC39XB)
-#define IFX_SSW_APPLICATIONRESET_MASK                                       \
-    (((unsigned int)IFX_SCU_RSTSTAT_SW_MSK << IFX_SCU_RSTSTAT_SW_OFF) |     \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM5_MSK << IFX_SCU_RSTSTAT_STM5_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM4_MSK << IFX_SCU_RSTSTAT_STM4_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM3_MSK << IFX_SCU_RSTSTAT_STM3_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM2_MSK << IFX_SCU_RSTSTAT_STM2_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM1_MSK << IFX_SCU_RSTSTAT_STM1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM0_MSK << IFX_SCU_RSTSTAT_STM0_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_SMU_MSK << IFX_SCU_RSTSTAT_SMU_OFF) |   \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR1_MSK << IFX_SCU_RSTSTAT_ESR1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR0_MSK << IFX_SCU_RSTSTAT_ESR0_OFF))
-
-#elif defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-#define IFX_SSW_APPLICATIONRESET_MASK                                       \
-    (((unsigned int)IFX_SCU_RSTSTAT_SW_MSK << IFX_SCU_RSTSTAT_SW_OFF) |     \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM3_MSK << IFX_SCU_RSTSTAT_STM3_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM2_MSK << IFX_SCU_RSTSTAT_STM2_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM1_MSK << IFX_SCU_RSTSTAT_STM1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM0_MSK << IFX_SCU_RSTSTAT_STM0_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_SMU_MSK << IFX_SCU_RSTSTAT_SMU_OFF) |   \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR1_MSK << IFX_SCU_RSTSTAT_ESR1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR0_MSK << IFX_SCU_RSTSTAT_ESR0_OFF))
-	 
-#elif defined(DEVICE_TC37XED) || defined(DEVICE_TC37X) || defined(DEVICE_TC35X)
-#define IFX_SSW_APPLICATIONRESET_MASK                                       \
+#define IFX_SSW_APPLICATIONRESET_MASK                         \
     (((unsigned int)IFX_SCU_RSTSTAT_SW_MSK << IFX_SCU_RSTSTAT_SW_OFF) |     \
      ((unsigned int)IFX_SCU_RSTSTAT_STM2_MSK << IFX_SCU_RSTSTAT_STM2_OFF) | \
      ((unsigned int)IFX_SCU_RSTSTAT_STM1_MSK << IFX_SCU_RSTSTAT_STM1_OFF) | \
@@ -99,61 +74,43 @@
      ((unsigned int)IFX_SCU_RSTSTAT_SMU_MSK << IFX_SCU_RSTSTAT_SMU_OFF) |   \
      ((unsigned int)IFX_SCU_RSTSTAT_ESR1_MSK << IFX_SCU_RSTSTAT_ESR1_OFF) | \
      ((unsigned int)IFX_SCU_RSTSTAT_ESR0_MSK << IFX_SCU_RSTSTAT_ESR0_OFF))
-	 
-#elif defined(DEVICE_TC36X) || defined(DEVICE_TC33XED)
-#define IFX_SSW_APPLICATIONRESET_MASK                                       \
-    (((unsigned int)IFX_SCU_RSTSTAT_SW_MSK << IFX_SCU_RSTSTAT_SW_OFF) |     \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM1_MSK << IFX_SCU_RSTSTAT_STM1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM0_MSK << IFX_SCU_RSTSTAT_STM0_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_SMU_MSK << IFX_SCU_RSTSTAT_SMU_OFF) |   \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR1_MSK << IFX_SCU_RSTSTAT_ESR1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR0_MSK << IFX_SCU_RSTSTAT_ESR0_OFF))
 
-#elif defined(DEVICE_TC33X)
-#define IFX_SSW_APPLICATIONRESET_MASK                                       \
-    (((unsigned int)IFX_SCU_RSTSTAT_SW_MSK << IFX_SCU_RSTSTAT_SW_OFF) |     \
-     ((unsigned int)IFX_SCU_RSTSTAT_STM0_MSK << IFX_SCU_RSTSTAT_STM0_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_SMU_MSK << IFX_SCU_RSTSTAT_SMU_OFF) |   \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR1_MSK << IFX_SCU_RSTSTAT_ESR1_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_ESR0_MSK << IFX_SCU_RSTSTAT_ESR0_OFF))
-
-#endif
 /** \brief Cold PowerOn Reset Mask
  */
-#define IFX_SSW_COLD_POWERONRESET_MASK                                        \
+#define IFX_SSW_COLD_POWERONRESET_MASK                         \
     (((unsigned int)IFX_SCU_RSTSTAT_STBYR_MSK << IFX_SCU_RSTSTAT_STBYR_OFF) | \
-     ((unsigned int)IFX_SCU_RSTSTAT_SWD_MSK << IFX_SCU_RSTSTAT_SWD_OFF) |     \
+     ((unsigned int)IFX_SCU_RSTSTAT_SWD_MSK << IFX_SCU_RSTSTAT_SWD_OFF)     | \
      ((unsigned int)IFX_SCU_RSTSTAT_EVR33_MSK << IFX_SCU_RSTSTAT_EVR33_OFF) | \
      ((unsigned int)IFX_SCU_RSTSTAT_EVRC_MSK << IFX_SCU_RSTSTAT_EVRC_OFF))
 
 /** \brief Application reset enabled
  * In SCU_RSTCON register, value 2 represents the Application reset
  */
-#define IFX_SSW_APPLICATIONRESET                  (2U)
+#define IFX_SSW_APPLICATIONRESET              (2U)
 
 /** \brief Reload value mask */
-#define IFX_SSW_SEICON_REL_VAL_MSK                (unsigned short)(0xFFFCU << IFX_SCU_SEICON0_REL_OFF)
+#define IFX_SSW_SEICON_REL_VAL_MSK           (unsigned short)(0xFFFCU << IFX_SCU_SEICON0_REL_OFF)
 
 /** \brief Mask values is used to invert the password value bits */
-#define IFX_SSW_WDT_PASSWORD_INVERT_MSK           (0x003FU)
+#define IFX_SSW_WDT_PASSWORD_INVERT_MSK      (0x003FU)
 
 /** \brief CSA size */
-#define IFX_SSW_CSA_SIZE                          16U
+#define IFX_SSW_CSA_SIZE                      16U
 
 #ifndef IFX_CFG_SSW_STARTCPU_WAIT_TIME_IN_SECONDS
 #define IFX_CFG_SSW_STARTCPU_WAIT_TIME_IN_SECONDS (0.0001)
 #endif
 
 #ifndef IFX_CFG_SSW_EVR_OSC_FREQUENCY
-#define IFX_CFG_SSW_EVR_OSC_FREQUENCY             (100000000.0)
+#define IFX_CFG_SSW_EVR_OSC_FREQUENCY         (100000000.0)
 #endif
 
 #ifndef IFX_CFG_SSW_SYSCLK_PIN_FREQUENCY
-#define IFX_CFG_SSW_SYSCLK_PIN_FREQUENCY          (20000000.0)
+#define IFX_CFG_SSW_SYSCLK_PIN_FREQUENCY      (20000000.0)
 #endif
 
 #ifndef IFX_CFG_SSW_XTAL_FREQUENCY
-#define IFX_CFG_SSW_XTAL_FREQUENCY                (IFX_CFG_SCU_XTAL_FREQUENCY)
+#define IFX_CFG_SSW_XTAL_FREQUENCY            (IFX_CFG_SCU_XTAL_FREQUENCY)
 #endif
 
 /******************************************************************************/
@@ -162,246 +119,182 @@
 /** \brief clear safety endinit.\n
  * Note: IFX_CFG_SSW_CLEAR_SAFETY_ENDINIT() function macro is added to avoid issues higher optimization is enabled.
  */
-#define IFX_CFG_SSW_CLEAR_SAFETY_ENDINIT()                                                                   \
-    {                                                                                                        \
-        /* see Table 1 (Password Access Bit Pattern Requirements) */                                         \
-        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                               \
-                          ((unsigned int)0 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                   \
-                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) | \
-                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                  \
-        /* Clear ENDINT and set LCK bit in Config_0 register */                                              \
-        SCU_WDTS_CON0.U = ((unsigned int)0 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                               \
-                          ((unsigned int)1 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                   \
-                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) | \
-                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                  \
-        /* Read back of the register is mandatory to ensure the register update  */                          \
-        SCU_WDTS_CON0.U;                                                                                     \
+#define IFX_CFG_SSW_CLEAR_SAFETY_ENDINIT()                                                                    \
+    {                                                                                                       \
+        /* see Table 1 (Password Access Bit Pattern Requirements) */                                        \
+        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                              \
+                          ((unsigned int)0 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                  \
+                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) |\
+                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                 \
+        /* Clear ENDINT and set LCK bit in Config_0 register */                                             \
+        SCU_WDTS_CON0.U = ((unsigned int)0 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                              \
+                          ((unsigned int)1 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                  \
+                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) |\
+                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                 \
+        /* Read back of the register is mandatory to ensure the register update  */                         \
+        SCU_WDTS_CON0.U;                                                                                    \
     }
 
 /** \brief set safety endinit.\n
  * Note: IFX_CFG_SSW_SET_SAFETY_ENDINIT() function macro is added to avoid issues higher optimization is enabled.
  */
-#define IFX_CFG_SSW_SET_SAFETY_ENDINIT()                                                                     \
-    {                                                                                                        \
-        /* see Table 1 (Password Access Bit Pattern Requirements) */                                         \
-        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                               \
-                          ((unsigned int)0 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                   \
-                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) | \
-                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                  \
-        /* Set ENDINT and set LCK bit in Config_0 register */                                                \
-        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                               \
-                          ((unsigned int)1 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                   \
-                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) | \
-                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                  \
-        /* Read back of the register is mandatory to ensure the register update  */                          \
-        SCU_WDTS_CON0.U;                                                                                     \
+#define IFX_CFG_SSW_SET_SAFETY_ENDINIT()                                                                  \
+    {                                                                                                       \
+        /* see Table 1 (Password Access Bit Pattern Requirements) */                                        \
+        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                              \
+                          ((unsigned int)0 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                  \
+                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) |\
+                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                 \
+        /* Set ENDINT and set LCK bit in Config_0 register */                                               \
+        SCU_WDTS_CON0.U = ((unsigned int)1 << IFX_SCU_WDTS_CON0_ENDINIT_OFF) |                              \
+                          ((unsigned int)1 << IFX_SCU_WDTS_CON0_LCK_OFF) |                                  \
+                          ((unsigned int)(MODULE_SCU.WDTS.CON0.B.PW ^ 0x003F) << IFX_SCU_WDTS_CON0_PW_OFF) |\
+                          ((unsigned int)SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);                 \
+        /* Read back of the register is mandatory to ensure the register update  */                             \
+        SCU_WDTS_CON0.U;                                                                                        \
     }
 
-/**
- * \brief Fetch current password of CPU Watchdog module.
+/** \brief Fetch current password of CPU Watchdog module.
  *
  * This API will fetch current Watchdog password for CPU WDT Hardware module.
- * password is needed to be passed with most of the WDT APIs.
- *
- * \param[in] watchdog Pointer to the watchdog register map of CPU WDT hardware instance.
- *
- * \retval unsigned short Existing (Application specific) password for the Watchdog module.
+ * password is needed to be passed with most of the WDT APIs. 
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance
+ * \return password Existing (Application specific) password for the Watchdog module.
  */
 extern unsigned short Ifx_Ssw_getCpuWatchdogPassword(Ifx_SCU_WDTCPU *watchdog);
 
-/**
- * \brief Fetch current password of Safety Watchdog module.
+/** \brief Fetch current password of Safety Watchdog module.
  *
  * This API will fetch current Watchdog password for Safety WDT Hardware module.
- * password is needed to be passed with most of the WDT APIs.
- *
- * \retval unsigned short Existing (Application specific) password for the Watchdog module.
+ * password is needed to be passed with most of the WDT APIs. 
+ * \return password Existing (Application specific) password for the Watchdog module.
  */
 extern unsigned short Ifx_Ssw_getSafetyWatchdogPassword(void);
 
-/**
- * \brief Clear ENDINIT bit provided by CPU WDT Hardware module.
+/** \brief Clear ENDINIT bit provided by CPU WDT Hardware module.
  *
  * This API will disable ENDINIT functionality provided by CPU WDT Hardware module.
  * User need to use this API call before modifying any ENDINIT protected register. User must
- * always set the ENDINIT bit using other API \ref Ifx_Ssw_setCpuEndinit. The sequence clear and set
+ * always set the ENDINIT bit using other API Ifx_Ssw_setCpuEndinit. The sequence clear and set
  * ENDINIT shall not be interrupted by another interrupt/call.
- *
- * \param[inout] watchdog Pointer to the watchdog register map of CPU WDT hardware instance.
- * \param[in]    password Existing (Application specific) password for the Watchdog module.
- * 				 		  Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_clearCpuEndinit(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
+extern void           Ifx_Ssw_clearCpuEndinit(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
 
-/**
- * \brief Set ENDINIT bit provided by CPU WDT Hardware module.
+/** \brief Set ENDINIT bit provided by CPU WDT Hardware module.
  *
  * This API will enable ENDINIT functionality provided by CPU WDT Hardware module.
  * User need to use this API call after modifying any ENDINIT protected register.
- *
- * \param[inout] watchdog Pointer to the watchdog register map of CPU WDT hardware instance.
- * \param[in] 	 password Existing (Application specific) password for the Watchdog module.
- * 			     		  Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_setCpuEndinit(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
+extern void           Ifx_Ssw_setCpuEndinit(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
 
-/**
- * \brief Clear ENDINIT bit provided by Safety WDT Hardware module.
+/** \brief Clear ENDINIT bit provided by Safety WDT Hardware module.
  *
  * This API will disable ENDINIT functionality provided by Safety WDT Hardware module.
  * User need to use this API call before modifying any ENDINIT protected register. User must
- * always set the ENDINIT bit using other API \ref Ifx_Ssw_setCpuEndinit. The sequence clear and set
+ * always set the ENDINIT bit using other API Ifx_Ssw_setCpuEndinit. The sequence clear and set
  * ENDINIT shall not be interrupted by another interrupt/call.
- *
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_clearSafetyEndinit(unsigned short password);
+extern void           Ifx_Ssw_clearSafetyEndinit(unsigned short password);
 
-/**
- * \brief Set ENDINIT bit provided by Safety WDT Hardware module.
+/** \brief Set ENDINIT bit provided by Safety WDT Hardware module.
  *
  * This API will enable ENDINIT functionality provided by Safety WDT Hardware module.
  * User need to use this API call after modifying any ENDINIT protected register.
- *
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_setSafetyEndinit(unsigned short password);
+extern void           Ifx_Ssw_setSafetyEndinit(unsigned short password);
 
-/**
- * \brief Disable CPU Watchdog functionality.
+/** \brief Disable CPU Watchdog functionality.
  *
  * This API will disable Watchdog functionality of CPU WDT Hardware module. The Watchdog timers will stop counting
  * after this API call.
- *
- * \param[in] watchdog Pointer to the watchdog register map of CPU WDT hardware instance
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_disableCpuWatchdog(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
+extern void           Ifx_Ssw_disableCpuWatchdog(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
 
-/**
- * \brief SCUWDT API to enable CPU Watchdog functionality.
+/** \brief SCUWDT API to enable CPU Watchdog functionality.
  *
- * This API will enable Watchdog functionality of CPU WDT Hardware module. The Watchdog timers need to be serviced
- * periodically after this API call.
- *
- * \param[in] watchdog Pointer to the watchdog register map of CPU WDT hardware instance.
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ *   This API will enable Watchdog functionality of CPU WDT Hardware module. The Watchdog timers need to be serviced
+ *   periodically after this API call.
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_enableCpuWatchdog(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
+extern void           Ifx_Ssw_enableCpuWatchdog(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
 
-/**
- * \brief Disable Safety Watchdog functionality.
+/** \brief Disable Safety Watchdog functionality.
  *
  * This API will disable Watchdog functionality of Safety WDT Hardware module. The Watchdog timers will stop counting
  * after this API call.
- *
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_disableSafetyWatchdog(unsigned short password);
+extern void           Ifx_Ssw_disableSafetyWatchdog(unsigned short password);
 
-/**
- * \brief Enable Safety Watchdog functionality.
+/** \brief Enable Safety Watchdog functionality.
  *
  * This API will enable Watchdog functionality of Safety WDT Hardware module. The Watchdog timers need to be serviced
  * periodically after this API call.
- *
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
-extern void Ifx_Ssw_enableSafetyWatchdog(unsigned short password);
+extern void           Ifx_Ssw_enableSafetyWatchdog(unsigned short password);
 
-/**
- * \brief Set the program counter for the CPU specified and start the CPU.
- *
- * \param[inout] cpu 			Pointer to the CPU HW module (register memory map).
- * \param[in]    programCounter Program counter value to start the CPU.
- * 					 			Range: 0 to 0xFFFFFFFE
- *
- * \retval None
+/** \brief Set the program counter for the CPU specified and start the CPU
+ * \param cpu Pointer to the CPU HW module (register memory map)
+ * \param programCounter Program counter value to start the CPU
  */
-extern void Ifx_Ssw_startCore(Ifx_CPU *cpu, unsigned int programCounter);
+extern void           Ifx_Ssw_startCore(Ifx_CPU *cpu, unsigned int programCounter);
 
-/**
- * \brief Set CPU0 to idle state
- *
- * \retval None
- */
-extern void Ifx_Ssw_setCpu0Idle(void);
+/** \brief Set CPU0 to idle state */
+extern void           Ifx_Ssw_setCpu0Idle(void);
 
-/**
- * \brief Initialize the C/Cpp runtime environment
- *
- * \retval None
- */
+/** \brief Initialize the C/Cpp runtime environment */
 extern void Ifx_Ssw_doCppInit(void);
 
-/**
- * \brief De-initialize the C/Cpp runtime environment
- *
- * \retval None
- */
+/** \brief De-initialize the C/Cpp runtime environment */
 extern void Ifx_Ssw_doCppExit(int status);
 
-/**
- * \brief Returns the system timer frequency.
- *
- * \retval float The system timer frequency in Hz.
+/** \brief Returns the system timer frequency.
+ * \return the system timer frequency in Hz.
  */
-extern float Ifx_Ssw_getStmFrequency(void);
+extern float          Ifx_Ssw_getStmFrequency(void);
 
-/**
- * \brief SCUWDT API to service CPU Watchdog functionality.
+/** \brief SCUWDT API to service CPU Watchdog functionality.
  *
- * This API will service Watchdog functionality corresponding to CPU WDT Hardware module.
- * User need to use this API call periodically. This API results in reloading of the Watchdog Timer.
- * User need to have the password stored locally in the caller function, (use \ref Ifx_Ssw_getCpuWatchdogPassword).
- *
- * \param[inout] watchdog pointer to the watchdog register map of CPU WDT hardware instance.
- * \param[in]    password Existing (Application specific) password for the Watchdog module.
- * 						  Range: 0 to 0xFFFF
- *
- * \retval None
+ *   This API will service Watchdog functionality corresponding to CPU WDT Hardware module.
+ *   User need to use this API call periodically. This API results in reloading of the Watchdog Timer.
+ *   User need to have the password stored locally in the caller function, (use Ifx_Ssw_getCpuWatchdogPassword).
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \param watchdog pointer to the watchdog register map of CPU WDT hardware instance.
+ * \return None
  */
 extern void Ifx_Ssw_serviceCpuWatchdog(Ifx_SCU_WDTCPU *watchdog, unsigned short password);
 
-/**
- * \brief SCUWDT API to service Safety Watchdog functionality.
+/** \brief SCUWDT API to service Safety Watchdog functionality.
  *
  * This API will service Watchdog functionality corresponding to Safety WDT Hardware module.
  * User need to use this API call periodically. This API results in reloading of the Watchdog Timer.
- * User need to have the password stored locally in the caller function, (use \ref Ifx_Ssw_getSafetyWatchdogPassword).
- *
- * \param[in] password Existing (Application specific) password for the Watchdog module.
- * 					   Range: 0 to 0xFFFF
- *
- * \retval None
+ * User need to have the password stored locally in the caller function, (use Ifx_Ssw_getSafetyWatchdogPassword).
+ * \param password Existing (Application specific) password for the Watchdog module.
+ * \return None
  */
 extern void Ifx_Ssw_serviceSafetyWatchdog(unsigned short password);
 
 /* Hook Functions */
-extern void hardware_init_hook(void);
-extern void software_init_hook(void);
+extern IFX_SSW_WEAK void hardware_init_hook(void);
+extern IFX_SSW_WEAK void software_init_hook(void);
 
 /*Endinit Functions*/
 IFX_SSW_INLINE unsigned short Ifx_Ssw_getGlobalSafetyEndinitPasswordInline(void)
@@ -428,7 +321,7 @@ IFX_SSW_INLINE void Ifx_Ssw_clearGlobalSafetyEndinitInline(unsigned short passwo
 IFX_SSW_INLINE void Ifx_Ssw_setGlobalSafetyEndinitInline(unsigned short password)
 {
     /* Set EndInit Watch-dog*/
-    MODULE_SCU.SEICON0.U = IFX_SSW_SEICON_REL_VAL_MSK |                          \
+    MODULE_SCU.SEICON0.U = IFX_SSW_SEICON_REL_VAL_MSK | \
                            ((unsigned int)password << IFX_SCU_SEICON0_EPW_OFF) | \
                            ((unsigned int)1 << IFX_SCU_SEICON0_ENDINIT_OFF);
 
@@ -455,7 +348,7 @@ IFX_SSW_INLINE unsigned short Ifx_Ssw_getSafetyWatchdogPasswordInline(void)
 {
     unsigned short password;
     Ifx_SCU_WDTS  *watchdog;
-    watchdog  = &MODULE_SCU.WDTS;
+    watchdog = &MODULE_SCU.WDTS;
     /* Read Password from Safety WDT CON0 register
      * !!! NOTE: !!! when read bottom six bit of password are inverted so we have
      * to toggle them before returning password */
@@ -553,7 +446,6 @@ IFX_SSW_INLINE void Ifx_Ssw_setSafetyEndinitInline(unsigned short password)
     SCU_WDTS_CON0.U;
 }
 
-
 /* Check if Cold PowerOn Reset */
 
 IFX_SSW_INLINE char Ifx_Ssw_isColdPoweronReset(void)
@@ -561,9 +453,8 @@ IFX_SSW_INLINE char Ifx_Ssw_isColdPoweronReset(void)
     return (char)((SCU_RSTSTAT.U & IFX_SSW_COLD_POWERONRESET_MASK) > 0);
 }
 
-
 /*Add options to eliminate usage of stack pointers unnecessarily*/
-#if defined(__HIGHTEC__) && !defined(__clang__)
+#if defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
@@ -612,19 +503,28 @@ IFX_SSW_INLINE unsigned char Ifx_Ssw_isApplicationReset(void)
 
 
 /*Restore the options to command line provided ones*/
-#if defined(__HIGHTEC__) && !defined(__clang__)
+#if defined(__HIGHTEC__)
 #pragma GCC reset_options
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC reset_options
 #endif
 
+/** \brief API to initialize the context save area of the CPU where this is called.
+ *
+ * This API can initialize the CSA of the host CPU where this API is called. This API
+ * shall not be used to initialize the CSA of another CPU.
+ * \param csaBegin Pointer to start of context save area, shall not be NULL pointer
+ * \param csaEnd Pointer to end of context save area, shall be higher address than csaBegin
+ * \return None
+ */
+
 IFX_SSW_INLINE void Ifx_Ssw_initCSA(unsigned int *csaBegin, unsigned int *csaEnd)
 {
     unsigned int  k;
     unsigned int  nxt_cxi_val = 0U;
-    unsigned int *prvCsa      = 0U;
+    unsigned int *prvCsa      = csaBegin;
     unsigned int *nxtCsa      = csaBegin;
-    unsigned int  numOfCsa    = (((unsigned int)csaEnd - (unsigned int)csaBegin) / 64U);
+    unsigned int numOfCsa     = (((unsigned int)csaEnd - (unsigned int)csaBegin) / 64U);
 
     for (k = 0U; k < numOfCsa; k++)
     {
@@ -649,9 +549,10 @@ IFX_SSW_INLINE void Ifx_Ssw_initCSA(unsigned int *csaBegin, unsigned int *csaEnd
         nxtCsa += IFX_SSW_CSA_SIZE; /* next CSA */
     }
 
-    *prvCsa = 0U;                   /* Store null pointer in last CSA (= very first time!) */
+    *prvCsa = 0U;                       /* Store null pointer in last CSA (= very first time!) */
 
     Ifx_Ssw_DSYNC();
 }
+
 
 #endif /* IFXCPU_SSW_INFRA_H_ */

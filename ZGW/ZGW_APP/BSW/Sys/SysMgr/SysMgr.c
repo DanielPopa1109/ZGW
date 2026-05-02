@@ -2,7 +2,6 @@
 #include "SysMgr.h"
 #include "McuSm.h"
 #include "IfxCpu.h"
-#include "Ain_Filtering.h"
 #include "Can.h"
 #include "Crc.h"
 #include "task_core0.h"
@@ -17,16 +16,12 @@
 #include "SafetyKit_Main.h"
 
 uint32 SysMgr_MainCounter = 0u;
-uint32 SysMgr_RunCounter = 0u;
-uint32 SysMgr_PostRunCounter = 0u;
+uint32 SysMgr_RunCounter = 400u;
+uint32 SysMgr_PostRunCounter = 400u;
+uint32 SysMgr_BusActivityCounter = 400u;
 SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
 uint8 SysMgr_NoBusActivity = 0u;
-uint8 SysMgr_Core1OnHalt = 0u;
-uint8 SysMgr_Core2OnHalt = 0u;
 float SysMgr_McuTemperature = 0u;
-uint8 SysMgr_Core0OnIdlePowerDown = 0u;
-uint8 SysMgr_ReleaseRun = 0u;
-uint8 SysMgr_ReleasePostRun = 0u;
 
 void SysMgr_ProcessResetDtc(void);
 void SysMgr_EcuStateMachine(void);
@@ -42,15 +37,13 @@ void SysMgr_ProcessResetDtc(void)
 {
     if(0u == SysMgr_MainCounter)
     {
-        if(0xEFEFU != McuSm_LastResetReason &&
-                0xDFDFu != McuSm_LastResetReason &&
-                0u != McuSm_LastResetReason)
+        if(0u != McuSm_LastResetReason)
         {
-//            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 1u, 5u);
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_FAILED);
         }
         else
         {
-//            Dem_SetDtc(MCUSM_DTC_ID_SW_ERROR, 0u, 5u);
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_PASSED);
         }
     }
     else
@@ -61,12 +54,66 @@ void SysMgr_ProcessResetDtc(void)
 
 void SysMgr_EcuStateMachine(void)
 {
+    if(SYSMGR_STARTUP == SysMgr_EcuState)
+    {
+        SysMgr_EcuState = SYSMGR_RUN;
+        SysMgr_ProcessResetDtc();
+        SysMgr_RunCounter = 400u;
+        SysMgr_PostRunCounter = 400u;
+    }
+
+    SysMgr_BusActivityCounter--;
+
+    if(0u == SysMgr_BusActivityCounter)
+    {
+        SysMgr_NoBusActivity = 0u;
+    }
+
+    if(SYSMGR_RUN == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_RunCounter--;
+
+            if(0u == SysMgr_RunCounter)
+            {
+                SysMgr_EcuState = SYSMGR_POSTRUN;
+            }
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
+
+    if(SYSMGR_POSTRUN == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_PostRunCounter--;
+
+            if(0u == SysMgr_PostRunCounter)
+            {
+                SysMgr_EcuState = SYSMGR_SLEEP;
+            }
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
+
 
 }
 
 void SysMgr_MainFunction(void)
 {
     SysMgr_EcuStateMachine();
+
     SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
     SysMgr_MainCounter++;
 }

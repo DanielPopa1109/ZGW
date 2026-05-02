@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_Tc2.c
  * \brief Startup Software for Core2
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2018 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -43,16 +43,9 @@
 **                      Includes                                              **
 *******************************************************************************/
 #include "Ifx_Cfg.h"
-#if defined (__TASKING__)
-#pragma warning 508		/* To suppress empty file warning */
-#endif
-#if defined (__ghs__)
-#pragma diag_suppress 96		/* To suppress empty file warning */
-#endif
-
-#if defined(DEVICE_TC35X) || defined(DEVICE_TC37X) || defined(DEVICE_TC37XED) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) || defined(DEVICE_TC39XB)
 #include "Ifx_Ssw.h"
 #include "Ifx_Ssw_Infra.h"
+
 #include "IfxScu_reg.h"
 #include "IfxStm_reg.h"
 
@@ -71,7 +64,7 @@
 /*******************************************************************************
 **                      Imported Function Declarations                        **
 *******************************************************************************/
-IFX_SSW_COMMON_LINKER_SYMBOLS();
+IFX_SSW_COMMON_LINKER_SYMBOLS(); // @suppress("Unused variable declaration in file scope")
 IFX_SSW_CORE_LINKER_SYMBOLS(2);
 
 #if defined(__TASKING__)
@@ -86,7 +79,7 @@ __asm("\t .extern core2_main");
 * - startup code
 *********************************************************************************/
 /*Add options to eliminate usage of stack pointers unnecessarily*/
-#if defined(__HIGHTEC__) && !defined(__clang__)
+#if defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC optimize "O2"
@@ -97,6 +90,10 @@ void __Core2_start(void)
     unsigned int   stmCount;
     unsigned int   stmCountBegin = STM0_TIM0.U;     /* it is necessary to get this value to have minimum 100uS delay in subsequent CPU start */
     unsigned short wdtPassword   = Ifx_Ssw_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[2]);
+
+    /* Load user stack pointer */
+    Ifx_Ssw_setAddressReg(sp, __USTACK(2));
+    Ifx_Ssw_DSYNC();
 
     /* Set the PSW to its reset value in case of a warm start,clear PSW.IS */
     Ifx_Ssw_MTCR(CPU_PSW, IFX_CFG_SSW_PSW_DEFAULT);
@@ -142,7 +139,7 @@ void __Core2_start(void)
     /* Clears any instruction buffer */
     Ifx_Ssw_ISYNC();
 
-    stmCount = (unsigned int)(Ifx_Ssw_getStmFrequency() * (float32)IFX_CFG_SSW_STARTCPU_WAIT_TIME_IN_SECONDS);
+    stmCount = (unsigned int)(Ifx_Ssw_getStmFrequency() * IFX_CFG_SSW_STARTCPU_WAIT_TIME_IN_SECONDS);
 
     while ((unsigned int)(STM0_TIM0.U - stmCountBegin) < stmCount)
     {
@@ -154,56 +151,35 @@ void __Core2_start(void)
          *     diff= stmCountNow - stmCountBegin = 4 as expected.*/
     }
 
-    /*Start remaining cores down the line in a daisy-chain fashion*/
-#if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-#if (IFX_CFG_SSW_ENABLE_TRICORE3 != 0)
-    (void)Ifx_Ssw_startCore(&MODULE_CPU3, (unsigned int)__START(3));       /*The status returned by function call is ignored */
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE3 != 0) */
-
-#if defined(DEVICE_TC39XB)
-#if (IFX_CFG_SSW_ENABLE_TRICORE3 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE4 != 0)
-    (void)Ifx_Ssw_startCore(&MODULE_CPU4, (unsigned int)__START(4));       /*The status returned by function call is ignored */
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE4 != 0) */
-
-#if (IFX_CFG_SSW_ENABLE_TRICORE4 == 0)
-#if (IFX_CFG_SSW_ENABLE_TRICORE5 != 0)
-    (void)Ifx_Ssw_startCore(&MODULE_CPU5, (unsigned int)__START(5));       /*The status returned by function call is ignored */
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE5 != 0) */
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE4 == 0) */
-
-#endif /* #if (IFX_CFG_SSW_ENABLE_TRICORE3 == 0) */
-#endif /* #if defined(DEVICE_TC39XB) */
-
-#endif /* #if defined(DEVICE_TC39XB) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X) */
-
     /*Initialize CPU Private Global Variables*/
-    volatile unsigned int tempVar = ((unsigned int)&__ENABLE_INDIVIDUAL_C_INIT_CPU2);
-    if (tempVar != 0)
-    {
-		/* Hook functions to initialize application specific HW extensions */
-		//hardware_init_hook();
-		/* Initialization of C runtime variables and CPP constructors and destructors */
-		(void)Ifx_Ssw_doCppInit();
-		/* Hook functions to initialize application specific SW extensions */
-		//software_init_hook();
-    }
+    //TODO : This implementation is done once all compilers support this
+#if (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0)
+    /* Hook functions to initialize application specific HW extensions */
+        if(hardware_init_hook)
+        {
+        	hardware_init_hook();
+        }
 
+        /* Hook functions to initialize application specific SW extensions */
+        if(software_init_hook)
+        {
+        	software_init_hook();
+        }
+
+        /* Initialization of C runtime variables and CPP constructors and destructors */
+        (void)Ifx_Ssw_doCppInit();
+#endif
 
     /*Call main function of Cpu2 */
 #ifdef IFX_CFG_SSW_RETURN_FROM_MAIN
     {
         extern int core2_main(void);
         int status= core2_main();        /* Call main function of CPU2 */
-        volatile unsigned int tempVar = ((unsigned int)&__ENABLE_INDIVIDUAL_C_INIT_CPU2);
-		if (tempVar != 0)
-		{
-				Ifx_Ssw_doCppExit(status);
-		}
-		else
-		{
-				(void)status;     /* Added to avoid "Unused parameter warning" */
-		}
+#if (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0)
+        Ifx_Ssw_doCppExit(status);
+#else /* (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0) */
+        (void)status;     /* Added to avoid "Unused parameter warning" */
+#endif /* (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0) */
     }
 #else /* IFX_CFG_SSW_RETURN_FROM_MAIN */
     extern void core2_main(void);
@@ -220,11 +196,9 @@ void __Core2_start(void)
 #if defined(__TASKING__)
 #pragma protect on
 #pragma section code "start_cpu2"
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
 #pragma section ".start_cpu2" x
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=".start_cpu2"
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #pragma section ".start_cpu2" x
@@ -236,17 +210,15 @@ void __Core2_start(void)
 
 void _START2(void)
 {
-    Ifx_Ssw_Start(__USTACK(2), __Core2_start);
+    Ifx_Ssw_jumpToFunction(__Core2_start);
 }
 
 /* reset the sections defined above, to normal region */
 #if defined(__TASKING__)
 #pragma protect restore
 #pragma section code restore
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #pragma section
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#pragma clang section text=""
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #elif defined(__DCC__)
@@ -256,14 +228,8 @@ void _START2(void)
 #endif
 
 /*Restore the options to command line provided ones*/
-#if defined(__HIGHTEC__) && !defined(__clang__)
+#if defined(__HIGHTEC__)
 #pragma GCC reset_options
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma GCC reset_options
-#endif
-
-#endif
-
-#if defined (_TASKING_) || defined (_ghs_)
-#pragma restore
 #endif

@@ -197,7 +197,7 @@ void core0_main(void)
         Fbl_CanInit();
     }
 
-    if(g_FblStayInBoot == 0u)
+    if(g_FblStayInBoot == 1u)
     {
         Fbl_JumpToApp();
     }

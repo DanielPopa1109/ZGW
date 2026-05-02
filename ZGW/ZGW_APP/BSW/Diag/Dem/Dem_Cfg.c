@@ -89,7 +89,7 @@ static void Dem_DefaultStatusChangedCallback(
 static const Dem_EventConfigType Dem_EventConfigList[] =
 {
     {
-        DEM_EVENT_ID_BATTERY_UNDERVOLTAGE,
+        DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR,
         DEM_DTC_BATTERY_UNDERVOLTAGE,
         0u,
         1u,

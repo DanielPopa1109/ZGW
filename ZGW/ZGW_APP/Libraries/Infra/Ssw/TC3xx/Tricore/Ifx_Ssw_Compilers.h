@@ -2,8 +2,8 @@
  * \file Ifx_Ssw_Compilers.h
  * \brief Startup Software for compiler options
  *
- * \version iLLD_1_20_0
- * \copyright Copyright (c) 2024 Infineon Technologies AG. All rights reserved.
+ * \version iLLD_1_0_1_17_0
+ * \copyright Copyright (c) 2017 Infineon Technologies AG. All rights reserved.
  *
  *
  *                                 IMPORTANT NOTICE
@@ -45,7 +45,6 @@
 /*Macro definition to show GNUC macros with the editor*/
 #if ((!defined(__ghs__)) && (!defined(__DCC__)) && (!defined(__TASKING__)) && (!defined(__GNUC__)))
 #define __HIGHTEC__
-#define __clang__
 #endif
 
 /*Include files for each compiler*/
@@ -55,18 +54,14 @@
 #elif defined(__TASKING__)
 #include "Ifx_Ssw_CompilersTasking.h"
 
-#elif defined(__HIGHTEC__) && !defined(__clang__)
+#elif defined(__HIGHTEC__)
 #include "Ifx_Ssw_CompilersGnuc.h"
 
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #include "Ifx_Ssw_CompilersGcc.h"
 
-#elif defined(__HIGHTEC__) && defined(__clang__)
-#include "Ifx_Ssw_CompilersHighTec.h"
-
 #elif defined(__ghs__)
 #include "Ifx_Ssw_CompilersGhs.h"
-#endif /* #ifdef __DCC__ */
+#endif
 
-#define IFX_SSW_USED __attribute__((used))
 #endif /* IFX_SSW_COMPILERS_H_ */

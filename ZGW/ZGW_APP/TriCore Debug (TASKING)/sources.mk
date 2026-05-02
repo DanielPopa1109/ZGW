@@ -49,8 +49,6 @@ BSW/Com/Lin \
 BSW/Com/PduR \
 BSW/Diag/Dcm \
 BSW/Diag/Dem \
-BSW/Io/Ain \
-BSW/Io/Irq \
 BSW/Mem/Fee \
 BSW/Mem/Fls \
 BSW/Mem/MemIf \
@@ -86,8 +84,6 @@ Libraries/iLLD/TC3xx/Tricore/Cpu/Std \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Trap \
 Libraries/iLLD/TC3xx/Tricore/Dts/Dts \
 Libraries/iLLD/TC3xx/Tricore/Dts/Std \
-Libraries/iLLD/TC3xx/Tricore/Evadc/Adc \
-Libraries/iLLD/TC3xx/Tricore/Evadc/Std \
 Libraries/iLLD/TC3xx/Tricore/Flash/Std \
 Libraries/iLLD/TC3xx/Tricore/Geth/Eth \
 Libraries/iLLD/TC3xx/Tricore/Geth/Std \

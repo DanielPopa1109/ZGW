@@ -1,7 +1,7 @@
 #include "CanIf.h"
 #include "CanTp.h"
 #include "CanSM.h"
-#include "Com.h"
+#include "PduR.h"
 #include <string.h>
 
 static uint8 CanIf_BusOffState[CAN_NUM_CONTROLLERS];
@@ -186,7 +186,7 @@ void CanIf_RxIndication(const Can_FrameType* frame)
             }
             else
             {
-                Com_RxIndication(cfg->rxPduId, frame->data, frame->dlc);
+                PduR_CanIfRxIndication(cfg->rxPduId, frame->data, frame->dlc);
             }
 
             return;
@@ -211,7 +211,7 @@ void CanIf_TxConfirmation(PduIdType CanIfTxSduId)
     }
     else
     {
-        Com_TxConfirmation(CanIfTxSduId);
+        PduR_CanIfTxConfirmation(CanIfTxSduId);
     }
 }
 

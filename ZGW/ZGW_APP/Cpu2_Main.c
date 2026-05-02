@@ -7,6 +7,8 @@
 #include "SafetyKit_InternalWatchdogs.h"
 #include "McuSm.h"
 #include "EthStack.h"
+#include "aurix_pin_mappings.h"
+#include "SysMgr.h"
 
 extern uint8 OsInit_C1;
 uint8 OsInit_C2 = 0u;
@@ -22,13 +24,17 @@ void core2_main(void)
         serviceCpuWatchdog();
     }
 
-    EthStack_Init();
+    rmii0_init_pins();
 
     Os_Init_C2();
+    
+    //EthStack_Init();
 
     OsInit_C2 = 1u;
 
     serviceCpuWatchdog();
+
+    SysMgr_EcuState = SYSMGR_STARTUP;
 
     vTaskStartScheduler_core2();
 }

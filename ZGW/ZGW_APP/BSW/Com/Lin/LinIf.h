@@ -2,11 +2,18 @@
 #define LINIF_H
 
 #include "Lin.h"
+#include "ComStack_Types.h"
 
-#define LINIF_SCHED_NORMAL    0u
-#define LINIF_SCHED_DIAG_REQ  1u
-#define LINIF_SCHED_DIAG_RESP 2u
+#define LINIF_SCHED_NORMAL       0u
+#define LINIF_SCHED_DIAG_REQ     1u
+#define LINIF_SCHED_DIAG_RESP    2u
 #define LINIF_DIAG_TIMEOUT_TICKS 100u
+
+#define LINIF_PDU_APP10_RX       0u
+#define LINIF_PDU_APP11_TX       0u
+
+#define LINIF_MAX_APP_TX_PDUS    4u
+#define LINIF_MAX_APP_RX_PDUS    4u
 
 typedef enum
 {
@@ -47,6 +54,10 @@ void LinIf_Init(void);
 void LinIf_MainFunction(void);
 
 Std_ReturnType LinIf_SwitchSchedule(uint8 scheduleId);
+Std_ReturnType LinIf_Transmit(PduIdType LinIfTxPduId,
+                              const uint8* data,
+                              PduLengthType len);
+
 Std_ReturnType LinIf_SetDiagRequest(const uint8 data[8]);
 Std_ReturnType LinIf_GetDiagResponse(uint8 data[8]);
 
