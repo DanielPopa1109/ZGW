@@ -9,6 +9,7 @@
 #include "EthStack.h"
 #include "aurix_pin_mappings.h"
 #include "SysMgr.h"
+#include "GatewaySwc.h"
 
 extern uint8 OsInit_C1;
 uint8 OsInit_C2 = 0u;
@@ -28,7 +29,9 @@ void core2_main(void)
 
     Os_Init_C2();
     
-    //EthStack_Init();
+    EthStack_Init();
+
+    GatewaySwc_Init();
 
     OsInit_C2 = 1u;
 

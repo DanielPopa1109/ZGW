@@ -13,10 +13,16 @@ uint8 OsInit_C1 = 0u;
 void core1_main(void)
 {
     IfxCpu_enableInterrupts();
+
     initCpuWatchdog(1u);
-    while(OsInit_C0 == 0u) serviceCpuWatchdog();
+
+    while(OsInit_C0 == 0u); serviceCpuWatchdog();
+
     Os_Init_C1();
+
     OsInit_C1 = 1u;
+
     serviceCpuWatchdog();
+
     vTaskStartScheduler_core1();
 }

@@ -14,13 +14,18 @@
 #include "Dem.h"
 #include "SafetyKit_InternalWatchdogs.h"
 #include "SafetyKit_Main.h"
+#include "IfxAsclin_Lin.h"
+#include "IfxGeth.h"
+#include "Fee.h"
+#include "Fls.h"
+#include "SCR.h"
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = 400u;
 uint32 SysMgr_PostRunCounter = 400u;
 uint32 SysMgr_BusActivityCounter = 400u;
 SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
-uint8 SysMgr_NoBusActivity = 0u;
+uint8 SysMgr_NoBusActivity = 1u;
 float SysMgr_McuTemperature = 0u;
 
 void SysMgr_ProcessResetDtc(void);
@@ -30,7 +35,162 @@ void SysMgr_GoSleep(void);
 
 void SysMgr_GoSleep(void)
 {
-    McuSm_PerformResetHook(0, 0);
+    uint16 cpuWdtPw;
+    uint16 safetyWdtPw;
+    Ifx_PMS_PMSWCR0 pmswcr0;
+
+    (void)IfxCpu_disableInterrupts();
+
+    (void)Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE,
+            DEM_CYCLE_STATE_END);
+
+    (void)Dem_Shutdown();
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+        Dem_MainFunction();
+    }
+
+    (void)NvM_WriteAll();
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+    }
+
+    IfxAsclin_disableModule((Ifx_ASCLIN *)(void *)&MODULE_ASCLIN1);
+    IfxCan_disableModule(&MODULE_CAN0);
+    IfxGeth_disableModule(&MODULE_GETH);
+    vTaskSuspendAll_core0();
+    vTaskEndScheduler_core0();
+    IfxStm_disableModule(&MODULE_STM0);
+    SRC_STM0SR0.B.SRE = 0u;
+    SRC_STM0SR1.B.SRE = 0u;
+    SRC_STM1SR0.B.SRE = 0u;
+    SRC_STM1SR1.B.SRE = 0u;
+    SRC_STM2SR0.B.SRE = 0u;
+    SRC_STM2SR1.B.SRE = 0u;
+    SRC_BCUSPB.B.SRE = 0u;
+    SRC_MTUDONE.B.SRE = 0U;
+    SRC_PMSDTS.B.SRE = 0U;
+    SRC_CAN0INT0.B.SRE = 0u;
+    SRC_CAN0INT1.B.SRE = 0u;
+    SRC_CAN0INT2.B.SRE = 0u;
+    SRC_CAN0INT3.B.SRE = 0u;
+    SRC_CAN0INT4.B.SRE = 0u;
+    SRC_CAN0INT5.B.SRE = 0u;
+    SRC_CAN0INT6.B.SRE = 0u;
+    SRC_CAN0INT7.B.SRE = 0u;
+    SRC_CAN0INT8.B.SRE = 0u;
+    SRC_CAN0INT9.B.SRE = 0u;
+    SRC_CAN0INT10.B.SRE = 0u;
+    SRC_CAN0INT11.B.SRE = 0u;
+    SRC_CAN0INT12.B.SRE = 0u;
+    SRC_CAN0INT13.B.SRE = 0u;
+    SRC_CAN0INT14.B.SRE = 0u;
+    SRC_CAN0INT15.B.SRE = 0u;
+    SRC_STM0SR0.B.CLRR = 1U;
+    SRC_STM0SR1.B.CLRR = 1U;
+    SRC_STM1SR0.B.CLRR = 1U;
+    SRC_STM1SR1.B.CLRR = 1U;
+    SRC_STM2SR0.B.CLRR = 1U;
+    SRC_STM2SR1.B.CLRR = 1U;
+    SRC_BCUSPB.B.CLRR = 1U;
+    SRC_MTUDONE.B.CLRR = 1U;
+    SRC_PMSDTS.B.CLRR = 1U;
+    SRC_CAN0INT0.B.CLRR = 1;
+    SRC_CAN0INT1.B.CLRR = 1;
+    SRC_CAN0INT2.B.CLRR = 1;
+    SRC_CAN0INT3.B.CLRR = 1;
+    SRC_CAN0INT4.B.CLRR = 1;
+    SRC_CAN0INT5.B.CLRR = 1;
+    SRC_CAN0INT6.B.CLRR = 1;
+    SRC_CAN0INT7.B.CLRR = 1;
+    SRC_CAN0INT8.B.CLRR = 1;
+    SRC_CAN0INT9.B.CLRR = 1;
+    SRC_CAN0INT10.B.CLRR = 1;
+    SRC_CAN0INT11.B.CLRR = 1;
+    SRC_CAN0INT12.B.CLRR = 1;
+    SRC_CAN0INT13.B.CLRR = 1;
+    SRC_CAN0INT14.B.CLRR = 1;
+    SRC_CAN0INT15.B.CLRR = 1;
+    SRC_STM0SR0.B.IOVCLR = 1;
+    SRC_STM0SR1.B.IOVCLR = 1;
+    SRC_STM1SR0.B.IOVCLR = 1;
+    SRC_STM1SR1.B.IOVCLR = 1;
+    SRC_STM2SR0.B.IOVCLR = 1;
+    SRC_STM2SR1.B.IOVCLR = 1;
+    SRC_BCUSPB.B.IOVCLR = 1;
+    SRC_MTUDONE.B.IOVCLR = 1;
+    SRC_PMSDTS.B.IOVCLR = 1;
+    SRC_CAN0INT0.B.IOVCLR = 1;
+    SRC_CAN0INT1.B.IOVCLR = 1;
+    SRC_CAN0INT2.B.IOVCLR = 1;
+    SRC_CAN0INT3.B.IOVCLR = 1;
+    SRC_CAN0INT4.B.IOVCLR = 1;
+    SRC_CAN0INT5.B.IOVCLR = 1;
+    SRC_CAN0INT6.B.IOVCLR = 1;
+    SRC_CAN0INT7.B.IOVCLR = 1;
+    SRC_CAN0INT8.B.IOVCLR = 1;
+    SRC_CAN0INT9.B.IOVCLR = 1;
+    SRC_CAN0INT10.B.IOVCLR = 1;
+    SRC_CAN0INT11.B.IOVCLR = 1;
+    SRC_CAN0INT12.B.IOVCLR = 1;
+    SRC_CAN0INT13.B.IOVCLR = 1;
+    SRC_CAN0INT14.B.IOVCLR = 1;
+    SRC_CAN0INT15.B.IOVCLR = 1;
+    IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
+
+    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    IfxScr_enableSCR();
+    IfxScr_copyProgram();
+    IfxScr_init(1);
+    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    if(SCU_RSTSTAT.B.STBYR)
+    {
+        IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+        SCU_RSTCON2.B.CLRC = 1;    /* A write access to this register is Endinit protected;
+                                          the protection has to be removed and set again afterward. */
+        IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+    }
+
+    while(SCU_RSTSTAT.B.STBYR)    /* Wait until Reset status is finally reset */
+    {
+    }
+
+    /* Set P33.4 under control of SCR (SCR_P00.4) */
+    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    while(P33_PCSR.B.LCK);    /* Wait while any previous update of PCSR is done */
+    {
+    }
+    P33_PCSR.B.SEL10 = 1;
+    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+
+    __dsync();
+    cpuWdtPw = IfxScuWdt_getCpuWatchdogPassword();
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+    IfxScuWdt_clearCpuEndinit(cpuWdtPw);
+
+    PMS_PMSWSTATCLR.U = 0xFFFFFFFFu;
+    pmswcr0.U = PMS_PMSWCR0.U;
+    pmswcr0.U = 0x60070000u;//0x631702D0u;
+    PMS_PMSWCR0.U = pmswcr0.U;
+    SCU_PMSWCR1.B.IRADIS = 1u;
+
+    __dsync();
+    SCU_PMCSR0.B.REQSLP = 0x03u;;
+    __dsync();
+
+    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    IfxScuWdt_setCpuEndinit(cpuWdtPw);
+
+    McuSm_PerformResetHook(254, 253);
 }
 
 void SysMgr_ProcessResetDtc(void)
@@ -39,11 +199,11 @@ void SysMgr_ProcessResetDtc(void)
     {
         if(0u != McuSm_LastResetReason)
         {
-            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_FAILED);
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_FAILED);
         }
         else
         {
-            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_PASSED);
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_PASSED);
         }
     }
     else
@@ -62,11 +222,14 @@ void SysMgr_EcuStateMachine(void)
         SysMgr_PostRunCounter = 400u;
     }
 
-    SysMgr_BusActivityCounter--;
+    if(0u < SysMgr_BusActivityCounter)
+    {
+        SysMgr_BusActivityCounter--;
+    }
 
     if(0u == SysMgr_BusActivityCounter)
     {
-        SysMgr_NoBusActivity = 0u;
+        SysMgr_NoBusActivity = 0;
     }
 
     if(SYSMGR_RUN == SysMgr_EcuState)
@@ -107,12 +270,27 @@ void SysMgr_EcuStateMachine(void)
         }
     }
 
-
+    if(SYSMGR_SLEEP == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_GoSleep();
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
 }
 
 void SysMgr_MainFunction(void)
 {
     SysMgr_EcuStateMachine();
+
+    serviceCpuWatchdog();
+    serviceSafetyWatchdog();
 
     SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
     SysMgr_MainCounter++;

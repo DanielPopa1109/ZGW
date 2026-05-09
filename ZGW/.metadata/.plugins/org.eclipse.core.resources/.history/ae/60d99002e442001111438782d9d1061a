@@ -1,8 +1,0 @@
-#ifndef LIN_LOWLEVEL_H
-#define LIN_LOWLEVEL_H
-
-#include "Std_Types.h"
-
-void Lin_LowLevel_Init(void);
-
-#endif

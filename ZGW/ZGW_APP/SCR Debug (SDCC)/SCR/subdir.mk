@@ -14,7 +14,7 @@ OBJS += \
 SCR/%.o: ../SCR/%.c SCR/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: SDCC Compiler'
-	sdcc --asm-scr -c --model-large --std-sdcc99 --nooverlay --no-peep-return --opt-code-speed  "$<" -o "$@"
+	sdcc --asm-scr -c --model-large -I"C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\SCR" --std-sdcc99 --nooverlay --no-peep-return --opt-code-speed  "$<" -o "$@"
 	@echo 'Finished building: $<'
 	@echo ' '
 

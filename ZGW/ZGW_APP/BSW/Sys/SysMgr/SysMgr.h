@@ -13,7 +13,4 @@ extern SysMgr_EcuState_t SysMgr_EcuState;
 extern uint8 SysMgr_NoBusActivity;
 extern uint32 SysMgr_BusActivityCounter;
 
-extern void SysMgr_ProcessResetDtc(void);
-extern void SysMgr_EcuStateMachine(void);
-extern void SysMgr_GoSleepSequence(void);
 extern void SysMgr_MainFunction(void);

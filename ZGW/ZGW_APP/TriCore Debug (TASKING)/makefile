@@ -8,7 +8,6 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include SCR/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/_PinMap/TC37x/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/_Impl/subdir.mk
 -include Libraries/iLLD/TC3xx/Tricore/Stm/Std/subdir.mk
@@ -76,6 +75,7 @@ RM := rm -rf
 -include BSW/Com/CanIf/subdir.mk
 -include BSW/Com/Can/subdir.mk
 -include BSW/Com/subdir.mk
+-include APP/GatewaySwc/subdir.mk
 -include subdir.mk
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(strip $(C++M_DEPS)),)

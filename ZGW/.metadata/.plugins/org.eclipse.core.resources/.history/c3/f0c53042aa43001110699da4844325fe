@@ -1,4 +1,0 @@
-uint32 aliveTimerMs;
-uint32 inactivityTimerMs;
-uint32 tcpDisconnectCnt;
-uint32 tcpTimeoutCnt;

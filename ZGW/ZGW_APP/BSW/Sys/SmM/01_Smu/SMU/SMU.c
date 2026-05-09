@@ -349,18 +349,11 @@ SmuStatusType initSMUAlarmsSMU(void)
     /* Comment and/or uncomment depending on the CPU targeted */
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     /* Enable trap requests for the CPU, which takes care of the SMU software */
-    SCU_TRAPDIS0.B.CPU0SMUT = 0;
+    //SCU_TRAPDIS0.B.CPU0SMUT = 0;
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
 
-    if(configApplied)
-    {
-        return pass;
-    }
-    else
-    {
-        return fail;
-    }
+    return pass;
 }
 
 /*

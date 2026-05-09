@@ -1,29 +1,16 @@
-/**********************************************************************************************************************
- * \file Lcf_Tasking_Tricore_Tc_fixed_bsw.lsl
- * \brief Linker command file for TASKING compiler, TC375, modified for AUTOSAR-like BSW COM/DIAG RAM placement.
- *
- * Fixes applied:
- *  - Dcm large buffers placed in dsram1, not cpu1_dlmu, because Dcm_Conn can exceed 64 KB.
- *  - CanTp placed in cpu0_dlmu when it fits; otherwise move CanTp group to dsram2 or dsram1.
- *  - Can placed in cpu2_dlmu.
- *  - CanIf and PduR placed in cpu1_dlmu.
- *  - Default far .data/.bss group no longer requires contiguous allocation.
- *  - Default catch-all remains in dsram0.
- *********************************************************************************************************************/
+#define LCF_CSA0_SIZE 2k
+#define LCF_USTACK0_SIZE 512
+#define LCF_ISTACK0_SIZE 512
 
-#define LCF_CSA0_SIZE 8k
-#define LCF_USTACK0_SIZE 2k
-#define LCF_ISTACK0_SIZE 1k
+#define LCF_CSA1_SIZE 2k
+#define LCF_USTACK1_SIZE 512
+#define LCF_ISTACK1_SIZE 512
 
-#define LCF_CSA1_SIZE 8k
-#define LCF_USTACK1_SIZE 2k
-#define LCF_ISTACK1_SIZE 1k
+#define LCF_CSA2_SIZE 2k
+#define LCF_USTACK2_SIZE 512
+#define LCF_ISTACK2_SIZE 512
 
-#define LCF_CSA2_SIZE 8k
-#define LCF_USTACK2_SIZE 2k
-#define LCF_ISTACK2_SIZE 1k
-
-#define LCF_HEAP_SIZE  4k
+#define LCF_HEAP_SIZE  128
 
 #define LCF_CPU0 0
 #define LCF_CPU1 1
@@ -58,35 +45,37 @@
 #define LCF_HEAP1_OFFSET    (LCF_USTACK1_OFFSET - LCF_HEAP_SIZE)
 #define LCF_HEAP2_OFFSET    (LCF_USTACK2_OFFSET - LCF_HEAP_SIZE)
 
-#define LCF_INTVEC0_START 0x80032000
-#define LCF_INTVEC1_START 0x803FC000
-#define LCF_INTVEC2_START 0x803FE000
+#define LCF_INTVEC0_START       0x80032000
+#define LCF_INTVEC1_START       0x803FC000
+#define LCF_INTVEC2_START       0x803FE000
 
-#define LCF_TRAPVEC0_START 0x80030060
-#define LCF_TRAPVEC1_START 0x80300000
-#define LCF_TRAPVEC2_START 0x80300100
+#define LCF_TRAPVEC0_START      0x80030100
+#define LCF_TRAPVEC1_START      0x80300000
+#define LCF_TRAPVEC2_START      0x80300100
 
-#define LCF_STARTPTR_CPU0 0x80030000
-#define LCF_STARTPTR_CPU1 0x80300200
-#define LCF_STARTPTR_CPU2 0x80300220
+#define LCF_STARTPTR_CPU0       0x80030000
+#define LCF_STARTPTR_CPU1       0x80300200
+#define LCF_STARTPTR_CPU2       0x80300220
 
-#define LCF_STARTPTR_NC_CPU0 0xA0030000
-#define LCF_STARTPTR_NC_CPU1 0xA0300200
-#define LCF_STARTPTR_NC_CPU2 0xA0300220
+#define LCF_STARTPTR_NC_CPU0    0xA0030000
+#define LCF_STARTPTR_NC_CPU1    0xA0300200
+#define LCF_STARTPTR_NC_CPU2    0xA0300220
 
-#define INTTAB0             (LCF_INTVEC0_START)
-#define INTTAB1             (LCF_INTVEC1_START)
-#define INTTAB2             (LCF_INTVEC2_START)
-#define TRAPTAB0            (LCF_TRAPVEC0_START)
-#define TRAPTAB1            (LCF_TRAPVEC1_START)
-#define TRAPTAB2            (LCF_TRAPVEC2_START)
+#define INTTAB0                 LCF_INTVEC0_START
+#define INTTAB1                 LCF_INTVEC1_START
+#define INTTAB2                 LCF_INTVEC2_START
 
-#define RESET LCF_STARTPTR_NC_CPU0
-#define APP_PFLASH0_START 0x80020000
-#define APP_PFLASH0_NC_START 0xA0020000
-#define APP_PFLASH0_SIZE 2944k
+#define TRAPTAB0                LCF_TRAPVEC0_START
+#define TRAPTAB1                LCF_TRAPVEC1_START
+#define TRAPTAB2                LCF_TRAPVEC2_START
+
+#define RESET                   LCF_STARTPTR_CPU0
+
+#define APP_PFLASH0_START       0x80030000
+#define APP_PFLASH0_NC_START    0xA0030000
+#define APP_PFLASH0_SIZE        2880k
+
 #define FLASH_UNUSED_FILL_VALUE 0x36
-
 #include "tc1v1_6_2.lsl"
 
 processor mpe
@@ -390,21 +379,21 @@ derivative tc37
 
         group (ordered)
         {
-            group trapvec_tc0 (align = 8, run_addr=LCF_TRAPVEC0_START)
+            group trapvec_tc0 (align =256, run_addr=LCF_TRAPVEC0_START)
             {
                 section "trapvec_tc0" (size=0x100, attributes=rx, fill=0x36)
                 {
                     select "(.text.traptab_cpu0*)";
                 }
             }
-            group trapvec_tc1 (align = 8, run_addr=LCF_TRAPVEC1_START)
+            group trapvec_tc1 (align =256, run_addr=LCF_TRAPVEC1_START)
             {
                 section "trapvec_tc1" (size=0x100, attributes=rx, fill=0x36)
                 {
                     select "(.text.traptab_cpu1*)";
                 }
             }
-            group trapvec_tc2 (align = 8, run_addr=LCF_TRAPVEC2_START)
+            group trapvec_tc2 (align = 256, run_addr=LCF_TRAPVEC2_START)
             {
                 section "trapvec_tc2" (size=0x100, attributes=rx, fill=0x36)
                 {
@@ -697,6 +686,30 @@ derivative tc37
             select ".data.lmudata_dcm*";
             select ".bss.lmubss_dcm*";
         }
+        
+        group NCR (ordered, attributes = rws, run_addr = mem:cpu0_dlmu, align = 4)
+        {
+            select ".data.McuSm.McuSm_AGs";
+            select ".bss.McuSm.McuSm_AGs";
+            select ".data.McuSm.McuSm_LastResetReason";
+            select ".bss.McuSm.McuSm_LastResetReason";
+            select ".data.McuSm.McuSm_LastResetInformation";
+            select ".bss.McuSm.McuSm_LastResetInformation";
+            select ".data.McuSm.McuSm_ResetHistory";
+            select ".bss.McuSm.McuSm_ResetHistory";
+            select ".data.McuSm.McuSm_IndexResetHistory";
+            select ".bss.McuSm.McuSm_IndexResetHistory";
+            select ".data.McuSm.DiagMaster_ActiveSessionState";
+            select ".bss.McuSm.DiagMaster_ActiveSessionState";  
+            select ".data.McuSm.DiagMaster_AliveTime";
+            select ".bss.McuSm.DiagMaster_AliveTime";
+            select ".data.McuSm.Iven_IcmLookupTable";
+            select ".bss.McuSm.Iven_IcmLookupTable";  
+            select ".data.McuSm.McuSm_FBL_ResetCounter";
+            select ".bss.McuSm.McuSm_FBL_ResetCounter";                     
+        }
+        "__NCR_START" := "_lc_gb_NCR";
+        "__NCR_END"   := "_lc_ge_NCR";
 
         group bsw_com_cantp_dlmu0 (ordered, align = 8, attributes=rw, run_addr = mem:cpu0_dlmu)
         {

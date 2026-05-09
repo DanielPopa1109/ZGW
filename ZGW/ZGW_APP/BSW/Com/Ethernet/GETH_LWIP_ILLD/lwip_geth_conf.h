@@ -95,7 +95,7 @@ extern void netif_status_cb(struct netif *netif);
 #define GW_ADDR2                        (0U)
 #define GW_ADDR3                        (1U)
 
-#define CPU_WHICH_SERVICE_ETHERNET      0
+#define CPU_WHICH_SERVICE_ETHERNET      2
 #define ISR_PRIORITY_GETH_TX            100
 #define ISR_PRIORITY_GETH_RX            101
 #define LWIP_GETH_IS_ISR                1

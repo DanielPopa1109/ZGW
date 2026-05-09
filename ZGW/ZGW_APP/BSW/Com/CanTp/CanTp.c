@@ -166,12 +166,6 @@ static void CanTp_StartTimer(uint8 ch, CanTp_TimerType timer)
     CanTp_Channel[ch].timer = CanTp_GetTimerTicks(timer);
 }
 
-static void CanTp_StopTimer(uint8 ch)
-{
-    CanTp_Channel[ch].timerType = CANTP_TIMER_NONE;
-    CanTp_Channel[ch].timer = 0u;
-}
-
 static uint8 CanTp_IsConfigValid(void)
 {
     if (CanTp_ConfigPtr == NULL_PTR)

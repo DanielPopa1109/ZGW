@@ -1,0 +1,169 @@
+#include "Nvm.h"
+#include "SysMgr.h"
+#include "McuSm.h"
+#include "IfxCpu.h"
+#include "Can.h"
+#include "Crc.h"
+#include "task_core0.h"
+#include "FreeRTOSConfig_core0.h"
+#include "Wdg.h"
+#include "IfxPmsPm.h"
+#include "IfxStm.h"
+#include "IfxPort.h"
+#include "IfxPort_reg.h"
+#include "Dem.h"
+#include "SafetyKit_InternalWatchdogs.h"
+#include "SafetyKit_Main.h"
+#include "IfxAsclin_Lin.h"
+#include "IfxGeth.h"
+
+uint32 SysMgr_MainCounter = 0u;
+uint32 SysMgr_RunCounter = 400u;
+uint32 SysMgr_PostRunCounter = 400u;
+uint32 SysMgr_BusActivityCounter = 400u;
+SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
+uint8 SysMgr_NoBusActivity = 0u;
+float SysMgr_McuTemperature = 0u;
+
+void SysMgr_ProcessResetDtc(void);
+void SysMgr_EcuStateMachine(void);
+void SysMgr_MainFunction(void);
+void SysMgr_GoSleep(void);
+
+void SysMgr_GoSleep(void)
+{
+
+    Ifx_P *portSfr0 = IfxPort_getAddress(0u);
+
+    serviceCpuWatchdog();
+    serviceSafetyWatchdog();
+    Wdg_DeInitializeCpu0Watchdog();
+    Wdg_DeInitializeSafetyWatchdog();
+
+    IfxAsclin_Lin_disableModule(&MODULE_ASCLIN1);
+    IfxCan_disableModule(&MODULE_CAN0);
+    IfxGeth_disableModule(&MODULE_GETH);
+
+    vTaskSuspendAll_core0();
+    vTaskEndScheduler_core0();
+    IfxStm_disableModule(&MODULE_STM0);
+
+    SRC_STM0SR0.B.SRE = 0u;
+    SRC_STM0SR1.B.SRE = 0u;
+    SRC_STM1SR0.B.SRE = 0u;
+    SRC_STM1SR1.B.SRE = 0u;
+    SRC_STM2SR0.B.SRE = 0u;
+    SRC_STM2SR1.B.SRE = 0u;
+    SRC_BCUSPB.B.SRE = 0u;
+    SRC_MTUDONE.B.SRE = 0U;
+    SRC_PMSDTS.B.SRE = 0U;
+    SRC_STM0SR0.B.CLRR = 1U;
+    SRC_STM0SR1.B.CLRR = 1U;
+    SRC_STM1SR0.B.CLRR = 1U;
+    SRC_STM1SR1.B.CLRR = 1U;
+    SRC_STM2SR0.B.CLRR = 1U;
+    SRC_STM2SR1.B.CLRR = 1U;
+    SRC_BCUSPB.B.CLRR = 1U;
+    SRC_MTUDONE.B.CLRR = 1U;
+    SRC_PMSDTS.B.CLRR = 1U;
+
+
+    McuSm_PerformResetHook(0, 0);
+}
+
+void SysMgr_ProcessResetDtc(void)
+{
+    if(0u == SysMgr_MainCounter)
+    {
+        if(0u != McuSm_LastResetReason)
+        {
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_FAILED);
+        }
+        else
+        {
+            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR, DEM_EVENT_STATUS_PASSED);
+        }
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+}
+
+void SysMgr_EcuStateMachine(void)
+{
+    if(SYSMGR_STARTUP == SysMgr_EcuState)
+    {
+        SysMgr_EcuState = SYSMGR_RUN;
+        SysMgr_ProcessResetDtc();
+        SysMgr_RunCounter = 400u;
+        SysMgr_PostRunCounter = 400u;
+    }
+
+    SysMgr_BusActivityCounter--;
+
+    if(0u == SysMgr_BusActivityCounter)
+    {
+        SysMgr_NoBusActivity = 0u;
+    }
+
+    if(SYSMGR_RUN == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_RunCounter--;
+
+            if(0u == SysMgr_RunCounter)
+            {
+                SysMgr_EcuState = SYSMGR_POSTRUN;
+            }
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
+
+    if(SYSMGR_POSTRUN == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_PostRunCounter--;
+
+            if(0u == SysMgr_PostRunCounter)
+            {
+                SysMgr_EcuState = SYSMGR_SLEEP;
+            }
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
+
+    if(SYSMGR_SLEEP == SysMgr_EcuState)
+    {
+        if(0u == SysMgr_NoBusActivity)
+        {
+            SysMgr_GoSleep();
+        }
+        else
+        {
+            SysMgr_RunCounter = 400u;
+            SysMgr_PostRunCounter = 400u;
+            SysMgr_EcuState = SYSMGR_RUN;
+        }
+    }
+}
+
+void SysMgr_MainFunction(void)
+{
+    SysMgr_EcuStateMachine();
+
+    SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
+    SysMgr_MainCounter++;
+}

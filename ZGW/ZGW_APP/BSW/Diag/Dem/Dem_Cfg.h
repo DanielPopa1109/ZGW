@@ -9,7 +9,7 @@
 #define DEM_EXTENDED_DATA_SIZE         16u
 
 #define DEM_NVM_ENABLED                1u
-#define DEM_NVM_BLOCK_ID_PRIMARY       30u
+#define DEM_NVM_BLOCK_ID_PRIMARY       1u
 #define DEM_NVM_WRITE_RETRY_LIMIT      3u
 #define DEM_NVM_INCLUDE_NVM_H         1u
 
@@ -19,15 +19,9 @@
 
 #define DEM_DEFAULT_OPERATION_CYCLE    0u
 
-#define DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR  1u
-#define DEM_EVENT_ID_CAN_BUS_OFF           2u
-#define DEM_EVENT_ID_ETH_LINK_DOWN         3u
-#define DEM_EVENT_ID_NVM_FAILURE           4u
+#define DEM_EVENT_ID_MCUSM_SW_ERROR  1u
 
-#define DEM_DTC_BATTERY_UNDERVOLTAGE  0x00010101u
-#define DEM_DTC_CAN_BUS_OFF           0x00C10001u
-#define DEM_DTC_ETH_LINK_DOWN         0x00D00001u
-#define DEM_DTC_NVM_FAILURE           0x00E00001u
+#define DEM_DTC_MCUSM_SW_ERROR  0x00010101u
 
 #ifndef DEM_ENTER_CRITICAL
 #define DEM_ENTER_CRITICAL() do { } while (0)

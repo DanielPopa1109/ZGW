@@ -26,16 +26,21 @@ typedef struct
 } NvM_BlockDescriptorType;
 
 #define NVM_TOTAL_BLOCKS                    (2u)
-#define NVM_BLOCK_ID_1                      (1u)
-#define NVM_BLOCK_ID_2                      (2u)
-#define NVM_BLOCK_1_LENGTH                  (1024u)
-#define NVM_BLOCK_2_LENGTH                  (2048u)
+
+#define NVM_BLOCK_ID_DEM_PRIMARY            (1u)
+#define NVM_BLOCK_ID_APP_DATA               (2u)
+
+#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (2048u)
+#define NVM_BLOCK_APP_DATA_LENGTH           (2048u)
+
 #define NVM_MAX_BLOCK_LENGTH                (2048u)
 
-extern uint8 NvM_Block1_Ram[NVM_BLOCK_1_LENGTH];
-extern uint8 NvM_Block2_Ram[NVM_BLOCK_2_LENGTH];
-extern const uint8 NvM_Block1_Rom[NVM_BLOCK_1_LENGTH];
-extern const uint8 NvM_Block2_Rom[NVM_BLOCK_2_LENGTH];
+extern uint8 NvM_DemPrimary_Ram[NVM_BLOCK_DEM_PRIMARY_LENGTH];
+extern uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];
+
+extern const uint8 NvM_DemPrimary_Rom[NVM_BLOCK_DEM_PRIMARY_LENGTH];
+extern const uint8 NvM_AppData_Rom[NVM_BLOCK_APP_DATA_LENGTH];
+
 extern const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS];
 
 #endif /* NVM_CFG_H */

@@ -19,44 +19,36 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo);
 void McuSm_TRAP4(IfxCpu_Trap trapInfo);
 void McuSm_TRAP7(IfxCpu_Trap trapInfo);
 
+volatile uint8 debugvar = 0;
+
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 {
-    while(1){__debug();}
+    McuSm_LastResetReason = resetReason;
+    McuSm_LastResetInformation = resetInformation;
+    McuSm_ResetHistory[McuSm_IndexResetHistory].reason = resetReason;
+    McuSm_ResetHistory[McuSm_IndexResetHistory].information = resetInformation;
+    McuSm_IndexResetHistory++;
 
-
-    if(0u != resetReason)
+    if(0xEFEFU != resetReason && 0xDFDFU != resetReason)
     {
-        McuSm_LastResetReason = resetReason;
-        McuSm_LastResetInformation = resetInformation;
-        McuSm_ResetHistory[McuSm_IndexResetHistory].reason = resetReason;
-        McuSm_ResetHistory[McuSm_IndexResetHistory].information = resetInformation;
-        McuSm_IndexResetHistory++;
-
-        if(0xEFEFU != resetReason && 0xDFDFU != resetReason)
-        {
-            McuSm_FBL_ResetCounter += 1u;
-            DiagMaster_AliveTime = 0u;
-        }
-        else
-        {
-            /* Do nothing. */
-        }
-
-        if(19u < McuSm_IndexResetHistory)
-        {
-            McuSm_IndexResetHistory = 0u;
-        }
-        else
-        {
-            /* Do nothing. */
-        }
-
-        IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+        McuSm_FBL_ResetCounter += 1u;
     }
     else
     {
         /* Do nothing. */
     }
+
+    if(19u < McuSm_IndexResetHistory)
+    {
+        McuSm_IndexResetHistory = 0u;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+    
+    IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+
 }
 
 void McuSm_TRAP1(IfxCpu_Trap trapInfo)

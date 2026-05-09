@@ -1,0 +1,1497 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: PDM4 PDM3 PDM2 PDM1 Tester ZGW
+
+
+BO_ 147 PDM4_LoadStatus: 12 PDM4
+ SG_ PDM4_LoadStatus_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_LoadStatus_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_LoadStatus_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 146 PDM3_LoadStatus: 12 PDM3
+ SG_ PDM3_LoadStatus_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_LoadStatus_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_LoadStatus_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 145 PDM2_LoadStatus: 12 PDM2
+ SG_ PDM2_LoadStatus_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_LoadStatus_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_LoadStatus_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 144 PDM1_LoadStatus: 12 PDM1
+ SG_ PDM1_LoadStatus_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_LoadStatus_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_LoadStatus_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 262 InfotainmentData1: 12 ZGW
+ SG_ IT1_MileageTrip : 56|32@1+ (1,0) [0|4294967295] ""  Tester
+ SG_ IT1_MileageTotal : 24|32@1+ (1,0) [0|4294967295] ""  Tester
+ SG_ IT1_DisplayCameraStatus : 16|8@1+ (1,0) [0|255] ""  Tester
+ SG_ IT1_CommandDisplayErrorMessage : 8|8@1+ (1,0) [0|255] ""  Tester
+ SG_ IT1_AliveIndication : 0|1@1+ (1,0) [0|1] ""  Tester
+
+BO_ 261 EnergyManagementData2: 6 ZGW
+ SG_ EM1_WeakBattery : 8|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_ValidOcvCalibration : 7|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_LoadStatus : 6|1@1+ (1,0) [0|0] ""  Tester
+ SG_ EM1_Discharging : 5|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_DeepDischarge : 4|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_CrankingEvent : 3|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_Confindence : 2|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_Charging : 1|1@1+ (1,0) [0|1] ""  Tester
+ SG_ EM1_CapacityAh : 16|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_BattRest : 0|1@1+ (1,0) [0|1] ""  Tester
+
+BO_ 260 EnergyManagementData1: 64 ZGW
+ SG_ EM1_TimeToFull : 480|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_T30Voltage : 80|16@1+ (1,0) [0|65535] ""  Tester
+ SG_ EM1_Soh : 448|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_SocOcv : 416|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_SocHybrid : 384|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_SocCoulomb : 352|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_RuntimeRemaining : 320|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_McuTemp : 288|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_L1Voltage : 64|16@1+ (1,0) [0|65535] ""  Tester
+ SG_ EM1_L1Temp : 256|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_L1ISense : 224|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_IntResistance : 192|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_I2TCounter : 160|32@1+ (1,0) [0|4294967295] ""  Tester
+ SG_ EM1_DischargeAh : 128|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_ChargeAh : 96|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_AvgDischargeCurrent : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ EM1_AvgChargeCurrent : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+
+BO_ 48 VehicleState: 1 ZGW
+ SG_ VehicleStatus : 0|4@1+ (1,0) [0|15] ""  Tester
+
+BO_ 1023 NM3: 1 ZGW
+ SG_ Nm3_Pn1 : 0|8@1+ (1,0) [0|255] ""  Tester
+
+BO_ 514 SDAT: 7 ZGW
+ SG_ CANFD_SDAT_Year : 48|6@1+ (1,0) [0|63] ""  Tester
+ SG_ CANFD_SDAT_Second : 40|6@1+ (1,0) [0|63] ""  Tester
+ SG_ CANFD_SDAT_Month : 32|4@1+ (1,0) [0|15] ""  Tester
+ SG_ CANFD_SDAT_Minute : 24|6@1+ (1,0) [0|63] ""  Tester
+ SG_ CANFD_SDAT_Millisecond : 16|8@1+ (1,0) [0|255] ""  Tester
+ SG_ CANFD_SDAT_Hour : 8|5@1+ (1,0) [0|31] ""  Tester
+ SG_ CANFD_SDAT_Day : 0|5@1+ (1,0) [0|31] ""  Tester
+
+BO_ 259 LightData1: 3 ZGW
+ SG_ LD1_TurnSignalsStatus : 16|3@1+ (1,0) [0|7] ""  Tester
+ SG_ LD1_TurnSignalCommand : 12|4@1+ (1,0) [0|15] ""  Tester
+ SG_ LD1_ReverseLigthStatus : 10|2@1+ (1,0) [0|3] ""  Tester
+ SG_ LD1_PositionLightStatus : 8|2@1+ (1,0) [0|3] ""  Tester
+ SG_ LD1_LowBeamStatus : 6|2@1+ (1,0) [0|3] ""  Tester
+ SG_ LD1_InteriorLightStatus : 4|2@1+ (1,0) [0|3] ""  Tester
+ SG_ LD1_HighBeamStatus : 2|2@1+ (1,0) [0|3] ""  Tester
+ SG_ LD1_FogLightsStatus : 0|2@1+ (1,0) [0|3] ""  Tester
+
+BO_ 258 PowerTrainData2: 16 ZGW
+ SG_ PT2_VehSpeed : 96|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT2_TractionControlStatus : 88|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PT2_TorqueValue : 80|5@1+ (1,0) [0|63] ""  Tester
+ SG_ PT2_ShiftPhase : 29|3@1+ (1,0) [0|7] ""  Tester
+ SG_ PT2_PedalStatus : 56|7@1+ (1,0) [0|127] ""  Tester
+ SG_ PT2_EngineRPM : 64|13@1+ (1,0) [0|8191] ""  Tester
+ SG_ PT2_DSCStatus : 40|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PT2_CurrentGear : 48|4@1+ (1,0) [0|15] ""  Tester
+ SG_ PT2_ClutchStatus : 26|3@1+ (1,0) [0|7] ""  Tester
+ SG_ PT2_BrakeWheelStatus : 32|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PT2_ASGStatus : 24|2@1+ (1,0) [0|3] ""  Tester
+ SG_ PT2_ActualTorque : 16|7@1+ (1,0) [0|127] ""  Tester
+ SG_ PT2_ABSStatus : 8|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PT2_BrakePressureValue : 0|8@1+ (1,0) [0|255] ""  Tester
+
+BO_ 257 PowerTrainData1: 64 ZGW
+ SG_ PT1_LatAcc : 64|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_IntakeTemperature : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_CoolantTemperature : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_YawRate : 480|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_ShortTermFuelTrimBank2 : 448|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_ShortTermFuelTrimBank1 : 416|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SensorVoltage2Bank2 : 384|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SensorVoltage2Bank1 : 352|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SensorVoltage1Bank2 : 320|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SensorVoltage1Bank1 : 288|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SensB1_ShortTermFuelTrim : 256|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_O2SenB2_ShortTermFuelTrim : 224|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_MafValue : 192|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_LongTermFuelTrimBank2 : 160|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_LongTermFuelTrimBank1 : 128|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ PT1_LongAcc : 96|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+
+BO_ 256 BodyData1: 20 ZGW
+ SG_ BD1_WiperStockCommand : 128|8@1+ (1,0) [0|255] ""  Tester
+ SG_ BD1_VibrationSensorStatus : 120|8@1+ (1,0) [0|255] ""  Tester
+ SG_ BD1_StatusWipers : 109|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_StatusDoors : 112|6@1+ (1,0) [0|63] ""  Tester
+ SG_ BD1_RlsCommand : 104|5@1+ (1,0) [0|31] ""  Tester
+ SG_ BD1_RecirculationCommand : 83|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_PdcDistanceRear : 96|7@1+ (1,0) [0|127] ""  Tester
+ SG_ BD1_PdcDistanceFront : 88|7@1+ (1,0) [0|127] ""  Tester
+ SG_ BD1_PdcBuzzerFrontRear : 80|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_OutsideTemperature : 48|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
+ SG_ BD1_LigthSensor : 40|8@1+ (1,0) [0|255] ""  Tester
+ SG_ BD1_Ignition : 34|4@1+ (1,0) [0|15] ""  Tester
+ SG_ BD1_HighBeamCommand : 32|2@1+ (1,0) [0|3] ""  Tester
+ SG_ BD1_HC05ConnectionStatus : 30|2@1+ (1,0) [0|3] ""  Tester
+ SG_ BD1_Gearbox : 20|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_FogLightsCommand : 13|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_ClimateTemperatureCommand : 24|6@1+ (1,0) [0|63] ""  Tester
+ SG_ BD1_ClimateFanCommand : 16|4@1+ (1,0) [0|15] ""  Tester
+ SG_ BD1_ClimateAutoCommand : 11|2@1+ (1,0) [0|3] ""  Tester
+ SG_ BD1_CentralLockStatus : 8|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_CentralLockCommand : 5|3@1+ (1,0) [0|7] ""  Tester
+ SG_ BD1_CentralLockBuzzer : 3|2@1+ (1,0) [0|3] ""  Tester
+ SG_ BD1_BrakeLightStatus : 0|3@1+ (1,0) [0|7] ""  Tester
+
+BO_ 768 PDM1_VoltageFeedback_1: 64 PDM1
+ SG_ PDM1_VoltFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 769 PDM1_VoltageFeedback_2: 64 PDM1
+ SG_ PDM1_VoltFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 770 PDM1_VoltageFeedback_3: 64 PDM1
+ SG_ PDM1_VoltFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 771 PDM1_VoltageFeedback_4: 64 PDM1
+ SG_ PDM1_VoltFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 772 PDM1_VoltageFeedback_5: 48 PDM1
+ SG_ PDM1_VoltFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_VoltFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 773 PDM1_CurrentFeedback_1: 64 PDM1
+ SG_ PDM1_CurrFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 774 PDM1_CurrentFeedback_2: 64 PDM1
+ SG_ PDM1_CurrFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 775 PDM1_CurrentFeedback_3: 64 PDM1
+ SG_ PDM1_CurrFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 776 PDM1_CurrentFeedback_4: 64 PDM1
+ SG_ PDM1_CurrFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 777 PDM1_CurrentFeedback_5: 48 PDM1
+ SG_ PDM1_CurrFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_CurrFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 778 PDM1_StuckAtOnEvent: 12 PDM1
+ SG_ PDM1_StuckAtOn_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_StuckAtOn_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_StuckAtOn_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 779 PDM1_StuckAtOffEvent: 12 PDM1
+ SG_ PDM1_StuckAtOff_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_StuckAtOff_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_StuckAtOff_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 780 PDM1_TemperatureFeedback_1: 64 PDM1
+ SG_ PDM1_TempFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 781 PDM1_TemperatureFeedback_2: 64 PDM1
+ SG_ PDM1_TempFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 782 PDM1_TemperatureFeedback_3: 64 PDM1
+ SG_ PDM1_TempFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 783 PDM1_TemperatureFeedback_4: 64 PDM1
+ SG_ PDM1_TempFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 784 PDM1_TemperatureFeedback_5: 48 PDM1
+ SG_ PDM1_TempFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM1_TempFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 785 PDM2_VoltageFeedback_1: 64 PDM2
+ SG_ PDM2_VoltFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 786 PDM2_VoltageFeedback_2: 64 PDM2
+ SG_ PDM2_VoltFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 787 PDM2_VoltageFeedback_3: 64 PDM2
+ SG_ PDM2_VoltFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 788 PDM2_VoltageFeedback_4: 64 PDM2
+ SG_ PDM2_VoltFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 789 PDM2_VoltageFeedback_5: 48 PDM2
+ SG_ PDM2_VoltFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_VoltFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 790 PDM2_CurrentFeedback_1: 64 PDM2
+ SG_ PDM2_CurrFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 791 PDM2_CurrentFeedback_2: 64 PDM2
+ SG_ PDM2_CurrFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 792 PDM2_CurrentFeedback_3: 64 PDM2
+ SG_ PDM2_CurrFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 793 PDM2_CurrentFeedback_4: 64 PDM2
+ SG_ PDM2_CurrFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 794 PDM2_CurrentFeedback_5: 48 PDM2
+ SG_ PDM2_CurrFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_CurrFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 795 PDM2_StuckAtOnEvent: 12 PDM2
+ SG_ PDM2_StuckAtOn_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_StuckAtOn_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_StuckAtOn_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 796 PDM2_StuckAtOffEvent: 12 PDM2
+ SG_ PDM2_StuckAtOff_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_StuckAtOff_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_StuckAtOff_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 797 PDM2_TemperatureFeedback_1: 64 PDM2
+ SG_ PDM2_TempFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 798 PDM2_TemperatureFeedback_2: 64 PDM2
+ SG_ PDM2_TempFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 799 PDM2_TemperatureFeedback_3: 64 PDM2
+ SG_ PDM2_TempFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 800 PDM2_TemperatureFeedback_4: 64 PDM2
+ SG_ PDM2_TempFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 801 PDM2_TemperatureFeedback_5: 48 PDM2
+ SG_ PDM2_TempFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM2_TempFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 802 PDM3_VoltageFeedback_1: 64 PDM3
+ SG_ PDM3_VoltFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 803 PDM3_VoltageFeedback_2: 64 PDM3
+ SG_ PDM3_VoltFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 804 PDM3_VoltageFeedback_3: 64 PDM3
+ SG_ PDM3_VoltFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 805 PDM3_VoltageFeedback_4: 64 PDM3
+ SG_ PDM3_VoltFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 806 PDM3_VoltageFeedback_5: 48 PDM3
+ SG_ PDM3_VoltFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_VoltFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 807 PDM3_CurrentFeedback_1: 64 PDM3
+ SG_ PDM3_CurrFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 808 PDM3_CurrentFeedback_2: 64 PDM3
+ SG_ PDM3_CurrFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 809 PDM3_CurrentFeedback_3: 64 PDM3
+ SG_ PDM3_CurrFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 810 PDM3_CurrentFeedback_4: 64 PDM3
+ SG_ PDM3_CurrFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 811 PDM3_CurrentFeedback_5: 48 PDM3
+ SG_ PDM3_CurrFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_CurrFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 812 PDM3_StuckAtOnEvent: 12 PDM3
+ SG_ PDM3_StuckAtOn_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_StuckAtOn_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_StuckAtOn_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 813 PDM3_StuckAtOffEvent: 12 PDM3
+ SG_ PDM3_StuckAtOff_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_StuckAtOff_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_StuckAtOff_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 814 PDM3_TemperatureFeedback_1: 64 PDM3
+ SG_ PDM3_TempFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 815 PDM3_TemperatureFeedback_2: 64 PDM3
+ SG_ PDM3_TempFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 816 PDM3_TemperatureFeedback_3: 64 PDM3
+ SG_ PDM3_TempFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 817 PDM3_TemperatureFeedback_4: 64 PDM3
+ SG_ PDM3_TempFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 818 PDM3_TemperatureFeedback_5: 48 PDM3
+ SG_ PDM3_TempFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM3_TempFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 819 PDM4_VoltageFeedback_1: 64 PDM4
+ SG_ PDM4_VoltFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 820 PDM4_VoltageFeedback_2: 64 PDM4
+ SG_ PDM4_VoltFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 821 PDM4_VoltageFeedback_3: 64 PDM4
+ SG_ PDM4_VoltFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 822 PDM4_VoltageFeedback_4: 64 PDM4
+ SG_ PDM4_VoltFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 823 PDM4_VoltageFeedback_5: 48 PDM4
+ SG_ PDM4_VoltFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_VoltFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 824 PDM4_CurrentFeedback_1: 64 PDM4
+ SG_ PDM4_CurrFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 825 PDM4_CurrentFeedback_2: 64 PDM4
+ SG_ PDM4_CurrFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 826 PDM4_CurrentFeedback_3: 64 PDM4
+ SG_ PDM4_CurrFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 827 PDM4_CurrentFeedback_4: 64 PDM4
+ SG_ PDM4_CurrFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 828 PDM4_CurrentFeedback_5: 48 PDM4
+ SG_ PDM4_CurrFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_CurrFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 829 PDM4_StuckAtOnEvent: 12 PDM4
+ SG_ PDM4_StuckAtOn_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_StuckAtOn_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_StuckAtOn_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 830 PDM4_StuckAtOffEvent: 12 PDM4
+ SG_ PDM4_StuckAtOff_01 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_StuckAtOff_02 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_StuckAtOff_03 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 831 PDM4_TemperatureFeedback_1: 64 PDM4
+ SG_ PDM4_TempFb_001 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_002 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_003 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_004 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_005 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_006 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_007 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_008 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_009 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_010 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_011 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_012 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_013 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_014 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_015 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_016 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 832 PDM4_TemperatureFeedback_2: 64 PDM4
+ SG_ PDM4_TempFb_017 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_018 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_019 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_020 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_021 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_022 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_023 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_024 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_025 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_026 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_027 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_028 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_029 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_030 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_031 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_032 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 833 PDM4_TemperatureFeedback_3: 64 PDM4
+ SG_ PDM4_TempFb_033 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_034 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_035 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_036 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_037 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_038 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_039 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_040 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_041 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_042 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_043 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_044 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_045 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_046 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_047 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_048 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 834 PDM4_TemperatureFeedback_4: 64 PDM4
+ SG_ PDM4_TempFb_049 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_050 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_051 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_052 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_053 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_054 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_055 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_056 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_057 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_058 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_059 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_060 : 352|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_061 : 384|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_062 : 416|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_063 : 448|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_064 : 480|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 835 PDM4_TemperatureFeedback_5: 48 PDM4
+ SG_ PDM4_TempFb_065 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_066 : 32|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_067 : 64|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_068 : 96|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_069 : 128|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_070 : 160|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_071 : 192|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_072 : 224|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_073 : 256|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_074 : 288|32@1+ (1,0) [0|4294967295] ""  ZGW
+ SG_ PDM4_TempFb_075 : 320|32@1+ (1,0) [0|4294967295] ""  ZGW
+
+BO_ 1824 PDM1_DiagRequest: 64 ZGW
+ SG_ PDM1_DiagReq_Byte00 : 0|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte01 : 8|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte02 : 16|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte03 : 24|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte04 : 32|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte05 : 40|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte06 : 48|8@1+ (1,0) [0|255] ""  PDM1
+ SG_ PDM1_DiagReq_Byte07 : 56|8@1+ (1,0) [0|255] ""  PDM1
+
+BO_ 1825 PDM1_DiagResponse: 64 PDM1
+ SG_ PDM1_DiagResp_Byte00 : 0|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte01 : 8|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte02 : 16|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte03 : 24|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte04 : 32|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte05 : 40|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte06 : 48|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM1_DiagResp_Byte07 : 56|8@1+ (1,0) [0|255] ""  ZGW
+
+BO_ 1826 PDM2_DiagRequest: 64 ZGW
+ SG_ PDM2_DiagReq_Byte00 : 0|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte01 : 8|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte02 : 16|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte03 : 24|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte04 : 32|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte05 : 40|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte06 : 48|8@1+ (1,0) [0|255] ""  PDM2
+ SG_ PDM2_DiagReq_Byte07 : 56|8@1+ (1,0) [0|255] ""  PDM2
+
+BO_ 1827 PDM2_DiagResponse: 64 PDM2
+ SG_ PDM2_DiagResp_Byte00 : 0|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte01 : 8|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte02 : 16|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte03 : 24|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte04 : 32|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte05 : 40|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte06 : 48|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM2_DiagResp_Byte07 : 56|8@1+ (1,0) [0|255] ""  ZGW
+
+BO_ 1828 PDM3_DiagRequest: 8 ZGW
+ SG_ PDM3_DiagReq_Byte00 : 0|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte01 : 8|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte02 : 16|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte03 : 24|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte04 : 32|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte05 : 40|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte06 : 48|8@1+ (1,0) [0|255] ""  PDM3
+ SG_ PDM3_DiagReq_Byte07 : 56|8@1+ (1,0) [0|255] ""  PDM3
+
+BO_ 1829 PDM3_DiagResponse: 8 PDM3
+ SG_ PDM3_DiagResp_Byte00 : 0|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte01 : 8|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte02 : 16|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte03 : 24|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte04 : 32|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte05 : 40|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte06 : 48|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM3_DiagResp_Byte07 : 56|8@1+ (1,0) [0|255] ""  ZGW
+
+BO_ 1830 PDM4_DiagRequest: 64 ZGW
+ SG_ PDM4_DiagReq_Byte00 : 0|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte01 : 8|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte02 : 16|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte03 : 24|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte04 : 32|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte05 : 40|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte06 : 48|8@1+ (1,0) [0|255] ""  PDM4
+ SG_ PDM4_DiagReq_Byte07 : 56|8@1+ (1,0) [0|255] ""  PDM4
+
+BO_ 1831 PDM4_DiagResponse: 64 PDM4
+ SG_ PDM4_DiagResp_Byte00 : 0|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte01 : 8|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte02 : 16|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte03 : 24|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte04 : 32|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte05 : 40|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte06 : 48|8@1+ (1,0) [0|255] ""  ZGW
+ SG_ PDM4_DiagResp_Byte07 : 56|8@1+ (1,0) [0|255] ""  ZGW
+
+BO_ 128 CommandLoad_PDM1: 12 ZGW
+ SG_ PDM1_CommandLoad_01 : 0|32@1+ (1,0) [0|4294967295] ""  PDM1
+ SG_ PDM1_CommandLoad_02 : 32|32@1+ (1,0) [0|4294967295] ""  PDM1
+ SG_ PDM1_CommandLoad_03 : 64|32@1+ (1,0) [0|4294967295] ""  PDM1
+
+BO_ 129 CommandLoad_PDM2: 12 ZGW
+ SG_ PDM2_CommandLoad_01 : 0|32@1+ (1,0) [0|4294967295] ""  PDM2
+ SG_ PDM2_CommandLoad_02 : 32|32@1+ (1,0) [0|4294967295] ""  PDM2
+ SG_ PDM2_CommandLoad_03 : 64|32@1+ (1,0) [0|4294967295] ""  PDM2
+
+BO_ 130 CommandLoad_PDM3: 12 ZGW
+ SG_ PDM3_CommandLoad_01 : 0|32@1+ (1,0) [0|4294967295] ""  PDM3
+ SG_ PDM3_CommandLoad_02 : 32|32@1+ (1,0) [0|4294967295] ""  PDM3
+ SG_ PDM3_CommandLoad_03 : 64|32@1+ (1,0) [0|4294967295] ""  PDM3
+
+BO_ 131 CommandLoad_PDM4: 12 ZGW
+ SG_ PDM4_CommandLoad_01 : 0|32@1+ (1,0) [0|4294967295] ""  PDM4
+ SG_ PDM4_CommandLoad_02 : 32|32@1+ (1,0) [0|4294967295] ""  PDM4
+ SG_ PDM4_CommandLoad_03 : 64|32@1+ (1,0) [0|4294967295] ""  PDM4
+
+BO_ 263 EnergyManagementData3: 20 ZGW
+ SG_ ALT_ResponseError : 0|1@1+ (1,0) [0|1] ""  Tester
+ SG_ ALT_ChargingActive : 8|1@1+ (1,0) [0|1] ""  Tester
+ SG_ ALT_OutputCurrent : 16|8@1+ (1,0) [0|255] ""  Tester
+ SG_ ALT_OutputVoltage : 24|8@1+ (1,0) [0|255] ""  Tester
+ SG_ ALT_FieldDutyActual : 32|8@1+ (1,0) [0|255] ""  Tester
+ SG_ ALT_Power : 40|8@1+ (1,0) [0|255] ""  Tester
+ SG_ ALT_Temperature : 48|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_ResponseError : 56|1@1+ (1,0) [0|1] ""  Tester
+ SG_ HVDCDC_LV_Voltage : 64|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_LV_Current : 72|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_HV_Voltage : 80|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_HV_Current : 88|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PCU48_ResponseError : 96|1@1+ (1,0) [0|1] ""  Tester
+ SG_ PCU48_SoH : 104|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PCU48_SoC : 112|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PCU48_Voltage : 120|8@1+ (1,0) [0|255] ""  Tester
+ SG_ PCU48_ChargeState : 128|8@1+ (1,0) [0|255] ""  Tester
+
+
+
+BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";
+BA_DEF_  "MultiplexExtEnabled" ENUM  "No","Yes";
+BA_DEF_  "BusType" STRING ;
+BA_DEF_DEF_  "VFrameFormat" "ExtendedCAN_FD";
+BA_DEF_DEF_  "MultiplexExtEnabled" "No";
+BA_DEF_DEF_  "BusType" "CAN";
+BA_ "BusType" "CAN FD";
+BA_ "VFrameFormat" BO_ 147 14;
+BA_ "VFrameFormat" BO_ 146 14;
+BA_ "VFrameFormat" BO_ 145 14;
+BA_ "VFrameFormat" BO_ 144 14;
+BA_ "VFrameFormat" BO_ 262 14;
+BA_ "VFrameFormat" BO_ 261 14;
+BA_ "VFrameFormat" BO_ 260 14;
+BA_ "VFrameFormat" BO_ 48 14;
+BA_ "VFrameFormat" BO_ 1023 14;
+BA_ "VFrameFormat" BO_ 514 14;
+BA_ "VFrameFormat" BO_ 259 14;
+BA_ "VFrameFormat" BO_ 258 14;
+BA_ "VFrameFormat" BO_ 257 14;
+BA_ "VFrameFormat" BO_ 256 14;
+BA_ "VFrameFormat" BO_ 768 14;
+BA_ "VFrameFormat" BO_ 769 14;
+BA_ "VFrameFormat" BO_ 770 14;
+BA_ "VFrameFormat" BO_ 771 14;
+BA_ "VFrameFormat" BO_ 772 14;
+BA_ "VFrameFormat" BO_ 773 14;
+BA_ "VFrameFormat" BO_ 774 14;
+BA_ "VFrameFormat" BO_ 775 14;
+BA_ "VFrameFormat" BO_ 776 14;
+BA_ "VFrameFormat" BO_ 777 14;
+BA_ "VFrameFormat" BO_ 778 14;
+BA_ "VFrameFormat" BO_ 779 14;
+BA_ "VFrameFormat" BO_ 780 14;
+BA_ "VFrameFormat" BO_ 781 14;
+BA_ "VFrameFormat" BO_ 782 14;
+BA_ "VFrameFormat" BO_ 783 14;
+BA_ "VFrameFormat" BO_ 784 14;
+BA_ "VFrameFormat" BO_ 785 14;
+BA_ "VFrameFormat" BO_ 786 14;
+BA_ "VFrameFormat" BO_ 787 14;
+BA_ "VFrameFormat" BO_ 788 14;
+BA_ "VFrameFormat" BO_ 789 14;
+BA_ "VFrameFormat" BO_ 790 14;
+BA_ "VFrameFormat" BO_ 791 14;
+BA_ "VFrameFormat" BO_ 792 14;
+BA_ "VFrameFormat" BO_ 793 14;
+BA_ "VFrameFormat" BO_ 794 14;
+BA_ "VFrameFormat" BO_ 795 14;
+BA_ "VFrameFormat" BO_ 796 14;
+BA_ "VFrameFormat" BO_ 797 14;
+BA_ "VFrameFormat" BO_ 798 14;
+BA_ "VFrameFormat" BO_ 799 14;
+BA_ "VFrameFormat" BO_ 800 14;
+BA_ "VFrameFormat" BO_ 801 14;
+BA_ "VFrameFormat" BO_ 802 14;
+BA_ "VFrameFormat" BO_ 803 14;
+BA_ "VFrameFormat" BO_ 804 14;
+BA_ "VFrameFormat" BO_ 805 14;
+BA_ "VFrameFormat" BO_ 806 14;
+BA_ "VFrameFormat" BO_ 807 14;
+BA_ "VFrameFormat" BO_ 808 14;
+BA_ "VFrameFormat" BO_ 809 14;
+BA_ "VFrameFormat" BO_ 810 14;
+BA_ "VFrameFormat" BO_ 811 14;
+BA_ "VFrameFormat" BO_ 812 14;
+BA_ "VFrameFormat" BO_ 813 14;
+BA_ "VFrameFormat" BO_ 814 14;
+BA_ "VFrameFormat" BO_ 815 14;
+BA_ "VFrameFormat" BO_ 816 14;
+BA_ "VFrameFormat" BO_ 817 14;
+BA_ "VFrameFormat" BO_ 818 14;
+BA_ "VFrameFormat" BO_ 819 14;
+BA_ "VFrameFormat" BO_ 820 14;
+BA_ "VFrameFormat" BO_ 821 14;
+BA_ "VFrameFormat" BO_ 822 14;
+BA_ "VFrameFormat" BO_ 823 14;
+BA_ "VFrameFormat" BO_ 824 14;
+BA_ "VFrameFormat" BO_ 825 14;
+BA_ "VFrameFormat" BO_ 826 14;
+BA_ "VFrameFormat" BO_ 827 14;
+BA_ "VFrameFormat" BO_ 828 14;
+BA_ "VFrameFormat" BO_ 829 14;
+BA_ "VFrameFormat" BO_ 830 14;
+BA_ "VFrameFormat" BO_ 831 14;
+BA_ "VFrameFormat" BO_ 832 14;
+BA_ "VFrameFormat" BO_ 833 14;
+BA_ "VFrameFormat" BO_ 834 14;
+BA_ "VFrameFormat" BO_ 835 14;
+BA_ "VFrameFormat" BO_ 1824 14;
+BA_ "VFrameFormat" BO_ 1825 14;
+BA_ "VFrameFormat" BO_ 1826 14;
+BA_ "VFrameFormat" BO_ 1827 14;
+BA_ "VFrameFormat" BO_ 1828 14;
+BA_ "VFrameFormat" BO_ 1829 14;
+BA_ "VFrameFormat" BO_ 1830 14;
+BA_ "VFrameFormat" BO_ 1831 14;
+BA_ "VFrameFormat" BO_ 128 14;
+BA_ "VFrameFormat" BO_ 129 14;
+BA_ "VFrameFormat" BO_ 130 14;
+BA_ "VFrameFormat" BO_ 131 14;
+BA_ "VFrameFormat" BO_ 263 14;
+SIG_VALTYPE_ 261 EM1_CapacityAh : 1;
+SIG_VALTYPE_ 260 EM1_TimeToFull : 1;
+SIG_VALTYPE_ 260 EM1_Soh : 1;
+SIG_VALTYPE_ 260 EM1_SocOcv : 1;
+SIG_VALTYPE_ 260 EM1_SocHybrid : 1;
+SIG_VALTYPE_ 260 EM1_SocCoulomb : 1;
+SIG_VALTYPE_ 260 EM1_RuntimeRemaining : 1;
+SIG_VALTYPE_ 260 EM1_McuTemp : 1;
+SIG_VALTYPE_ 260 EM1_L1Temp : 1;
+SIG_VALTYPE_ 260 EM1_L1ISense : 1;
+SIG_VALTYPE_ 260 EM1_IntResistance : 1;
+SIG_VALTYPE_ 260 EM1_DischargeAh : 1;
+SIG_VALTYPE_ 260 EM1_ChargeAh : 1;
+SIG_VALTYPE_ 260 EM1_AvgDischargeCurrent : 1;
+SIG_VALTYPE_ 260 EM1_AvgChargeCurrent : 1;
+SIG_VALTYPE_ 258 PT2_VehSpeed : 1;
+SIG_VALTYPE_ 257 PT1_LatAcc : 1;
+SIG_VALTYPE_ 257 PT1_IntakeTemperature : 1;
+SIG_VALTYPE_ 257 PT1_CoolantTemperature : 1;
+SIG_VALTYPE_ 257 PT1_YawRate : 1;
+SIG_VALTYPE_ 257 PT1_ShortTermFuelTrimBank2 : 1;
+SIG_VALTYPE_ 257 PT1_ShortTermFuelTrimBank1 : 1;
+SIG_VALTYPE_ 257 PT1_O2SensorVoltage2Bank2 : 1;
+SIG_VALTYPE_ 257 PT1_O2SensorVoltage2Bank1 : 1;
+SIG_VALTYPE_ 257 PT1_O2SensorVoltage1Bank2 : 1;
+SIG_VALTYPE_ 257 PT1_O2SensorVoltage1Bank1 : 1;
+SIG_VALTYPE_ 257 PT1_O2SensB1_ShortTermFuelTrim : 1;
+SIG_VALTYPE_ 257 PT1_O2SenB2_ShortTermFuelTrim : 1;
+SIG_VALTYPE_ 257 PT1_MafValue : 1;
+SIG_VALTYPE_ 257 PT1_LongTermFuelTrimBank2 : 1;
+SIG_VALTYPE_ 257 PT1_LongTermFuelTrimBank1 : 1;
+SIG_VALTYPE_ 257 PT1_LongAcc : 1;
+SIG_VALTYPE_ 256 BD1_OutsideTemperature : 1;
+

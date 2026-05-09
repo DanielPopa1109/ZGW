@@ -30,6 +30,7 @@ SECONDARY_SIZE :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
+APP/GatewaySwc \
 BSW/Com/Can \
 BSW/Com/CanIf \
 BSW/Com/CanSM \
@@ -98,5 +99,4 @@ Libraries/iLLD/TC3xx/Tricore/Src/Std \
 Libraries/iLLD/TC3xx/Tricore/Stm/Std \
 Libraries/iLLD/TC3xx/Tricore/_Impl \
 Libraries/iLLD/TC3xx/Tricore/_PinMap/TC37x \
-SCR \
 

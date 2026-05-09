@@ -1,0 +1,40 @@
+#include "Ifx_Types.h"
+#include "IfxCpu.h"
+#include "IfxScuWdt.h"
+#include "Os.h"
+#include "Wdg.h"
+#include "task_core2.h"
+#include "SafetyKit_InternalWatchdogs.h"
+#include "McuSm.h"
+#include "EthStack.h"
+#include "aurix_pin_mappings.h"
+#include "SysMgr.h"
+
+extern uint8 OsInit_C1;
+uint8 OsInit_C2 = 0u;
+
+void core2_main(void)
+{
+    IfxCpu_enableInterrupts();
+
+    //initCpuWatchdog(2u); todo
+
+    while(OsInit_C1 == 0u)
+    {
+        //serviceCpuWatchdog();
+    }
+
+    rmii0_init_pins();
+
+    Os_Init_C2();
+    
+    EthStack_Init();
+
+    OsInit_C2 = 1u;
+
+    //serviceCpuWatchdog(); todo
+
+    SysMgr_EcuState = SYSMGR_STARTUP;
+
+    vTaskStartScheduler_core2();
+}

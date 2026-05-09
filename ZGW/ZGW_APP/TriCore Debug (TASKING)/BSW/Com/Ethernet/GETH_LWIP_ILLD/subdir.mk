@@ -30,19 +30,19 @@ OBJS += \
 
 # Each subdirectory must supply rules for building sources it contributes
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth.src":"../BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth.c" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
-	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -Wc-g3 -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
+	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -g -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth.o":"BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth.src" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
 	astc -Og -Os --no-warnings= --error-limit=42 -o  "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_conf.src":"../BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_conf.c" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
-	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -Wc-g3 -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
+	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -g -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_conf.o":"BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_conf.src" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
 	astc -Og -Os --no-warnings= --error-limit=42 -o  "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_dp83825i.src":"../BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_dp83825i.c" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
-	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -Wc-g3 -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
+	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -g -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_dp83825i.o":"BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_dp83825i.src" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
 	astc -Og -Os --no-warnings= --error-limit=42 -o  "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_rtl8211f.src":"../BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_rtl8211f.c" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
-	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -Wc-g3 -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
+	cctc -cs --dep-file="$*.d" --misrac-version=2012 -D__CPU__=tc37x "-fC:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/TriCore Debug (TASKING)/TASKING_C_C___Compiler-Include_paths__-I_.opt" --iso=99 --c++14 --language=+volatile --exceptions --anachronisms --fp-model=3 -O0 --tradeoff=0 --compact-max-size=200 -g -Wc-w544 -Wc-w557 -Wc-w508 -Ctc37x -Y0 -N0 -Z0 -o "$@" "$<"
 "BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_rtl8211f.o":"BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip_geth_private_phy_rtl8211f.src" "BSW/Com/Ethernet/GETH_LWIP_ILLD/subdir.mk"
 	astc -Og -Os --no-warnings= --error-limit=42 -o  "$@" "$<"
 

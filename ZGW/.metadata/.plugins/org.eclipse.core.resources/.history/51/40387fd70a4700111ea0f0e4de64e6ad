@@ -1,0 +1,42 @@
+#ifndef DEM_CFG_H_
+#define DEM_CFG_H_
+
+#include "Dem_Types.h"
+
+#define DEM_MAX_EVENTS                 64u
+#define DEM_PRIMARY_MEMORY_SIZE        32u
+#define DEM_FREEZE_FRAME_SIZE          32u
+#define DEM_EXTENDED_DATA_SIZE         16u
+
+#define DEM_NVM_ENABLED                1u
+#define DEM_NVM_BLOCK_ID_PRIMARY       1u
+#define DEM_NVM_WRITE_RETRY_LIMIT      3u
+#define DEM_NVM_INCLUDE_NVM_H         1u
+
+#define DEM_CRC32_INITIAL_VALUE        0xFFFFFFFFu
+#define DEM_NV_MAGIC                   0x44454D31u
+#define DEM_NV_VERSION                 0x0001u
+
+#define DEM_DEFAULT_OPERATION_CYCLE    0u
+
+#define DEM_EVENT_ID_MCUSM_SW_ERROR  1u
+#define DEM_EVENT_ID_CAN_BUS_OFF           2u
+#define DEM_EVENT_ID_ETH_LINK_DOWN         3u
+#define DEM_EVENT_ID_NVM_FAILURE           4u
+
+#define DEM_DTC_MCUSM_SW_ERROR  0x00010101u
+#define DEM_DTC_CAN_BUS_OFF           0x00C10001u
+#define DEM_DTC_ETH_LINK_DOWN         0x00D00001u
+#define DEM_DTC_NVM_FAILURE           0x00E00001u
+
+#ifndef DEM_ENTER_CRITICAL
+#define DEM_ENTER_CRITICAL() do { } while (0)
+#endif
+
+#ifndef DEM_EXIT_CRITICAL
+#define DEM_EXIT_CRITICAL() do { } while (0)
+#endif
+
+extern const Dem_ConfigType Dem_Config;
+
+#endif

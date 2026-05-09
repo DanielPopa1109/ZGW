@@ -89,8 +89,8 @@ static void Dem_DefaultStatusChangedCallback(
 static const Dem_EventConfigType Dem_EventConfigList[] =
 {
     {
-        DEM_EVENT_ID_MCUSM_DTC_ID_SW_ERROR,
-        DEM_DTC_BATTERY_UNDERVOLTAGE,
+        DEM_EVENT_ID_MCUSM_SW_ERROR,
+        DEM_DTC_MCUSM_SW_ERROR,
         0u,
         1u,
         3,
@@ -105,57 +105,7 @@ static const Dem_EventConfigType Dem_EventConfigList[] =
         Dem_DefaultExtendedDataCapture,
         Dem_DefaultStatusChangedCallback
     },
-    {
-        DEM_EVENT_ID_CAN_BUS_OFF,
-        DEM_DTC_CAN_BUS_OFF,
-        0u,
-        1u,
-        1,
-        -1,
-        1,
-        1,
-        1u,
-        TRUE,
-        40u,
-        TRUE,
-        Dem_DefaultFreezeFrameCapture,
-        Dem_DefaultExtendedDataCapture,
-        Dem_DefaultStatusChangedCallback
-    },
-    {
-        DEM_EVENT_ID_ETH_LINK_DOWN,
-        DEM_DTC_ETH_LINK_DOWN,
-        0u,
-        2u,
-        2,
-        -2,
-        1,
-        1,
-        2u,
-        TRUE,
-        40u,
-        TRUE,
-        Dem_DefaultFreezeFrameCapture,
-        Dem_DefaultExtendedDataCapture,
-        Dem_DefaultStatusChangedCallback
-    },
-    {
-        DEM_EVENT_ID_NVM_FAILURE,
-        DEM_DTC_NVM_FAILURE,
-        0u,
-        1u,
-        1,
-        -1,
-        1,
-        1,
-        1u,
-        FALSE,
-        0u,
-        TRUE,
-        Dem_DefaultFreezeFrameCapture,
-        Dem_DefaultExtendedDataCapture,
-        Dem_DefaultStatusChangedCallback
-    }
+
 };
 
 const Dem_ConfigType Dem_Config =

@@ -14,21 +14,51 @@ static const Lin_FrameConfigType LinIf_Frame_SRF =
     0x3Du, LIN_PID_SLAVE_RESPONSE, 8u, LIN_CS_CLASSIC, LIN_FRM_DIAGNOSTIC_SRF, 20u
 };
 
-static const Lin_FrameConfigType LinIf_Frame_App10_Rx =
+static const Lin_FrameConfigType LinIf_Frame_ZGW_NM3 =
 {
-    0x10u, 0u, 8u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+    0x01u, 0u, 1u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
-static const Lin_FrameConfigType LinIf_Frame_App11_Tx =
+static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_ALT =
 {
-    0x11u, 0u, 8u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+    0x02u, 0u, 4u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
+static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_HVDCDC =
+{
+    0x03u, 0u, 2u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
+static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_PCU48 =
+{
+    0x04u, 0u, 1u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
+static const Lin_FrameConfigType LinIf_Frame_ALT_STATUS =
+{
+    0x0Au, 0u, 7u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
+static const Lin_FrameConfigType LinIf_Frame_HVDCDC_STATUS =
+{
+    0x0Bu, 0u, 5u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
+static const Lin_FrameConfigType LinIf_Frame_PCU48_STATUS =
+{
+    0x0Cu, 0u, 5u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
 static const LinIf_ScheduleEntryType LinIf_NormalEntries[] =
 {
-    { &LinIf_Frame_App10_Rx, 10u, LIN_SLAVE_RESPONSE },
-    { &LinIf_Frame_App11_Tx, 10u, LIN_MASTER_RESPONSE }
+    { &LinIf_Frame_ZGW_NM3, 10u, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_PCU48, 10u, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_HVDCDC, 10u, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_ALT, 10u, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_PCU48_STATUS, 10u, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_HVDCDC_STATUS, 10u, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_ALT_STATUS, 10u, LIN_SLAVE_RESPONSE }
 };
+
 
 static const LinIf_ScheduleEntryType LinIf_DiagReqEntries[] =
 {
@@ -80,12 +110,17 @@ typedef struct
 
 static const LinIf_AppPduConfigType LinIf_AppTxPduCfg[] =
 {
-    { LINIF_PDU_APP11_TX, 0x11u, 8u }
+    { LINIF_TX_PDU_ZGW_NM3, 0x01u, 1u },
+    { LINIF_TX_PDU_ZGW_REQUEST_ALT, 0x02u, 4u },
+    { LINIF_TX_PDU_ZGW_REQUEST_HVDCDC, 0x03u, 2u },
+    { LINIF_TX_PDU_ZGW_REQUEST_PCU48, 0x04u, 1u }
 };
 
 static const LinIf_AppPduConfigType LinIf_AppRxPduCfg[] =
 {
-    { LINIF_PDU_APP10_RX, 0x10u, 8u }
+    { LINIF_RX_PDU_ALT_STATUS, 0x0Au, 7u },
+    { LINIF_RX_PDU_HVDCDC_STATUS, 0x0Bu, 5u },
+    { LINIF_RX_PDU_PCU48_STATUS, 0x0Cu, 5u }
 };
 
 static LinIf_StateType LinIf_State;

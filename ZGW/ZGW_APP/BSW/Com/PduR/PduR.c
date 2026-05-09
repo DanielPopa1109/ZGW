@@ -23,9 +23,6 @@
 /* Keep these IDs aligned with EthStack_Cfg.c. */
 #define PDUR_SOAD_SOCON_PDUR_IF_UDP     4u
 
-/* Current COM example PDU IDs from Com.c. Move these to Com_Cfg.h later. */
-#define PDUR_COM_TX_PDU_APP_STATUS      2u
-#define PDUR_COM_RX_PDU_APP_STATUS      0u
 
 /* ===================== Routing types ===================== */
 
@@ -123,40 +120,181 @@ typedef struct
 
 static const PduR_ComTxRouteType PduR_ComTxRoutes[] =
 {
-    /* Existing COM application status -> CAN Classic application frame. */
-    { TRUE,  PDUR_COM_TX_PDU_APP_STATUS, PDUR_IF_LOWER_CANIF, CANIF_PDU_APP_TX, PDUR_SOAD_INVALID_SOCON },
-
-    /* Enable after configuring matching LinIf Tx frame/PDU and COM I-PDU. */
-    { FALSE, PDUR_COM_TX_PDU_APP_STATUS, PDUR_IF_LOWER_LINIF, LINIF_PDU_APP11_TX, PDUR_SOAD_INVALID_SOCON },
-
-    /* Enable after configuring the peer IP/port on SOAD_SOCON_PDUR_IF_UDP. */
-    { FALSE, PDUR_COM_TX_PDU_APP_STATUS, PDUR_IF_LOWER_SOAD,  0u, PDUR_SOAD_SOCON_PDUR_IF_UDP }
+    { TRUE, COM_TX_PDU_VEHICLESTATE                                , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_VEHICLESTATE                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_DISPLAYOUTTEMP                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_DISPLAYOUTTEMP                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_STATUSBODYDATA1                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_STATUSBODYDATA1                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_COMMANDDISPLAYSTATUS                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_COMMANDDISPLAYSTATUS                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_XCPREQUEST_7C8                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_XCPREQUEST_7C8                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_XCPREQUEST_7C6                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_XCPREQUEST_7C6                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_XCPREQUEST_7C4                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_XCPREQUEST_7C4                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_XCPREQUEST_7C2                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_XCPREQUEST_7C2                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_XCPREQUEST_7C0                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_XCPREQUEST_7C0                          , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_SDAT                                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_SDAT                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_NM3                                         , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_NM3                                     , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LOADREQUEST                                 , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_LOADREQUEST                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_DIAGREQUEST_706                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_DIAGREQUEST_706                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_DIAGREQUEST_704                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_DIAGREQUEST_704                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_DIAGREQUEST_702                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_DIAGREQUEST_702                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_DIAGREQUEST_700                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_DIAGREQUEST_700                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_INFOTAINMENTDATA1                                      , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_INFOTAINMENTDATA1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                                  , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1                                  , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_VEHICLESTATE                                           , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_VEHICLESTATE                                      , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_NM3                                                    , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_NM3                                               , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_SDAT                                                   , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_SDAT                                              , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_LIGHTDATA1                                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_LIGHTDATA1                                        , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_POWERTRAINDATA2                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_POWERTRAINDATA1                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_BODYDATA1                                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_BODYDATA1                                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM1_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_PDM2_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM2_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_PDM3_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM3_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_PDM4_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM4_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM1                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM2                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM2                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM3                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM3                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM4                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM4                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LIN_ZGW_NM3                            , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_NM3               , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_ALT       , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_HVDCDC    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_PCU48                  , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_PCU48     , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =
 {
-    /* Fixes the current mismatch: CanIf RX PDU 4 -> COM RX I-PDU 0. */
-    { TRUE,  CANIF_PDU_APP_RX, PDUR_IF_DEST_COM, PDUR_COM_RX_PDU_APP_STATUS, PDUR_SOAD_INVALID_SOCON },
-
-    /* Raw PDU gateway examples. Enable only after the target PDU exists. */
-    { FALSE, CANIF_PDU_APP_RX, PDUR_IF_DEST_LINIF, LINIF_PDU_APP11_TX, PDUR_SOAD_INVALID_SOCON },
-    { FALSE, CANIF_PDU_APP_RX, PDUR_IF_DEST_SOAD,  0u, PDUR_SOAD_SOCON_PDUR_IF_UDP }
+    { TRUE, CANIF_RX_PDU_CENTRALLOCKDATA                         , PDUR_IF_DEST_COM, COM_RX_PDU_CENTRALLOCKDATA                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_LIGHTDATA1                              , PDUR_IF_DEST_COM, COM_RX_PDU_LIGHTDATA1                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_STATUSACTUATOR                          , PDUR_IF_DEST_COM, COM_RX_PDU_STATUSACTUATOR                              , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_OUTSIDETEMPERATURESTATUS                , PDUR_IF_DEST_COM, COM_RX_PDU_OUTSIDETEMPERATURESTATUS                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CENTRALCOMMAND1                         , PDUR_IF_DEST_COM, COM_RX_PDU_CENTRALCOMMAND1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DMUSTATUS                               , PDUR_IF_DEST_COM, COM_RX_PDU_DMUSTATUS                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA7                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA7                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTFULLSTAT                            , PDUR_IF_DEST_COM, COM_RX_PDU_BATTFULLSTAT                                , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA6                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA6                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA5                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA4                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA3                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA2                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DSCDATA3                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA3                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DSCDATA2                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA2                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DSCDATA1                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA1                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ENGINEDATA1                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ASGDATA1                                , PDUR_IF_DEST_COM, COM_RX_PDU_ASGDATA1                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_PDCSTAT                                 , PDUR_IF_DEST_COM, COM_RX_PDU_PDCSTAT                                     , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_MILEAGE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_MILEAGE                                     , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DMU_ALIVE                               , PDUR_IF_DEST_COM, COM_RX_PDU_DMU_ALIVE                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_XCPRESPONSE_7C7                         , PDUR_IF_DEST_COM, COM_RX_PDU_XCPRESPONSE_7C7                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_XCPRESPONSE_7C5                         , PDUR_IF_DEST_COM, COM_RX_PDU_XCPRESPONSE_7C5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_XCPRESPONSE_7C3                         , PDUR_IF_DEST_COM, COM_RX_PDU_XCPRESPONSE_7C3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_XCPRESPONSE_7C1                         , PDUR_IF_DEST_COM, COM_RX_PDU_XCPRESPONSE_7C1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_VOLTAGECURRENT                          , PDUR_IF_DEST_COM, COM_RX_PDU_VOLTAGECURRENT                              , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_TEMPMEAS                                , PDUR_IF_DEST_COM, COM_RX_PDU_TEMPMEAS                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_LOADSTATUS                              , PDUR_IF_DEST_COM, COM_RX_PDU_LOADSTATUS                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_L1_I2T_COUNTER                          , PDUR_IF_DEST_COM, COM_RX_PDU_L1_I2T_COUNTER                              , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ERROR_706                               , PDUR_IF_DEST_COM, COM_RX_PDU_ERROR_706                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ERROR_704                               , PDUR_IF_DEST_COM, COM_RX_PDU_ERROR_704                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ERROR_702                               , PDUR_IF_DEST_COM, COM_RX_PDU_ERROR_702                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_ERROR_700                               , PDUR_IF_DEST_COM, COM_RX_PDU_ERROR_700                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DIAGREQUEST_710                         , PDUR_IF_DEST_COM, COM_RX_PDU_DIAGREQUEST_710                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DIAGRESPONSE_707                        , PDUR_IF_DEST_COM, COM_RX_PDU_DIAGRESPONSE_707                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DIAGRESPONSE_705                        , PDUR_IF_DEST_COM, COM_RX_PDU_DIAGRESPONSE_705                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DIAGRESPONSE_703                        , PDUR_IF_DEST_COM, COM_RX_PDU_DIAGRESPONSE_703                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_DIAGRESPONSE_701                        , PDUR_IF_DEST_COM, COM_RX_PDU_DIAGRESPONSE_701                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTSOCSOH                              , PDUR_IF_DEST_COM, COM_RX_PDU_BATTSOCSOH                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTSOC                                 , PDUR_IF_DEST_COM, COM_RX_PDU_BATTSOC                                     , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTDIAGNOSIS                           , PDUR_IF_DEST_COM, COM_RX_PDU_BATTDIAGNOSIS                               , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTCURRENT                             , PDUR_IF_DEST_COM, COM_RX_PDU_BATTCURRENT                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTCAPDISCHARGE                        , PDUR_IF_DEST_COM, COM_RX_PDU_BATTCAPDISCHARGE                            , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_BATTCAPRES                              , PDUR_IF_DEST_COM, COM_RX_PDU_BATTCAPRES                                  , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_LOADSTATUS                                   , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_LOADSTATUS                                        , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_LOADSTATUS                                   , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_LOADSTATUS                                        , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_LOADSTATUS                                   , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_LOADSTATUS                                        , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS                                   , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_LOADSTATUS                                        , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_STUCKATONEVENT                               , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_STUCKATONEVENT                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_STUCKATOFFEVENT                              , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_STUCKATOFFEVENT                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_1                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_2                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_2                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_STUCKATONEVENT                               , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_STUCKATONEVENT                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_STUCKATOFFEVENT                              , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_STUCKATOFFEVENT                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_1                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_2                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_2                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_3                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_4                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_4                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_5                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_STUCKATONEVENT                               , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_STUCKATONEVENT                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_STUCKATOFFEVENT                              , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_STUCKATOFFEVENT                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_1                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_2                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_2                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_3                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_4                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_4                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_5                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_STUCKATONEVENT                               , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_STUCKATONEVENT                                    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_STUCKATOFFEVENT                              , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_STUCKATOFFEVENT                                   , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_1                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_1                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_2                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_2                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_3                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_3                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_4                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_4                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_5                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM2_DIAGRESPONSE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM2_DIAGRESPONSE                                      , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM3_DIAGRESPONSE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM3_DIAGRESPONSE                                      , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM4_DIAGRESPONSE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM4_DIAGRESPONSE                                      , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_IfRxRouteType PduR_LinIfRxRoutes[] =
 {
-    /* Enable when LIN frame 0x10 shall update the COM application RX I-PDU. */
-    { FALSE, LINIF_PDU_APP10_RX, PDUR_IF_DEST_COM, PDUR_COM_RX_PDU_APP_STATUS, PDUR_SOAD_INVALID_SOCON },
-
-    /* Raw LIN -> CAN gateway example. Enable only after CANIF target PDU is configured. */
-    { FALSE, LINIF_PDU_APP10_RX, PDUR_IF_DEST_CANIF, CANIF_PDU_APP_TX, PDUR_SOAD_INVALID_SOCON }
+    { TRUE, LINIF_RX_PDU_ALT_STATUS            , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_ALT_STATUS                         , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, LINIF_RX_PDU_HVDCDC_STATUS         , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_HVDCDC_STATUS                      , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, LINIF_RX_PDU_PCU48_STATUS          , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_PCU48_STATUS                       , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_SoAdRxRouteType PduR_SoAdRxRoutes[] =
 {
-    /* Raw Ethernet UDP -> COM or CAN gateway examples. Disabled until a network description exists. */
-    { FALSE, PDUR_SOAD_SOCON_PDUR_IF_UDP, PDUR_IF_DEST_COM,   PDUR_COM_RX_PDU_APP_STATUS, PDUR_SOAD_INVALID_SOCON },
-    { FALSE, PDUR_SOAD_SOCON_PDUR_IF_UDP, PDUR_IF_DEST_CANIF, CANIF_PDU_APP_TX,           PDUR_SOAD_INVALID_SOCON }
+    { FALSE, PDUR_SOAD_SOCON_PDUR_IF_UDP, PDUR_IF_DEST_NONE, 0u, PDUR_SOAD_INVALID_SOCON }
 };
 
 /* ===================== Diagnostic TP routes ===================== */

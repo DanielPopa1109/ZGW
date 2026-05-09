@@ -27,6 +27,8 @@
 #include "LinTp.h"
 #include "EthStack.h"
 #include "Dem.h"
+#include "Fls.h"
+#include "Fee.h"
 
 uint8 OsInit_C0 = 0u;
 
@@ -52,7 +54,7 @@ void core0_main(void)
 
     Ssw_StartCores();
 
-   // McuSm_InitializeBusMpu(); //todo
+    McuSm_InitializeBusMpu();
 
     gpio_init_pins();
     can0_node0_init_pins();
@@ -71,8 +73,39 @@ void core0_main(void)
     LinTp_Init(1);
 
     Dem_PreInit();
-    NvM_ReadAll();
-    Dem_Init(NULL_PTR);
+
+    NvM_Init(NULL_PTR);
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+    }
+
+    (void)NvM_ReadAll();
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+    }
+
+    Dem_Init(&Dem_Config);
+
+    (void)Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE,
+            DEM_CYCLE_STATE_START);
+
+    (void)NvM_WriteAll();
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+        Dem_MainFunction();
+    }
 
     Os_Init_C0();
 

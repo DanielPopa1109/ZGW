@@ -10,7 +10,7 @@
 
 #define FLS_ERASED_VALUE                    (0xFFu)
 #define FLS_FLASH_MODULE                    (0u)
-#define FLS_VERIFY_WRITE                    (STD_ON)
+#define FLS_VERIFY_WRITE                    (STD_OFF)
 #define FLS_VERIFY_ERASE                    (STD_ON)
 #define FLS_DISABLE_INTERRUPTS_FOR_COMMAND  (STD_ON)
 

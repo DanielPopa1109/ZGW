@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="Ssw_StartCores"/>
+		<item key="selection" value="serviceC"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="Ssw_StartCores"/>
-			<item value="else if (len &gt; 0)"/>
-			<item value="ignition"/>
-			<item value="Oper"/>
-			<item value="oper"/>
-			<item value="mainfunc"/>
-			<item value="maifunc"/>
-			<item value="ain_main"/>
-			<item value="__ram_code_start"/>
-			<item value="ram"/>
-			<item value="RAM_CODE_GROUP "/>
-			<item value="ram_buff"/>
-			<item value="linear"/>
-			<item value="mpe:vtc:linear"/>
-			<item value="BootManager_PFLASH"/>
+			<item value="servicec"/>
+			<item value="ASIL_BSW"/>
+			<item value="Alarm5ms_Flag_ASIL_BSW_Task_C2"/>
+			<item value="ASIL_APPL_Task_C0"/>
+			<item value="Alarm5ms_Callback_ASIL_APPL_Task_C1"/>
+			<item value="GatewaySwc_IsDiagnosticOrXcpSignal"/>
+			<item value="SysMgr_GoSleep"/>
+			<item value="N"/>
+			<item value="verify"/>
+			<item value="SCR_SCU_STDBYWKP "/>
+			<item value="dem_init"/>
+			<item value="Dem_ConfigPtr"/>
+			<item value="lmu"/>
+			<item value="/*LMU Data sect"/>
+			<item value="trapvec_tc0 "/>
 		</list>
 		<list key="replacehistory">
 		</list>

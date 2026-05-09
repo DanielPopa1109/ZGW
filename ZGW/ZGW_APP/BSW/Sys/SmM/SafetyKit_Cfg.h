@@ -204,10 +204,10 @@
 #define ISR_PROVIDER_CCU6_MISSION_DACT_FUC3             CPU_WHICH_RUNS_DIGITAL_ACQ_ACT
 
 /* The CPU which service the DTS Service Request where functions/variables are located.  */
-#define CPU_WHICH_RUN_DTS                               1
+#define CPU_WHICH_RUN_DTS                               0
 
 /* The CPU which service the Pflash SM  */
-#define CPU_WHICH_RUN_PFLASH_SM                         1
+#define CPU_WHICH_RUN_PFLASH_SM                         0
 
 /* The CPU which service the QSPI safe communication  */
 #define CPU_WHICH_RUN_MASTER_QSPI_SAFE_COMM             2

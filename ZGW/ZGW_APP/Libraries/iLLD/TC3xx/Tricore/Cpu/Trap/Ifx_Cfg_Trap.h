@@ -61,14 +61,6 @@ extern int vPortSyscallHandler_core2( unsigned char id );
 #define IFX_CFG_CPU_TRAP_CME_HOOK(trapWatch)    ((void)McuSm_TRAP3(trapWatch))      /**< By default context Management Error macro is empty*/
 #define IFX_CFG_CPU_TRAP_TSR_HOOK(trapWatch)    ((void)trapWatch)       /**< By default macro is empty*/
 #define IFX_CFG_CPU_TRAP_ASSERT_HOOK(trapWatch) ((void)trapWatch)     /**< By default assertion is empty*/
-/*define how many context save areas can be dumped*/
-#define CSA_CAPTURE_LIMIT   (20u)
-/*define how many stacks can be dumped for upper context dumps*/
-#define STACK_CAPTURE_LIMIT (10u)
-/*define how many words should be captured from each stack*/
-#define STACK_CAPTURE_SIZE  (8u)
-#define CSA_UPPER_CONTEXT   (1)
-#define CSA_LOWER_CONTEXT   (0)
 /*********************************************************************************************************************/
 /*-------------------------------------------------Type Definitions--------------------------------------------------*/
 /*********************************************************************************************************************/

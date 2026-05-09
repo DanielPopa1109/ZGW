@@ -23,6 +23,165 @@ typedef struct
         uint8 txErrorCounter;
 } Can_ControllerRuntimeType;
 
+
+typedef struct
+{
+    uint16 id;
+    const char* name;
+} Can_StdIdFilterConfigType;
+
+#define CAN_FD_STD_FILTER_COUNT ((uint8)(sizeof(Can_FdStdIdFilters) / sizeof(Can_FdStdIdFilters[0])))
+
+static const Can_StdIdFilterConfigType Can_FdStdIdFilters[] =
+{
+    { 0x093u, "PDM4_LoadStatus" }, /* PDM4_LoadStatus, sender PDM4 */
+    { 0x092u, "PDM3_LoadStatus" }, /* PDM3_LoadStatus, sender PDM3 */
+    { 0x091u, "PDM2_LoadStatus" }, /* PDM2_LoadStatus, sender PDM2 */
+    { 0x090u, "PDM1_LoadStatus" }, /* PDM1_LoadStatus, sender PDM1 */
+    { 0x300u, "PDM1_VoltageFeedback_1" }, /* PDM1_VoltageFeedback_1, sender PDM1 */
+    { 0x301u, "PDM1_VoltageFeedback_2" }, /* PDM1_VoltageFeedback_2, sender PDM1 */
+    { 0x302u, "PDM1_VoltageFeedback_3" }, /* PDM1_VoltageFeedback_3, sender PDM1 */
+    { 0x303u, "PDM1_VoltageFeedback_4" }, /* PDM1_VoltageFeedback_4, sender PDM1 */
+    { 0x304u, "PDM1_VoltageFeedback_5" }, /* PDM1_VoltageFeedback_5, sender PDM1 */
+    { 0x305u, "PDM1_CurrentFeedback_1" }, /* PDM1_CurrentFeedback_1, sender PDM1 */
+    { 0x306u, "PDM1_CurrentFeedback_2" }, /* PDM1_CurrentFeedback_2, sender PDM1 */
+    { 0x307u, "PDM1_CurrentFeedback_3" }, /* PDM1_CurrentFeedback_3, sender PDM1 */
+    { 0x308u, "PDM1_CurrentFeedback_4" }, /* PDM1_CurrentFeedback_4, sender PDM1 */
+    { 0x309u, "PDM1_CurrentFeedback_5" }, /* PDM1_CurrentFeedback_5, sender PDM1 */
+    { 0x30Au, "PDM1_StuckAtOnEvent" }, /* PDM1_StuckAtOnEvent, sender PDM1 */
+    { 0x30Bu, "PDM1_StuckAtOffEvent" }, /* PDM1_StuckAtOffEvent, sender PDM1 */
+    { 0x30Cu, "PDM1_TemperatureFeedback_1" }, /* PDM1_TemperatureFeedback_1, sender PDM1 */
+    { 0x30Du, "PDM1_TemperatureFeedback_2" }, /* PDM1_TemperatureFeedback_2, sender PDM1 */
+    { 0x30Eu, "PDM1_TemperatureFeedback_3" }, /* PDM1_TemperatureFeedback_3, sender PDM1 */
+    { 0x30Fu, "PDM1_TemperatureFeedback_4" }, /* PDM1_TemperatureFeedback_4, sender PDM1 */
+    { 0x310u, "PDM1_TemperatureFeedback_5" }, /* PDM1_TemperatureFeedback_5, sender PDM1 */
+    { 0x311u, "PDM2_VoltageFeedback_1" }, /* PDM2_VoltageFeedback_1, sender PDM2 */
+    { 0x312u, "PDM2_VoltageFeedback_2" }, /* PDM2_VoltageFeedback_2, sender PDM2 */
+    { 0x313u, "PDM2_VoltageFeedback_3" }, /* PDM2_VoltageFeedback_3, sender PDM2 */
+    { 0x314u, "PDM2_VoltageFeedback_4" }, /* PDM2_VoltageFeedback_4, sender PDM2 */
+    { 0x315u, "PDM2_VoltageFeedback_5" }, /* PDM2_VoltageFeedback_5, sender PDM2 */
+    { 0x316u, "PDM2_CurrentFeedback_1" }, /* PDM2_CurrentFeedback_1, sender PDM2 */
+    { 0x317u, "PDM2_CurrentFeedback_2" }, /* PDM2_CurrentFeedback_2, sender PDM2 */
+    { 0x318u, "PDM2_CurrentFeedback_3" }, /* PDM2_CurrentFeedback_3, sender PDM2 */
+    { 0x319u, "PDM2_CurrentFeedback_4" }, /* PDM2_CurrentFeedback_4, sender PDM2 */
+    { 0x31Au, "PDM2_CurrentFeedback_5" }, /* PDM2_CurrentFeedback_5, sender PDM2 */
+    { 0x31Bu, "PDM2_StuckAtOnEvent" }, /* PDM2_StuckAtOnEvent, sender PDM2 */
+    { 0x31Cu, "PDM2_StuckAtOffEvent" }, /* PDM2_StuckAtOffEvent, sender PDM2 */
+    { 0x31Du, "PDM2_TemperatureFeedback_1" }, /* PDM2_TemperatureFeedback_1, sender PDM2 */
+    { 0x31Eu, "PDM2_TemperatureFeedback_2" }, /* PDM2_TemperatureFeedback_2, sender PDM2 */
+    { 0x31Fu, "PDM2_TemperatureFeedback_3" }, /* PDM2_TemperatureFeedback_3, sender PDM2 */
+    { 0x320u, "PDM2_TemperatureFeedback_4" }, /* PDM2_TemperatureFeedback_4, sender PDM2 */
+    { 0x321u, "PDM2_TemperatureFeedback_5" }, /* PDM2_TemperatureFeedback_5, sender PDM2 */
+    { 0x322u, "PDM3_VoltageFeedback_1" }, /* PDM3_VoltageFeedback_1, sender PDM3 */
+    { 0x323u, "PDM3_VoltageFeedback_2" }, /* PDM3_VoltageFeedback_2, sender PDM3 */
+    { 0x324u, "PDM3_VoltageFeedback_3" }, /* PDM3_VoltageFeedback_3, sender PDM3 */
+    { 0x325u, "PDM3_VoltageFeedback_4" }, /* PDM3_VoltageFeedback_4, sender PDM3 */
+    { 0x326u, "PDM3_VoltageFeedback_5" }, /* PDM3_VoltageFeedback_5, sender PDM3 */
+    { 0x327u, "PDM3_CurrentFeedback_1" }, /* PDM3_CurrentFeedback_1, sender PDM3 */
+    { 0x328u, "PDM3_CurrentFeedback_2" }, /* PDM3_CurrentFeedback_2, sender PDM3 */
+    { 0x329u, "PDM3_CurrentFeedback_3" }, /* PDM3_CurrentFeedback_3, sender PDM3 */
+    { 0x32Au, "PDM3_CurrentFeedback_4" }, /* PDM3_CurrentFeedback_4, sender PDM3 */
+    { 0x32Bu, "PDM3_CurrentFeedback_5" }, /* PDM3_CurrentFeedback_5, sender PDM3 */
+    { 0x32Cu, "PDM3_StuckAtOnEvent" }, /* PDM3_StuckAtOnEvent, sender PDM3 */
+    { 0x32Du, "PDM3_StuckAtOffEvent" }, /* PDM3_StuckAtOffEvent, sender PDM3 */
+    { 0x32Eu, "PDM3_TemperatureFeedback_1" }, /* PDM3_TemperatureFeedback_1, sender PDM3 */
+    { 0x32Fu, "PDM3_TemperatureFeedback_2" }, /* PDM3_TemperatureFeedback_2, sender PDM3 */
+    { 0x330u, "PDM3_TemperatureFeedback_3" }, /* PDM3_TemperatureFeedback_3, sender PDM3 */
+    { 0x331u, "PDM3_TemperatureFeedback_4" }, /* PDM3_TemperatureFeedback_4, sender PDM3 */
+    { 0x332u, "PDM3_TemperatureFeedback_5" }, /* PDM3_TemperatureFeedback_5, sender PDM3 */
+    { 0x333u, "PDM4_VoltageFeedback_1" }, /* PDM4_VoltageFeedback_1, sender PDM4 */
+    { 0x334u, "PDM4_VoltageFeedback_2" }, /* PDM4_VoltageFeedback_2, sender PDM4 */
+    { 0x335u, "PDM4_VoltageFeedback_3" }, /* PDM4_VoltageFeedback_3, sender PDM4 */
+    { 0x336u, "PDM4_VoltageFeedback_4" }, /* PDM4_VoltageFeedback_4, sender PDM4 */
+    { 0x337u, "PDM4_VoltageFeedback_5" }, /* PDM4_VoltageFeedback_5, sender PDM4 */
+    { 0x338u, "PDM4_CurrentFeedback_1" }, /* PDM4_CurrentFeedback_1, sender PDM4 */
+    { 0x339u, "PDM4_CurrentFeedback_2" }, /* PDM4_CurrentFeedback_2, sender PDM4 */
+    { 0x33Au, "PDM4_CurrentFeedback_3" }, /* PDM4_CurrentFeedback_3, sender PDM4 */
+    { 0x33Bu, "PDM4_CurrentFeedback_4" }, /* PDM4_CurrentFeedback_4, sender PDM4 */
+    { 0x33Cu, "PDM4_CurrentFeedback_5" }, /* PDM4_CurrentFeedback_5, sender PDM4 */
+    { 0x33Du, "PDM4_StuckAtOnEvent" }, /* PDM4_StuckAtOnEvent, sender PDM4 */
+    { 0x33Eu, "PDM4_StuckAtOffEvent" }, /* PDM4_StuckAtOffEvent, sender PDM4 */
+    { 0x33Fu, "PDM4_TemperatureFeedback_1" }, /* PDM4_TemperatureFeedback_1, sender PDM4 */
+    { 0x340u, "PDM4_TemperatureFeedback_2" }, /* PDM4_TemperatureFeedback_2, sender PDM4 */
+    { 0x341u, "PDM4_TemperatureFeedback_3" }, /* PDM4_TemperatureFeedback_3, sender PDM4 */
+    { 0x342u, "PDM4_TemperatureFeedback_4" }, /* PDM4_TemperatureFeedback_4, sender PDM4 */
+    { 0x343u, "PDM4_TemperatureFeedback_5" }, /* PDM4_TemperatureFeedback_5, sender PDM4 */
+    { 0x721u, "PDM1_DiagResponse" }, /* PDM1_DiagResponse, sender PDM1 */
+    { 0x723u, "PDM2_DiagResponse" }, /* PDM2_DiagResponse, sender PDM2 */
+    { 0x725u, "PDM3_DiagResponse" }, /* PDM3_DiagResponse, sender PDM3 */
+    { 0x727u, "PDM4_DiagResponse" }, /* PDM4_DiagResponse, sender PDM4 */
+    { 0x711u, "LegacyCanFdDiagPhysRx_711" }, /* preserved previous CAN-FD physical diagnostic RX */
+    { 0x7E0u, "LegacyCanFdDiagFuncRx_7E0" } /* preserved previous CAN-FD functional diagnostic RX */
+};
+
+#define CAN_CLASSIC_STD_FILTER_COUNT ((uint8)(sizeof(Can_ClassicStdIdFilters) / sizeof(Can_ClassicStdIdFilters[0])))
+
+static const Can_StdIdFilterConfigType Can_ClassicStdIdFilters[] =
+{
+    { 0x030u, "VehicleState" }, /* VehicleState, sender ZGW */
+    { 0x253u, "CentralLockData" }, /* CentralLockData, sender FRBE */
+    { 0x252u, "LightData1" }, /* LightData1, sender FRBE */
+    { 0x221u, "DisplayOutTemp" }, /* DisplayOutTemp, sender ZGW */
+    { 0x240u, "StatusActuator" }, /* StatusActuator, sender CBM */
+    { 0x040u, "StatusBodyData1" }, /* StatusBodyData1, sender ZGW */
+    { 0x251u, "OutsideTemperatureStatus" }, /* OutsideTemperatureStatus, sender CBM */
+    { 0x250u, "CentralCommand1" }, /* CentralCommand1, sender CBM */
+    { 0x201u, "DmuStatus" }, /* DmuStatus, sender DMU */
+    { 0x220u, "CommandDisplayStatus" }, /* CommandDisplayStatus, sender ZGW */
+    { 0x086u, "EngineData7" }, /* EngineData7, sender DME */
+    { 0x6F6u, "BattFullStat" }, /* BattFullStat, sender ELC */
+    { 0x085u, "EngineData6" }, /* EngineData6, sender DME */
+    { 0x084u, "EngineData5" }, /* EngineData5, sender DME */
+    { 0x083u, "EngineData4" }, /* EngineData4, sender DME */
+    { 0x082u, "EngineData3" }, /* EngineData3, sender DME */
+    { 0x081u, "EngineData2" }, /* EngineData2, sender DME */
+    { 0x092u, "DSCData3" }, /* DSCData3, sender DSC */
+    { 0x091u, "DSCData2" }, /* DSCData2, sender DSC */
+    { 0x090u, "DSCData1" }, /* DSCData1, sender DSC */
+    { 0x080u, "EngineData1" }, /* EngineData1, sender DME */
+    { 0x100u, "ASGData1" }, /* ASGData1, sender AGS */
+    { 0x10Du, "PdcStat" }, /* PdcStat, sender FRBE */
+    { 0x299u, "Mileage" }, /* Mileage, sender DMU */
+    { 0x200u, "Dmu_Alive" }, /* Dmu_Alive, sender DMU */
+    { 0x7C7u, "XcpResponse_7C7" }, /* XcpResponse_7C7, sender ELC */
+    { 0x7C5u, "XcpResponse_7C5" }, /* XcpResponse_7C5, sender DMU */
+    { 0x7C3u, "XcpResponse_7C3" }, /* XcpResponse_7C3, sender FRBE */
+    { 0x7C1u, "XcpResponse_7C1" }, /* XcpResponse_7C1, sender CBM */
+    { 0x7C8u, "XcpRequest_7C8" }, /* XcpRequest_7C8, sender ZGW */
+    { 0x7C6u, "XcpRequest_7C6" }, /* XcpRequest_7C6, sender ZGW */
+    { 0x7C4u, "XcpRequest_7C4" }, /* XcpRequest_7C4, sender ZGW */
+    { 0x7C2u, "XcpRequest_7C2" }, /* XcpRequest_7C2, sender ZGW */
+    { 0x7C0u, "XcpRequest_7C0" }, /* XcpRequest_7C0, sender ZGW */
+    { 0x6EFu, "VoltageCurrent" }, /* VoltageCurrent, sender ELC */
+    { 0x6EEu, "TempMeas" }, /* TempMeas, sender ELC */
+    { 0x202u, "SDAT" }, /* SDAT, sender ZGW */
+    { 0x3FFu, "NM3" }, /* NM3, sender ZGW */
+    { 0x051u, "LoadStatus" }, /* LoadStatus, sender ELC */
+    { 0x050u, "LoadRequest" }, /* LoadRequest, sender ZGW */
+    { 0x6F0u, "L1_I2T_Counter" }, /* L1_I2T_Counter, sender ELC */
+    { 0x753u, "Error_706" }, /* Error_706, sender ELC */
+    { 0x752u, "Error_704" }, /* Error_704, sender DMU */
+    { 0x751u, "Error_702" }, /* Error_702, sender FRBE */
+    { 0x750u, "Error_700" }, /* Error_700, sender CBM */
+    { 0x710u, "DiagRequest_710" }, /* DiagRequest_710, sender Tester */
+    { 0x707u, "DiagResponse_707" }, /* DiagResponse_707, sender ELC */
+    { 0x705u, "DiagResponse_705" }, /* DiagResponse_705, sender DMU */
+    { 0x703u, "DiagResponse_703" }, /* DiagResponse_703, sender FRBE */
+    { 0x701u, "DiagResponse_701" }, /* DiagResponse_701, sender CBM */
+    { 0x706u, "DiagRequest_706" }, /* DiagRequest_706, sender ZGW */
+    { 0x704u, "DiagRequest_704" }, /* DiagRequest_704, sender ZGW */
+    { 0x702u, "DiagRequest_702" }, /* DiagRequest_702, sender ZGW */
+    { 0x700u, "DiagRequest_700" }, /* DiagRequest_700, sender ZGW */
+    { 0x6F3u, "BattSoCSoH" }, /* BattSoCSoH, sender ELC */
+    { 0x6F2u, "BattSoC" }, /* BattSoC, sender ELC */
+    { 0x6F7u, "BattDiagnosis" }, /* BattDiagnosis, sender ELC */
+    { 0x6F5u, "BattCurrent" }, /* BattCurrent, sender ELC */
+    { 0x6F1u, "BattCapDischarge" }, /* BattCapDischarge, sender ELC */
+    { 0x6F4u, "BattCapRes" }, /* BattCapRes, sender ELC */
+    { 0x7DFu, "FunctionalDiag_7DF" }, /* FunctionalDiag_7DF, sender LOCAL */
+    { 0x500u, "LegacyWakeOrLab_500" }, /* LegacyWakeOrLab_500, sender LOCAL */
+};
+
 typedef struct
 {
         IfxCan_Can_Config moduleConfig;
@@ -400,8 +559,8 @@ static void Can_InitClassicNode(void)
     Can_Hw.nodeConfigClassic.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_8;
 
     Can_Hw.nodeConfigClassic.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
-    Can_Hw.nodeConfigClassic.filterConfig.standardListSize = 16u;
-    Can_Hw.nodeConfigClassic.filterConfig.extendedListSize = 16u;
+    Can_Hw.nodeConfigClassic.filterConfig.standardListSize = CAN_CLASSIC_STD_FILTER_COUNT;
+    Can_Hw.nodeConfigClassic.filterConfig.extendedListSize = 0u;
     Can_Hw.nodeConfigClassic.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
     Can_Hw.nodeConfigClassic.filterConfig.extendedFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
     Can_Hw.nodeConfigClassic.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
@@ -435,22 +594,20 @@ static void Can_InitClassicNode(void)
     IfxPort_setPinModeOutput(&MODULE_P20, 6, IfxPort_OutputMode_pushPull, IfxPort_OutputIdx_general);
     IfxPort_setPinLow(&MODULE_P20, 6);
 
-    Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    {
+        uint8 i;
 
-    Can_Hw.filter.number = 0u;
-    Can_Hw.filter.id1 = 0x710u;
-    Can_Hw.filter.id2 = 0x710u;
-    IfxCan_Can_setStandardFilter(&Can_Hw.nodeClassic, &Can_Hw.filter);
+        Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+        Can_Hw.filter.type = IfxCan_FilterType_classic;
 
-    Can_Hw.filter.number = 1u;
-    Can_Hw.filter.id1 = 0x7DFu;
-    Can_Hw.filter.id2 = 0x7DFu;
-    IfxCan_Can_setStandardFilter(&Can_Hw.nodeClassic, &Can_Hw.filter);
-
-    Can_Hw.filter.number = 2u;
-    Can_Hw.filter.id1 = 0x500u;
-    Can_Hw.filter.id2 = 0x500u;
-    IfxCan_Can_setStandardFilter(&Can_Hw.nodeClassic, &Can_Hw.filter);
+        for (i = 0u; i < CAN_CLASSIC_STD_FILTER_COUNT; i++)
+        {
+            Can_Hw.filter.number = i;
+            Can_Hw.filter.id1 = Can_ClassicStdIdFilters[i].id;
+            Can_Hw.filter.id2 = Can_ClassicStdIdFilters[i].id;
+            IfxCan_Can_setStandardFilter(&Can_Hw.nodeClassic, &Can_Hw.filter);
+        }
+    }
 }
 
 static void Can_InitFdNode(void)
@@ -473,8 +630,8 @@ static void Can_InitFdNode(void)
     Can_Hw.nodeConfigFd.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
 
     Can_Hw.nodeConfigFd.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
-    Can_Hw.nodeConfigFd.filterConfig.standardListSize = 16u;
-    Can_Hw.nodeConfigFd.filterConfig.extendedListSize = 16u;
+    Can_Hw.nodeConfigFd.filterConfig.standardListSize = CAN_FD_STD_FILTER_COUNT;
+    Can_Hw.nodeConfigFd.filterConfig.extendedListSize = 0u;
     Can_Hw.nodeConfigFd.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
     Can_Hw.nodeConfigFd.filterConfig.extendedFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
     Can_Hw.nodeConfigFd.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
@@ -505,17 +662,20 @@ static void Can_InitFdNode(void)
             IfxPort_OutputMode_pushPull,
             IfxPort_PadDriver_cmosAutomotiveSpeed4);
 
-    Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    {
+        uint8 i;
 
-    Can_Hw.filter.number = 0u;
-    Can_Hw.filter.id1 = 0x711u;
-    Can_Hw.filter.id2 = 0x711u;
-    IfxCan_Can_setStandardFilter(&Can_Hw.nodeFd, &Can_Hw.filter);
+        Can_Hw.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+        Can_Hw.filter.type = IfxCan_FilterType_classic;
 
-    Can_Hw.filter.number = 1u;
-    Can_Hw.filter.id1 = 0x7E0u;
-    Can_Hw.filter.id2 = 0x7E0u;
-    IfxCan_Can_setStandardFilter(&Can_Hw.nodeFd, &Can_Hw.filter);
+        for (i = 0u; i < CAN_FD_STD_FILTER_COUNT; i++)
+        {
+            Can_Hw.filter.number = i;
+            Can_Hw.filter.id1 = Can_FdStdIdFilters[i].id;
+            Can_Hw.filter.id2 = Can_FdStdIdFilters[i].id;
+            IfxCan_Can_setStandardFilter(&Can_Hw.nodeFd, &Can_Hw.filter);
+        }
+    }
 }
 
 static Ifx_CAN_N* Can_GetNodeSfr(uint8 controllerId)
