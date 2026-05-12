@@ -28,6 +28,7 @@ typedef struct
     PduLengthType rxLen;
     PduLengthType expectedRxLen;
     uint8 rxSn;
+    PduIdType rxPduId;
 
     LinTp_InternalStateType state;
     uint16 timer;
@@ -49,10 +50,10 @@ uint8 LinTp_GetNad(void)
 
 Std_ReturnType LinTp_AssignNad(uint8 initialNad, uint16 supplierId, uint16 functionId, uint8 newNad)
 {
-    (void)supplierId;
-    (void)functionId;
-
-    if ((initialNad == LinTp_State.nad) || (initialNad == LINTP_NAD_BROADCAST))
+    if ((initialNad == LinTp_State.nad) &&
+        (supplierId == LINTP_SUPPLIER_ID) &&
+        (functionId == LINTP_FUNCTION_ID) &&
+        (newNad < LINTP_NAD_FUNCTIONAL))
     {
         LinTp_State.nad = newNad;
         return E_OK;
@@ -188,7 +189,7 @@ void LinTp_MainFunction(void)
     }
     else if (LinTp_State.state == LINTP_RX_IN_PROGRESS)
     {
-        PduR_LinTpRxIndication(LINTP_PDUR_ID, E_NOT_OK);
+        PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
     }
 }
@@ -202,6 +203,12 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
     uint8 sn;
     uint8 copy;
     PduLengthType rem;
+    uint8 diagnosticAddress;
+
+    if (pduRId == LINTP_PDUR_SLAVE_RESP_ID)
+    {
+        return;
+    }
 
     nad = frame[0];
 
@@ -213,9 +220,20 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
     }
 
     pci = frame[1] & 0xF0u;
+    diagnosticAddress = ((nad == LINTP_NAD_FUNCTIONAL) || (nad == LINTP_NAD_BROADCAST)) ? TRUE : FALSE;
+
+    if ((diagnosticAddress != FALSE) && (pci != LINTP_PCI_SF))
+    {
+        return;
+    }
 
     if (pci == LINTP_PCI_SF)
     {
+        if (LinTp_State.state != LINTP_IDLE)
+        {
+            return;
+        }
+
         len = frame[1] & 0x0Fu;
 
         if ((len == 0u) || (len > 6u))
@@ -240,6 +258,11 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
 
     if (pci == LINTP_PCI_FF)
     {
+        if (LinTp_State.state != LINTP_IDLE)
+        {
+            return;
+        }
+
         totalLen = (uint16)((((uint16)frame[1] & 0x0Fu) << 8u) | frame[2]);
 
         if ((totalLen == 0u) || (totalLen > LINTP_MAX_PAYLOAD))
@@ -263,6 +286,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         LinTp_State.expectedRxLen = totalLen;
         LinTp_State.rxLen = copy;
         LinTp_State.rxSn = 1u;
+        LinTp_State.rxPduId = pduRId;
         LinTp_State.state = LINTP_RX_IN_PROGRESS;
         LinTp_State.timer = LINTP_TIMER_N_CR;
         return;
@@ -279,7 +303,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
 
         if (sn != LinTp_State.rxSn)
         {
-            PduR_LinTpRxIndication(pduRId, E_NOT_OK);
+            PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
             return;
         }
@@ -287,9 +311,9 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         rem = (PduLengthType)(LinTp_State.expectedRxLen - LinTp_State.rxLen);
         copy = (rem > 6u) ? 6u : (uint8)rem;
 
-        if (PduR_LinTpCopyRxData(pduRId, &frame[2], copy) != E_OK)
+        if (PduR_LinTpCopyRxData(LinTp_State.rxPduId, &frame[2], copy) != E_OK)
         {
-            PduR_LinTpRxIndication(pduRId, E_NOT_OK);
+            PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
             return;
         }
@@ -300,7 +324,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
 
         if (LinTp_State.rxLen >= LinTp_State.expectedRxLen)
         {
-            PduR_LinTpRxIndication(pduRId, E_OK);
+            PduR_LinTpRxIndication(LinTp_State.rxPduId, E_OK);
             LinTp_State.state = LINTP_IDLE;
         }
     }
@@ -308,10 +332,10 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
 
 void LinTp_RxMasterRequest(const uint8 frame[8])
 {
-    LinTp_HandleRxFrame(frame, LINTP_PDUR_ID);
+    LinTp_HandleRxFrame(frame, LINTP_PDUR_MASTER_REQ_ID);
 }
 
 void LinTp_RxSlaveResponse(const uint8 frame[8])
 {
-    LinTp_HandleRxFrame(frame, LINTP_PDUR_ID);
+    LinTp_HandleRxFrame(frame, LINTP_PDUR_SLAVE_RESP_ID);
 }

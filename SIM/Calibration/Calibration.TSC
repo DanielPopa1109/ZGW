@@ -1,0 +1,19 @@
+﻿[RecorderGroup]
+Recorder Name=Recorder
+Recorder Comment=
+Recorder File Name={DATE}\TSMaster_{TIME}
+Active=False
+Enter Comments on stop=True
+Recorder File Format=mdf
+MDF Version=4.10
+Compression=Active
+Record Bus Data=False
+
+[RecorderSystemVar]
+vCount=0
+
+[ECUGroup]
+Add ECU Prefix To System Variable=False
+
+[Calibration]
+ECUCount=0

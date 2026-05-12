@@ -66,41 +66,41 @@ typedef struct
 
 static const Com_TxIpduConfigType Com_TxIpduCfg[] =
 {
-    { COM_TX_PDU_VEHICLESTATE                                , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_DISPLAYOUTTEMP                              , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_STATUSBODYDATA1                             , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_COMMANDDISPLAYSTATUS                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 6u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_VEHICLESTATE                                , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_DISPLAYOUTTEMP                              , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_STATUSBODYDATA1                             , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_COMMANDDISPLAYSTATUS                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 6u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_XCPREQUEST_7C8                              , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_XCPREQUEST_7C6                              , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_XCPREQUEST_7C4                              , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_XCPREQUEST_7C2                              , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_XCPREQUEST_7C0                              , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_SDAT                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_NM3                                         , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LOADREQUEST                                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_SDAT                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_NM3                                         , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_LOADREQUEST                                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 3u, 2u, 1u, 2u, 100u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_DIAGREQUEST_706                             , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_DIAGREQUEST_704                             , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_DIAGREQUEST_702                             , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_DIAGREQUEST_700                             , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_INFOTAINMENTDATA1                                      , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 6u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_VEHICLESTATE                                           , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_NM3                                                    , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_SDAT                                                   , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_LIGHTDATA1                                             , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 3u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 16u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_BODYDATA1                                              , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 20u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_PDM2_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 20u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_PDM3_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 20u, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_PDM4_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 20u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM2                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM3                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM4                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 20u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_INFOTAINMENTDATA1                                      , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 6u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_VEHICLESTATE                                           , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_NM3                                                    , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_SDAT                                                   , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_LIGHTDATA1                                             , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 3u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 16u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_BODYDATA1                                              , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_PDM2_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_PDM3_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_PDM4_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM2                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM3                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_COMMANDLOAD_PDM4                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 19u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_LIN_ZGW_NM3                            , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
@@ -1652,6 +1652,32 @@ static void Com_StoreValue(void* ptr, uint8 size, uint32 value)
     }
 }
 
+static uint16 Com_GetTxRetryTimeoutTicks(const Com_TxIpduConfigType* cfg)
+{
+    uint16 timeoutTicks;
+
+    if (cfg == NULL_PTR)
+    {
+        return 1u;
+    }
+
+    timeoutTicks = cfg->deadlineTicks;
+
+    if (((cfg->txMode == COM_TX_MODE_PERIODIC) ||
+            (cfg->txMode == COM_TX_MODE_MIXED)) &&
+            (cfg->periodTicks > 0u))
+    {
+        timeoutTicks = cfg->periodTicks;
+    }
+
+    if (timeoutTicks == 0u)
+    {
+        timeoutTicks = 1u;
+    }
+
+    return timeoutTicks;
+}
+
 static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
 {
     const Com_TxIpduConfigType* cfg;
@@ -1668,11 +1694,6 @@ static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
         return E_NOT_OK;
     }
 
-    if (Com_TxRt[txIdx].txInProgress != COM_FALSE)
-    {
-        return E_NOT_OK;
-    }
-
     if (Com_TxRt[txIdx].mdtTimer > 0u)
     {
         return E_NOT_OK;
@@ -1680,9 +1701,10 @@ static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
 
     if (PduR_ComTransmit(cfg->pduId, Com_TxRt[txIdx].buffer, cfg->len) == E_OK)
     {
-        Com_TxRt[txIdx].txInProgress = COM_TRUE;
+        Com_TxRt[txIdx].txInProgress = COM_FALSE;
         Com_TxRt[txIdx].mdtTimer = cfg->mdtTicks;
-        Com_TxRt[txIdx].deadlineTimer = cfg->deadlineTicks;
+        Com_TxRt[txIdx].deadlineTimer = Com_GetTxRetryTimeoutTicks(cfg);
+        Com_TxRt[txIdx].dirty = COM_FALSE;
         return E_OK;
     }
 
@@ -1699,7 +1721,14 @@ void Com_Init(void)
     for (i = 0u; i < (uint8)(sizeof(Com_TxIpduCfg) / sizeof(Com_TxIpduCfg[0])); i++)
     {
         memcpy(Com_TxRt[i].buffer, Com_TxIpduCfg[i].init, Com_TxIpduCfg[i].len);
-        Com_TxRt[i].periodTimer = Com_TxIpduCfg[i].periodTicks;
+        if (Com_TxIpduCfg[i].periodTicks > 0u)
+        {
+            Com_TxRt[i].periodTimer = (uint16)(i % Com_TxIpduCfg[i].periodTicks);
+        }
+        else
+        {
+            Com_TxRt[i].periodTimer = 0u;
+        }
         Com_TxRt[i].deadlineTimer = Com_TxIpduCfg[i].deadlineTicks;
         Com_TxRt[i].active = COM_TRUE;
     }
@@ -1763,6 +1792,8 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     const Com_SignalConfigType* sig;
     uint8 txIdx;
     uint32 value;
+    uint32 previousValue;
+    uint8 pduChanged = COM_FALSE;
 
     if (SignalDataPtr == NULL_PTR)
     {
@@ -1784,17 +1815,37 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     }
 
     value = Com_LoadValue(SignalDataPtr, sig->dataSize);
+    if (sig->bitSize < 32u)
+    {
+        value &= (uint32)((1UL << sig->bitSize) - 1UL);
+    }
+
+    previousValue = Com_ReadBits(Com_TxRt[txIdx].buffer, sig->bitPosition, sig->bitSize);
+    if (previousValue != value)
+    {
+        pduChanged = COM_TRUE;
+    }
+
     Com_WriteBits(Com_TxRt[txIdx].buffer, sig->bitPosition, sig->bitSize, value);
 
     if (sig->hasUpdateBit != COM_FALSE)
     {
+        if (Com_ReadBits(Com_TxRt[txIdx].buffer, sig->updateBitPosition, 1u) == 0u)
+        {
+            pduChanged = COM_TRUE;
+        }
+
         Com_WriteBits(Com_TxRt[txIdx].buffer, sig->updateBitPosition, 1u, 1u);
     }
 
-    Com_TxRt[txIdx].dirty = COM_TRUE;
+    if (pduChanged != COM_FALSE)
+    {
+        Com_TxRt[txIdx].dirty = COM_TRUE;
+    }
 
-    if ((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_DIRECT) ||
-        (Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_MIXED))
+    if ((pduChanged != COM_FALSE) &&
+        ((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_DIRECT) ||
+        (Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_MIXED)))
     {
         Com_TxRt[txIdx].repetitionsLeft = Com_TxIpduCfg[txIdx].repetitions;
         Com_TxRt[txIdx].repetitionTimer = 0u;
@@ -1844,6 +1895,114 @@ Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr)
 
     value = Com_ReadBits(Com_RxRt[rxIdx].buffer, sig->bitPosition, sig->bitSize);
     Com_StoreValue(SignalDataPtr, sig->dataSize, value);
+
+    return E_OK;
+}
+
+Std_ReturnType Com_GetRxPduDiagStatus(PduIdType RxPduId, uint8* StatusPtr)
+{
+    uint8 rxIdx;
+
+    if (StatusPtr == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    rxIdx = Com_FindRxIpdu(RxPduId);
+
+    if ((rxIdx == 0xFFu) || (Com_RxRt[rxIdx].active == COM_FALSE))
+    {
+        return E_NOT_OK;
+    }
+
+    *StatusPtr = COM_RX_DIAG_STATUS_OK;
+
+    if (Com_RxRt[rxIdx].timeout != COM_FALSE)
+    {
+        *StatusPtr |= COM_RX_DIAG_STATUS_TIMEOUT;
+    }
+
+    return E_OK;
+}
+
+Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
+        uint16* CycleTicksPtr,
+        uint16* TimeoutTicksPtr)
+{
+    uint8 rxIdx;
+    uint16 timeoutTicks;
+
+    if ((CycleTicksPtr == NULL_PTR) || (TimeoutTicksPtr == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    rxIdx = Com_FindRxIpdu(RxPduId);
+
+    if (rxIdx == 0xFFu)
+    {
+        return E_NOT_OK;
+    }
+
+    timeoutTicks = Com_RxIpduCfg[rxIdx].deadlineTicks;
+    *TimeoutTicksPtr = timeoutTicks;
+
+    if (timeoutTicks >= 10u)
+    {
+        *CycleTicksPtr = (uint16)(timeoutTicks / 10u);
+    }
+    else
+    {
+        *CycleTicksPtr = timeoutTicks;
+    }
+
+    return E_OK;
+}
+
+Std_ReturnType Com_GetRxSignalDiagStatus(Com_SignalIdType SignalId,
+        uint32* ValuePtr,
+        uint32* InvalidValuePtr,
+        uint8* StatusPtr)
+{
+    const Com_SignalConfigType* sig;
+    uint8 rxIdx;
+    uint32 value;
+
+    if ((ValuePtr == NULL_PTR) ||
+            (InvalidValuePtr == NULL_PTR) ||
+            (StatusPtr == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    sig = Com_FindSignal(SignalId);
+
+    if ((sig == NULL_PTR) || (sig->isTx != COM_FALSE))
+    {
+        return E_NOT_OK;
+    }
+
+    rxIdx = Com_FindRxIpdu(sig->pduId);
+
+    if ((rxIdx == 0xFFu) || (Com_RxRt[rxIdx].active == COM_FALSE))
+    {
+        return E_NOT_OK;
+    }
+
+    value = Com_ReadBits(Com_RxRt[rxIdx].buffer, sig->bitPosition, sig->bitSize);
+
+    *ValuePtr = value;
+    *InvalidValuePtr = sig->invalidValue;
+    *StatusPtr = COM_RX_DIAG_STATUS_OK;
+
+    if (Com_RxRt[rxIdx].timeout != COM_FALSE)
+    {
+        *StatusPtr |= COM_RX_DIAG_STATUS_TIMEOUT;
+    }
+    else if (value >= sig->invalidValue)
+    {
+        *StatusPtr |= COM_RX_DIAG_STATUS_INVALID;
+    }
 
     return E_OK;
 }
@@ -1921,7 +2080,6 @@ void Com_TxConfirmation(PduIdType TxPduId)
     }
 
     Com_TxRt[txIdx].txInProgress = COM_FALSE;
-    Com_TxRt[txIdx].dirty = COM_FALSE;
 }
 
 void Com_MainFunctionTx(void)
@@ -1940,13 +2098,18 @@ void Com_MainFunctionTx(void)
             Com_TxRt[i].mdtTimer--;
         }
 
-        if (Com_TxRt[i].deadlineTimer > 0u)
+        if (Com_TxRt[i].txInProgress != COM_FALSE)
         {
-            Com_TxRt[i].deadlineTimer--;
-        }
-        else if (Com_TxRt[i].txInProgress != COM_FALSE)
-        {
-            Com_TxRt[i].txInProgress = COM_FALSE;
+            if (Com_TxRt[i].deadlineTimer > 0u)
+            {
+                Com_TxRt[i].deadlineTimer--;
+            }
+
+            if (Com_TxRt[i].deadlineTimer == 0u)
+            {
+                Com_TxRt[i].txInProgress = COM_FALSE;
+                Com_TxRt[i].dirty = COM_TRUE;
+            }
         }
 
         if (Com_TxRt[i].repetitionTimer > 0u)
@@ -1974,7 +2137,7 @@ void Com_MainFunctionTx(void)
             }
             else
             {
-                (void)Com_TriggerTransmit(i);
+                Com_TxRt[i].dirty = COM_TRUE;
                 Com_TxRt[i].periodTimer = Com_TxIpduCfg[i].periodTicks;
             }
         }

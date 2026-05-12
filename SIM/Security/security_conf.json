@@ -1,0 +1,31 @@
+{
+  "auth_data": [
+    [
+      65537,
+      []
+    ]
+  ],
+  "macsec_channels": [
+    {
+      "channel_index": 0,
+      "mac_addr": "001122AABBCC",
+      "profile_name": "MACSec conf"
+    }
+  ],
+  "secoc_channels": [
+    {
+      "channel_index": 0,
+      "channel_type": 1,
+      "profile_name": "SecOC auth data conf",
+      "secoc_type": 1
+    },
+    {
+      "channel_index": 1,
+      "channel_type": 1,
+      "profile_name": "SecOC auth data conf",
+      "secoc_type": 1
+    }
+  ],
+  "timestamp": [],
+  "trip": []
+}

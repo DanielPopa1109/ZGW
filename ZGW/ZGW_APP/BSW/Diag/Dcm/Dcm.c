@@ -774,6 +774,12 @@ static void Dcm_ProcessConnection(uint8 connIdx)
         return;
     }
 
+    if (c->state == DCM_CONN_TX_READY)
+    {
+        (void)Dcm_StartTx(connIdx);
+        return;
+    }
+
     if (c->state != DCM_CONN_PROCESSING)
     {
         return;
@@ -996,7 +1002,7 @@ static Std_ReturnType Dcm_StartTx(uint8 connIdx)
 
     if (ret != E_OK)
     {
-        c->state = DCM_CONN_PROCESSING;
+        c->state = DCM_CONN_TX_READY;
     }
 
     return ret;
@@ -1711,7 +1717,7 @@ DCM_WEAK Dcm_ReturnType DcmAppl_EcuReset(
     (void)resetType;
     (void)respData;
     (void)respLen;
-    return DCM_E_OK;
+    return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
@@ -1792,7 +1798,7 @@ DCM_WEAK Dcm_ReturnType DcmAppl_CommunicationControl(
     (void)opStatus;
     (void)controlType;
     (void)communicationType;
-    return DCM_E_OK;
+    return DCM_NRC_REQUEST_OUT_OF_RANGE;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_ControlDtcSetting(
@@ -1803,7 +1809,7 @@ DCM_WEAK Dcm_ReturnType DcmAppl_ControlDtcSetting(
     (void)connIdx;
     (void)opStatus;
     (void)settingType;
-    return DCM_E_OK;
+    return DCM_NRC_REQUEST_OUT_OF_RANGE;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_RequestDownload(
@@ -1818,13 +1824,10 @@ DCM_WEAK Dcm_ReturnType DcmAppl_RequestDownload(
     (void)opStatus;
     (void)reqData;
     (void)reqLen;
+    (void)respData;
+    (void)respLen;
 
-    respData[0] = 0x20u;
-    respData[1] = (uint8)((DCM_TRANSFER_BLOCK_LEN >> 8u) & 0xFFu);
-    respData[2] = (uint8)(DCM_TRANSFER_BLOCK_LEN & 0xFFu);
-    *respLen = 3u;
-
-    return DCM_E_OK;
+    return DCM_NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_TransferData(
@@ -1842,9 +1845,9 @@ DCM_WEAK Dcm_ReturnType DcmAppl_TransferData(
     (void)reqData;
     (void)reqLen;
     (void)respData;
+    (void)respLen;
 
-    *respLen = 0u;
-    return DCM_E_OK;
+    return DCM_NRC_TRANSFER_DATA_SUSPENDED;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_RequestTransferExit(
@@ -1860,9 +1863,9 @@ DCM_WEAK Dcm_ReturnType DcmAppl_RequestTransferExit(
     (void)reqData;
     (void)reqLen;
     (void)respData;
+    (void)respLen;
 
-    *respLen = 0u;
-    return DCM_E_OK;
+    return DCM_NRC_REQUEST_SEQUENCE_ERROR;
 }
 
 uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len)

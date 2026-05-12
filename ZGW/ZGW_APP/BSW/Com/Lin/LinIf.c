@@ -387,9 +387,6 @@ void LinIf_MainFunction(void)
 
             if (res == LIN_RES_OK)
             {
-                SysMgr_BusActivityCounter = 400u;
-                SysMgr_NoBusActivity = 1u;
-
                 if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
                 {
                     LinTp_TxFrameConfirmation(TRUE);
@@ -402,6 +399,7 @@ void LinIf_MainFunction(void)
 
                     LinTp_RxSlaveResponse(rx);
                     LinIf_DiagFrameDone(TRUE);
+                    SysMgr_NotifyBusActivity();
                 }
                 else if (entry->frame->frameClass == LIN_FRM_UNCONDITIONAL)
                 {
@@ -412,6 +410,7 @@ void LinIf_MainFunction(void)
                         if (rxIdx != 0xFFu)
                         {
                             PduR_LinIfRxIndication(LinIf_AppRxPduCfg[rxIdx].pduId, rx, (PduLengthType)len);
+                            SysMgr_NotifyBusActivity();
                         }
                     }
                     else if (entry->direction == LIN_MASTER_RESPONSE)

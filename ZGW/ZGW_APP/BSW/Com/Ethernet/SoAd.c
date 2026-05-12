@@ -8,6 +8,7 @@ typedef struct
     TcpIp_SocketIdType activeSock;
     TcpIp_SockAddrType remoteAddr;
     const SoAd_SocketConnectionConfigType *cfg;
+    uint8 requestedOpen;
 } SoAd_SoConRuntimeType;
 
 static SoAd_SoConRuntimeType SoAd_Runtime[SOAD_MAX_CONNECTIONS];
@@ -41,6 +42,78 @@ static const SoAd_SocketConnectionConfigType *SoAd_FindConfig(SoAd_SoConIdType i
     return 0;
 }
 
+static uint8 SoAd_RuntimeSocketLost(const SoAd_SoConRuntimeType *rt)
+{
+    if ((rt == 0) || (rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
+    {
+        return 0u;
+    }
+
+    if ((rt->listenSock == TCPIP_INVALID_SOCKET) ||
+        (TcpIp_IsSocketOpen(rt->listenSock) == 0u))
+    {
+        return 1u;
+    }
+
+    if ((rt->state == SOAD_SOCON_CONNECTED) &&
+        ((rt->activeSock == TCPIP_INVALID_SOCKET) ||
+         (TcpIp_IsSocketOpen(rt->activeSock) == 0u)))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
+static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
+{
+    SoAd_SoConRuntimeType *rt;
+    const SoAd_SocketConnectionConfigType *cfg;
+    uint8 reopen;
+
+    if (id >= SOAD_MAX_CONNECTIONS)
+    {
+        return;
+    }
+
+    rt = &SoAd_Runtime[id];
+    cfg = rt->cfg;
+    reopen = rt->requestedOpen;
+
+    if ((cfg != 0) &&
+        (cfg->tcpDisconnected != 0) &&
+        (rt->state == SOAD_SOCON_CONNECTED))
+    {
+        cfg->tcpDisconnected(id);
+    }
+
+    if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
+        (rt->activeSock != rt->listenSock) &&
+        (TcpIp_IsSocketOpen(rt->activeSock) != 0u))
+    {
+        TcpIp_Close(rt->activeSock);
+    }
+
+    if ((rt->listenSock != TCPIP_INVALID_SOCKET) &&
+        (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
+    {
+        TcpIp_Close(rt->listenSock);
+    }
+
+    rt->listenSock = TCPIP_INVALID_SOCKET;
+    rt->activeSock = TCPIP_INVALID_SOCKET;
+    rt->remoteAddr.addr = 0u;
+    rt->remoteAddr.port = 0u;
+    rt->state = SOAD_SOCON_CLOSED;
+    rt->cfg = 0;
+    rt->requestedOpen = reopen;
+
+    if ((reopen != 0u) && (TcpIp_IsLinkAvailable() != 0u))
+    {
+        (void)SoAd_OpenSoCon(id);
+    }
+}
+
 void SoAd_Init(const SoAd_ConfigType *cfg)
 {
     uint8 i;
@@ -55,6 +128,7 @@ void SoAd_Init(const SoAd_ConfigType *cfg)
         SoAd_Runtime[i].remoteAddr.addr = 0u;
         SoAd_Runtime[i].remoteAddr.port = 0u;
         SoAd_Runtime[i].cfg = 0;
+        SoAd_Runtime[i].requestedOpen = 0u;
     }
 }
 
@@ -77,10 +151,16 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
     }
 
     rt = &SoAd_Runtime[id];
+    rt->requestedOpen = 1u;
 
     if (rt->state != SOAD_SOCON_CLOSED)
     {
         return 1u;
+    }
+
+    if (TcpIp_IsLinkAvailable() == 0u)
+    {
+        return 0u;
     }
 
     rt->cfg = cfg;
@@ -152,6 +232,7 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     rt->activeSock = TCPIP_INVALID_SOCKET;
     rt->state = SOAD_SOCON_CLOSED;
     rt->cfg = 0;
+    rt->requestedOpen = 0u;
 }
 
 void SoAd_MainFunction(void)
@@ -166,8 +247,23 @@ void SoAd_MainFunction(void)
     {
         rt = &SoAd_Runtime[id];
 
-        if ((rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
+        if (rt->state == SOAD_SOCON_CLOSED)
         {
+            if ((rt->requestedOpen != 0u) && (TcpIp_IsLinkAvailable() != 0u))
+            {
+                (void)SoAd_OpenSoCon(id);
+            }
+            continue;
+        }
+
+        if (rt->cfg == 0)
+        {
+            continue;
+        }
+
+        if (SoAd_RuntimeSocketLost(rt) != 0u)
+        {
+            SoAd_HandleSocketLoss(id);
             continue;
         }
 
@@ -207,8 +303,7 @@ void SoAd_MainFunction(void)
                     if (rt->cfg->rxIndication != 0)
                     {
                         rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, (uint16)len);
-                        SysMgr_BusActivityCounter = 400u;
-                        SysMgr_NoBusActivity = 1u;
+                        SysMgr_NotifyBusActivity();
                     }
                 }
             }
@@ -224,8 +319,7 @@ void SoAd_MainFunction(void)
                 if (rt->cfg->rxIndication != 0)
                 {
                     rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
-                    SysMgr_BusActivityCounter = 400u;
-                    SysMgr_NoBusActivity = 1u;
+                    SysMgr_NotifyBusActivity();
                 }
             }
         }

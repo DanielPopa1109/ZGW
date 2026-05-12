@@ -86,7 +86,7 @@ static void Dem_DefaultStatusChangedCallback(
     (void)newStatus;
 }
 
-static const Dem_EventConfigType Dem_EventConfigList[] =
+static const Dem_EventConfigType Dem_StaticEventConfigList[] =
 {
     {
         DEM_EVENT_ID_MCUSM_SW_ERROR,
@@ -104,14 +104,76 @@ static const Dem_EventConfigType Dem_EventConfigList[] =
         Dem_DefaultFreezeFrameCapture,
         Dem_DefaultExtendedDataCapture,
         Dem_DefaultStatusChangedCallback
-    },
-
+    }
 };
+
+static void Dem_FillGatewayEventConfig(
+    Dem_EventConfigType *eventConfig,
+    Dem_EventIdType eventId,
+    Dem_DTCType dtc
+)
+{
+    eventConfig->EventId = eventId;
+    eventConfig->DTC = dtc;
+    eventConfig->Severity = 0u;
+    eventConfig->Priority = 1u;
+    eventConfig->FailedThreshold = 3;
+    eventConfig->PassedThreshold = -3;
+    eventConfig->IncrementStep = 1;
+    eventConfig->DecrementStep = 1;
+    eventConfig->ConfirmationThreshold = 1u;
+    eventConfig->AgingAllowed = TRUE;
+    eventConfig->AgingThreshold = 40u;
+    eventConfig->StorageEnabled = TRUE;
+    eventConfig->FreezeFrameCapture = GatewaySwc_CaptureRxDiagFreezeFrame;
+    eventConfig->ExtendedDataCapture = GatewaySwc_CaptureRxDiagExtendedData;
+    eventConfig->StatusChangedCallback = Dem_DefaultStatusChangedCallback;
+}
+
+Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *eventConfig)
+{
+    uint16 offset;
+
+    if (eventConfig == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    if (eventIndex < DEM_STATIC_EVENT_COUNT)
+    {
+        *eventConfig = Dem_StaticEventConfigList[eventIndex];
+        return E_OK;
+    }
+
+    offset = (uint16)(eventIndex - DEM_STATIC_EVENT_COUNT);
+
+    if (offset < (uint16)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)
+    {
+        Dem_FillGatewayEventConfig(
+                eventConfig,
+                (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST + offset),
+                (Dem_DTCType)(DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + offset));
+        return E_OK;
+    }
+
+    offset = (uint16)(offset - DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT);
+
+    if (offset < (uint16)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT)
+    {
+        Dem_FillGatewayEventConfig(
+                eventConfig,
+                (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST + offset),
+                (Dem_DTCType)(DEM_DTC_GATEWAY_RX_SIGNAL_INVALID + offset));
+        return E_OK;
+    }
+
+    return E_NOT_OK;
+}
 
 const Dem_ConfigType Dem_Config =
 {
-    Dem_EventConfigList,
-    (uint16)(sizeof(Dem_EventConfigList) / sizeof(Dem_EventConfigList[0])),
+    Dem_StaticEventConfigList,
+    (uint16)DEM_MAX_EVENTS,
     DEM_DEFAULT_OPERATION_CYCLE,
     DEM_NVM_BLOCK_ID_PRIMARY,
     Dem_DefaultStatusChangedCallback

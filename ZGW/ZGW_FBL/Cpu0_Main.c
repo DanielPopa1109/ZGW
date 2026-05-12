@@ -35,6 +35,9 @@
 #define FBL_CAN_MAX_DL                   64u
 
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
+#define FBL_ISOTP_FC_TIMEOUT_LOOPS       1000000u
+#define FBL_ISOTP_FC_WFT_MAX             8u
+#define FBL_CAN_TX_BUSY_RETRY_MAX        100000u
 
 #define UDS_SID_SESSION                  0x10u
 #define UDS_SID_RESET                    0x11u
@@ -118,7 +121,10 @@ typedef struct
     uint8 txSn;
     uint8 rxReady;
     uint8 txActive;
-    uint8 waitFc;
+    volatile uint8 waitFc;
+    volatile uint8 fcStatus;
+    volatile uint8 fcBlockSize;
+    volatile uint8 fcStMin;
 } FblIsoTp_Type;
 
 typedef struct
@@ -159,6 +165,8 @@ static void Fbl_IsoTpInit(void);
 static void Fbl_IsoTpRx(const uint8 *data, uint8 len);
 static void Fbl_IsoTpSend(const uint8 *data, uint16 len);
 static void Fbl_IsoTpSendFc(void);
+static uint8 Fbl_IsoTpWaitFc(void);
+static void Fbl_IsoTpDelayStMin(uint8 stMin);
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
 static void Fbl_UdsSend(const uint8 *res, uint16 len, uint8 transport);
 static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
@@ -251,11 +259,11 @@ static void Fbl_CanInit(void)
     g_can.nodeConfig.baudRate.timeSegment2 = 3u;
     g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
     g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-    g_can.nodeConfig.fastBaudRate.prescaler = 1u;
+    g_can.nodeConfig.fastBaudRate.prescaler = 0u;
     g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.fastBaudRate.timeSegment2 = 5u;
+    g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
     g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
-    g_can.nodeConfig.calculateBitTimingValues = FALSE;
+    g_can.nodeConfig.calculateBitTimingValues = TRUE;
 
     g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
     g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
@@ -321,6 +329,8 @@ void Fbl_CanRxIsr(void)
 
 static void Fbl_CanSend(const uint8 *data, uint8 len)
 {
+    uint32 retry = FBL_CAN_TX_BUSY_RETRY_MAX;
+
     memset(g_can.txData, 0u, sizeof(g_can.txData));
     memcpy(g_can.txData, data, len);
 
@@ -331,8 +341,10 @@ static void Fbl_CanSend(const uint8 *data, uint8 len)
     g_can.txMsg.dataLengthCode = Fbl_CanDlcFromLen(len);
     g_can.txMsg.bufferNumber = 0u;
 
-    while(IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32 *)g_can.txData) == IfxCan_Status_notSentBusy)
+    while((retry > 0u) &&
+          (IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32 *)g_can.txData) == IfxCan_Status_notSentBusy))
     {
+        retry--;
     }
 }
 
@@ -388,6 +400,8 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
             offset = 2u;
         }
 
+        if(sfLen == 0u) { return; }
+
         if((sfLen <= (len - offset)) && (sfLen <= FBL_ISOTP_MAX_PAYLOAD))
         {
             memcpy(g_iso.rxBuf, &data[offset], sfLen);
@@ -397,6 +411,8 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
     }
     else if(pci == 0x10u)
     {
+        if(len < 3u) { return; }
+
         ffLen = (((uint16)(data[0u] & 0x0Fu)) << 8u) | data[1u];
         if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
 
@@ -411,6 +427,8 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
     }
     else if(pci == 0x20u)
     {
+        if((len < 2u) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
+
         sn = data[0u] & 0x0Fu;
         if(sn != g_iso.nextSn) { return; }
 
@@ -431,6 +449,11 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
     }
     else if(pci == 0x30u)
     {
+        if(len < 3u) { return; }
+
+        g_iso.fcStatus = data[0u] & 0x0Fu;
+        g_iso.fcBlockSize = data[1u];
+        g_iso.fcStMin = data[2u];
         g_iso.waitFc = 0u;
     }
     else
@@ -438,10 +461,76 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
     }
 }
 
+static uint8 Fbl_IsoTpWaitFc(void)
+{
+    uint32 timeout;
+    uint8 waitFrames = 0u;
+
+    do
+    {
+        timeout = FBL_ISOTP_FC_TIMEOUT_LOOPS;
+
+        while((g_iso.waitFc != 0u) && (timeout > 0u))
+        {
+            timeout--;
+        }
+
+        if(timeout == 0u)
+        {
+            return 0u;
+        }
+
+        if(g_iso.fcStatus == 0u)
+        {
+            return 1u;
+        }
+
+        if(g_iso.fcStatus == 1u)
+        {
+            waitFrames++;
+            if(waitFrames > FBL_ISOTP_FC_WFT_MAX)
+            {
+                return 0u;
+            }
+            g_iso.waitFc = 1u;
+        }
+        else
+        {
+            return 0u;
+        }
+    } while(waitFrames <= FBL_ISOTP_FC_WFT_MAX);
+
+    return 0u;
+}
+
+static void Fbl_IsoTpDelayStMin(uint8 stMin)
+{
+    volatile uint32 loops;
+
+    if(stMin <= 0x7Fu)
+    {
+        loops = (uint32)stMin * 1000u;
+    }
+    else if((stMin >= 0xF1u) && (stMin <= 0xF9u))
+    {
+        loops = (uint32)(stMin - 0xF0u) * 100u;
+    }
+    else
+    {
+        loops = 0u;
+    }
+
+    while(loops > 0u)
+    {
+        loops--;
+    }
+}
+
 static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
 {
     uint8 frame[64];
     uint8 chunk;
+    uint8 blockCounter;
 
     if(len <= 7u)
     {
@@ -463,9 +552,37 @@ static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
     g_iso.txLen = len;
     g_iso.txIdx = chunk;
     g_iso.txSn = 1u;
+    g_iso.waitFc = 1u;
+    g_iso.fcStatus = 0xFFu;
+
+    if(Fbl_IsoTpWaitFc() == 0u)
+    {
+        g_iso.txLen = 0u;
+        g_iso.txIdx = 0u;
+        return;
+    }
+
+    blockCounter = 0u;
 
     while(g_iso.txIdx < g_iso.txLen)
     {
+        if((g_iso.fcBlockSize != 0u) && (blockCounter >= g_iso.fcBlockSize))
+        {
+            g_iso.waitFc = 1u;
+            g_iso.fcStatus = 0xFFu;
+
+            if(Fbl_IsoTpWaitFc() == 0u)
+            {
+                g_iso.txLen = 0u;
+                g_iso.txIdx = 0u;
+                return;
+            }
+
+            blockCounter = 0u;
+        }
+
+        Fbl_IsoTpDelayStMin(g_iso.fcStMin);
+
         memset(frame, 0u, sizeof(frame));
         frame[0u] = (uint8)(0x20u | (g_iso.txSn & 0x0Fu));
 
@@ -479,6 +596,7 @@ static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
         Fbl_CanSend(frame, (uint8)(chunk + 1u));
         g_iso.txIdx += chunk;
         g_iso.txSn = (uint8)((g_iso.txSn + 1u) & 0x0Fu);
+        blockCounter++;
     }
 }
 

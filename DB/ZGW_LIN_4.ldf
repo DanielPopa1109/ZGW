@@ -19,26 +19,26 @@ Signals {
 	PCU48_ResponseError: 1, 1, PCU48, ZGW;
 	HVDCDC_ResponseError: 1, 1, HVDCDC, ZGW;
 	ALT_OutputVoltage: 8, 0, ALT, ZGW;
-	ALT_ChargingActive: , , ;
+	ALT_ChargingActive: 1, 0, ALT, ZGW;
 	ALT_OutputCurrent: 8, 0, ALT, ZGW;
 	ZGW_TargetCurrent_ALT: 8, 0, ZGW, ALT;
 	ZGW_TargetVoltage_ALT: 8, 0, ZGW, ALT;
 	ALT_FieldDutyActual: 8, 0, ALT, ZGW;
 	ALT_Power: 8, 0, ALT, ZGW;
 	ALT_Temperature: 8, 0, ALT, ZGW;
-	ZGW_Enable_ALT: , , ZGW, ALT;
-	HVDCDC_LV_Voltage: 0, , HVDCDC, ZGW;
+	ZGW_Enable_ALT: 1, 0, ZGW, ALT;
+	HVDCDC_LV_Voltage: 8, 0, HVDCDC, ZGW;
 	HVDCDC_LV_Current: 8, 0, HVDCDC, ZGW;
-	HVDCDC_HV_Voltage: , 0, HVDCDC, ZGW;
-	HVDCDC_HV_Current: , 0, HVDCDC, ZGW;
+	HVDCDC_HV_Voltage: 8, 0, HVDCDC, ZGW;
+	HVDCDC_HV_Current: 8, 0, HVDCDC, ZGW;
 	HVDCDC_ChargingActive: 1, 0, HVDCDC, ZGW;
-	ZGW_Enable_HVDCDC: , 0, ZGW, HVDCDC;
+	ZGW_Enable_HVDCDC: 1, 0, ZGW, HVDCDC;
 	ZGW_FieldDutyCommand_ALT: 8, 0, ZGW, ALT;
 	ZGW_TargetVoltage_HVDCDC: 8, 0, ZGW, HVDCDC;
-	PCU48_SoH: , 0, PCU48, ZGW;
+	PCU48_SoH: 8, 0, PCU48, ZGW;
 	PCU48_SoC: 8, 0, PCU48, ZGW;
 	PCU48_Voltage: 8, 0, PCU48, ZGW;
-	PCU48_ChargeState: , , ;
+	PCU48_ChargeState: 8, 0, PCU48, ZGW;
 	ZGW_RequestAvailability_PCU48: 1, 0, ZGW, PCU48;
 }
 
@@ -99,7 +99,7 @@ Frames {
 	ZGW_Request_PCU48: 0x04, ZGW, 1 {
 		ZGW_RequestAvailability_PCU48, 0;
 	}
-	ZGW_NM3: 0x01, , 1 {
+	ZGW_NM3: 0x01, ZGW, 1 {
 		ZGW_NM3_PN1, 0;
 	}
 }

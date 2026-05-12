@@ -709,7 +709,7 @@
         <DisplayCollapsedArrayStruct>true</DisplayCollapsedArrayStruct>
         <DisplayPointerMemArea>false</DisplayPointerMemArea>
         <EnumDisplay>Enum</EnumDisplay>
-        <Hex>true</Hex>
+        <Hex>false</Hex>
         <MaxParseUpload>256</MaxParseUpload>
         <QualifiedNames>Unique</QualifiedNames>
         <UseSpacers>false</UseSpacers>
@@ -842,7 +842,7 @@
         <Count>0</Count>
         <Enabled>true</Enabled>
         <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::28</Location>
+        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::27</Location>
         <ProcessFilter></ProcessFilter>
        </__.0>
       </BPs>
@@ -1035,8 +1035,8 @@
           <Enabled>0</Enabled>
           <BP.0>
            <Access>1</Access>
-           <Address>SysMgr_MainCounter,,ZGW_APP.elf</Address>
-           <Enabled>1</Enabled>
+           <Address>SysMgr_BusActivityCounter</Address>
+           <Enabled>0</Enabled>
            <EntireObject>1</EntireObject>
            <Range>1</Range>
            <Event>

@@ -24,6 +24,11 @@ static uint8 TcpIp_IsLinkUp(void)
 #endif
 }
 
+uint8 TcpIp_IsLinkAvailable(void)
+{
+    return TcpIp_IsLinkUp();
+}
+
 void TcpIp_Init(void)
 {
     uint32 i;
@@ -49,6 +54,7 @@ void TcpIp_MainFunction(void)
                 lwip_close(TcpIp_Sockets[i].sock);
                 TcpIp_Sockets[i].sock = TCPIP_INVALID_SOCKET;
                 TcpIp_Sockets[i].used = 0u;
+                TcpIp_Sockets[i].tcp = 0u;
             }
         }
     }
@@ -68,6 +74,27 @@ static TcpIp_SocketType *TcpIp_Alloc(void)
     }
 
     return 0;
+}
+
+static TcpIp_SocketType *TcpIp_Find(TcpIp_SocketIdType sock)
+{
+    uint32 i;
+
+    for (i = 0u; i < TCPIP_MAX_SOCKETS; i++)
+    {
+        if ((TcpIp_Sockets[i].used != 0u) &&
+            (TcpIp_Sockets[i].sock == sock))
+        {
+            return &TcpIp_Sockets[i];
+        }
+    }
+
+    return 0;
+}
+
+uint8 TcpIp_IsSocketOpen(TcpIp_SocketIdType sock)
+{
+    return (TcpIp_Find(sock) != 0) ? 1u : 0u;
 }
 
 TcpIp_SocketIdType TcpIp_Create(uint8 tcp)
@@ -120,17 +147,29 @@ TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *rem
     struct sockaddr_in addr;
     socklen_t len;
     sint32 newSock;
+    TcpIp_SocketType *slot;
 
     len = sizeof(addr);
     newSock = lwip_accept(sock, (struct sockaddr *)&addr, &len);
 
     if (newSock >= 0)
     {
+        slot = TcpIp_Alloc();
+
+        if (slot == 0)
+        {
+            (void)lwip_close(newSock);
+            return TCPIP_INVALID_SOCKET;
+        }
+
+        slot->sock = (TcpIp_SocketIdType)newSock;
+        slot->tcp = 1u;
+
         (void)lwip_fcntl(newSock, F_SETFL, O_NONBLOCK);
 
         if (remoteAddr != 0)
         {
-            remoteAddr->addr = addr.sin_addr.s_addr;
+            remoteAddr->addr = ntohl(addr.sin_addr.s_addr);
             remoteAddr->port = ntohs(addr.sin_port);
         }
     }
@@ -144,7 +183,7 @@ sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = ip;
+    addr.sin_addr.s_addr = htonl(ip);
 
     return (sint32)lwip_connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 }
@@ -173,7 +212,7 @@ sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(remoteAddr->port);
-    addr.sin_addr.s_addr = remoteAddr->addr;
+    addr.sin_addr.s_addr = htonl(remoteAddr->addr);
 
     return (sint32)lwip_sendto(sock, data, len, 0, (struct sockaddr *)&addr, sizeof(addr));
 }
@@ -208,7 +247,7 @@ sint32 TcpIp_RecvFrom(TcpIp_SocketIdType sock,
 
     if ((ret > 0) && (remoteAddr != 0))
     {
-        remoteAddr->addr = addr.sin_addr.s_addr;
+        remoteAddr->addr = ntohl(addr.sin_addr.s_addr);
         remoteAddr->port = ntohs(addr.sin_port);
     }
 
@@ -217,8 +256,19 @@ sint32 TcpIp_RecvFrom(TcpIp_SocketIdType sock,
 
 void TcpIp_Close(TcpIp_SocketIdType sock)
 {
+    TcpIp_SocketType *slot;
+
     if (sock != TCPIP_INVALID_SOCKET)
     {
         (void)lwip_close(sock);
+
+        slot = TcpIp_Find(sock);
+
+        if (slot != 0)
+        {
+            slot->sock = TCPIP_INVALID_SOCKET;
+            slot->used = 0u;
+            slot->tcp = 0u;
+        }
     }
 }

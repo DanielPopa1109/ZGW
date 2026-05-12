@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="serviceC"/>
+		<item key="selection" value="GATEWAYSWC_DIAG_PERIOD_MS"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="servicec"/>
-			<item value="ASIL_BSW"/>
-			<item value="Alarm5ms_Flag_ASIL_BSW_Task_C2"/>
-			<item value="ASIL_APPL_Task_C0"/>
-			<item value="Alarm5ms_Callback_ASIL_APPL_Task_C1"/>
-			<item value="GatewaySwc_IsDiagnosticOrXcpSignal"/>
-			<item value="SysMgr_GoSleep"/>
-			<item value="N"/>
-			<item value="verify"/>
-			<item value="SCR_SCU_STDBYWKP "/>
-			<item value="dem_init"/>
-			<item value="Dem_ConfigPtr"/>
-			<item value="lmu"/>
-			<item value="/*LMU Data sect"/>
-			<item value="trapvec_tc0 "/>
+			<item value="GATEWAYSWC_DIAG_PERIOD_MS"/>
+			<item value="GatewaySwc_Command"/>
+			<item value="GatewaySwc_SetCommands"/>
+			<item value="LoadRequest"/>
+			<item value="CAN_TX_HW_PENDING_TIMEOUT_MS "/>
+			<item value="WCAN_ClearEvents"/>
+			<item value="SCR_RequestStandbyWake"/>
+			<item value="Can_ReadRxFifo"/>
+			<item value="SysMgr_NoBusActivity"/>
+			<item value="P33_4"/>
+			<item value="p33_6"/>
+			<item value="p33_5"/>
+			<item value="IfxPort_P33_5"/>
+			<item value="Can_Init"/>
+			<item value="can_init"/>
 		</list>
 		<list key="replacehistory">
 		</list>

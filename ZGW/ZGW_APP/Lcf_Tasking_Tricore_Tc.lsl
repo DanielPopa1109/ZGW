@@ -686,6 +686,42 @@ derivative tc37
             select ".data.lmudata_dcm*";
             select ".bss.lmubss_dcm*";
         }
+
+        group bsw_diag_dem_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        {
+            select ".data.Dem.*";
+            select ".bss.Dem.*";
+            select ".data.Dem_Cfg.*";
+            select ".bss.Dem_Cfg.*";
+            select ".data.Dem_NvM.*";
+            select ".bss.Dem_NvM.*";
+            select ".data.DEM_*";
+            select ".bss.DEM_*";
+            select ".data.dem_*";
+            select ".bss.dem_*";
+            select ".data.lmudata_dem*";
+            select ".bss.lmubss_dem*";
+        }
+
+        group bsw_mem_fee_work_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
+        {
+            select ".bss.Fee.Fee_JobData";
+            select ".bss.Fee.Fee_PendingData";
+        }
+
+        group bsw_mem_nvm_fee_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        {
+            select ".data.NvM_Cfg.*";
+            select ".bss.NvM_Cfg.*";
+            select ".data.Nvm.*";
+            select ".bss.Nvm.*";
+            select ".data.NVM_*";
+            select ".bss.NVM_*";
+            select ".data.nvm_*";
+            select ".bss.nvm_*";
+
+            select ".bss.Fee.Fee_RecordData";
+        }
         
         group NCR (ordered, attributes = rws, run_addr = mem:cpu0_dlmu, align = 4)
         {

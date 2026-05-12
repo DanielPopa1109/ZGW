@@ -52,12 +52,48 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 void Alarm5ms_Callback_ASIL_APPL_Task_C2( TimerHandle_t_core2 xTimer_core2);
 void Alarm5ms_Callback_QM_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2);
 
+#define OS_CPU_CORE_0                  0u
+#define OS_CPU_CORE_1                  1u
+#define OS_CPU_CORE_2                  2u
+#define OS_CPU_LOAD_MAX_PERCENT        100u
+#define OS_CPU_LOAD_MAX_PERMILLE       1000u
+#define OS_CPU_LOAD_SAMPLE_TICKS       ((uint32)configTICK_RATE_HZ_core0)
+
+typedef struct
+{
+    uint8 initialized;
+    uint8 valid;
+    uint32 sampleTicks;
+    uint32 lastRuntime;
+    uint32 lastIdleRuntime;
+    uint32 idleRuntime;
+    uint32 idleTaskStartRuntime;
+    uint32 runtimeDelta;
+    uint32 idleRuntimeDelta;
+    uint16 loadPermille;
+    uint8 currentTaskIsIdle;
+} Os_CpuLoadRuntimeType;
+
+static void Os_CpuLoad_RecordTick(uint8 CoreId);
+static uint32 Os_CpuLoad_ReadRuntimeCounter(uint8 CoreId);
+static void Os_CpuLoad_UpdateIdleRuntime(uint8 CoreId, uint32 RuntimeNow);
+static uint8 Os_CpuLoad_PermilleToPercent(uint16 LoadPermille);
+static void Os_CpuLoad_StorePublic(uint8 CoreId, uint16 LoadPermille, uint8 Valid);
+void Os_CpuLoad_TaskSwitchedIn(uint8 CoreId, uint8 IsIdleTask);
+void Os_CpuLoad_TaskSwitchedOut(uint8 CoreId);
+
 long long OS_Counter_core0 = 0u;
 long long IDLE_Counter_core0 = 0u;
 long long OS_Counter_core1 = 0u;
 long long IDLE_Counter_core1 = 0u;
 long long OS_Counter_core2 = 0u;
 long long IDLE_Counter_core2 = 0u;
+volatile uint8 Os_CpuLoadPercent_core0 = OS_CPU_LOAD_INVALID_PERCENT;
+volatile uint8 Os_CpuLoadPercent_core1 = OS_CPU_LOAD_INVALID_PERCENT;
+volatile uint8 Os_CpuLoadPercent_core2 = OS_CPU_LOAD_INVALID_PERCENT;
+volatile uint16 Os_CpuLoadPermille_core0 = OS_CPU_LOAD_INVALID_PERMILLE;
+volatile uint16 Os_CpuLoadPermille_core1 = OS_CPU_LOAD_INVALID_PERMILLE;
+volatile uint16 Os_CpuLoadPermille_core2 = OS_CPU_LOAD_INVALID_PERMILLE;
 uint8 Alarm5ms_Flag_ASIL_BSW_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_ASIL_BSW_Task_C1 = 0u;
@@ -76,6 +112,7 @@ TaskHandle_t_core1 ASIL_BSW_Task_C1_THandle;
 TaskHandle_t_core1 ASIL_APPL_Task_C1_THandle;
 TaskHandle_t_core2 ASIL_APPL_Task_C2_THandle;
 TaskHandle_t_core2 QM_BSW_Task_C2_THandle;
+static Os_CpuLoadRuntimeType Os_CpuLoadRuntime[OS_CPU_LOAD_CORE_COUNT];
 
 void Os_Init_C0(void)
 {
@@ -159,6 +196,7 @@ void vApplicationStackOverflowHook_core0(TaskHandle_t_core0 xTask, char * pcTask
 void vApplicationTickHook_core0(void)
 {
     OS_Counter_core0++;
+    Os_CpuLoad_RecordTick(OS_CPU_CORE_0);
 }
 
 void vApplicationIdleHook_core0(void)
@@ -179,6 +217,7 @@ void vApplicationStackOverflowHook_core1(TaskHandle_t_core1 xTask, char * pcTask
 void vApplicationTickHook_core1(void)
 {
     OS_Counter_core1++;
+    Os_CpuLoad_RecordTick(OS_CPU_CORE_1);
 }
 
 void vApplicationIdleHook_core1(void)
@@ -199,11 +238,277 @@ void vApplicationStackOverflowHook_core2(TaskHandle_t_core2 xTask, char * pcTask
 void vApplicationTickHook_core2(void)
 {
     OS_Counter_core2++;
+    Os_CpuLoad_RecordTick(OS_CPU_CORE_2);
 }
 
 void vApplicationIdleHook_core2(void)
 {
     IDLE_Counter_core2++;
+}
+
+static uint32 Os_CpuLoad_ReadRuntimeCounter(uint8 CoreId)
+{
+    switch(CoreId)
+    {
+        case OS_CPU_CORE_0:
+            return (uint32)portGET_RUN_TIME_COUNTER_VALUE_core0();
+
+        case OS_CPU_CORE_1:
+            return (uint32)portGET_RUN_TIME_COUNTER_VALUE_core1();
+
+        case OS_CPU_CORE_2:
+            return (uint32)portGET_RUN_TIME_COUNTER_VALUE_core2();
+
+        default:
+            return 0u;
+    }
+}
+
+static void Os_CpuLoad_UpdateIdleRuntime(uint8 CoreId, uint32 RuntimeNow)
+{
+    Os_CpuLoadRuntimeType *runtime;
+
+    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
+    {
+        return;
+    }
+
+    runtime = &Os_CpuLoadRuntime[CoreId];
+    if (runtime->currentTaskIsIdle != 0u)
+    {
+        runtime->idleRuntime += RuntimeNow - runtime->idleTaskStartRuntime;
+        runtime->idleTaskStartRuntime = RuntimeNow;
+    }
+}
+
+void Os_CpuLoad_TaskSwitchedIn(uint8 CoreId, uint8 IsIdleTask)
+{
+    Os_CpuLoadRuntimeType *runtime;
+    uint32 runtimeNow;
+
+    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
+    {
+        return;
+    }
+
+    runtime = &Os_CpuLoadRuntime[CoreId];
+    runtimeNow = Os_CpuLoad_ReadRuntimeCounter(CoreId);
+    Os_CpuLoad_UpdateIdleRuntime(CoreId, runtimeNow);
+
+    if (IsIdleTask != 0u)
+    {
+        runtime->currentTaskIsIdle = 1u;
+        runtime->idleTaskStartRuntime = runtimeNow;
+    }
+    else
+    {
+        runtime->currentTaskIsIdle = 0u;
+    }
+}
+
+void Os_CpuLoad_TaskSwitchedOut(uint8 CoreId)
+{
+    uint32 runtimeNow;
+
+    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
+    {
+        return;
+    }
+
+    runtimeNow = Os_CpuLoad_ReadRuntimeCounter(CoreId);
+    Os_CpuLoad_UpdateIdleRuntime(CoreId, runtimeNow);
+    Os_CpuLoadRuntime[CoreId].currentTaskIsIdle = 0u;
+}
+
+static uint8 Os_CpuLoad_PermilleToPercent(uint16 LoadPermille)
+{
+    uint16 percent;
+
+    if (LoadPermille == OS_CPU_LOAD_INVALID_PERMILLE)
+    {
+        return OS_CPU_LOAD_INVALID_PERCENT;
+    }
+
+    percent = (uint16)((LoadPermille + 5u) / 10u);
+
+    if (percent > OS_CPU_LOAD_MAX_PERCENT)
+    {
+        percent = OS_CPU_LOAD_MAX_PERCENT;
+    }
+
+    return (uint8)percent;
+}
+
+static void Os_CpuLoad_StorePublic(uint8 CoreId, uint16 LoadPermille, uint8 Valid)
+{
+    uint16 permille;
+    uint8 percent;
+
+    permille = (Valid != 0u) ? LoadPermille : OS_CPU_LOAD_INVALID_PERMILLE;
+    percent = Os_CpuLoad_PermilleToPercent(permille);
+
+    switch(CoreId)
+    {
+        case OS_CPU_CORE_0:
+            Os_CpuLoadPermille_core0 = permille;
+            Os_CpuLoadPercent_core0 = percent;
+            break;
+
+        case OS_CPU_CORE_1:
+            Os_CpuLoadPermille_core1 = permille;
+            Os_CpuLoadPercent_core1 = percent;
+            break;
+
+        case OS_CPU_CORE_2:
+            Os_CpuLoadPermille_core2 = permille;
+            Os_CpuLoadPercent_core2 = percent;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void Os_CpuLoad_RecordTick(uint8 CoreId)
+{
+    Os_CpuLoadRuntimeType *runtime;
+    uint32 runtimeNow;
+    uint32 idleRuntimeNow;
+    uint32 runtimeDelta;
+    uint32 idleRuntimeDelta;
+    uint32 busyRuntimeDelta;
+    uint32 loadPermille;
+    uint64 loadNumerator;
+
+    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
+    {
+        return;
+    }
+
+    runtime = &Os_CpuLoadRuntime[CoreId];
+    runtimeNow = Os_CpuLoad_ReadRuntimeCounter(CoreId);
+    Os_CpuLoad_UpdateIdleRuntime(CoreId, runtimeNow);
+    idleRuntimeNow = runtime->idleRuntime;
+
+    if (runtime->initialized == 0u)
+    {
+        runtime->lastRuntime = runtimeNow;
+        runtime->lastIdleRuntime = idleRuntimeNow;
+        runtime->initialized = 1u;
+        Os_CpuLoad_StorePublic(CoreId, OS_CPU_LOAD_INVALID_PERMILLE, 0u);
+        return;
+    }
+
+    runtime->sampleTicks++;
+    if (runtime->sampleTicks < OS_CPU_LOAD_SAMPLE_TICKS)
+    {
+        return;
+    }
+
+    runtime->sampleTicks = 0u;
+    runtimeDelta = runtimeNow - runtime->lastRuntime;
+    idleRuntimeDelta = idleRuntimeNow - runtime->lastIdleRuntime;
+    runtime->lastRuntime = runtimeNow;
+    runtime->lastIdleRuntime = idleRuntimeNow;
+
+    if (runtimeDelta == 0u)
+    {
+        runtime->valid = 0u;
+        runtime->loadPermille = OS_CPU_LOAD_INVALID_PERMILLE;
+        runtime->runtimeDelta = 0u;
+        runtime->idleRuntimeDelta = 0u;
+        Os_CpuLoad_StorePublic(CoreId, OS_CPU_LOAD_INVALID_PERMILLE, 0u);
+        return;
+    }
+
+    if (idleRuntimeDelta > runtimeDelta)
+    {
+        idleRuntimeDelta = runtimeDelta;
+    }
+
+    busyRuntimeDelta = runtimeDelta - idleRuntimeDelta;
+    loadNumerator = ((uint64)busyRuntimeDelta * OS_CPU_LOAD_MAX_PERMILLE) + (runtimeDelta / 2u);
+    loadPermille = (uint32)(loadNumerator / runtimeDelta);
+
+    if (loadPermille > OS_CPU_LOAD_MAX_PERMILLE)
+    {
+        loadPermille = OS_CPU_LOAD_MAX_PERMILLE;
+    }
+
+    runtime->runtimeDelta = runtimeDelta;
+    runtime->idleRuntimeDelta = idleRuntimeDelta;
+    runtime->loadPermille = (uint16)loadPermille;
+    runtime->valid = 1u;
+    Os_CpuLoad_StorePublic(CoreId, runtime->loadPermille, runtime->valid);
+}
+
+uint8 Os_GetCpuLoadPercent(uint8 CoreId)
+{
+    switch(CoreId)
+    {
+        case OS_CPU_CORE_0:
+            return Os_CpuLoadPercent_core0;
+
+        case OS_CPU_CORE_1:
+            return Os_CpuLoadPercent_core1;
+
+        case OS_CPU_CORE_2:
+            return Os_CpuLoadPercent_core2;
+
+        default:
+            return OS_CPU_LOAD_INVALID_PERCENT;
+    }
+}
+
+uint16 Os_GetCpuLoadPermille(uint8 CoreId)
+{
+    switch(CoreId)
+    {
+        case OS_CPU_CORE_0:
+            return Os_CpuLoadPermille_core0;
+
+        case OS_CPU_CORE_1:
+            return Os_CpuLoadPermille_core1;
+
+        case OS_CPU_CORE_2:
+            return Os_CpuLoadPermille_core2;
+
+        default:
+            return OS_CPU_LOAD_INVALID_PERMILLE;
+    }
+}
+
+void Os_GetCpuLoadSnapshot(uint8 CoreId, Os_CpuLoadType *CpuLoad)
+{
+    Os_CpuLoadRuntimeType *runtime;
+
+    if (CpuLoad == 0)
+    {
+        return;
+    }
+
+    CpuLoad->valid = 0u;
+    CpuLoad->percent = OS_CPU_LOAD_INVALID_PERCENT;
+    CpuLoad->permille = OS_CPU_LOAD_INVALID_PERMILLE;
+    CpuLoad->runtimeDelta = 0u;
+    CpuLoad->idleRuntimeDelta = 0u;
+
+    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
+    {
+        return;
+    }
+
+    runtime = &Os_CpuLoadRuntime[CoreId];
+    if (runtime->valid == 0u)
+    {
+        return;
+    }
+
+    CpuLoad->valid = 1u;
+    CpuLoad->permille = runtime->loadPermille;
+    CpuLoad->percent = Os_CpuLoad_PermilleToPercent(runtime->loadPermille);
+    CpuLoad->runtimeDelta = runtime->runtimeDelta;
+    CpuLoad->idleRuntimeDelta = runtime->idleRuntimeDelta;
 }
 
 
@@ -237,6 +542,9 @@ void QM_BSW_Task_C0(void *pvParameters)
         {
             Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
             Can_MainFunction();
+            CanSM_MainFunction();
+            Com_MainFunctionTx();
+            Com_MainFunctionRx();
             Dcm_MainFunction();
             CanTp_MainFunction();
             LinSM_MainFunction();

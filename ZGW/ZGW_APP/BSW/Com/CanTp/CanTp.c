@@ -46,10 +46,10 @@ typedef struct
 
 static const CanTp_ChannelConfigType CanTp_ChannelConfig[] =
 {
-    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, 0u, 0u, CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
-    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 1u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
-    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 2u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON },
-    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 3u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON }
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, 0u, 0u, CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_CLASSIC_FUNC_RX, CANIF_PDU_CLASSIC_PHYS_TX, 1u, 1u, CANTP_ADDR_FUNCTIONAL, 8u,  8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      2u, 2u, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_FUNC_RX,      CANIF_PDU_FD_PHYS_TX,      3u, 3u, CANTP_ADDR_FUNCTIONAL, 64u, 8u, 0u, 0xAAu, CANTP_FORMAT_NORMAL, 0u, CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS }
 };
 
 const CanTp_ConfigType CanTp_Config =
@@ -60,6 +60,8 @@ const CanTp_ConfigType CanTp_Config =
 
 static const CanTp_ConfigType* CanTp_ConfigPtr;
 static CanTp_ChannelStateType CanTp_Channel[CANTP_MAX_CHANNELS];
+
+static uint8 CanTp_IsConfigValid(void);
 
 static uint8 CanTp_GetAddrOffset(const CanTp_ChannelConfigType* cfg)
 {
@@ -146,16 +148,27 @@ static void CanTp_SetTxAddress(const CanTp_ChannelConfigType* cfg, uint8* frame)
     }
 }
 
-static uint16 CanTp_GetTimerTicks(CanTp_TimerType timer)
+static uint16 CanTp_GetTimerTicks(uint8 ch, CanTp_TimerType timer)
 {
+    const CanTp_ChannelConfigType* cfg;
+
+    if ((CanTp_IsConfigValid() != FALSE) && (ch < CanTp_ConfigPtr->numChannels))
+    {
+        cfg = &CanTp_ConfigPtr->channels[ch];
+    }
+    else
+    {
+        cfg = NULL_PTR;
+    }
+
     switch (timer)
     {
-        case CANTP_TIMER_N_AS: return (uint16)CANTP_N_AS_TICKS;
-        case CANTP_TIMER_N_AR: return (uint16)CANTP_N_AR_TICKS;
-        case CANTP_TIMER_N_BS: return (uint16)CANTP_N_BS_TICKS;
-        case CANTP_TIMER_N_BR: return (uint16)CANTP_N_BR_TICKS;
-        case CANTP_TIMER_N_CS: return (uint16)CANTP_N_CS_TICKS;
-        case CANTP_TIMER_N_CR: return (uint16)CANTP_N_CR_TICKS;
+        case CANTP_TIMER_N_AS: return (cfg != NULL_PTR) ? cfg->nAsTicks : (uint16)CANTP_N_AS_TICKS;
+        case CANTP_TIMER_N_AR: return (cfg != NULL_PTR) ? cfg->nArTicks : (uint16)CANTP_N_AR_TICKS;
+        case CANTP_TIMER_N_BS: return (cfg != NULL_PTR) ? cfg->nBsTicks : (uint16)CANTP_N_BS_TICKS;
+        case CANTP_TIMER_N_BR: return (cfg != NULL_PTR) ? cfg->nBrTicks : (uint16)CANTP_N_BR_TICKS;
+        case CANTP_TIMER_N_CS: return (cfg != NULL_PTR) ? cfg->nCsTicks : (uint16)CANTP_N_CS_TICKS;
+        case CANTP_TIMER_N_CR: return (cfg != NULL_PTR) ? cfg->nCrTicks : (uint16)CANTP_N_CR_TICKS;
         default: return 0u;
     }
 }
@@ -163,7 +176,7 @@ static uint16 CanTp_GetTimerTicks(CanTp_TimerType timer)
 static void CanTp_StartTimer(uint8 ch, CanTp_TimerType timer)
 {
     CanTp_Channel[ch].timerType = timer;
-    CanTp_Channel[ch].timer = CanTp_GetTimerTicks(timer);
+    CanTp_Channel[ch].timer = CanTp_GetTimerTicks(ch, timer);
 }
 
 static uint8 CanTp_IsConfigValid(void)
@@ -257,7 +270,7 @@ static uint8 CanTp_StMinToTicks(uint8 stMin)
 
     if ((stMin >= 0xF1u) && (stMin <= 0xF9u))
     {
-        return 1u;
+        return 0u;
     }
 
     return 0xFFu;
@@ -563,12 +576,22 @@ static void CanTp_HandleSingleFrame(uint8 ch, const uint8* data, PduLengthType l
 {
     uint8 sfLen;
     uint8 offset;
+    uint8 pciBase;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-
-    uint8 pciBase;
     pciBase = CanTp_GetRxPciIndex(cfg);
+
+    if (len <= pciBase)
+    {
+        return;
+    }
+
+    if (CanTp_Channel[ch].state != CANTP_IDLE)
+    {
+        return;
+    }
+
     data = &data[pciBase];
     len = (PduLengthType)(len - pciBase);
 
@@ -630,12 +653,22 @@ static void CanTp_HandleFirstFrame(uint8 ch, const uint8* data, PduLengthType le
     PduLengthType totalLen;
     uint8 payload;
     uint8 copy;
+    uint8 pciBase;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-
-    uint8 pciBase;
     pciBase = CanTp_GetRxPciIndex(cfg);
+
+    if (len <= pciBase)
+    {
+        return;
+    }
+
+    if (CanTp_Channel[ch].state != CANTP_IDLE)
+    {
+        return;
+    }
+
     data = &data[pciBase];
     len = (PduLengthType)(len - pciBase);
 
@@ -683,13 +716,18 @@ static void CanTp_HandleConsecutiveFrame(uint8 ch, const uint8* data, PduLengthT
     uint8 sn;
     uint8 payload;
     uint8 copy;
+    uint8 pciBase;
     PduLengthType remaining;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-
-    uint8 pciBase;
     pciBase = CanTp_GetRxPciIndex(cfg);
+
+    if (len <= pciBase)
+    {
+        return;
+    }
+
     data = &data[pciBase];
     len = (PduLengthType)(len - pciBase);
 
@@ -750,12 +788,17 @@ static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType l
 {
     uint8 fs;
     uint8 ticks;
+    uint8 pciBase;
     const CanTp_ChannelConfigType* cfg;
 
     cfg = &CanTp_ConfigPtr->channels[ch];
-
-    uint8 pciBase;
     pciBase = CanTp_GetRxPciIndex(cfg);
+
+    if (len <= pciBase)
+    {
+        return;
+    }
+
     data = &data[pciBase];
     len = (PduLengthType)(len - pciBase);
 

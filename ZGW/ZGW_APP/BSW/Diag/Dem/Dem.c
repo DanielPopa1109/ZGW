@@ -82,9 +82,36 @@ static boolean Dem_IsValidDtcFormatAndOrigin(
     return TRUE;
 }
 
+static Std_ReturnType Dem_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *eventConfig)
+{
+    if ((Dem_ConfigPtr == NULL_PTR) || (eventConfig == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    if (eventIndex >= Dem_ConfigPtr->EventCount)
+    {
+        return E_NOT_OK;
+    }
+
+    if (Dem_ConfigPtr == &Dem_Config)
+    {
+        return Dem_Cfg_GetEventConfig(eventIndex, eventConfig);
+    }
+
+    if (Dem_ConfigPtr->Events == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    *eventConfig = Dem_ConfigPtr->Events[eventIndex];
+    return E_OK;
+}
+
 static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
 {
     uint16 i;
+    Dem_EventConfigType eventConfig;
 
     if (Dem_ConfigPtr == NULL_PTR)
     {
@@ -93,7 +120,8 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
-        if (Dem_ConfigPtr->Events[i].EventId == eventId)
+        if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
+            (eventConfig.EventId == eventId))
         {
             return i;
         }
@@ -105,6 +133,7 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
 static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
 {
     uint16 i;
+    Dem_EventConfigType eventConfig;
 
     if (Dem_ConfigPtr == NULL_PTR)
     {
@@ -113,7 +142,8 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
-        if ((Dem_ConfigPtr->Events[i].DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu))
+        if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
+            ((eventConfig.DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu)))
         {
             return i;
         }
@@ -163,6 +193,7 @@ static uint16 Dem_AllocatePrimaryEntry(uint16 eventIndex)
     uint8 newPriority;
     uint8 worstPriority = 0u;
     uint32 oldestChange = 0xFFFFFFFFu;
+    Dem_EventConfigType eventConfig;
 
     for (i = 0u; i < DEM_PRIMARY_MEMORY_SIZE; i++)
     {
@@ -172,16 +203,23 @@ static uint16 Dem_AllocatePrimaryEntry(uint16 eventIndex)
         }
     }
 
-    newPriority = Dem_ConfigPtr->Events[eventIndex].Priority;
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return DEM_PRIMARY_MEMORY_SIZE;
+    }
+
+    newPriority = eventConfig.Priority;
 
     for (i = 0u; i < DEM_PRIMARY_MEMORY_SIZE; i++)
     {
         uint16 oldEventIndex = Dem_FindEventIndex(Dem_PrimaryMemory[i].eventId);
         uint8 oldPriority = 255u;
+        Dem_EventConfigType oldEventConfig;
 
-        if (oldEventIndex < DEM_MAX_EVENTS)
+        if ((oldEventIndex < DEM_MAX_EVENTS) &&
+            (Dem_GetEventConfig(oldEventIndex, &oldEventConfig) == E_OK))
         {
-            oldPriority = Dem_ConfigPtr->Events[oldEventIndex].Priority;
+            oldPriority = oldEventConfig.Priority;
         }
 
         if (oldPriority > newPriority)
@@ -208,17 +246,23 @@ static void Dem_InvokeStatusChanged(
 )
 {
     Dem_EventIdType eventId;
+    Dem_EventConfigType eventConfig;
 
     if (oldStatus == newStatus)
     {
         return;
     }
 
-    eventId = Dem_ConfigPtr->Events[eventIndex].EventId;
-
-    if (Dem_ConfigPtr->Events[eventIndex].StatusChangedCallback != NULL_PTR)
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
     {
-        Dem_ConfigPtr->Events[eventIndex].StatusChangedCallback(
+        return;
+    }
+
+    eventId = eventConfig.EventId;
+
+    if (eventConfig.StatusChangedCallback != NULL_PTR)
+    {
+        eventConfig.StatusChangedCallback(
             eventId,
             oldStatus,
             newStatus
@@ -249,15 +293,21 @@ static void Dem_UpdatePrimaryEntryStatus(Dem_EventIdType eventId, Dem_UdsStatusB
 static void Dem_SetStatusByte(uint16 eventIndex, Dem_UdsStatusByteType newStatus)
 {
     Dem_UdsStatusByteType oldStatus;
+    Dem_EventConfigType eventConfig;
 
     oldStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
 
     if (oldStatus != newStatus)
     {
+        if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+        {
+            return;
+        }
+
         DEM_ENTER_CRITICAL();
         Dem_RuntimeEvents[eventIndex].udsStatus = newStatus;
         Dem_UpdatePrimaryEntryStatus(
-            Dem_ConfigPtr->Events[eventIndex].EventId,
+            eventConfig.EventId,
             newStatus
         );
         Dem_Dirty = TRUE;
@@ -270,6 +320,7 @@ static void Dem_SetStatusByte(uint16 eventIndex, Dem_UdsStatusByteType newStatus
 static void Dem_InitDefaultRuntime(void)
 {
     uint16 i;
+    Dem_EventConfigType eventConfig;
 
     memset(Dem_RuntimeEvents, 0, sizeof(Dem_RuntimeEvents));
     memset(Dem_PrimaryMemory, 0, sizeof(Dem_PrimaryMemory));
@@ -282,7 +333,12 @@ static void Dem_InitDefaultRuntime(void)
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
-        Dem_RuntimeEvents[i].eventId = Dem_ConfigPtr->Events[i].EventId;
+        if (Dem_GetEventConfig(i, &eventConfig) != E_OK)
+        {
+            continue;
+        }
+
+        Dem_RuntimeEvents[i].eventId = eventConfig.EventId;
         Dem_RuntimeEvents[i].udsStatus =
             (uint8)(DEM_UDS_STATUS_TNCSLC | DEM_UDS_STATUS_TNCTOC);
         Dem_RuntimeEvents[i].debounceCounter = 0;
@@ -406,8 +462,14 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
 static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
 {
     uint16 len;
+    Dem_EventConfigType eventConfig;
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
+    {
+        return;
+    }
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
     {
         return;
     }
@@ -415,10 +477,10 @@ static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
     len = DEM_FREEZE_FRAME_SIZE;
     Dem_PrimaryMemory[entryIndex].freezeFrameLength = 0u;
 
-    if (Dem_ConfigPtr->Events[eventIndex].FreezeFrameCapture != NULL_PTR)
+    if (eventConfig.FreezeFrameCapture != NULL_PTR)
     {
-        if (Dem_ConfigPtr->Events[eventIndex].FreezeFrameCapture(
-                Dem_ConfigPtr->Events[eventIndex].EventId,
+        if (eventConfig.FreezeFrameCapture(
+                eventConfig.EventId,
                 Dem_PrimaryMemory[entryIndex].freezeFrame,
                 &len) == E_OK)
         {
@@ -434,10 +496,10 @@ static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
     len = DEM_EXTENDED_DATA_SIZE;
     Dem_PrimaryMemory[entryIndex].extendedDataLength = 0u;
 
-    if (Dem_ConfigPtr->Events[eventIndex].ExtendedDataCapture != NULL_PTR)
+    if (eventConfig.ExtendedDataCapture != NULL_PTR)
     {
-        if (Dem_ConfigPtr->Events[eventIndex].ExtendedDataCapture(
-                Dem_ConfigPtr->Events[eventIndex].EventId,
+        if (eventConfig.ExtendedDataCapture(
+                eventConfig.EventId,
                 Dem_PrimaryMemory[entryIndex].extendedData,
                 &len) == E_OK)
         {
@@ -455,13 +517,19 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
 {
     uint16 entryIndex;
     Dem_EventIdType eventId;
+    Dem_EventConfigType eventConfig;
 
-    if (Dem_ConfigPtr->Events[eventIndex].StorageEnabled == FALSE)
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
     {
         return;
     }
 
-    eventId = Dem_ConfigPtr->Events[eventIndex].EventId;
+    if (eventConfig.StorageEnabled == FALSE)
+    {
+        return;
+    }
+
+    eventId = eventConfig.EventId;
     entryIndex = Dem_FindPrimaryEntryByEvent(eventId);
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
@@ -480,7 +548,7 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
 
         Dem_PrimaryMemory[entryIndex].valid = TRUE;
         Dem_PrimaryMemory[entryIndex].eventId = eventId;
-        Dem_PrimaryMemory[entryIndex].dtc = Dem_ConfigPtr->Events[eventIndex].DTC & 0x00FFFFFFu;
+        Dem_PrimaryMemory[entryIndex].dtc = eventConfig.DTC & 0x00FFFFFFu;
         Dem_PrimaryMemory[entryIndex].firstFailedCycle = Dem_OperationCycleCounter;
 
         Dem_CaptureSnapshot(eventIndex, entryIndex);
@@ -513,6 +581,12 @@ static void Dem_ProcessFailed(uint16 eventIndex)
 {
     Dem_UdsStatusByteType status;
     uint8 confirmationThreshold;
+    Dem_EventConfigType eventConfig;
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
 
     status = Dem_RuntimeEvents[eventIndex].udsStatus;
 
@@ -524,7 +598,7 @@ static void Dem_ProcessFailed(uint16 eventIndex)
     status |= DEM_UDS_STATUS_PDTC;
     status |= DEM_UDS_STATUS_TFSLC;
 
-    confirmationThreshold = Dem_ConfigPtr->Events[eventIndex].ConfirmationThreshold;
+    confirmationThreshold = eventConfig.ConfirmationThreshold;
     if (confirmationThreshold == 0u)
     {
         confirmationThreshold = 1u;
@@ -571,18 +645,24 @@ static void Dem_ProcessPassed(uint16 eventIndex)
 static void Dem_ProcessPreFailed(uint16 eventIndex)
 {
     sint16 counter;
+    Dem_EventConfigType eventConfig;
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
 
     counter = Dem_RuntimeEvents[eventIndex].debounceCounter;
-    counter = (sint16)(counter + Dem_ConfigPtr->Events[eventIndex].IncrementStep);
+    counter = (sint16)(counter + eventConfig.IncrementStep);
 
-    if (counter > Dem_ConfigPtr->Events[eventIndex].FailedThreshold)
+    if (counter > eventConfig.FailedThreshold)
     {
-        counter = Dem_ConfigPtr->Events[eventIndex].FailedThreshold;
+        counter = eventConfig.FailedThreshold;
     }
 
     Dem_RuntimeEvents[eventIndex].debounceCounter = counter;
 
-    if (counter >= Dem_ConfigPtr->Events[eventIndex].FailedThreshold)
+    if (counter >= eventConfig.FailedThreshold)
     {
         Dem_ProcessFailed(eventIndex);
     }
@@ -595,18 +675,24 @@ static void Dem_ProcessPreFailed(uint16 eventIndex)
 static void Dem_ProcessPrePassed(uint16 eventIndex)
 {
     sint16 counter;
+    Dem_EventConfigType eventConfig;
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
 
     counter = Dem_RuntimeEvents[eventIndex].debounceCounter;
-    counter = (sint16)(counter - Dem_ConfigPtr->Events[eventIndex].DecrementStep);
+    counter = (sint16)(counter - eventConfig.DecrementStep);
 
-    if (counter < Dem_ConfigPtr->Events[eventIndex].PassedThreshold)
+    if (counter < eventConfig.PassedThreshold)
     {
-        counter = Dem_ConfigPtr->Events[eventIndex].PassedThreshold;
+        counter = eventConfig.PassedThreshold;
     }
 
     Dem_RuntimeEvents[eventIndex].debounceCounter = counter;
 
-    if (counter <= Dem_ConfigPtr->Events[eventIndex].PassedThreshold)
+    if (counter <= eventConfig.PassedThreshold)
     {
         Dem_ProcessPassed(eventIndex);
     }
@@ -619,10 +705,12 @@ static void Dem_ProcessPrePassed(uint16 eventIndex)
 static boolean Dem_DtcAlreadySeen(uint16 currentIndex, Dem_DTCType dtc)
 {
     uint16 i;
+    Dem_EventConfigType eventConfig;
 
     for (i = 0u; i < currentIndex; i++)
     {
-        if ((Dem_ConfigPtr->Events[i].DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu))
+        if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
+            ((eventConfig.DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu)))
         {
             if ((Dem_RuntimeEvents[i].udsStatus & Dem_Filter.statusMask) != 0u)
             {
@@ -637,6 +725,7 @@ static boolean Dem_DtcAlreadySeen(uint16 currentIndex, Dem_DTCType dtc)
 static boolean Dem_FilterMatch(uint16 eventIndex)
 {
     Dem_UdsStatusByteType status;
+    Dem_EventConfigType eventConfig;
 
     if (Dem_Filter.active == FALSE)
     {
@@ -648,14 +737,19 @@ static boolean Dem_FilterMatch(uint16 eventIndex)
         return FALSE;
     }
 
-    if ((Dem_ConfigPtr->Events[eventIndex].DTC & 0x00FFFFFFu) == 0u)
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return FALSE;
+    }
+
+    if ((eventConfig.DTC & 0x00FFFFFFu) == 0u)
     {
         return FALSE;
     }
 
     if (Dem_Filter.filterWithSeverity != FALSE)
     {
-        if ((Dem_ConfigPtr->Events[eventIndex].Severity & Dem_Filter.severityMask) == 0u)
+        if ((eventConfig.Severity & Dem_Filter.severityMask) == 0u)
         {
             return FALSE;
         }
@@ -678,7 +772,7 @@ static boolean Dem_FilterMatch(uint16 eventIndex)
         }
     }
 
-    if (Dem_DtcAlreadySeen(eventIndex, Dem_ConfigPtr->Events[eventIndex].DTC) != FALSE)
+    if (Dem_DtcAlreadySeen(eventIndex, eventConfig.DTC) != FALSE)
     {
         return FALSE;
     }
@@ -690,9 +784,15 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
 {
     Dem_UdsStatusByteType oldStatus;
     Dem_UdsStatusByteType newStatus;
+    Dem_EventConfigType eventConfig;
 
     oldStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
     newStatus = (uint8)(DEM_UDS_STATUS_TNCSLC | DEM_UDS_STATUS_TNCTOC);
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
 
     Dem_RuntimeEvents[eventIndex].udsStatus = newStatus;
     Dem_RuntimeEvents[eventIndex].debounceCounter = 0;
@@ -700,7 +800,7 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
     Dem_RuntimeEvents[eventIndex].occurrenceCounter = 0u;
     Dem_RuntimeEvents[eventIndex].agingCounter = 0u;
 
-    Dem_RemovePrimaryEntryByEvent(Dem_ConfigPtr->Events[eventIndex].EventId);
+    Dem_RemovePrimaryEntryByEvent(eventConfig.EventId);
 
     if (oldStatus != newStatus)
     {
@@ -905,6 +1005,7 @@ void Dem_MainFunction(void)
 Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType EventStatus)
 {
     uint16 eventIndex;
+    Dem_EventConfigType eventConfig;
 
     if (Dem_InitState != DEM_INITIALIZED)
     {
@@ -923,20 +1024,25 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
         return E_NOT_OK;
     }
 
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
     DEM_ENTER_CRITICAL();
 
     switch (EventStatus)
     {
         case DEM_EVENT_STATUS_FAILED:
             Dem_RuntimeEvents[eventIndex].debounceCounter =
-                Dem_ConfigPtr->Events[eventIndex].FailedThreshold;
+                eventConfig.FailedThreshold;
             DEM_EXIT_CRITICAL();
             Dem_ProcessFailed(eventIndex);
             break;
 
         case DEM_EVENT_STATUS_PASSED:
             Dem_RuntimeEvents[eventIndex].debounceCounter =
-                Dem_ConfigPtr->Events[eventIndex].PassedThreshold;
+                eventConfig.PassedThreshold;
             DEM_EXIT_CRITICAL();
             Dem_ProcessPassed(eventIndex);
             break;
@@ -1065,6 +1171,7 @@ Std_ReturnType Dem_GetFaultDetectionCounter(
     sint16 failedThreshold;
     sint16 passedThreshold;
     sint32 scaled;
+    Dem_EventConfigType eventConfig;
 
     if ((Dem_InitState != DEM_INITIALIZED) || (FaultDetectionCounter == NULL_PTR))
     {
@@ -1078,9 +1185,14 @@ Std_ReturnType Dem_GetFaultDetectionCounter(
         return E_NOT_OK;
     }
 
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
     counter = Dem_RuntimeEvents[eventIndex].debounceCounter;
-    failedThreshold = Dem_ConfigPtr->Events[eventIndex].FailedThreshold;
-    passedThreshold = Dem_ConfigPtr->Events[eventIndex].PassedThreshold;
+    failedThreshold = eventConfig.FailedThreshold;
+    passedThreshold = eventConfig.PassedThreshold;
 
     if (counter >= failedThreshold)
     {
@@ -1124,6 +1236,7 @@ Std_ReturnType Dem_GetDTCOfEvent(
 )
 {
     uint16 eventIndex;
+    Dem_EventConfigType eventConfig;
 
     if ((Dem_InitState != DEM_INITIALIZED) || (DTCOfEvent == NULL_PTR))
     {
@@ -1142,7 +1255,12 @@ Std_ReturnType Dem_GetDTCOfEvent(
         return E_NOT_OK;
     }
 
-    *DTCOfEvent = Dem_ConfigPtr->Events[eventIndex].DTC & 0x00FFFFFFu;
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    *DTCOfEvent = eventConfig.DTC & 0x00FFFFFFu;
     return E_OK;
 }
 
@@ -1191,6 +1309,12 @@ Std_ReturnType Dem_SetOperationCycleState(
             Dem_UdsStatusByteType status = Dem_RuntimeEvents[i].udsStatus;
             boolean failedThisCycle = ((status & DEM_UDS_STATUS_TFTOC) != 0u) ? TRUE : FALSE;
             boolean testedThisCycle = ((status & DEM_UDS_STATUS_TNCTOC) == 0u) ? TRUE : FALSE;
+            Dem_EventConfigType eventConfig;
+
+            if (Dem_GetEventConfig(i, &eventConfig) != E_OK)
+            {
+                continue;
+            }
 
             if ((failedThisCycle == FALSE) && (testedThisCycle != FALSE))
             {
@@ -1200,17 +1324,17 @@ Std_ReturnType Dem_SetOperationCycleState(
             if (((status & DEM_UDS_STATUS_CDTC) != 0u) &&
                 (failedThisCycle == FALSE) &&
                 (testedThisCycle != FALSE) &&
-                (Dem_ConfigPtr->Events[i].AgingAllowed != FALSE))
+                (eventConfig.AgingAllowed != FALSE))
             {
                 if (Dem_RuntimeEvents[i].agingCounter < 255u)
                 {
                     Dem_RuntimeEvents[i].agingCounter++;
                 }
 
-                if (Dem_RuntimeEvents[i].agingCounter >= Dem_ConfigPtr->Events[i].AgingThreshold)
+                if (Dem_RuntimeEvents[i].agingCounter >= eventConfig.AgingThreshold)
                 {
                     status &= (uint8)~DEM_UDS_STATUS_CDTC;
-                    Dem_RemovePrimaryEntryByEvent(Dem_ConfigPtr->Events[i].EventId);
+                    Dem_RemovePrimaryEntryByEvent(eventConfig.EventId);
                 }
             }
 
@@ -1293,7 +1417,10 @@ Std_ReturnType Dem_ClearDTC(
     {
         for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
         {
-            if ((Dem_ConfigPtr->Events[i].DTC & 0x00FFFFFFu) == (DTC & 0x00FFFFFFu))
+            Dem_EventConfigType eventConfig;
+
+            if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
+                ((eventConfig.DTC & 0x00FFFFFFu) == (DTC & 0x00FFFFFFu)))
             {
                 Dem_ClearRuntimeEvent(i);
                 found = TRUE;
@@ -1411,7 +1538,14 @@ Std_ReturnType Dem_GetNextFilteredDTC(
     {
         if (Dem_FilterMatch(i) != FALSE)
         {
-            *DTC = Dem_ConfigPtr->Events[i].DTC & 0x00FFFFFFu;
+            Dem_EventConfigType eventConfig;
+
+            if (Dem_GetEventConfig(i, &eventConfig) != E_OK)
+            {
+                continue;
+            }
+
+            *DTC = eventConfig.DTC & 0x00FFFFFFu;
             *DTCStatus = Dem_RuntimeEvents[i].udsStatus;
             Dem_Filter.nextIndex = (uint16)(i + 1u);
             return E_OK;

@@ -14,3 +14,4 @@ extern uint8 SysMgr_NoBusActivity;
 extern uint32 SysMgr_BusActivityCounter;
 
 extern void SysMgr_MainFunction(void);
+extern void SysMgr_NotifyBusActivity(void);

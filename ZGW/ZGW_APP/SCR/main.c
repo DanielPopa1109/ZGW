@@ -34,9 +34,58 @@
 
 #define MaskWCANRXDIS   (0x0Fu)
 #define SetWCANRXDA     (0x00u)
-#define SetWCANRXDG     (0x06u)
+#define SetWCANRXDD     (0x03u)
+
+#define CANFD_RXD_PIN_MASK             (0x20u)
+#define WCAN_INT_MASK_ALL              (0x0Fu)
+#define WCAN_INT_MASK_WUP_ONLY         (0x07u)
+#define WCAN_STATUS0_WAKE_MASK         (0x80u)
+#define WCAN_STATUS1_WAKE_MASK         (0x03u)
+#define WCAN_STATUS0_CLEAR_MASK        (0xFCu)
+#define WCAN_STATUS1_CLEAR_MASK        (0x0Bu)
 
 #define G_COUNTER_ADDR   ((volatile __xdata uint8 *)0x1760u)
+#define G_WCAN_STAT0_ADDR ((volatile __xdata uint8 *)0x1761u)
+#define G_WCAN_STAT1_ADDR ((volatile __xdata uint8 *)0x1762u)
+#define G_P00_IN_ADDR     ((volatile __xdata uint8 *)0x1763u)
+
+static void WCAN_ClearEvents(void)
+{
+    SCR_WCAN_PAGE = MOD_PAGE_1;
+    SCR_WCAN_INTESCLR0 = WCAN_STATUS0_CLEAR_MASK;
+    SCR_WCAN_INTESCLR1 = WCAN_STATUS1_CLEAR_MASK;
+}
+
+static void SCR_RequestStandbyWake(void)
+{
+    SCR_SCU_PAGE = MOD_PAGE_1;
+    SCR_SCU_STDBYWKP = (SCR_SCU_STDBYWKP | WCANWKSEL_MASK | SCRWKP_MASK);
+}
+
+static void WCAN_CheckWake(void)
+{
+    uint8 wcanStatus0;
+    uint8 wcanStatus1;
+    uint8 p00In;
+
+    SCR_WCAN_PAGE = MOD_PAGE_1;
+    wcanStatus0 = SCR_WCAN_INTESTAT0;
+    wcanStatus1 = SCR_WCAN_INTESTAT1;
+
+    SCR_IO_PAGE = MOD_PAGE_0;
+    p00In = SCR_IO_P00_IN;
+
+    *G_WCAN_STAT0_ADDR = wcanStatus0;
+    *G_WCAN_STAT1_ADDR = wcanStatus1;
+    *G_P00_IN_ADDR = p00In;
+
+    if(((wcanStatus0 & WCAN_STATUS0_WAKE_MASK) != 0u) ||
+       ((wcanStatus1 & WCAN_STATUS1_WAKE_MASK) != 0u) ||
+       ((p00In & CANFD_RXD_PIN_MASK) == 0u))
+    {
+        SCR_RequestStandbyWake();
+    }
+}
 
 char WCAN_Init(void)
 {
@@ -51,10 +100,10 @@ char WCAN_Init(void)
     // Set pads to input mode, pull-up enable
     SCR_IO_PAGE = 0x1;
     // Pull-up control before enable
-    SCR_IO_P01_IOCR4 = 0x20 ; // WCANRXDG(P33.12)
+    SCR_IO_P00_IOCR5 = ScrPortMode_inputPullUp; // WCANRXDD(P33.5 / SCR_P00.5)
 
     SCR_IO_PAGE = 0x2;
-    SCR_IO_P01_PDISC = 0xFB ; // WCANRXDG(P33.12)
+    SCR_IO_P00_PDISC = 0xDF ; // WCANRXDD(P33.5 / SCR_P00.5)
 
     SCR_SCU_PAGE = 0x1;
     SCR_SCU_RSTCON = 0x0 ; // Disable WDT and ECC reset
@@ -67,9 +116,7 @@ char WCAN_Init(void)
      * 3. Configure CDR,CAN FD and Baud Rate Configuration registers
      * 4. Reset CFG.CCE = 0
      * 5. Reset CFG.SELWK_EN = 0
-     * 6. Configure WUF Configuration registers
-     * 7. Set CFG.SELWK_EN = 1
-     * 8. Wait until INTESTAT0.SWKACK = 1
+     * 6. Keep selective wake disabled; wake on any valid CAN wake-up pattern
      */
 
     /**************************
@@ -81,62 +128,30 @@ char WCAN_Init(void)
 
     SCR_SCU_PAGE = 0x2;
     TempVar = SCR_SCU_MODPISEL0 & MaskWCANRXDIS; // Mask WCAN bits
-    SCR_SCU_MODPISEL0 = TempVar | (SetWCANRXDG<<4); // Enable CAN on P33.12
+    SCR_SCU_MODPISEL0 = TempVar | (SetWCANRXDD<<4); // Enable CAN on P33.5
 
     SCR_WCAN_PAGE = 0x0 ;
     SCR_WCAN_CFG = (1<<3)|(0<<2)|(1<<0) ; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
-    SCR_WCAN_INTMRSLT = (0<<3)|(1<<2)|(0<<1)|(0<<0); // WUP=0, WUF=1, ERR=0, CANTO=0 --> enable WUF interrupt
+    SCR_WCAN_INTMRSLT = WCAN_INT_MASK_ALL;
+    SCR_WCAN_FD_CTRL = 0x01 ; // Enable CAN FD tolerant mode
 
     /*****************************************************************
      * 3. Configure CDR,CAN FD and Baud Rate Configuration registers
      *****************************************************************/
     SCR_WCAN_PAGE = 0x1;
+    SCR_WCAN_FRMERRCNT = (1<<6); // Do not count CAN FD frames as wake-up frame errors
     SCR_WCAN_DLC_CTRL = 0x8 ; // 8 bytes of data
-    SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure Baud Rate of 500 kbits/s (see table 747 and register WCAN_BTL2_CTRL)
-    SCR_WCAN_BTL2_CTRL = (1<<6) | (0x33<<0) ; // BRP=01(Divide by 2) and SP=0x33 represents ~80%SP
+    SCR_WCAN_BTL1_CTRL = 0xC8 ; // Configure nominal Baud Rate of 500 kbit/s
+    SCR_WCAN_BTL2_CTRL = (0<<6) | (0x33<<0) ; // BRP=00(Divide by 1) and SP=0x33 represents ~80%SP
+    WCAN_ClearEvents();
 
     /*****************************
      * 4. Reset CFG.CCE = 0
      * 5. Reset CFG.SELWK_EN = 0
      *****************************/
     SCR_WCAN_PAGE = 0x0 ;
-    SCR_WCAN_CFG &= ~((1<<3)|(1<<2)|(0<<0)); // reset CCE=1, SELWK_EN=1, WCAN_EN=0 according to UM
-
-    /********************************************
-     * 6. Configure WUF Configuration registers
-     ********************************************/
-    SCR_WCAN_PAGE = 0x2 ;
-    SCR_WCAN_ID0_CTRL = 0x00 ; // ID = 0x555 (11-bit)
-    SCR_WCAN_ID1_CTRL = 0x00 ;
-    SCR_WCAN_ID2_CTRL = 0x04 ;
-    SCR_WCAN_ID3_CTRL = 0x54 ; // RTR=0 ; IDE = 0
-
-    SCR_WCAN_MASK_ID0_CTRL = 0xFF ;
-    SCR_WCAN_MASK_ID1_CTRL = 0xFF ;
-    SCR_WCAN_MASK_ID2_CTRL = 0xFF ;
-    SCR_WCAN_MASK_ID3_CTRL = 0xFF ;
-
-    SCR_WCAN_PAGE = 0x3 ;
-    SCR_WCAN_DATA7_CTRL = 0x01 ; // Data Frame = 0x01 23 45 67 89 ab cd ef (byte8...byte1)
-    SCR_WCAN_DATA6_CTRL = 0x23 ;
-    SCR_WCAN_DATA5_CTRL = 0x45 ;
-    SCR_WCAN_DATA4_CTRL = 0x67 ;
-    SCR_WCAN_DATA3_CTRL = 0x89 ;
-    SCR_WCAN_DATA2_CTRL = 0xab ;
-    SCR_WCAN_DATA1_CTRL = 0xcd ;
-    SCR_WCAN_DATA0_CTRL = 0xef ;
-
-    /********************************************
-     * 7. Set CFG.SELWK_EN = 1
-     ********************************************/
-    SCR_WCAN_PAGE = 0x0 ;
-    SCR_WCAN_CFG |= ((0<<3)|(1<<2)|(0<<0)); //set CCE=0, SELWK_EN=1, WCAN_EN=0
-
-    /********************************************
-     * 8. Wait until INTESTAT0.SWKACK = 1
-     ********************************************/
-    SCR_WCAN_PAGE = 0x1 ;
-    while ((SCR_WCAN_INTESTAT0 & 0x1) != 0x1) { } ; // selective wake up enable protocol handle is activated
+    SCR_WCAN_INTMRSLT = WCAN_INT_MASK_WUP_ONLY; // Enable WUP wake; mask WUF/SYSERR/CANTO
+    SCR_WCAN_CFG &= ~((1<<3)|(1<<2)); // CCE=0, SELWK_EN=0, WCAN_EN remains enabled
 
     return result;
 }
@@ -144,12 +159,15 @@ char WCAN_Init(void)
 void main(void)
 {
     *G_COUNTER_ADDR = 0u;
-    Scr_set_fsys_70kHz();
+    *G_WCAN_STAT0_ADDR = 0u;
+    *G_WCAN_STAT1_ADDR = 0u;
+    *G_P00_IN_ADDR = 0u;
+    Scr_set_fsys(DIV5);
     WCAN_Init();
 
     while(1)
     {
-
+        WCAN_CheckWake();
         (*G_COUNTER_ADDR)++;
     }
 }

@@ -62,14 +62,14 @@ Discarded input sections
 Memory Configuration
 
 Name             Origin             Length             Used               Free               Attributes
-text             0x0000000000000000 0x0000000000001c00         0x0000000000000247         0x00000000000019b9 xr
+text             0x0000000000000000 0x0000000000001c00         0x000000000000025f         0x00000000000019a1 xr
 bit              0x0000000000000000 0x0000000000000080         0x0000000000000000         0x0000000000000080 rw !x
 data             0x0000000000000000 0x0000000000000100         0x0000000000000008         0x00000000000000f8 rw !x
 pdata            0x0000000000000000 0x0000000000000100         0x0000000000000000         0x0000000000000100 rw !x
-xdata            0x0000000000001c00 0x0000000000000400         0x0000000000000104         0x00000000000002fc rw !x
+xdata            0x0000000000001c00 0x0000000000000400         0x0000000000000107         0x00000000000002f9 rw !x
 edata            0x0000000000000000 0x0000000000000000         0x0000000000000000         0x0000000000000000 rw !x
 eeprom           0x0000000000000000 0x0000000000000000         0x0000000000000000         0x0000000000000000 rw !x
-*default*        0x0000000000000000 0xffffffffffffffff         0x0000000000001d04         0xffffffffffffe2fb
+*default*        0x0000000000000000 0xffffffffffffffff         0x0000000000001d07         0xffffffffffffe2f8
 
 Linker script and memory map
 
@@ -226,7 +226,7 @@ LOAD ./SCR/main.o
                 0x0000000000000101        0x2 SHORT 0x100 ADDR (.gsinit)
 
 .text           memory region -> text
-                0x0000000000000103      0x144
+                0x0000000000000103      0x15c
  *(.init)
  *(.text.gsinit0)
  .text.gsinit0  0x0000000000000103        0x6 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
@@ -253,27 +253,33 @@ LOAD ./SCR/main.o
                 0x0000000000000171                __sdcc_program_startup
  *(.text)
  *(.text.*)
+ .text.code.WCAN_ClearEvents
+                0x0000000000000179        0xa ./SCR/main.o
+ .text.code.SCR_RequestStandbyWake
+                0x0000000000000183        0x7 ./SCR/main.o
+ .text.code.WCAN_CheckWake
+                0x000000000000018a       0x46 ./SCR/main.o
  .text.code.WCAN_Init
-                0x0000000000000179       0x9e ./SCR/main.o
-                0x0000000000000179                _WCAN_Init
+                0x00000000000001d0       0x5a ./SCR/main.o
+                0x00000000000001d0                _WCAN_Init
  .text.code.main
-                0x0000000000000217       0x2c ./SCR/main.o
-                0x0000000000000217                _main
+                0x000000000000022a       0x31 ./SCR/main.o
+                0x000000000000022a                _main
  .text.code._sdcc_external_startup
-                0x0000000000000243        0x4 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
-                0x0000000000000243                __sdcc_external_startup
+                0x000000000000025b        0x4 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
+                0x000000000000025b                __sdcc_external_startup
  *(.fini)
-                0x0000000000000247                _etext = .
+                0x000000000000025f                _etext = .
 
 .roxdata        memory region -> text
-                0x0000000000000247        0x0
-                0x0000000000000247                __roxdata_start = .
+                0x000000000000025f        0x0
+                0x000000000000025f                __roxdata_start = .
  *(.roxdata.*)
-                0x0000000000000247                __roxdata_end = .
+                0x000000000000025f                __roxdata_end = .
                 0x0000000000000008                regsize = DEFINED (__RB3__)?0x20:DEFINED (__RB2__)?0x18:DEFINED (__RB1__)?0x10:0x8
 
 .reg            memory region -> data
-                0x0000000000000000        0x8 load address 0x0000000000000247
+                0x0000000000000000        0x8 load address 0x000000000000025f
                 0x0000000000000000                PROVIDE (__reg_start, .)
  *(.regbank)
                 0x0000000000000008                . = regsize
@@ -331,21 +337,21 @@ LOAD ./SCR/main.o
                 0x0000000000001c01                PROVIDE (__xstack_start, .)
 
 .xdata          memory region -> xdata
-                0x0000000000001d00        0x4
+                0x0000000000001d00        0x7
                 0x0000000000001d00                __xdatac_start = .
  *(.xdata.i51*)
- .xdata.i51     0x0000000000001d00        0x4 ./SCR/main.o
+ .xdata.i51     0x0000000000001d00        0x7 ./SCR/main.o
  *(.xdata.abs*)
-                0x0000000000001d04                __xdatac_end = .
-                0x0000000000001d04                __xdatai_start = .
+                0x0000000000001d07                __xdatac_end = .
+                0x0000000000001d07                __xdatai_start = .
  *(.xdata.init*)
-                0x0000000000001d04                __xdatai_end = .
+                0x0000000000001d07                __xdatai_end = .
 
 .ixdata         memory region -> xdata
-                0x0000000000001d04        0x0
-                0x0000000000001d04                PROVIDE (__ixdata_start, .)
+                0x0000000000001d07        0x0
+                0x0000000000001d07                PROVIDE (__ixdata_start, .)
  *(.xbss*)
-                0x0000000000001d04                PROVIDE (__ixdata_end, .)
+                0x0000000000001d07                PROVIDE (__ixdata_end, .)
 
 .edata          memory region -> edata
                 0x0000000000000000        0x0
@@ -355,10 +361,10 @@ LOAD ./SCR/main.o
                 0x0000000000001c01                s_PSEG = __pdata_start
                 0x0000000000000000                l_PSEG = (__pdata_end - __pdata_start)
                 0x0000000000001d00                s_XSEG = __xdatac_start
-                0x0000000000000004                l_XSEG = (__xdatac_end - __xdatac_start)
-                0x0000000000001d04                s_XISEG = __xdatai_start
+                0x0000000000000007                l_XSEG = (__xdatac_end - __xdatac_start)
+                0x0000000000001d07                s_XISEG = __xdatai_start
                 0x0000000000000000                l_XISEG = (__xdatai_end - __xdatai_start)
-                0x0000000000000247                s_XINIT = __roxdata_start
+                0x000000000000025f                s_XINIT = __roxdata_start
                 0x0000000000000000                l_XINIT = (__roxdata_end - __roxdata_start)
                 0x0000000000000001                _. = ASSERT ((__stack_start < 0xf0), Stack Iram above limit 0xF0)
                 0x0000000000000001                _. = ASSERT ((__ddata_end < 0x80), Direct Iram Data above Limit 0x80)

@@ -73,6 +73,13 @@ typedef struct
     uint8 addressFormat;
     uint8 nTa;
     uint8 paddingActivation;
+
+    uint16 nAsTicks;
+    uint16 nArTicks;
+    uint16 nBsTicks;
+    uint16 nBrTicks;
+    uint16 nCsTicks;
+    uint16 nCrTicks;
 } CanTp_ChannelConfigType;
 
 typedef struct

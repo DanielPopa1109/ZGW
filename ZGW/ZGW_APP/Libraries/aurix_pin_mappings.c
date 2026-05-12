@@ -66,23 +66,23 @@ extern void can0_node0_init_pins(void)
 }
 
 
-/* CAN0_NODE1 pin configuration */
+/* CAN1_NODE3 pin configuration */
 
-static const IfxPort_Io_ConfigPin can0_node1_pin_table[] = 
+static const IfxPort_Io_ConfigPin can1_node3_pin_table[] = 
 {
-    IFXCFG_P33_9_IO_CONFIG,
-    IFXCFG_P33_10_IO_CONFIG
+    IFXCFG_P33_4_IO_CONFIG,
+    IFXCFG_P33_5_IO_CONFIG
 };
 
-static const IfxPort_Io_Config can0_node1_io_config_table = 
+static const IfxPort_Io_Config can1_node3_io_config_table = 
 {
-    sizeof(can0_node1_pin_table)/sizeof(IfxPort_Io_ConfigPin),
-    (IfxPort_Io_ConfigPin*)can0_node1_pin_table
+    sizeof(can1_node3_pin_table)/sizeof(IfxPort_Io_ConfigPin),
+    (IfxPort_Io_ConfigPin*)can1_node3_pin_table
 };
 
-extern void can0_node1_init_pins(void)
+extern void can1_node3_init_pins(void)
 {
-    IfxPort_Io_initModule(&can0_node1_io_config_table);
+    IfxPort_Io_initModule(&can1_node3_io_config_table);
 }
 
 

@@ -286,11 +286,11 @@ static void Ram_CanInit(void)
     g_can.nodeConfig.baudRate.timeSegment2 = 3u;
     g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
     g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-    g_can.nodeConfig.fastBaudRate.prescaler = 1u;
+    g_can.nodeConfig.fastBaudRate.prescaler = 0u;
     g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.fastBaudRate.timeSegment2 = 5u;
+    g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
     g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
-    g_can.nodeConfig.calculateBitTimingValues = FALSE;
+    g_can.nodeConfig.calculateBitTimingValues = TRUE;
 
     g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
     g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;

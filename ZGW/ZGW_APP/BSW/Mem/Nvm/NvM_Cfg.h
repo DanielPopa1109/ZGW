@@ -30,10 +30,10 @@ typedef struct
 #define NVM_BLOCK_ID_DEM_PRIMARY            (1u)
 #define NVM_BLOCK_ID_APP_DATA               (2u)
 
-#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (2048u)
+#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (32u * 1024u)
 #define NVM_BLOCK_APP_DATA_LENGTH           (2048u)
 
-#define NVM_MAX_BLOCK_LENGTH                (2048u)
+#define NVM_MAX_BLOCK_LENGTH                (32u * 1024u)
 
 extern uint8 NvM_DemPrimary_Ram[NVM_BLOCK_DEM_PRIMARY_LENGTH];
 extern uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];

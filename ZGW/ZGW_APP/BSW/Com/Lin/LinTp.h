@@ -11,7 +11,17 @@
 #define LINTP_PCI_FF              0x10u
 #define LINTP_PCI_CF              0x20u
 
-#define LINTP_PDUR_ID             4u
+#define LINTP_PDUR_MASTER_REQ_ID  4u
+#define LINTP_PDUR_SLAVE_RESP_ID  0xFFFFu
+#define LINTP_PDUR_ID             LINTP_PDUR_MASTER_REQ_ID
+
+#ifndef LINTP_SUPPLIER_ID
+#define LINTP_SUPPLIER_ID         0xFFFFu
+#endif
+
+#ifndef LINTP_FUNCTION_ID
+#define LINTP_FUNCTION_ID         0xFFFFu
+#endif
 
 void LinTp_Init(uint8 configuredNad);
 void LinTp_MainFunction(void);

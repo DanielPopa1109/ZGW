@@ -18,6 +18,10 @@
 #define COM_IPDU_GROUP_0      0u
 #define COM_IPDU_GROUP_1      1u
 
+#define COM_RX_DIAG_STATUS_OK       0x00u
+#define COM_RX_DIAG_STATUS_TIMEOUT  0x01u
+#define COM_RX_DIAG_STATUS_INVALID  0x02u
+
 typedef uint16 Com_SignalIdType;
 typedef uint16 Com_IpduGroupIdType;
 
@@ -31,6 +35,14 @@ Std_ReturnType Com_IpduGroupStop(Com_IpduGroupIdType groupId);
 Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataPtr);
 Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr);
 Std_ReturnType Com_InvalidateSignal(Com_SignalIdType SignalId);
+Std_ReturnType Com_GetRxPduDiagStatus(PduIdType RxPduId, uint8* StatusPtr);
+Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
+        uint16* CycleTicksPtr,
+        uint16* TimeoutTicksPtr);
+Std_ReturnType Com_GetRxSignalDiagStatus(Com_SignalIdType SignalId,
+        uint32* ValuePtr,
+        uint32* InvalidValuePtr,
+        uint8* StatusPtr);
 
 void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
 void Com_TxConfirmation(PduIdType TxPduId);

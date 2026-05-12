@@ -19,7 +19,7 @@ typedef struct
 } Fee_BlockConfigType;
 
 #define FEE_CONFIGURED_BLOCKS               (2u)
-#define FEE_MAX_BLOCK_SIZE                  (2048u)
+#define FEE_MAX_BLOCK_SIZE                  (32u * 1024u)
 #define FEE_VIRTUAL_SECTOR_COUNT            (2u)
 #define FEE_VIRTUAL_SECTOR_SIZE             (128u * 1024u)
 #define FEE_VIRTUAL_SECTOR0_OFFSET          (0u)

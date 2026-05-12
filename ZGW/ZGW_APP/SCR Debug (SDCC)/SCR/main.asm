@@ -180,9 +180,15 @@ _Scr_set_fsys_div_65536_1:
 	.ds.b	1
 _Scr_set_fsys_70kHz_cmcon_65537_5:
 	.ds.b	1
-_WCAN_Init_TempVar_65536_11:
+_WCAN_CheckWake_wcanStatus0_65536_15:
 	.ds.b	1
-_main_cmcon_327680_19:
+_WCAN_CheckWake_wcanStatus1_65536_15:
+	.ds.b	1
+_WCAN_CheckWake_p00In_65536_15:
+	.ds.b	1
+_WCAN_Init_TempVar_65536_18:
+	.ds.b	1
+_main_div_196608_23:
 	.ds.b	1
 ;--------------------------------------------------------
 ; code
@@ -288,12 +294,120 @@ _Scr_request_idle:
 ;	../SCR/scr_common.h:98: }
 	ret
 ;------------------------------------------------------------
+;Allocation info for local variables in function 'WCAN_ClearEvents'
+;------------------------------------------------------------
+;	../SCR/main.c:52: static void WCAN_ClearEvents(void)
+;	-----------------------------------------
+;	 function WCAN_ClearEvents
+;	-----------------------------------------
+	.section .text.code.WCAN_ClearEvents,"ax" ;code for function WCAN_ClearEvents
+	.type   WCAN_ClearEvents, @function
+_WCAN_ClearEvents:
+	.using 0
+;	../SCR/main.c:54: SCR_WCAN_PAGE = MOD_PAGE_1;
+	mov	_SCR_WCAN_PAGE,#0x01
+;	../SCR/main.c:55: SCR_WCAN_INTESCLR0 = WCAN_STATUS0_CLEAR_MASK;
+	mov	_SCR_WCAN_INTESCLR0,#0xFC
+;	../SCR/main.c:56: SCR_WCAN_INTESCLR1 = WCAN_STATUS1_CLEAR_MASK;
+	mov	_SCR_WCAN_INTESCLR1,#0x0B
+.00111:
+;	../SCR/main.c:57: }
+	ret
+;------------------------------------------------------------
+;Allocation info for local variables in function 'SCR_RequestStandbyWake'
+;------------------------------------------------------------
+;	../SCR/main.c:59: static void SCR_RequestStandbyWake(void)
+;	-----------------------------------------
+;	 function SCR_RequestStandbyWake
+;	-----------------------------------------
+	.section .text.code.SCR_RequestStandbyWake,"ax" ;code for function SCR_RequestStandbyWake
+	.type   SCR_RequestStandbyWake, @function
+_SCR_RequestStandbyWake:
+	.using 0
+;	../SCR/main.c:61: SCR_SCU_PAGE = MOD_PAGE_1;
+	mov	_SCR_SCU_PAGE,#0x01
+;	../SCR/main.c:62: SCR_SCU_STDBYWKP = (SCR_SCU_STDBYWKP | WCANWKSEL_MASK | SCRWKP_MASK);
+	orl	_SCR_SCU_STDBYWKP,#0x05
+.00113:
+;	../SCR/main.c:63: }
+	ret
+;------------------------------------------------------------
+;Allocation info for local variables in function 'WCAN_CheckWake'
+;------------------------------------------------------------
+;wcanStatus0               Allocated with name '_WCAN_CheckWake_wcanStatus0_65536_15'
+;wcanStatus1               Allocated with name '_WCAN_CheckWake_wcanStatus1_65536_15'
+;p00In                     Allocated with name '_WCAN_CheckWake_p00In_65536_15'
+;------------------------------------------------------------
+;	../SCR/main.c:65: static void WCAN_CheckWake(void)
+;	-----------------------------------------
+;	 function WCAN_CheckWake
+;	-----------------------------------------
+	.section .text.code.WCAN_CheckWake,"ax" ;code for function WCAN_CheckWake
+	.type   WCAN_CheckWake, @function
+_WCAN_CheckWake:
+	.using 0
+;	../SCR/main.c:71: SCR_WCAN_PAGE = MOD_PAGE_1;
+	mov	_SCR_WCAN_PAGE,#0x01
+;	../SCR/main.c:72: wcanStatus0 = SCR_WCAN_INTESTAT0;
+	mov	dptr,#_WCAN_CheckWake_wcanStatus0_65536_15
+	mov	a,_SCR_WCAN_INTESTAT0
+	movx	@dptr,a
+;	../SCR/main.c:73: wcanStatus1 = SCR_WCAN_INTESTAT1;
+	mov	dptr,#_WCAN_CheckWake_wcanStatus1_65536_15
+	mov	a,_SCR_WCAN_INTESTAT1
+	movx	@dptr,a
+;	../SCR/main.c:75: SCR_IO_PAGE = MOD_PAGE_0;
+	mov	_SCR_IO_PAGE,#0x00
+;	../SCR/main.c:76: p00In = SCR_IO_P00_IN;
+	mov	dptr,#_WCAN_CheckWake_p00In_65536_15
+	mov	a,_SCR_IO_P00_IN
+	movx	@dptr,a
+;	../SCR/main.c:78: *G_WCAN_STAT0_ADDR = wcanStatus0;
+	mov	dptr,#_WCAN_CheckWake_wcanStatus0_65536_15
+	movx	a,@dptr
+	mov	r7,a
+	mov	dptr,#0x1761
+	movx	@dptr,a
+;	../SCR/main.c:79: *G_WCAN_STAT1_ADDR = wcanStatus1;
+	mov	dptr,#_WCAN_CheckWake_wcanStatus1_65536_15
+	movx	a,@dptr
+	mov	r6,a
+	mov	dptr,#0x1762
+	movx	@dptr,a
+;	../SCR/main.c:80: *G_P00_IN_ADDR = p00In;
+	mov	dptr,#_WCAN_CheckWake_p00In_65536_15
+	movx	a,@dptr
+	mov	r5,a
+	mov	dptr,#0x1763
+	movx	@dptr,a
+;	../SCR/main.c:82: if(((wcanStatus0 & WCAN_STATUS0_WAKE_MASK) != 0u) ||
+	mov	a,r7
+	jb	acc.7,.00115
+.00129:
+;	../SCR/main.c:83: ((wcanStatus1 & WCAN_STATUS1_WAKE_MASK) != 0u) ||
+	mov	a,r6
+	anl	a,#0x03
+	jz	.00131
+.00130:
+	sjmp	.00115
+.00131:
+;	../SCR/main.c:84: ((p00In & CANFD_RXD_PIN_MASK) == 0u))
+	mov	a,r5
+	jb	acc.5,.00119
+.00132:
+.00115:
+;	../SCR/main.c:86: SCR_RequestStandbyWake();
+	lcall	_SCR_RequestStandbyWake
+.00119:
+;	../SCR/main.c:88: }
+	ret
+;------------------------------------------------------------
 ;Allocation info for local variables in function 'WCAN_Init'
 ;------------------------------------------------------------
-;result                    Allocated with name '_WCAN_Init_result_65536_11'
-;TempVar                   Allocated with name '_WCAN_Init_TempVar_65536_11'
+;result                    Allocated with name '_WCAN_Init_result_65536_18'
+;TempVar                   Allocated with name '_WCAN_Init_TempVar_65536_18'
 ;------------------------------------------------------------
-;	../SCR/main.c:41: char WCAN_Init(void)
+;	../SCR/main.c:90: char WCAN_Init(void)
 ;	-----------------------------------------
 ;	 function WCAN_Init
 ;	-----------------------------------------
@@ -301,122 +415,78 @@ _Scr_request_idle:
 	.type   WCAN_Init, @function
 _WCAN_Init:
 	.using 0
-;	../SCR/main.c:44: unsigned char volatile TempVar = 0;
-	mov	dptr,#_WCAN_Init_TempVar_65536_11
+;	../SCR/main.c:93: unsigned char volatile TempVar = 0;
+	mov	dptr,#_WCAN_Init_TempVar_65536_18
 	clr	a
 	movx	@dptr,a
-;	../SCR/main.c:52: SCR_IO_PAGE = 0x1;
+;	../SCR/main.c:101: SCR_IO_PAGE = 0x1;
 	mov	_SCR_IO_PAGE,#0x01
-;	../SCR/main.c:54: SCR_IO_P01_IOCR4 = 0x20 ; // WCANRXDG(P33.12)
-	mov	_SCR_IO_P01_IOCR4,#0x20
-;	../SCR/main.c:56: SCR_IO_PAGE = 0x2;
+;	../SCR/main.c:103: SCR_IO_P00_IOCR5 = ScrPortMode_inputPullUp; // WCANRXDD(P33.5 / SCR_P00.5)
+	mov	_SCR_IO_P00_IOCR5,#0x10
+;	../SCR/main.c:105: SCR_IO_PAGE = 0x2;
 	mov	_SCR_IO_PAGE,#0x02
-;	../SCR/main.c:57: SCR_IO_P01_PDISC = 0xFB ; // WCANRXDG(P33.12)
-	mov	_SCR_IO_P01_PDISC,#0xFB
-;	../SCR/main.c:59: SCR_SCU_PAGE = 0x1;
+;	../SCR/main.c:106: SCR_IO_P00_PDISC = 0xDF ; // WCANRXDD(P33.5 / SCR_P00.5)
+	mov	_SCR_IO_P00_PDISC,#0xDF
+;	../SCR/main.c:108: SCR_SCU_PAGE = 0x1;
 	mov	_SCR_SCU_PAGE,#0x01
-;	../SCR/main.c:60: SCR_SCU_RSTCON = 0x0 ; // Disable WDT and ECC reset
+;	../SCR/main.c:109: SCR_SCU_RSTCON = 0x0 ; // Disable WDT and ECC reset
 ;	1-genFromRTrack replaced	mov	_SCR_SCU_RSTCON,#0x00
 	mov	_SCR_SCU_RSTCON,a
-;	../SCR/main.c:61: SCR_SCU_STDBYWKP = 0x4; // Select WCAN as wakeup source
+;	../SCR/main.c:110: SCR_SCU_STDBYWKP = 0x4; // Select WCAN as wakeup source
 	mov	_SCR_SCU_STDBYWKP,#0x04
-;	../SCR/main.c:79: SCR_SCU_PAGE = 1;
+;	../SCR/main.c:126: SCR_SCU_PAGE = 1;
 	mov	_SCR_SCU_PAGE,#0x01
-;	../SCR/main.c:80: SCR_SCU_PMCON1 &= ~(1<< 3); // enable WCAN clock (bit_3), default: WCAN is disabled
+;	../SCR/main.c:127: SCR_SCU_PMCON1 &= ~(1<< 3); // enable WCAN clock (bit_3), default: WCAN is disabled
 	anl	_SCR_SCU_PMCON1,#0xF7
-;	../SCR/main.c:82: SCR_SCU_PAGE = 0x2;
+;	../SCR/main.c:129: SCR_SCU_PAGE = 0x2;
 	mov	_SCR_SCU_PAGE,#0x02
-;	../SCR/main.c:83: TempVar = SCR_SCU_MODPISEL0 & MaskWCANRXDIS; // Mask WCAN bits
+;	../SCR/main.c:130: TempVar = SCR_SCU_MODPISEL0 & MaskWCANRXDIS; // Mask WCAN bits
 	mov	a,_SCR_SCU_MODPISEL0
-	mov	dptr,#_WCAN_Init_TempVar_65536_11
+	mov	dptr,#_WCAN_Init_TempVar_65536_18
 	anl	a,#0x0F
 	movx	@dptr,a
-;	../SCR/main.c:84: SCR_SCU_MODPISEL0 = TempVar | (SetWCANRXDG<<4); // Enable CAN on P33.12
+;	../SCR/main.c:131: SCR_SCU_MODPISEL0 = TempVar | (SetWCANRXDD<<4); // Enable CAN on P33.5
 	movx	a,@dptr
-	orl	a,#0x60
+	orl	a,#0x30
 	mov	_SCR_SCU_MODPISEL0,a
-;	../SCR/main.c:86: SCR_WCAN_PAGE = 0x0 ;
+;	../SCR/main.c:133: SCR_WCAN_PAGE = 0x0 ;
 	mov	_SCR_WCAN_PAGE,#0x00
-;	../SCR/main.c:87: SCR_WCAN_CFG = (1<<3)|(0<<2)|(1<<0) ; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
+;	../SCR/main.c:134: SCR_WCAN_CFG = (1<<3)|(0<<2)|(1<<0) ; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
 	mov	_SCR_WCAN_CFG,#0x09
-;	../SCR/main.c:88: SCR_WCAN_INTMRSLT = (0<<3)|(1<<2)|(0<<1)|(0<<0); // WUP=0, WUF=1, ERR=0, CANTO=0 --> enable WUF interrupt
-	mov	_SCR_WCAN_INTMRSLT,#0x04
-;	../SCR/main.c:93: SCR_WCAN_PAGE = 0x1;
+;	../SCR/main.c:135: SCR_WCAN_INTMRSLT = WCAN_INT_MASK_ALL;
+	mov	_SCR_WCAN_INTMRSLT,#0x0F
+;	../SCR/main.c:136: SCR_WCAN_FD_CTRL = 0x01 ; // Enable CAN FD tolerant mode
+	mov	_SCR_WCAN_FD_CTRL,#0x01
+;	../SCR/main.c:141: SCR_WCAN_PAGE = 0x1;
 	mov	_SCR_WCAN_PAGE,#0x01
-;	../SCR/main.c:94: SCR_WCAN_DLC_CTRL = 0x8 ; // 8 bytes of data
+;	../SCR/main.c:142: SCR_WCAN_FRMERRCNT = (1<<6); // Do not count CAN FD frames as wake-up frame errors
+	mov	_SCR_WCAN_FRMERRCNT,#0x40
+;	../SCR/main.c:143: SCR_WCAN_DLC_CTRL = 0x8 ; // 8 bytes of data
 	mov	_SCR_WCAN_DLC_CTRL,#0x08
-;	../SCR/main.c:95: SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure Baud Rate of 500 kbits/s (see table 747 and register WCAN_BTL2_CTRL)
-	mov	_SCR_WCAN_BTL1_CTRL,#0x64
-;	../SCR/main.c:96: SCR_WCAN_BTL2_CTRL = (1<<6) | (0x33<<0) ; // BRP=01(Divide by 2) and SP=0x33 represents ~80%SP
-	mov	_SCR_WCAN_BTL2_CTRL,#0x73
-;	../SCR/main.c:102: SCR_WCAN_PAGE = 0x0 ;
+;	../SCR/main.c:144: SCR_WCAN_BTL1_CTRL = 0xC8 ; // Configure nominal Baud Rate of 500 kbit/s
+	mov	_SCR_WCAN_BTL1_CTRL,#0xC8
+;	../SCR/main.c:145: SCR_WCAN_BTL2_CTRL = (0<<6) | (0x33<<0) ; // BRP=00(Divide by 1) and SP=0x33 represents ~80%SP
+	mov	_SCR_WCAN_BTL2_CTRL,#0x33
+;	../SCR/main.c:146: WCAN_ClearEvents();
+	lcall	_WCAN_ClearEvents
+;	../SCR/main.c:152: SCR_WCAN_PAGE = 0x0 ;
 	mov	_SCR_WCAN_PAGE,#0x00
-;	../SCR/main.c:103: SCR_WCAN_CFG &= ~((1<<3)|(1<<2)|(0<<0)); // reset CCE=1, SELWK_EN=1, WCAN_EN=0 according to UM
+;	../SCR/main.c:153: SCR_WCAN_INTMRSLT = WCAN_INT_MASK_WUP_ONLY; // Enable WUP wake; mask WUF/SYSERR/CANTO
+	mov	_SCR_WCAN_INTMRSLT,#0x07
+;	../SCR/main.c:154: SCR_WCAN_CFG &= ~((1<<3)|(1<<2)); // CCE=0, SELWK_EN=0, WCAN_EN remains enabled
 	anl	_SCR_WCAN_CFG,#0xF3
-;	../SCR/main.c:108: SCR_WCAN_PAGE = 0x2 ;
-	mov	_SCR_WCAN_PAGE,#0x02
-;	../SCR/main.c:109: SCR_WCAN_ID0_CTRL = 0x00 ; // ID = 0x555 (11-bit)
-	mov	_SCR_WCAN_ID0_CTRL,#0x00
-;	../SCR/main.c:110: SCR_WCAN_ID1_CTRL = 0x00 ;
-	mov	_SCR_WCAN_ID1_CTRL,#0x00
-;	../SCR/main.c:111: SCR_WCAN_ID2_CTRL = 0x04 ;
-	mov	_SCR_WCAN_ID2_CTRL,#0x04
-;	../SCR/main.c:112: SCR_WCAN_ID3_CTRL = 0x54 ; // RTR=0 ; IDE = 0
-	mov	_SCR_WCAN_ID3_CTRL,#0x54
-;	../SCR/main.c:114: SCR_WCAN_MASK_ID0_CTRL = 0xFF ;
-	mov	_SCR_WCAN_MASK_ID0_CTRL,#0xFF
-;	../SCR/main.c:115: SCR_WCAN_MASK_ID1_CTRL = 0xFF ;
-	mov	_SCR_WCAN_MASK_ID1_CTRL,#0xFF
-;	../SCR/main.c:116: SCR_WCAN_MASK_ID2_CTRL = 0xFF ;
-	mov	_SCR_WCAN_MASK_ID2_CTRL,#0xFF
-;	../SCR/main.c:117: SCR_WCAN_MASK_ID3_CTRL = 0xFF ;
-	mov	_SCR_WCAN_MASK_ID3_CTRL,#0xFF
-;	../SCR/main.c:119: SCR_WCAN_PAGE = 0x3 ;
-	mov	_SCR_WCAN_PAGE,#0x03
-;	../SCR/main.c:120: SCR_WCAN_DATA7_CTRL = 0x01 ; // Data Frame = 0x01 23 45 67 89 ab cd ef (byte8...byte1)
-	mov	_SCR_WCAN_DATA7_CTRL,#0x01
-;	../SCR/main.c:121: SCR_WCAN_DATA6_CTRL = 0x23 ;
-	mov	_SCR_WCAN_DATA6_CTRL,#0x23
-;	../SCR/main.c:122: SCR_WCAN_DATA5_CTRL = 0x45 ;
-	mov	_SCR_WCAN_DATA5_CTRL,#0x45
-;	../SCR/main.c:123: SCR_WCAN_DATA4_CTRL = 0x67 ;
-	mov	_SCR_WCAN_DATA4_CTRL,#0x67
-;	../SCR/main.c:124: SCR_WCAN_DATA3_CTRL = 0x89 ;
-	mov	_SCR_WCAN_DATA3_CTRL,#0x89
-;	../SCR/main.c:125: SCR_WCAN_DATA2_CTRL = 0xab ;
-	mov	_SCR_WCAN_DATA2_CTRL,#0xAB
-;	../SCR/main.c:126: SCR_WCAN_DATA1_CTRL = 0xcd ;
-	mov	_SCR_WCAN_DATA1_CTRL,#0xCD
-;	../SCR/main.c:127: SCR_WCAN_DATA0_CTRL = 0xef ;
-	mov	_SCR_WCAN_DATA0_CTRL,#0xEF
-;	../SCR/main.c:132: SCR_WCAN_PAGE = 0x0 ;
-	mov	_SCR_WCAN_PAGE,#0x00
-;	../SCR/main.c:133: SCR_WCAN_CFG |= ((0<<3)|(1<<2)|(0<<0)); //set CCE=0, SELWK_EN=1, WCAN_EN=0
-	orl	_SCR_WCAN_CFG,#0x04
-;	../SCR/main.c:138: SCR_WCAN_PAGE = 0x1 ;
-	mov	_SCR_WCAN_PAGE,#0x01
-;	../SCR/main.c:139: while ((SCR_WCAN_INTESTAT0 & 0x1) != 0x1) { } ; // selective wake up enable protocol handle is activated
-.00111:
-	mov	r6,_SCR_WCAN_INTESTAT0
-	anl	ar6,#0x01
-	mov	r7,#0x00
-	cjne	r6,#0x01,.00124
-	cjne	r7,#0x00,.00124
-	sjmp	.00125
-.00124:
-	sjmp	.00111
-.00125:
-;	../SCR/main.c:141: return result;
+;	../SCR/main.c:156: return result;
 	mov	dpl,#0x00
-.00114:
-;	../SCR/main.c:142: }
+.00133:
+;	../SCR/main.c:157: }
 	ret
 ;------------------------------------------------------------
 ;Allocation info for local variables in function 'main'
 ;------------------------------------------------------------
-;cmcon                     Allocated with name '_main_cmcon_327680_19'
+;__1310720187              Allocated with name '_main___1310720187_131072_22'
+;div                       Allocated with name '_main_div_196608_23'
 ;------------------------------------------------------------
-;	../SCR/main.c:144: void main(void)
+;	../SCR/main.c:159: void main(void)
 ;	-----------------------------------------
 ;	 function main
 ;	-----------------------------------------
@@ -424,30 +494,34 @@ _WCAN_Init:
 	.type   main, @function
 _main:
 	.using 0
-;	../SCR/main.c:146: *G_COUNTER_ADDR = 0u;
+;	../SCR/main.c:161: *G_COUNTER_ADDR = 0u;
 	mov	dptr,#0x1760
 	clr	a
 	movx	@dptr,a
-;	../SCR/scr_common.h:77: SCR_UNLOCK_PROTECTED_BITS();          /* Open access to write protected bits  */
-	mov	_SCR_PASSWD,#0x98
-;	../SCR/scr_common.h:79: SCR_SET_SCU_PAGE(MOD_PAGE_1);
-	mov	_SCR_SCU_PAGE,#0x01
-;	../SCR/scr_common.h:80: uint8 cmcon = SCR_SCU_CMCON;
-	mov	dptr,#_main_cmcon_327680_19
-	mov	a,_SCR_SCU_CMCON
+;	../SCR/main.c:162: *G_WCAN_STAT0_ADDR = 0u;
+	mov	dptr,#0x1761
 	movx	@dptr,a
-;	../SCR/scr_common.h:85: SCR_SCU_CMCON = (OSCPD_MASK | (cmcon & DIV_MASK));
-	movx	a,@dptr
-	anl	a,#0x0F
-	orl	a,#0x20
-	mov	_SCR_SCU_CMCON,a
-;	../SCR/scr_common.h:87: SCR_LOCK_PROTECTED_BITS();            /* Close access to write protected bits */
+;	../SCR/main.c:163: *G_WCAN_STAT1_ADDR = 0u;
+	mov	dptr,#0x1762
+	movx	@dptr,a
+;	../SCR/main.c:164: *G_P00_IN_ADDR = 0u;
+	mov	dptr,#0x1763
+	movx	@dptr,a
+;	../SCR/scr_common.h:63: SCR_UNLOCK_PROTECTED_BITS();          /* Open access to write protected bits  */
+	mov	_SCR_PASSWD,#0x98
+;	../SCR/scr_common.h:65: SCR_SET_SCU_PAGE(MOD_PAGE_1);
+	mov	_SCR_SCU_PAGE,#0x01
+;	../SCR/scr_common.h:70: SCR_SCU_CMCON = ((div & DIV_MASK) | OSCWAKE_MASK);
+	mov	_SCR_SCU_CMCON,#0x10
+;	../SCR/scr_common.h:72: SCR_LOCK_PROTECTED_BITS();            /* Close access to write protected bits */
 	mov	_SCR_PASSWD,#0xA8
-;	../SCR/main.c:148: WCAN_Init();
+;	../SCR/main.c:166: WCAN_Init();
 	lcall	_WCAN_Init
-;	../SCR/main.c:150: while(1)
-.00127:
-;	../SCR/main.c:153: (*G_COUNTER_ADDR)++;
+;	../SCR/main.c:168: while(1)
+.00136:
+;	../SCR/main.c:170: WCAN_CheckWake();
+	lcall	_WCAN_CheckWake
+;	../SCR/main.c:171: (*G_COUNTER_ADDR)++;
 	mov	dptr,#0x1760
 	movx	a,@dptr
 	mov	r7,a
@@ -455,7 +529,7 @@ _main:
 	mov	dptr,#0x1760
 	mov	a,r7
 	movx	@dptr,a
-	sjmp	.00127
-.00130:
-;	../SCR/main.c:155: }
+	sjmp	.00136
+.00139:
+;	../SCR/main.c:173: }
 	ret

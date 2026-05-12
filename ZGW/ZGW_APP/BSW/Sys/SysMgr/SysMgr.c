@@ -20,18 +20,26 @@
 #include "Fls.h"
 #include "SCR.h"
 
+#define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 400u
+
 uint32 SysMgr_MainCounter = 0u;
-uint32 SysMgr_RunCounter = 400u;
-uint32 SysMgr_PostRunCounter = 400u;
-uint32 SysMgr_BusActivityCounter = 400u;
+uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+uint32 SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+uint32 SysMgr_BusActivityCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
 SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
-uint8 SysMgr_NoBusActivity = 1u;
+uint8 SysMgr_NoBusActivity = 0u;
 float SysMgr_McuTemperature = 0u;
 
 void SysMgr_ProcessResetDtc(void);
 void SysMgr_EcuStateMachine(void);
 void SysMgr_MainFunction(void);
 void SysMgr_GoSleep(void);
+
+void SysMgr_NotifyBusActivity(void)
+{
+    SysMgr_BusActivityCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+    SysMgr_NoBusActivity = 0u;
+}
 
 void SysMgr_GoSleep(void)
 {
@@ -64,7 +72,8 @@ void SysMgr_GoSleep(void)
     }
 
     IfxAsclin_disableModule((Ifx_ASCLIN *)(void *)&MODULE_ASCLIN1);
-    IfxCan_disableModule(&MODULE_CAN0);
+    //IfxCan_disableModule(&MODULE_CAN0);
+    //IfxCan_disableModule(&MODULE_CAN1);
     IfxGeth_disableModule(&MODULE_GETH);
     vTaskSuspendAll_core0();
     vTaskEndScheduler_core0();
@@ -94,6 +103,22 @@ void SysMgr_GoSleep(void)
     SRC_CAN0INT13.B.SRE = 0u;
     SRC_CAN0INT14.B.SRE = 0u;
     SRC_CAN0INT15.B.SRE = 0u;
+    SRC_CAN1INT0.B.SRE = 0u;
+    SRC_CAN1INT1.B.SRE = 0u;
+    SRC_CAN1INT2.B.SRE = 0u;
+    SRC_CAN1INT3.B.SRE = 0u;
+    SRC_CAN1INT4.B.SRE = 0u;
+    SRC_CAN1INT5.B.SRE = 0u;
+    SRC_CAN1INT6.B.SRE = 0u;
+    SRC_CAN1INT7.B.SRE = 0u;
+    SRC_CAN1INT8.B.SRE = 0u;
+    SRC_CAN1INT9.B.SRE = 0u;
+    SRC_CAN1INT10.B.SRE = 0u;
+    SRC_CAN1INT11.B.SRE = 0u;
+    SRC_CAN1INT12.B.SRE = 0u;
+    SRC_CAN1INT13.B.SRE = 0u;
+    SRC_CAN1INT14.B.SRE = 0u;
+    SRC_CAN1INT15.B.SRE = 0u;
     SRC_STM0SR0.B.CLRR = 1U;
     SRC_STM0SR1.B.CLRR = 1U;
     SRC_STM1SR0.B.CLRR = 1U;
@@ -119,6 +144,22 @@ void SysMgr_GoSleep(void)
     SRC_CAN0INT13.B.CLRR = 1;
     SRC_CAN0INT14.B.CLRR = 1;
     SRC_CAN0INT15.B.CLRR = 1;
+    SRC_CAN1INT0.B.CLRR = 1;
+    SRC_CAN1INT1.B.CLRR = 1;
+    SRC_CAN1INT2.B.CLRR = 1;
+    SRC_CAN1INT3.B.CLRR = 1;
+    SRC_CAN1INT4.B.CLRR = 1;
+    SRC_CAN1INT5.B.CLRR = 1;
+    SRC_CAN1INT6.B.CLRR = 1;
+    SRC_CAN1INT7.B.CLRR = 1;
+    SRC_CAN1INT8.B.CLRR = 1;
+    SRC_CAN1INT9.B.CLRR = 1;
+    SRC_CAN1INT10.B.CLRR = 1;
+    SRC_CAN1INT11.B.CLRR = 1;
+    SRC_CAN1INT12.B.CLRR = 1;
+    SRC_CAN1INT13.B.CLRR = 1;
+    SRC_CAN1INT14.B.CLRR = 1;
+    SRC_CAN1INT15.B.CLRR = 1;
     SRC_STM0SR0.B.IOVCLR = 1;
     SRC_STM0SR1.B.IOVCLR = 1;
     SRC_STM1SR0.B.IOVCLR = 1;
@@ -144,7 +185,31 @@ void SysMgr_GoSleep(void)
     SRC_CAN0INT13.B.IOVCLR = 1;
     SRC_CAN0INT14.B.IOVCLR = 1;
     SRC_CAN0INT15.B.IOVCLR = 1;
+    SRC_CAN1INT0.B.IOVCLR = 1;
+    SRC_CAN1INT1.B.IOVCLR = 1;
+    SRC_CAN1INT2.B.IOVCLR = 1;
+    SRC_CAN1INT3.B.IOVCLR = 1;
+    SRC_CAN1INT4.B.IOVCLR = 1;
+    SRC_CAN1INT5.B.IOVCLR = 1;
+    SRC_CAN1INT6.B.IOVCLR = 1;
+    SRC_CAN1INT7.B.IOVCLR = 1;
+    SRC_CAN1INT8.B.IOVCLR = 1;
+    SRC_CAN1INT9.B.IOVCLR = 1;
+    SRC_CAN1INT10.B.IOVCLR = 1;
+    SRC_CAN1INT11.B.IOVCLR = 1;
+    SRC_CAN1INT12.B.IOVCLR = 1;
+    SRC_CAN1INT13.B.IOVCLR = 1;
+    SRC_CAN1INT14.B.IOVCLR = 1;
+    SRC_CAN1INT15.B.IOVCLR = 1;
     IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
+
+    /* Give SCR ownership of CANFD RX before starting WCAN wake detection. */
+    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    while(P33_PCSR.B.LCK);    /* Wait while any previous update of PCSR is done */
+    {
+    }
+    P33_PCSR.B.SEL5 = 1;
+    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
     IfxScr_enableSCR();
@@ -163,14 +228,6 @@ void SysMgr_GoSleep(void)
     {
     }
 
-    /* Set P33.4 under control of SCR (SCR_P00.4) */
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-    while(P33_PCSR.B.LCK);    /* Wait while any previous update of PCSR is done */
-    {
-    }
-    P33_PCSR.B.SEL10 = 1;
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-
     __dsync();
     cpuWdtPw = IfxScuWdt_getCpuWatchdogPassword();
     safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
@@ -179,7 +236,9 @@ void SysMgr_GoSleep(void)
 
     PMS_PMSWSTATCLR.U = 0xFFFFFFFFu;
     pmswcr0.U = PMS_PMSWCR0.U;
-    pmswcr0.U = 0x60070000u;//0x631702D0u;
+    pmswcr0.B.STBYRAMSEL = 7u;
+    pmswcr0.B.SCRWKEN = 1u;
+    pmswcr0.B.PORSTWKEN = 1u;
     PMS_PMSWCR0.U = pmswcr0.U;
     SCU_PMSWCR1.B.IRADIS = 1u;
 
@@ -218,23 +277,23 @@ void SysMgr_EcuStateMachine(void)
     {
         SysMgr_EcuState = SYSMGR_RUN;
         SysMgr_ProcessResetDtc();
-        SysMgr_RunCounter = 400u;
-        SysMgr_PostRunCounter = 400u;
+        SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+        SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
     }
 
     if(0u < SysMgr_BusActivityCounter)
     {
         SysMgr_BusActivityCounter--;
+        SysMgr_NoBusActivity = 0u;
     }
-
-    if(0u == SysMgr_BusActivityCounter)
+    else
     {
-        SysMgr_NoBusActivity = 0;
+        SysMgr_NoBusActivity = 1u;
     }
 
     if(SYSMGR_RUN == SysMgr_EcuState)
     {
-        if(0u == SysMgr_NoBusActivity)
+        if(0u != SysMgr_NoBusActivity)
         {
             SysMgr_RunCounter--;
 
@@ -245,15 +304,15 @@ void SysMgr_EcuStateMachine(void)
         }
         else
         {
-            SysMgr_RunCounter = 400u;
-            SysMgr_PostRunCounter = 400u;
+            SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }
 
     if(SYSMGR_POSTRUN == SysMgr_EcuState)
     {
-        if(0u == SysMgr_NoBusActivity)
+        if(0u != SysMgr_NoBusActivity)
         {
             SysMgr_PostRunCounter--;
 
@@ -264,22 +323,22 @@ void SysMgr_EcuStateMachine(void)
         }
         else
         {
-            SysMgr_RunCounter = 400u;
-            SysMgr_PostRunCounter = 400u;
+            SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }
 
     if(SYSMGR_SLEEP == SysMgr_EcuState)
     {
-        if(0u == SysMgr_NoBusActivity)
+        if(0u != SysMgr_NoBusActivity)
         {
             SysMgr_GoSleep();
         }
         else
         {
-            SysMgr_RunCounter = 400u;
-            SysMgr_PostRunCounter = 400u;
+            SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }

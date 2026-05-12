@@ -7,10 +7,12 @@
 #define configTICK_RATE_HZ_core0                         ( ( TickType_t_core0 ) 1000UL )
 #define configMAX_PRIORITIES_core0                       ( 31 )
 #define configMINIMAL_STACK_SIZE_core0                   ( ( unsigned short ) 256 )
-#define configTOTAL_HEAP_SIZE_core0                      ( ( size_t ) ( 10 * configMINIMAL_STACK_SIZE_core0 ) )
+#define configTOTAL_HEAP_SIZE_core0                      ( ( size_t ) ( 50 * configMINIMAL_STACK_SIZE_core0 ) )
 #define configMAX_TASK_NAME_LEN_core0                    ( 254 )
 #define configENABLE_BACKWARD_COMPATIBILITY_core0        0
 #define configUSE_TRACE_FACILITY_core0                   0
+#define configGENERATE_RUN_TIME_STATS_core0              1
+#define configRUN_TIME_COUNTER_TYPE_core0                uint32_t
 #define configUSE_16_BIT_TICKS_core0                     0
 #define configIDLE_SHOULD_YIELD_core0                    0
 #define configUSE_MALLOC_FAILED_HOOK_core0               1
@@ -59,4 +61,14 @@
 #define configSTM_CLOCK_HZ_core0                  ( 100000000 )
 #define configSTM_DEBUG_core0                     ( 0 )
 #define configCONTEXT_SRC_core0                   ( ( uint32_t * ) 0xF0038990 )
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS_core0()
+#define portGET_RUN_TIME_COUNTER_VALUE_core0() \
+    ( ( configRUN_TIME_COUNTER_TYPE_core0 ) ( ( ( volatile uint32_t * ) configSTM_core0 )[ 0x10u >> 2 ] ) )
+
+extern void Os_CpuLoad_TaskSwitchedIn(unsigned char CoreId, unsigned char IsIdleTask);
+extern void Os_CpuLoad_TaskSwitchedOut(unsigned char CoreId);
+#define traceTASK_SWITCHED_IN_core0() \
+    Os_CpuLoad_TaskSwitchedIn(0u, (unsigned char)(pxCurrentTCB_core0 == xIdleTaskHandle_core0))
+#define traceTASK_SWITCHED_OUT_core0() \
+    Os_CpuLoad_TaskSwitchedOut(0u)
 #endif /* FREERTOS_CONFIG_H */

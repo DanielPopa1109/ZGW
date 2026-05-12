@@ -58,7 +58,7 @@ void core0_main(void)
 
     gpio_init_pins();
     can0_node0_init_pins();
-    can0_node1_init_pins();
+    can1_node3_init_pins();
     asclin1_init_pins();
 
     Can_Init();
@@ -67,6 +67,8 @@ void core0_main(void)
     Com_Init();
     CanTp_Init(&CanTp_Config);
     CanSM_Init();
+    (void)CanSM_RequestComMode(CAN_CONTROLLER_CLASSIC, CANSM_COMM_FULL_COMMUNICATION);
+    (void)CanSM_RequestComMode(CAN_CONTROLLER_FD, CANSM_COMM_FULL_COMMUNICATION);
     Dcm_Init(&Dcm_Config);
     LinSM_Init();
     LinIf_Init();

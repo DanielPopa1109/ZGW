@@ -6,6 +6,7 @@
 #include "Dcm.h"
 #include "Dcm_Cfg.h"
 #include "DoIP.h"
+#include "GatewaySwc.h"
 #include "LinIf.h"
 #include "LinTp.h"
 #include "SoAd.h"
@@ -32,7 +33,8 @@ typedef enum
     PDUR_IF_DEST_COM,
     PDUR_IF_DEST_CANIF,
     PDUR_IF_DEST_LINIF,
-    PDUR_IF_DEST_SOAD
+    PDUR_IF_DEST_SOAD,
+    PDUR_IF_DEST_GATEWAY
 } PduR_IfDestType;
 
 typedef enum
@@ -294,7 +296,7 @@ static const PduR_IfRxRouteType PduR_LinIfRxRoutes[] =
 
 static const PduR_SoAdRxRouteType PduR_SoAdRxRoutes[] =
 {
-    { FALSE, PDUR_SOAD_SOCON_PDUR_IF_UDP, PDUR_IF_DEST_NONE, 0u, PDUR_SOAD_INVALID_SOCON }
+    { TRUE, PDUR_SOAD_SOCON_PDUR_IF_UDP, PDUR_IF_DEST_GATEWAY, 0u, PDUR_SOAD_SOCON_PDUR_IF_UDP }
 };
 
 /* ===================== Diagnostic TP routes ===================== */
@@ -451,6 +453,14 @@ static Std_ReturnType PduR_DispatchIfDest(PduR_IfDestType dest,
                 return E_NOT_OK;
             }
             return (SoAd_IfTransmit(destSoConId, NULL_PTR, data, (uint16)len) == SOAD_OK) ? E_OK : E_NOT_OK;
+
+        case PDUR_IF_DEST_GATEWAY:
+            if ((destSoConId == PDUR_SOAD_INVALID_SOCON) || (len > 0xFFFFu))
+            {
+                return E_NOT_OK;
+            }
+            GatewaySwc_EthRxIndication(destSoConId, NULL_PTR, data, (uint16)len);
+            return E_OK;
 
         default:
             return E_NOT_OK;
@@ -686,10 +696,17 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
             if (doipRet == DOIP_OK)
             {
                 Dcm_TxConfirmation(DcmTxPduId, E_OK);
+                if (!((len == 3u) &&
+                      (data[0u] == 0x7Fu) &&
+                      (data[2u] == DCM_NRC_RESPONSE_PENDING)))
+                {
+                    PduR_DoIPCtx.valid = FALSE;
+                }
                 return E_OK;
             }
 
             Dcm_TxConfirmation(DcmTxPduId, E_NOT_OK);
+            PduR_DoIPCtx.valid = FALSE;
             return E_NOT_OK;
 
         default:
@@ -933,6 +950,11 @@ void PduR_DoIPRxIndication(uint16 sourceAddress,
     }
 
     (void)routeIdx;
+
+    if (PduR_DoIPCtx.valid != FALSE)
+    {
+        return;
+    }
 
     PduR_DoIPCtx.valid = TRUE;
     PduR_DoIPCtx.sourceAddress = sourceAddress;

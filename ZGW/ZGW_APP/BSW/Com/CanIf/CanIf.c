@@ -340,8 +340,6 @@ void CanIf_RxIndication(const Can_FrameType* frame)
             {
                 PduR_CanIfRxIndication(cfg->rxPduId, frame->data, frame->dlc);
             }
-
-            return;
         }
     }
 }

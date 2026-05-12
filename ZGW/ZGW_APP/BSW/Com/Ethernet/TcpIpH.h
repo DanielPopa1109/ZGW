@@ -17,6 +17,8 @@ typedef struct
 
 void TcpIp_Init(void);
 void TcpIp_MainFunction(void);
+uint8 TcpIp_IsLinkAvailable(void);
+uint8 TcpIp_IsSocketOpen(TcpIp_SocketIdType sock);
 
 TcpIp_SocketIdType TcpIp_Create(uint8 tcp);
 sint32 TcpIp_Bind(TcpIp_SocketIdType sock, uint16 port);

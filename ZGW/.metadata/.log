@@ -9237,3 +9237,2459 @@ Caused by: java.nio.channels.UnresolvedAddressException
 
 !ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 10:04:12.207
 !MESSAGE Include paths were discovered in 27 milliseconds.
+!SESSION 2026-05-09 11:06:20.911 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.ui 2 0 2026-05-09 11:06:23.044
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-09 11:06:23.045
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-09 11:06:23.789
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-09 11:06:23.789
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:24.636
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 11:06:24.639
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:24.881
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 11:06:24.882
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:25.005
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 11:06:25.006
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 11:06:28.255
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:52.444
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 19363 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-09 11:06:52.807
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:56.943
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4497 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:06:57.231
+!MESSAGE Include paths were discovered in 265 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:07:24.563
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 3196 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:07:24.623
+!MESSAGE Include paths were discovered in 56 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:09:41.304
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1049 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:09:44.848
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3541 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:09:44.989
+!MESSAGE Include paths were discovered in 135 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:11:52.188
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 337 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-09 11:11:52.493
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:11:56.613
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4424 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:11:56.742
+!MESSAGE Include paths were discovered in 125 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:12:30.519
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 3061 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 11:12:30.568
+!MESSAGE Include paths were discovered in 47 milliseconds.
+!SESSION 2026-05-09 21:15:59.270 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.ui 2 0 2026-05-09 21:16:01.135
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-09 21:16:01.135
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-09 21:16:02.269
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-09 21:16:02.269
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:16:02.928
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 21:16:02.930
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:16:03.142
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 21:16:03.142
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:16:03.277
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 21:16:03.277
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-09 21:16:05.458
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:00.566
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 915 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-09 21:22:00.808
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:04.556
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3987 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:04.696
+!MESSAGE Include paths were discovered in 132 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:23.253
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2482 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:23.284
+!MESSAGE Include paths were discovered in 29 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:29.513
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 525 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:31.806
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2290 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:22:31.907
+!MESSAGE Include paths were discovered in 98 milliseconds.
+
+!ENTRY org.eclipse.cdt.dsf 4 10005 2026-05-09 21:24:11.417
+!MESSAGE Request monitor: 'RequestMonitor (org.eclipse.cdt.dsf.concurrent.DataRequestMonitor@54b0b8e1): Status CANCEL: si.isystem.eclipse.debug code=0 Cancelling command ISysCmdMiscUpdateCpuStatus[ISysDebuggerDmContext(0, ZGW_APP.elf)]()
+' resulted in a cancel status: Status CANCEL: si.isystem.eclipse.debug code=0 Cancelling command ISysCmdMiscUpdateCpuStatus[ISysDebuggerDmContext(0, ZGW_APP.elf)]()
+, even though the request is not set to cancel.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:24:57.368
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 400 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:24:59.539
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2170 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:24:59.639
+!MESSAGE Include paths were discovered in 98 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:25:07.779
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 326 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:25:07.807
+!MESSAGE Include paths were discovered in 26 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:26:28.039
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 387 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:26:30.228
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2189 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:26:30.320
+!MESSAGE Include paths were discovered in 89 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:26:37.594
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 336 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:26:37.620
+!MESSAGE Include paths were discovered in 24 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:27:50.323
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 364 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:27:52.500
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2176 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:27:52.581
+!MESSAGE Include paths were discovered in 79 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:27:59.923
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 334 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:27:59.950
+!MESSAGE Include paths were discovered in 24 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:29:23.496
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 365 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:29:25.753
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2256 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:29:25.835
+!MESSAGE Include paths were discovered in 80 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:29:34.045
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 325 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:29:34.069
+!MESSAGE Include paths were discovered in 23 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:30:29.459
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 379 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:30:31.636
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2176 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:30:31.718
+!MESSAGE Include paths were discovered in 80 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:30:39.908
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 333 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:30:39.934
+!MESSAGE Include paths were discovered in 24 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:32:27.538
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 375 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:32:29.749
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2210 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:32:29.825
+!MESSAGE Include paths were discovered in 74 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:32:37.982
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 322 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-09 21:32:38.007
+!MESSAGE Include paths were discovered in 23 milliseconds.
+!SESSION 2026-05-10 13:41:55.041 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.core.resources 2 10035 2026-05-10 13:41:56.056
+!MESSAGE The workspace exited with unsaved changes in the previous session; refreshing workspace to recover changes.
+
+!ENTRY org.eclipse.ui 2 0 2026-05-10 13:41:56.499
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-10 13:41:56.499
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-10 13:41:56.982
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-10 13:41:56.982
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 13:41:57.624
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 13:41:57.626
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 13:41:57.811
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 13:41:57.811
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 13:41:57.959
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 13:41:57.960
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 13:42:01.231
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+!SESSION 2026-05-10 19:19:21.756 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.core.resources 2 10035 2026-05-10 19:19:22.789
+!MESSAGE The workspace exited with unsaved changes in the previous session; refreshing workspace to recover changes.
+
+!ENTRY org.eclipse.ui 2 0 2026-05-10 19:19:23.254
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-10 19:19:23.254
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-10 19:19:23.751
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-10 19:19:23.751
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:19:24.478
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 19:19:24.479
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:19:24.833
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 19:19:24.834
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:19:25.089
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 19:19:25.090
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-10 19:19:28.694
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:20:00.675
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 774 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-10 19:20:00.955
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:20:04.538
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3862 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:20:04.697
+!MESSAGE Include paths were discovered in 154 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:20:27.693
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 3567 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:20:27.740
+!MESSAGE Include paths were discovered in 45 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:21:18.972
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 648 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:21:21.721
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2747 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:21:21.846
+!MESSAGE Include paths were discovered in 121 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:21:31.425
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 539 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:21:31.458
+!MESSAGE Include paths were discovered in 30 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:41:29.531
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 552 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:41:31.980
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2448 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:41:32.105
+!MESSAGE Include paths were discovered in 123 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:41:41.039
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 379 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-10 19:41:41.068
+!MESSAGE Include paths were discovered in 28 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 00:36:42.632
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 478 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 00:36:45.108
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2475 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 00:36:45.216
+!MESSAGE Include paths were discovered in 106 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 00:36:54.568
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 412 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 00:36:54.598
+!MESSAGE Include paths were discovered in 29 milliseconds.
+!SESSION 2026-05-11 23:33:34.107 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.ui 2 0 2026-05-11 23:33:35.608
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-11 23:33:35.608
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-11 23:33:36.083
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-11 23:33:36.083
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:36.790
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-11 23:33:36.791
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:37.080
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-11 23:33:37.081
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:37.342
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-11 23:33:37.343
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-11 23:33:42.010
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:47.971
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 907 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-11 23:33:48.215
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:51.902
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3929 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:33:52.084
+!MESSAGE Include paths were discovered in 173 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:34:13.043
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 3085 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:34:13.084
+!MESSAGE Include paths were discovered in 38 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:49:09.218
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 847 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:49:11.966
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2745 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:49:12.094
+!MESSAGE Include paths were discovered in 124 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:49:20.484
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 420 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:49:20.527
+!MESSAGE Include paths were discovered in 42 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:59:06.100
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 598 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:59:08.692
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2591 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:59:08.813
+!MESSAGE Include paths were discovered in 118 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:59:17.382
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 388 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-11 23:59:17.413
+!MESSAGE Include paths were discovered in 30 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:13:49.274
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 565 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:13:51.793
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2517 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:13:51.900
+!MESSAGE Include paths were discovered in 105 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:14:00.053
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 399 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:14:00.081
+!MESSAGE Include paths were discovered in 26 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:20:22.150
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 467 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:20:24.992
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2841 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:20:25.127
+!MESSAGE Include paths were discovered in 132 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:20:33.705
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 441 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:20:33.739
+!MESSAGE Include paths were discovered in 32 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:35:14.801
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 502 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:35:17.370
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2569 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:35:17.465
+!MESSAGE Include paths were discovered in 93 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:35:25.927
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 550 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:35:25.961
+!MESSAGE Include paths were discovered in 32 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:41:16.160
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 470 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:41:18.794
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2633 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:41:18.893
+!MESSAGE Include paths were discovered in 97 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:41:28.310
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1611 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:41:28.341
+!MESSAGE Include paths were discovered in 29 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:45:50.884
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 478 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:45:53.453
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2568 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:45:53.550
+!MESSAGE Include paths were discovered in 95 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:46:01.939
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 385 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 00:46:01.968
+!MESSAGE Include paths were discovered in 27 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 01:00:35.254
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 265 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-12 01:00:35.518
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 01:00:38.813
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3559 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 01:00:38.914
+!MESSAGE Include paths were discovered in 99 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 01:00:57.663
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1863 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 01:00:57.688
+!MESSAGE Include paths were discovered in 25 milliseconds.
+!SESSION 2026-05-12 11:05:33.479 -----------------------------------------------
+eclipse.buildId=1.10.32
+java.version=17.0.11
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY org.eclipse.ui 2 0 2026-05-12 11:05:40.308
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-12 11:05:40.308
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY org.eclipse.ui 2 0 2026-05-12 11:05:45.642
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-05-12 11:05:45.642
+!MESSAGE Commands should really have a category: plug-in='com.infineon.aurix.buildsystem.debug', id='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand', categoryId='com.infineon.aurix.buildsystem.debug.debugActiveProjectCommand'
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 11:05:46.979
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-12 11:05:46.982
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc4-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 11:05:47.245
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-12 11:05:47.246
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc2-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 11:05:47.387
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.32/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-12 11:05:47.388
+!MESSAGE C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+!STACK 0
+java.io.FileNotFoundException: C:\Users\Daniel\ADSDocuments\1.10.32\tc3-hardware.json (The system cannot find the path specified)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(FileInputStream.java:216)
+	at java.base/java.io.FileInputStream.<init>(FileInputStream.java:157)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:134)
+	at com.google.common.io.Files$FileByteSource.openStream(Files.java:122)
+	at com.google.common.io.ByteSource.openBufferedStream(ByteSource.java:120)
+	at com.infineon.aurix.buildsystem.configuration.contributor.CachedURLHardwareContainerConnector.getHardwareContainerJsonInputStream(CachedURLHardwareContainerConnector.java:60)
+	at com.infineon.aurix.buildsystem.configuration.contributor.AbstractSupportedHardwareContributor.getSupportedHardwareContribution(AbstractSupportedHardwareContributor.java:29)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.lambda$40(SupportedHardwareManager.java:367)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getSupportedHardwareContributions(SupportedHardwareManager.java:374)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.parseConfig(SupportedHardwareManager.java:76)
+	at com.infineon.aurix.buildsystem.configuration.SupportedHardwareManager.getInstance(SupportedHardwareManager.java:65)
+	at com.infineon.aurix.buildsystem.debug.propertyTester.AbstractSupportsDebuggerPropertyTester.test(AbstractSupportsDebuggerPropertyTester.java:17)
+	at org.eclipse.core.internal.expressions.Property.test(Property.java:65)
+	at org.eclipse.core.expressions.TestExpression.evaluate(TestExpression.java:107)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.internal.expressions.AdaptExpression.evaluate(AdaptExpression.java:121)
+	at org.eclipse.core.expressions.CompositeExpression.evaluateAnd(CompositeExpression.java:54)
+	at org.eclipse.core.expressions.WithExpression.evaluate(WithExpression.java:84)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:76)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivity(MutableActivityManager.java:658)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateActivities(MutableActivityManager.java:593)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.updateExpressionEnabledActivities(MutableActivityManager.java:562)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.addExpressionEnabledActivity(MutableActivityManager.java:549)
+	at org.eclipse.ui.internal.activities.MutableActivityManager.lambda$1(MutableActivityManager.java:615)
+	at org.eclipse.ui.internal.services.EvaluationReference.evaluate(EvaluationReference.java:116)
+	at org.eclipse.ui.internal.services.EvaluationReference.changed(EvaluationReference.java:100)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.ui.internal.services.EvaluationService$1.changed(EvaluationService.java:78)
+	at org.eclipse.e4.core.internal.contexts.TrackableComputationExt.update(TrackableComputationExt.java:105)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.processScheduled(EclipseContext.java:358)
+	at org.eclipse.e4.core.internal.contexts.EclipseContext.set(EclipseContext.java:374)
+	at org.eclipse.e4.core.commands.ExpressionContext.addVariable(ExpressionContext.java:87)
+	at org.eclipse.ui.internal.services.EvaluationService.changeVariable(EvaluationService.java:148)
+	at org.eclipse.ui.internal.services.EvaluationService.addSourceProvider(EvaluationService.java:168)
+	at org.eclipse.ui.internal.Workbench$33.runWithException(Workbench.java:2367)
+	at org.eclipse.ui.internal.StartupThreading$StartupRunnable.run(StartupThreading.java:35)
+	at org.eclipse.swt.widgets.Synchronizer.syncExec(Synchronizer.java:183)
+	at org.eclipse.ui.internal.UISynchronizer.syncExec(UISynchronizer.java:133)
+	at org.eclipse.swt.widgets.Display.syncExec(Display.java:4803)
+	at org.eclipse.ui.internal.StartupThreading.runWithoutExceptions(StartupThreading.java:93)
+	at org.eclipse.ui.internal.Workbench.initializeDefaultServices(Workbench.java:2359)
+	at org.eclipse.ui.internal.Workbench.init(Workbench.java:1702)
+	at org.eclipse.ui.internal.Workbench.runUI(Workbench.java:2791)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:632)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:339)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:546)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:173)
+	at org.eclipse.ui.internal.ide.application.IDEApplication.start(IDEApplication.java:152)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:208)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:143)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:109)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:439)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:271)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:651)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:588)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1459)
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-05-12 11:05:50.902
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1055)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:239)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:472)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:404)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$10(Exchange.java:476)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:476)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:380)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:408)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:449)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2340)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:439)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:341)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:157)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2673)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:294)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:654)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:552)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:149)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:157)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:816)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:839)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:13:43.336
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1703 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-12 13:13:43.619
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:13:47.429
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4089 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:13:47.595
+!MESSAGE Include paths were discovered in 156 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:14:09.491
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 3762 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:14:09.526
+!MESSAGE Include paths were discovered in 32 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:22:19.388
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 692 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:22:21.968
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2578 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:22:22.092
+!MESSAGE Include paths were discovered in 121 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:22:30.734
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 384 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:22:30.767
+!MESSAGE Include paths were discovered in 30 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:27:21.221
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 413 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:27:23.649
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2426 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:27:23.765
+!MESSAGE Include paths were discovered in 114 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:27:31.943
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 386 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:27:31.973
+!MESSAGE Include paths were discovered in 28 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:29:06.466
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 422 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:29:08.882
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2415 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:29:08.985
+!MESSAGE Include paths were discovered in 100 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:29:16.835
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 386 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:29:16.866
+!MESSAGE Include paths were discovered in 30 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:42:39.708
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 414 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:42:42.220
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2511 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:42:42.314
+!MESSAGE Include paths were discovered in 91 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:42:50.227
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 394 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:42:50.255
+!MESSAGE Include paths were discovered in 25 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:43:54.764
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 481 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:43:57.288
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2524 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:43:57.380
+!MESSAGE Include paths were discovered in 90 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:44:05.690
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 391 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:44:05.719
+!MESSAGE Include paths were discovered in 27 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:52:22.126
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 474 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:52:24.628
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2501 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:52:24.722
+!MESSAGE Include paths were discovered in 91 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:52:32.319
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 383 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 13:52:32.346
+!MESSAGE Include paths were discovered in 25 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:00:21.959
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 392 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:00:24.382
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2422 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:00:24.473
+!MESSAGE Include paths were discovered in 89 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:00:32.087
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 369 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:00:32.118
+!MESSAGE Include paths were discovered in 30 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:01:58.899
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 393 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:02:01.319
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2419 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:02:01.419
+!MESSAGE Include paths were discovered in 98 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:02:08.982
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 366 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:02:09.009
+!MESSAGE Include paths were discovered in 25 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:10:47.751
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 421 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:10:50.228
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2476 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:10:50.321
+!MESSAGE Include paths were discovered in 91 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:10:58.089
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 377 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 14:10:58.115
+!MESSAGE Include paths were discovered in 25 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:30:34.628
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 539 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:30:37.164
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2535 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:30:37.275
+!MESSAGE Include paths were discovered in 108 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:30:42.520
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 444 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:30:42.555
+!MESSAGE Include paths were discovered in 33 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:40:57.285
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 472 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:00.096
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2811 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:00.192
+!MESSAGE Include paths were discovered in 94 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:08.178
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 396 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:08.206
+!MESSAGE Include paths were discovered in 26 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:35.342
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 419 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:37.877
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2533 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:37.965
+!MESSAGE Include paths were discovered in 86 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:45.497
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 397 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 15:41:45.523
+!MESSAGE Include paths were discovered in 24 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:08:05.790
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 270 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 2 0 2026-05-12 17:08:06.069
+!MESSAGE Cannot boost source folder /ZGW_APP/BSW/Io/Ain because it can't be found.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:08:09.306
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3515 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:08:09.407
+!MESSAGE Include paths were discovered in 98 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:08:28.692
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 474 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:08:28.724
+!MESSAGE Include paths were discovered in 31 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:51:51.067
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 593 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:51:53.719
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2650 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:51:53.815
+!MESSAGE Include paths were discovered in 93 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:52:03.115
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 444 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-05-12 17:52:03.144
+!MESSAGE Include paths were discovered in 28 milliseconds.
