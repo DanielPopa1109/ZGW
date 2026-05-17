@@ -29,7 +29,7 @@
 /*********************************************************************************************************************/
 #include "SafetyKit_SSW.h"
 #include "SafetyKit_SSW_02_MCU_FW_CHECK.h"
-#include "SafetyKit_SSW_02_MCU_FW_CHECK_tables_TC39B.h"
+#include "SafetyKit_SSW_02_MCU_FW_CHECK_tables_TC375DP.h"
 #include "SafetyKit_Main.h"
 #include "IfxMtu.h"
 #include "IfxMtu_cfg.h"
@@ -86,15 +86,15 @@ void safetyKitSswMcuFwCheck(void)
             /* Read SMU alarm register values and compare with expected ones(listed in Appendix A of the
              * Safety Manual)
              * Note: depending on the device and reset type different register values are expected */
-            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSMUTC39B, fwCheckSMUTC39BSize,
+            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize,
                     g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSMU))   &&
                     /* Read SCU_STMEM register values and compare with expected ones(listed in Appendix A of the
                      * Safety Manual) */
-                    (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSTMEMTC39B, fwCheckSTMEMTC39BSize,
+                    (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSTMEMTC375DP, fwCheckSTMEMTC375DPSize,
                             g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSTMEM))  &&
                             /* Read SCU_LCLCON register values and compare with expected ones (listed in Appendix A of the
                              * Safety Manual) */
-                            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckLCLCONTC39B,  fwCheckLCLCONTC39BSize,
+                            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckLCLCONTC375DP,  fwCheckLCLCONTC375DPSize,
                                     g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationLCLCON)) &&
                                     /* Read SSH register values of all RAM and compare with expected ones (listed in Appendix A of
                                      * the Safety Manual)*/
@@ -107,7 +107,7 @@ void safetyKitSswMcuFwCheck(void)
         /* .. clear the content of the registers mentioned in the Appendix table */
         safetyKitFwCheckClearSSH(g_SafetyKitStatus.resetCode.resetType);
         /* .. clear the SMU alarms SMU_AG0..11 */
-        safetyKitFwCheckClearSmuAlarms(fwCheckSMUTC39B, fwCheckSMUTC39BSize);
+        safetyKitFwCheckClearSmuAlarms(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize);
         /* .. clear the corresponding reset status bits in RSTSTAT register */
         IfxScuRcu_clearColdResetStatus();
     }
@@ -182,11 +182,11 @@ boolean safetyKitFwCheckSmuStmemLclcon (const FwCheckStruct *fwCheckTable, const
         /* Compare the register value with the expected value and write both the test result and the actual register
          * value into the verification structure. */
         fwCheckVerification[i].regVal = registerValue;
-        fwCheckVerification[i].testHasPassed = (registerValue == expectedRegisterValue) ? TRUE : FALSE;
+            fwCheckVerification[i].testHasPassed = (registerValue == expectedRegisterValue) ? TRUE : FALSE;
         /* Set fwcheckHasPassed to FALSE in case test has failed for any register during the iteration. */
         if(!fwCheckVerification[i].testHasPassed)
         {
-            fwcheckHasPassed = TRUE;//FALSE;
+            fwcheckHasPassed = FALSE;
         }
     }
 
@@ -204,16 +204,16 @@ IfxMtu_MbistSel safetyKitFwCheckSsh(const SafetyKitResetType resetType)
     {
         case safetyKitResetTypeColdpoweron :
         case safetyKitResetTypeLbist :
-            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(coldPorstSSHTC39B, coldPorstSSHTC39BSize);
+            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(coldPorstSSHTC375DP, coldPorstSSHTC375DPSize);
             break;
         case safetyKitResetTypeWarmpoweron :
-            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(warmPorstSSHTC39B, warmPorstSSHTC39BSize);
+            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(warmPorstSSHTC375DP, warmPorstSSHTC375DPSize);
             break;
         case safetyKitResetTypeSystem :
-            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(systemSSHTC39B, systemSSHTC39BSize);
+            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(systemSSHTC375DP, systemSSHTC375DPSize);
             break;
         case safetyKitResetTypeApplication :
-            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(applicationSSHTC39B, applicationSSHTC39BSize);
+            fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(applicationSSHTC375DP, applicationSSHTC375DPSize);
             break;
         default:
             break;
@@ -234,20 +234,20 @@ void safetyKitFwCheckClearSSH(const SafetyKitResetType resetType)
     {
         case safetyKitResetTypeColdpoweron:
         case safetyKitResetTypeLbist:
-            sshTable    = coldPorstSSHTC39B;
-            tableSize  = coldPorstSSHTC39BSize;
+            sshTable    = coldPorstSSHTC375DP;
+            tableSize  = coldPorstSSHTC375DPSize;
             break;
         case safetyKitResetTypeWarmpoweron:
-            sshTable    = warmPorstSSHTC39B;
-            tableSize  = warmPorstSSHTC39BSize;
+            sshTable    = warmPorstSSHTC375DP;
+            tableSize  = warmPorstSSHTC375DPSize;
             break;
         case safetyKitResetTypeSystem:
-            sshTable    = systemSSHTC39B;
-            tableSize  = systemSSHTC39BSize;
+            sshTable    = systemSSHTC375DP;
+            tableSize  = systemSSHTC375DPSize;
             break;
         case safetyKitResetTypeApplication:
-            sshTable    = applicationSSHTC39B;
-            tableSize  = applicationSSHTC39BSize;
+            sshTable    = applicationSSHTC375DP;
+            tableSize  = applicationSSHTC375DPSize;
             break;
         default:
             break;
@@ -469,5 +469,5 @@ boolean safetyKitFwCheckEvaluateLmuInit(uint16 memoryMask)
  * */
 void safetyKitClearAllSmuAlarms(void)
 {
-    safetyKitFwCheckClearSmuAlarms(fwCheckSMUTC39B, fwCheckSMUTC39BSize);
+    safetyKitFwCheckClearSmuAlarms(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize);
 }

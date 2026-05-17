@@ -48,15 +48,19 @@
 /**********************************************************************************************************************
  * API IMPLEMENTATION
  **********************************************************************************************************************/
+volatile uint32 LWIP_GETH_InitCallCounter;
+volatile uint32 LWIP_GETH_TcpipInitCallCounter;
 
 /* Function to initialize the GETH module by the configuration made in GUI */
 LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
 {
   IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, ((handle != NULL) && (handle->app_config != NULL)));
   LWIP_GETH_STATUS_t status = LWIP_GETH_STATUS_SUCCESS;
+  LWIP_GETH_InitCallCounter++;
 
   if (!handle->app_is_initialized)
   {
+    handle->app_is_initialized = TRUE;
 #if LWIP_GETH_DEBUG_ENABLED
     if (handle->printf_asclin_app != NULL)
     {
@@ -65,12 +69,12 @@ LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
 #endif
     IfxGeth_enableModule(handle->app_config->geth_lld_config->gethSFR);
 #if LWIP_GETH_RTOS_ENABLED
-    tcpip_init(lwip_geth_Lwip_init,(void *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress);
+    LWIP_GETH_TcpipInitCallCounter++;
+    tcpip_init(lwip_geth_Lwip_init, NULL_PTR);
 #else
-    lwip_geth_Lwip_init();
+    lwip_geth_Lwip_init(NULL_PTR);
     TIMER_STM_Init(handle->stm_module);
 #endif
-    handle->app_is_initialized = TRUE;
   }
   else
   {

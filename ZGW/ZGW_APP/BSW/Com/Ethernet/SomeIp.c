@@ -15,6 +15,8 @@ typedef struct
 static const SomeIp_ConfigType *SomeIp_Cfg;
 static SomeIp_RuntimeType SomeIp_Rt;
 
+long long SomeIp_MainFunction_Counter = 0;
+
 static uint16_t rd16(const uint8_t *p)
 {
     return (uint16_t)(((uint16_t)p[0] << 8u) | p[1]);
@@ -253,6 +255,7 @@ void SomeIp_Init(const SomeIp_ConfigType *config)
 void SomeIp_MainFunction(uint32 elapsedMs)
 {
     (void)elapsedMs;
+    SomeIp_MainFunction_Counter++;
 }
 
 void SomeIp_SoAdTcpConnected(SoAd_SoConIdType soConId)

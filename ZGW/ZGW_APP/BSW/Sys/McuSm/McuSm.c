@@ -11,6 +11,17 @@ McuSm_ResetHistory_t McuSm_ResetHistory[20u];
 uint32 DiagMaster_AliveTime;
 uint8 DiagMaster_ActiveSessionState;
 uint8 McuSm_FBL_ResetCounter;
+volatile uint32 McuSm_LastTrapClass;
+volatile uint32 McuSm_LastTrapId;
+volatile uint32 McuSm_LastTrapCoreId;
+volatile uint32 McuSm_LastTrapTAddr;
+volatile uint32 McuSm_LastTrapPcxi;
+volatile uint32 McuSm_LastTrapFcx;
+volatile uint32 McuSm_LastTrapLcx;
+volatile uint32 McuSm_LastTrapPsw;
+volatile uint32 McuSm_TrapCounter;
+volatile uint32 McuSm_EndinitWaitCounter;
+volatile uint32 McuSm_EndinitTimeoutCounter;
 
 void McuSm_InitializeBusMpu(void);
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
@@ -21,8 +32,34 @@ void McuSm_TRAP7(IfxCpu_Trap trapInfo);
 
 volatile uint8 debugvar = 0;
 
+#define MCUSM_ENDINIT_WAIT_LIMIT 100000u
+#ifndef MCUSM_DEBUG_HALT_BEFORE_RESET
+#define MCUSM_DEBUG_HALT_BEFORE_RESET 0u
+#endif
+
+#define MCUSM_RECORD_TRAP(trapClass, trapInfo)                 \
+    do                                                         \
+    {                                                          \
+        Ifx_CPU_CORE_ID mcuSmCoreIdReg;                        \
+        mcuSmCoreIdReg.U = __mfcr(CPU_CORE_ID);                \
+        McuSm_LastTrapClass = (trapClass);                     \
+        McuSm_LastTrapId = (trapInfo).tId;                     \
+        McuSm_LastTrapCoreId = mcuSmCoreIdReg.B.CORE_ID;       \
+        McuSm_LastTrapTAddr = (trapInfo).tAddr;                \
+        McuSm_LastTrapPcxi = __mfcr(CPU_PCXI);                 \
+        McuSm_LastTrapFcx = __mfcr(CPU_FCX);                   \
+        McuSm_LastTrapLcx = __mfcr(CPU_LCX);                   \
+        McuSm_LastTrapPsw = __mfcr(CPU_PSW);                   \
+        McuSm_TrapCounter++;                                   \
+    } while (0)
+
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 {
+    if(McuSm_IndexResetHistory >= 20u)
+    {
+        McuSm_IndexResetHistory = 0u;
+    }
+
     McuSm_LastResetReason = resetReason;
     McuSm_LastResetInformation = resetInformation;
     McuSm_ResetHistory[McuSm_IndexResetHistory].reason = resetReason;
@@ -38,7 +75,7 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
         /* Do nothing. */
     }
 
-    if(19u < McuSm_IndexResetHistory)
+    if(McuSm_IndexResetHistory >= 20u)
     {
         McuSm_IndexResetHistory = 0u;
     }
@@ -53,16 +90,19 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 
 void McuSm_TRAP1(IfxCpu_Trap trapInfo)
 {
+    MCUSM_RECORD_TRAP(1u, trapInfo);
     McuSm_PerformResetHook(371u, trapInfo.tId);
 }
 
 void McuSm_TRAP2(IfxCpu_Trap trapInfo)
 {
+    MCUSM_RECORD_TRAP(2u, trapInfo);
     McuSm_PerformResetHook(372u, trapInfo.tId);
 }
 
 void McuSm_TRAP4(IfxCpu_Trap trapInfo)
 {
+    MCUSM_RECORD_TRAP(4u, trapInfo);
     McuSm_PerformResetHook(374u, trapInfo.tId);
 }
 
@@ -71,6 +111,8 @@ void McuSm_TRAP7(IfxCpu_Trap trapInfo)
     uint32 const volatile* ag;
     uint32 agRstRsn = 0u;
     uint32 agRstInfo = 0u;
+
+    MCUSM_RECORD_TRAP(7u, trapInfo);
 
     McuSm_AGs[0u] = SMU_AGCF0_0.U & SMU_AGCF0_2.U & ~(SMU_AGCF0_1.U);
     McuSm_AGs[1u] = SMU_AGCF1_0.U & SMU_AGCF1_2.U & ~(SMU_AGCF1_1.U);
@@ -108,16 +150,25 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo)
     Ifx_SCU_WDTS *watchdog = &MODULE_SCU.WDTS;
     Ifx_CPU_CORE_ID reg;
     uint8 coreId;
+
+    MCUSM_RECORD_TRAP(3u, trapInfo);
+
     reg.U = __mfcr(CPU_CORE_ID);
     coreId =  (IfxCpu_ResourceCpu)reg.B.CORE_ID;
     Ifx_SCU_WDTCPU *cpuwdg = &MODULE_SCU.WDTCPU[coreId];
+
+    if(McuSm_IndexResetHistory >= 20u)
+    {
+        McuSm_IndexResetHistory = 0u;
+    }
+
     McuSm_LastResetReason = 373u;
     McuSm_LastResetInformation = trapInfo.tId;
     McuSm_ResetHistory[McuSm_IndexResetHistory].reason = 373u;
     McuSm_ResetHistory[McuSm_IndexResetHistory].information = trapInfo.tId;
     McuSm_IndexResetHistory++;
 
-    if(McuSm_IndexResetHistory > 19u)
+    if(McuSm_IndexResetHistory >= 20u)
     {
         McuSm_IndexResetHistory = 0u;
     }
@@ -146,7 +197,16 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo)
             (password << IFX_SCU_WDTS_CON0_PW_OFF) |
             (SCU_WDTS_CON0.B.REL << IFX_SCU_WDTS_CON0_REL_OFF);
 
-    while (SCU_WDTS_CON0.B.ENDINIT == 1u){}
+    index = 0u;
+    while ((SCU_WDTS_CON0.B.ENDINIT == 1u) && (index < MCUSM_ENDINIT_WAIT_LIMIT))
+    {
+        index++;
+    }
+    McuSm_EndinitWaitCounter += index;
+    if (SCU_WDTS_CON0.B.ENDINIT == 1u)
+    {
+        McuSm_EndinitTimeoutCounter++;
+    }
 
     MODULE_SCU.RSTCON.B.SW = 2u;
     password  = cpuwdg->CON0.B.PW;
@@ -169,7 +229,16 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo)
             (password << IFX_SCU_WDTCPU_CON0_PW_OFF) |
             (cpuwdg->CON0.B.REL << IFX_SCU_WDTCPU_CON0_REL_OFF);
 
-    while (cpuwdg->CON0.B.ENDINIT == 1u){}
+    index = 0u;
+    while ((cpuwdg->CON0.B.ENDINIT == 1u) && (index < MCUSM_ENDINIT_WAIT_LIMIT))
+    {
+        index++;
+    }
+    McuSm_EndinitWaitCounter += index;
+    if (cpuwdg->CON0.B.ENDINIT == 1u)
+    {
+        McuSm_EndinitTimeoutCounter++;
+    }
 
     if (cpuwdg->CON0.B.LCK)
     {
@@ -184,7 +253,16 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo)
             (password << IFX_SCU_WDTCPU_CON0_PW_OFF) |
             (cpuwdg->CON0.B.REL << IFX_SCU_WDTCPU_CON0_REL_OFF);
 
-    while (cpuwdg->CON0.B.ENDINIT == 1u){}
+    index = 0u;
+    while ((cpuwdg->CON0.B.ENDINIT == 1u) && (index < MCUSM_ENDINIT_WAIT_LIMIT))
+    {
+        index++;
+    }
+    McuSm_EndinitWaitCounter += index;
+    if (cpuwdg->CON0.B.ENDINIT == 1u)
+    {
+        McuSm_EndinitTimeoutCounter++;
+    }
 
     MODULE_SCU.RSTCON2.B.USRINFO = 34u;
     MODULE_SCU.SWRSTCON.B.SWRSTREQ = 1U;
@@ -214,7 +292,7 @@ void McuSm_InitializeBusMpu(void)
     CPU2_SPR_SPROT_RGNACCENA0_R.U = 0xFFFFFFFFU;
     CPU2_SPR_SPROT_RGNACCENB0_R.U = 0xFFFFFFFFU;
     CPU0_DLMU_SPROT_RGNLA0.U = 0xB0000000U;
-    CPU0_DLMU_SPROT_RGNLA0.U = 0xB000FFE0U;
+    CPU0_DLMU_SPROT_RGNUA0.U = 0xB000FFE0U;
     CPU0_DLMU_SPROT_RGNACCENA0_W.U = 0x10001777U;
     CPU0_DLMU_SPROT_RGNACCENB0_W.U = 0x00000000U;
     CPU0_DLMU_SPROT_RGNACCENA0_R.U = 0xFFFFFFFFU;

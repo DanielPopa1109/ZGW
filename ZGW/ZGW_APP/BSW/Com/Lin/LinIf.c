@@ -4,6 +4,8 @@
 #include <string.h>
 #include "SysMgr.h"
 
+long long LinIf_MainFunction_Counter = 0;
+
 static const Lin_FrameConfigType LinIf_Frame_MRF =
 {
     0x3Cu, LIN_PID_MASTER_REQUEST, 8u, LIN_CS_CLASSIC, LIN_FRM_DIAGNOSTIC_MRF, 20u
@@ -489,6 +491,8 @@ void LinIf_MainFunction(void)
         LinIf_State.channelState = LINIF_CHANNEL_BUSY;
         Lin_SetResponseTimeout(entry->frame->responseTimeoutTicks);
     }
+
+    LinIf_MainFunction_Counter++;
 }
 
 LinIf_ChannelStateType LinIf_GetChannelState(void)

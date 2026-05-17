@@ -54,6 +54,7 @@ typedef struct
     SoAd_UpperLayerType upperLayer;
     TcpIp_ProtocolType protocol;
     uint8 isServer;
+    uint8 useConfiguredRemote;
     SoAd_SockAddrType localAddr;
     SoAd_SockAddrType remoteAddr;
     SoAd_RxIndicationFct rxIndication;
@@ -74,6 +75,30 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
 void SoAd_CloseSoCon(SoAd_SoConIdType id);
 
 sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
+
+extern volatile uint32 SoAd_OpenFailNoLinkCounter;
+extern volatile uint32 SoAd_OpenFailCreateCounter;
+extern volatile uint32 SoAd_OpenFailBindCounter;
+extern volatile uint32 SoAd_ApiLockCreateFailCounter;
+extern volatile uint32 SoAd_ApiLockTakeFailCounter;
+extern volatile uint32 SoAd_ApiLockGiveFailCounter;
+extern volatile uint8 SoAd_DebugState[SOAD_MAX_CONNECTIONS];
+extern volatile uint8 SoAd_DebugRequestedOpen[SOAD_MAX_CONNECTIONS];
+extern volatile sint32 SoAd_DebugSocket[SOAD_MAX_CONNECTIONS];
+extern volatile uint8 SoAd_DebugLastOpenResult[SOAD_MAX_CONNECTIONS];
+extern volatile SoAd_SoConIdType SoAd_DebugLastTxSoConId;
+extern volatile uint8 SoAd_DebugLastTxResult;
+extern volatile sint32 SoAd_DebugLastTxTcpIpResult;
+extern volatile uint16 SoAd_DebugLastTxLength;
+extern volatile uint32 SoAd_DebugRxCounter[SOAD_MAX_CONNECTIONS];
+extern volatile uint32 SoAd_DebugRxDropCounter[SOAD_MAX_CONNECTIONS];
+extern volatile uint16 SoAd_DebugLastRxLength[SOAD_MAX_CONNECTIONS];
+extern volatile uint16 SoAd_DebugLastRxRemotePort[SOAD_MAX_CONNECTIONS];
+extern volatile uint32 SoAd_DebugLastRxRemoteAddr[SOAD_MAX_CONNECTIONS];
+extern volatile uint32 SoAd_DebugPcHeartbeatRxCounter;
+extern volatile uint32 SoAd_DebugPcHeartbeatAckCounter;
+extern volatile uint32 SoAd_DebugPcHeartbeatLastRemoteAddr;
+extern volatile uint16 SoAd_DebugPcHeartbeatLastRemotePort;
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
                                 const TcpIp_SockAddrType *remoteAddr,

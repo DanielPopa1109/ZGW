@@ -32,6 +32,7 @@ typedef struct
 } DoIP_RuntimeType;
 
 static DoIP_RuntimeType DoIP_Rt;
+long long DoIP_MainFunction_Counter = 0;
 
 static uint16_t rd16(const uint8_t *p)
 {
@@ -426,6 +427,8 @@ void DoIP_MainFunction(uint32 elapsedMs)
         DoIP_Rt.aliveTimerMs = 0u;
         DoIP_Rt.inactivityTimerMs = 0u;
     }
+
+    DoIP_MainFunction_Counter++;
 }
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
 {

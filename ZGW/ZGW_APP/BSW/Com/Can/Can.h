@@ -80,6 +80,7 @@ void Can_Init(void);
 void Can_MainFunction(void);
 
 Std_ReturnType Can_Write(PduIdType Hth, const Can_PduType* PduInfo);
+Std_ReturnType Can_DrainTxPdu(PduIdType SwPduHandle, uint8 ControllerId, uint32 PollLimit);
 
 void Can_IsrRxClassic(void);
 void Can_IsrRxFd(void);

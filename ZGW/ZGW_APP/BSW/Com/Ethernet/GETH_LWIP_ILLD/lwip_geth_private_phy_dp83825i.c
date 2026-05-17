@@ -30,6 +30,64 @@
 
 static lwip_geth_PhyDp83825i_StatusType Dp83825i_Status;
 
+volatile uint32 Dp83825i_DebugPhyScanAddr;
+volatile uint32 Dp83825i_DebugPhyAddrFound = 0xFFFFFFFFu;
+volatile uint32 Dp83825i_DebugPhyId1;
+volatile uint32 Dp83825i_DebugPhyId2;
+volatile uint32 Dp83825i_DebugBmcr;
+volatile uint32 Dp83825i_DebugBmsr;
+volatile uint32 Dp83825i_DebugReadOkCount;
+volatile uint32 Dp83825i_DebugReadFailCount;
+
+void Dp83825i_DebugScanMdio(void)
+{
+    uint32 addr;
+    uint32 id1;
+    uint32 id2;
+    uint32 bmcr;
+    uint32 bmsr;
+
+    Dp83825i_DebugPhyAddrFound = 0xFFFFFFFFu;
+    Dp83825i_DebugPhyId1 = 0u;
+    Dp83825i_DebugPhyId2 = 0u;
+    Dp83825i_DebugBmcr = 0u;
+    Dp83825i_DebugBmsr = 0u;
+
+    for (addr = 0u; addr < 32u; addr++)
+    {
+        Dp83825i_DebugPhyScanAddr = addr;
+
+        if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYIDR1, &id1) == 0u)
+        {
+            Dp83825i_DebugReadFailCount++;
+            continue;
+        }
+
+        if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYIDR2, &id2) == 0u)
+        {
+            Dp83825i_DebugReadFailCount++;
+            continue;
+        }
+
+        Dp83825i_DebugReadOkCount++;
+
+        if ((id1 != 0x0000u) && (id1 != 0xFFFFu) &&
+            (id2 != 0x0000u) && (id2 != 0xFFFFu))
+        {
+            Dp83825i_DebugPhyAddrFound = addr;
+            Dp83825i_DebugPhyId1 = id1;
+            Dp83825i_DebugPhyId2 = id2;
+
+            (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMCR, &bmcr);
+            (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMSR, &bmsr);
+
+            Dp83825i_DebugBmcr = bmcr;
+            Dp83825i_DebugBmsr = bmsr;
+            break;
+        }
+    }
+}
+
 static uint32 Dp83825i_WaitMdioReady(void)
 {
     uint32 timeout = DP83825I_MDIO_MAX_WAIT;

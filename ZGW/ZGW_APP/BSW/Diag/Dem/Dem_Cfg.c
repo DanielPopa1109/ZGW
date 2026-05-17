@@ -75,15 +75,55 @@ static Std_ReturnType Dem_DefaultExtendedDataCapture(
     return E_OK;
 }
 
+static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType *dtc)
+{
+    if (dtc == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    if (eventId == DEM_EVENT_ID_MCUSM_SW_ERROR)
+    {
+        *dtc = DEM_DTC_MCUSM_SW_ERROR;
+        return E_OK;
+    }
+
+    if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
+        (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
+    {
+        *dtc = (Dem_DTCType)(DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT +
+                (Dem_DTCType)(eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST));
+        return E_OK;
+    }
+
+    if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST) &&
+        (eventId <= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_LAST))
+    {
+        *dtc = (Dem_DTCType)(DEM_DTC_GATEWAY_RX_SIGNAL_INVALID +
+                (Dem_DTCType)(eventId - DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST));
+        return E_OK;
+    }
+
+    return E_NOT_OK;
+}
+
 static void Dem_DefaultStatusChangedCallback(
     Dem_EventIdType eventId,
     Dem_UdsStatusByteType oldStatus,
     Dem_UdsStatusByteType newStatus
 )
 {
-    (void)eventId;
-    (void)oldStatus;
-    (void)newStatus;
+    Dem_DTCType dtc;
+
+    if (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) == 0u)
+    {
+        return;
+    }
+
+    if (Dem_GetDtcForEventId(eventId, &dtc) == E_OK)
+    {
+        GatewaySwc_ReportDtcTransition(dtc & 0x00FFFFFFu, newStatus);
+    }
 }
 
 static const Dem_EventConfigType Dem_StaticEventConfigList[] =
@@ -103,7 +143,7 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         TRUE,
         Dem_DefaultFreezeFrameCapture,
         Dem_DefaultExtendedDataCapture,
-        Dem_DefaultStatusChangedCallback
+        NULL_PTR
     }
 };
 
@@ -127,7 +167,7 @@ static void Dem_FillGatewayEventConfig(
     eventConfig->StorageEnabled = TRUE;
     eventConfig->FreezeFrameCapture = GatewaySwc_CaptureRxDiagFreezeFrame;
     eventConfig->ExtendedDataCapture = GatewaySwc_CaptureRxDiagExtendedData;
-    eventConfig->StatusChangedCallback = Dem_DefaultStatusChangedCallback;
+    eventConfig->StatusChangedCallback = NULL_PTR;
 }
 
 Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *eventConfig)

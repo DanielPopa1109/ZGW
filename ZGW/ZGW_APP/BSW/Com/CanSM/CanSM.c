@@ -19,6 +19,8 @@ typedef struct
 
 static CanSM_ChannelType CanSM_Channel[CAN_NUM_CONTROLLERS];
 
+long long CanSM_MainFunction_Counter = 0;
+
 static Std_ReturnType CanSM_ApplyMode(uint8 ControllerId, CanSM_ComModeType Mode)
 {
     Std_ReturnType ret;
@@ -261,6 +263,8 @@ void CanSM_MainFunction(void)
             CanSM_HandleBusOff(i);
         }
     }
+
+    CanSM_MainFunction_Counter++;
 }
 
 __attribute__((weak)) void CanSM_BusOffBeginNotification(uint8 ControllerId)

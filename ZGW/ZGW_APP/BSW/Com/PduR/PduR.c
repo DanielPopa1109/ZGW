@@ -23,6 +23,9 @@
 
 /* Keep these IDs aligned with EthStack_Cfg.c. */
 #define PDUR_SOAD_SOCON_PDUR_IF_UDP     4u
+#define PDUR_DOIP_TX_STATE_EMPTY        0u
+#define PDUR_DOIP_TX_STATE_PENDING      1u
+#define PDUR_DOIP_TX_STATE_CONFIRM      2u
 
 
 /* ===================== Routing types ===================== */
@@ -108,6 +111,35 @@ typedef struct
     uint16 sourceAddress;
     uint16 targetAddress;
 } PduR_DoIPContextType;
+
+typedef struct
+{
+    volatile uint8 valid;
+    uint16 sourceAddress;
+    uint16 targetAddress;
+    uint16 udsLen;
+    uint8 data[PDUR_MAX_TP_BUFFER];
+} PduR_DoIPRxMailboxType;
+
+typedef struct
+{
+    volatile uint8 state;
+    uint8 keepContext;
+    PduIdType txPduId;
+    uint16 sourceAddress;
+    uint16 targetAddress;
+    uint16 udsLen;
+    Std_ReturnType result;
+    uint8 data[PDUR_MAX_TP_BUFFER];
+} PduR_DoIPTxMailboxType;
+
+typedef struct
+{
+    volatile uint8 valid;
+    uint8 keepContext;
+    PduIdType txPduId;
+    Std_ReturnType result;
+} PduR_DoIPTxConfirmationMailboxType;
 
 /* ===================== IF routes =====================
  *
@@ -323,7 +355,17 @@ static const PduR_DcmTxRouteType PduR_DcmTxRoutes[] =
 
 static PduR_TpBufferType PduR_TpRxBuf[PDUR_MAX_TP_RX_ROUTES];
 static PduR_DoIPContextType PduR_DoIPCtx;
+static PduR_DoIPRxMailboxType PduR_DoIPRxMailbox;
+static PduR_DoIPTxMailboxType PduR_DoIPTxMailbox;
+static PduR_DoIPTxConfirmationMailboxType PduR_DoIPTxConfirmationMailbox;
 static uint8 PduR_Initialized;
+
+volatile uint32 PduR_DoIPRxMailboxFullCounter;
+volatile uint32 PduR_DoIPRxDroppedBusyCounter;
+volatile uint32 PduR_DoIPTxMailboxFullCounter;
+volatile uint32 PduR_DoIPTxConfirmFullCounter;
+volatile uint32 PduR_DoIPTxSentCounter;
+volatile uint32 PduR_DoIPTxFailCounter;
 
 /* ===================== Internal helpers ===================== */
 
@@ -601,6 +643,21 @@ void PduR_Init(void)
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
     PduR_DoIPCtx.targetAddress = 0u;
+    PduR_DoIPRxMailbox.valid = FALSE;
+    PduR_DoIPRxMailbox.sourceAddress = 0u;
+    PduR_DoIPRxMailbox.targetAddress = 0u;
+    PduR_DoIPRxMailbox.udsLen = 0u;
+    PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
+    PduR_DoIPTxMailbox.keepContext = FALSE;
+    PduR_DoIPTxMailbox.txPduId = 0u;
+    PduR_DoIPTxMailbox.sourceAddress = 0u;
+    PduR_DoIPTxMailbox.targetAddress = 0u;
+    PduR_DoIPTxMailbox.udsLen = 0u;
+    PduR_DoIPTxMailbox.result = E_NOT_OK;
+    PduR_DoIPTxConfirmationMailbox.valid = FALSE;
+    PduR_DoIPTxConfirmationMailbox.keepContext = FALSE;
+    PduR_DoIPTxConfirmationMailbox.txPduId = 0u;
+    PduR_DoIPTxConfirmationMailbox.result = E_NOT_OK;
 
     if (PduR_GetTpRxRouteCount() > PDUR_MAX_TP_RX_ROUTES)
     {
@@ -658,7 +715,7 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
                                 PduLengthType len)
 {
     const PduR_DcmTxRouteType* route;
-    DoIP_ReturnType doipRet;
+    uint8 keepContext;
 
     if ((PduR_Initialized == FALSE) ||
         (data == NULL_PTR) ||
@@ -689,25 +746,26 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
                 return E_NOT_OK;
             }
 
-            doipRet = DoIP_SendDiagnosticResponse(PduR_DoIPCtx.targetAddress,
-                                                  PduR_DoIPCtx.sourceAddress,
-                                                  data,
-                                                  (uint16)len);
-            if (doipRet == DOIP_OK)
+            if (PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_EMPTY)
             {
-                Dcm_TxConfirmation(DcmTxPduId, E_OK);
-                if (!((len == 3u) &&
-                      (data[0u] == 0x7Fu) &&
-                      (data[2u] == DCM_NRC_RESPONSE_PENDING)))
-                {
-                    PduR_DoIPCtx.valid = FALSE;
-                }
-                return E_OK;
+                PduR_DoIPTxMailboxFullCounter++;
+                return E_NOT_OK;
             }
 
-            Dcm_TxConfirmation(DcmTxPduId, E_NOT_OK);
-            PduR_DoIPCtx.valid = FALSE;
-            return E_NOT_OK;
+            keepContext = ((len == 3u) &&
+                           (data[0u] == 0x7Fu) &&
+                           (data[2u] == DCM_NRC_RESPONSE_PENDING)) ? TRUE : FALSE;
+
+            PduR_DoIPTxMailbox.txPduId = DcmTxPduId;
+            PduR_DoIPTxMailbox.sourceAddress = PduR_DoIPCtx.targetAddress;
+            PduR_DoIPTxMailbox.targetAddress = PduR_DoIPCtx.sourceAddress;
+            PduR_DoIPTxMailbox.udsLen = (uint16)len;
+            PduR_DoIPTxMailbox.keepContext = keepContext;
+            memcpy(PduR_DoIPTxMailbox.data, data, len);
+            __dsync();
+            PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_PENDING;
+            __dsync();
+            return E_OK;
 
         default:
             return E_NOT_OK;
@@ -951,14 +1009,144 @@ void PduR_DoIPRxIndication(uint16 sourceAddress,
 
     (void)routeIdx;
 
-    if (PduR_DoIPCtx.valid != FALSE)
+    if (PduR_DoIPRxMailbox.valid != FALSE)
+    {
+        PduR_DoIPRxMailboxFullCounter++;
+        return;
+    }
+
+    PduR_DoIPRxMailbox.sourceAddress = sourceAddress;
+    PduR_DoIPRxMailbox.targetAddress = targetAddress;
+    PduR_DoIPRxMailbox.udsLen = udsLen;
+    memcpy(PduR_DoIPRxMailbox.data, uds, udsLen);
+    __dsync();
+    PduR_DoIPRxMailbox.valid = TRUE;
+    __dsync();
+}
+
+void PduR_DoIPCore0MainFunction(void)
+{
+    const PduR_TpRxRouteType* route;
+    PduIdType txPduId;
+    Std_ReturnType txResult;
+    uint16 sourceAddress;
+    uint16 targetAddress;
+    uint16 udsLen;
+    uint8 keepContext;
+    uint8 routeIdx;
+
+    if (PduR_Initialized == FALSE)
     {
         return;
     }
 
-    PduR_DoIPCtx.valid = TRUE;
+    if (PduR_DoIPTxConfirmationMailbox.valid != FALSE)
+    {
+        __dsync();
+        txPduId = PduR_DoIPTxConfirmationMailbox.txPduId;
+        txResult = PduR_DoIPTxConfirmationMailbox.result;
+        keepContext = PduR_DoIPTxConfirmationMailbox.keepContext;
+        PduR_DoIPTxConfirmationMailbox.valid = FALSE;
+        __dsync();
+
+        Dcm_TxConfirmation(txPduId, txResult);
+
+        if ((keepContext == FALSE) || (txResult != E_OK))
+        {
+            PduR_DoIPCtx.valid = FALSE;
+        }
+    }
+
+    if (PduR_DoIPRxMailbox.valid == FALSE)
+    {
+        return;
+    }
+
+    __dsync();
+
+    if (PduR_DoIPCtx.valid != FALSE)
+    {
+        PduR_DoIPRxDroppedBusyCounter++;
+        PduR_DoIPRxMailbox.valid = FALSE;
+        __dsync();
+        return;
+    }
+
+    route = PduR_FindTpRxRoute(PDUR_TP_LOWER_DOIP, DCM_RX_ETH_PHYS, &routeIdx);
+
+    if (route == NULL_PTR)
+    {
+        PduR_DoIPRxMailbox.valid = FALSE;
+        __dsync();
+        return;
+    }
+
+    (void)routeIdx;
+
+    sourceAddress = PduR_DoIPRxMailbox.sourceAddress;
+    targetAddress = PduR_DoIPRxMailbox.targetAddress;
+    udsLen = PduR_DoIPRxMailbox.udsLen;
+
     PduR_DoIPCtx.sourceAddress = sourceAddress;
     PduR_DoIPCtx.targetAddress = targetAddress;
+    __dsync();
+    PduR_DoIPCtx.valid = TRUE;
+    __dsync();
 
-    Dcm_RxIndication(route->dcmRxPduId, uds, (PduLengthType)udsLen);
+    Dcm_RxIndication(route->dcmRxPduId, PduR_DoIPRxMailbox.data, (PduLengthType)udsLen);
+
+    PduR_DoIPRxMailbox.valid = FALSE;
+    __dsync();
+}
+
+void PduR_DoIPCore2MainFunction(void)
+{
+    DoIP_ReturnType doipRet;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    if (PduR_DoIPTxMailbox.state == PDUR_DOIP_TX_STATE_PENDING)
+    {
+        __dsync();
+        doipRet = DoIP_SendDiagnosticResponse(PduR_DoIPTxMailbox.sourceAddress,
+                                              PduR_DoIPTxMailbox.targetAddress,
+                                              PduR_DoIPTxMailbox.data,
+                                              PduR_DoIPTxMailbox.udsLen);
+        PduR_DoIPTxMailbox.result = (doipRet == DOIP_OK) ? E_OK : E_NOT_OK;
+        if (doipRet == DOIP_OK)
+        {
+            PduR_DoIPTxSentCounter++;
+        }
+        else
+        {
+            PduR_DoIPTxFailCounter++;
+        }
+
+        __dsync();
+        PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_CONFIRM;
+        __dsync();
+    }
+
+    if (PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_CONFIRM)
+    {
+        return;
+    }
+
+    if (PduR_DoIPTxConfirmationMailbox.valid != FALSE)
+    {
+        PduR_DoIPTxConfirmFullCounter++;
+        return;
+    }
+
+    PduR_DoIPTxConfirmationMailbox.txPduId = PduR_DoIPTxMailbox.txPduId;
+    PduR_DoIPTxConfirmationMailbox.result = PduR_DoIPTxMailbox.result;
+    PduR_DoIPTxConfirmationMailbox.keepContext = PduR_DoIPTxMailbox.keepContext;
+    __dsync();
+    PduR_DoIPTxConfirmationMailbox.valid = TRUE;
+    __dsync();
+    PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
+    __dsync();
 }

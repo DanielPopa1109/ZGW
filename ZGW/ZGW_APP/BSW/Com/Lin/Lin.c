@@ -26,6 +26,7 @@ typedef struct
     uint32 sleepCounter;
 } Lin_ChannelType;
 
+long long Lin_MainFunction_Counter = 0;
 static Lin_ChannelType Lin_Ch;
 
 void Lin_Init(void)
@@ -245,6 +246,8 @@ void Lin_MainFunction(void)
         Lin_LowLevel_DisableRx(LIN_CHANNEL_0);
         Lin_Ch.state = LIN_IDLE;
     }
+
+    Lin_MainFunction_Counter++;
 }
 
 Std_ReturnType Lin_GoToSleep(uint8 Channel)

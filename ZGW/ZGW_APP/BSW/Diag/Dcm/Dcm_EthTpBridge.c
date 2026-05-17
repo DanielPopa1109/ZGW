@@ -1,5 +1,7 @@
 #include "Dcm_EthTpBridge.h"
 #include "DoIP.h"
+#include "Dcm_Cfg.h"
+#include "PduR.h"
 #include <string.h>
 
 typedef struct
@@ -28,6 +30,8 @@ void Dcm_EthTp_RxIndication(uint16_t sourceAddress,
     {
         return;
     }
+
+    PduR_DoIPRxIndication(sourceAddress, targetAddress, data, len);
 
     if (DcmEth.rxPending != 0u)
     {
@@ -85,10 +89,7 @@ void Dcm_EthTp_SendResponse(const uint8_t *data, uint16_t len)
         return;
     }
 
-    (void)DoIP_SendDiagnosticResponse(DcmEth.targetAddress,
-                                      DcmEth.sourceAddress,
-                                      data,
-                                      len);
+    (void)PduR_DcmTransmit(DCM_TX_ETH_PHYS, data, (PduLengthType)len);
 }
 
 uint8_t Dcm_EthTp_HasPendingRx(void)

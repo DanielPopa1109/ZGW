@@ -7,6 +7,7 @@
 
 static LinSM_StateType LinSM_State[LINSM_MAX_CHANNELS];
 static uint16 LinSM_Timer[LINSM_MAX_CHANNELS];
+long long LinSM_MainFunction_Counter = 0;
 
 void LinSM_Init(void)
 {
@@ -97,6 +98,10 @@ void LinSM_MainFunction(void)
                 (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
             }
         }
+        else if (LinSM_State[ch] == LINSM_FULL_COMMUNICATION)
+        {
+            /* Keep the active schedule running in full communication. */
+        }
         else
         {
             if (LinSM_Timer[ch] > 0u)
@@ -109,4 +114,6 @@ void LinSM_MainFunction(void)
             }
         }
     }
+
+    LinSM_MainFunction_Counter++;
 }

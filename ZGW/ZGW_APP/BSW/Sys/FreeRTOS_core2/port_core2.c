@@ -77,6 +77,8 @@ static volatile uint32_t *const pxContextSrc_core2 = configCONTEXT_SRC_core2;
 #define portSTM_ICR_CMP0EN_OFF_core2       0
 #define portSTM_ICR_CMP0OS_OFF_core2       2
 #define portSTM_ISCR_CMP0IRR_OFF_core2     0
+#define portSRC_SRCR_CLRR_OFF_core2        25
+#define portSRC_SRCR_IOVCLR_OFF_core2      28
 
 static inline void vPortStartFirstTask_core2( void );
 static inline void vPortInitContextSrc_core2( void );
@@ -88,6 +90,11 @@ static inline void __attribute__( ( always_inline ) ) vPortSaveContext_core2( un
 static inline uint32_t * __attribute__( ( always_inline ) ) pxPortCsaToAddress_core2( uint32_t xCsa_core2 );
 
 static UBaseType_t_core2 uxCriticalNesting_core2 = 0xaaaaaaaa;
+
+volatile uint32_t FreeRTOS_core2_TickCatchUpCounter = 0u;
+volatile uint32_t FreeRTOS_core2_TickLastNow = 0u;
+volatile uint32_t FreeRTOS_core2_TickLastCompare = 0u;
+volatile uint32_t FreeRTOS_core2_TickLastLateDelta = 0u;
 
 /* FreeRTOS_core2 required functions */
 BaseType_t_core2 xPortStartScheduler_core2( void )
@@ -186,9 +193,23 @@ void __interrupt( configTIMER_INTERRUPT_PRIORITY_core2 ) __vector_table( configC
         {
     unsigned long ulSavedInterruptMask;
     BaseType_t_core2 xYieldRequired_core2;
+    uint32_t ulNow_core2;
+    uint32_t ulNextCompare_core2;
 
-    /* Increment compare value by tick count */
-    pxStm_core2[ portSTM_CMP0_core2 >> 2 ] = pxStm_core2[ portSTM_CMP0_core2 >> 2 ] + portTICK_COUNT_core2;
+    ulNow_core2 = pxStm_core2[ portSTM_TIM0_core2 >> 2 ];
+    ulNextCompare_core2 = pxStm_core2[ portSTM_CMP0_core2 >> 2 ] + portTICK_COUNT_core2;
+
+    if( ( int32_t ) ( ulNextCompare_core2 - ulNow_core2 ) <= 0 )
+    {
+        FreeRTOS_core2_TickCatchUpCounter++;
+        FreeRTOS_core2_TickLastLateDelta = ulNow_core2 - ulNextCompare_core2;
+        ulNextCompare_core2 = ulNow_core2 + portTICK_COUNT_core2;
+    }
+
+    FreeRTOS_core2_TickLastNow = ulNow_core2;
+    FreeRTOS_core2_TickLastCompare = ulNextCompare_core2;
+
+    pxStm_core2[ portSTM_CMP0_core2 >> 2 ] = ulNextCompare_core2;
     pxStm_core2[ portSTM_ISCR_core2 >> 2 ] |= ( 1 << portSTM_ISCR_CMP0IRR_OFF_core2 );
 
     /* Check for possible tick drop.
@@ -232,17 +253,22 @@ vPortSyscallHandler_core2( unsigned char id )
 
 void vPortInitTickTimer_core2()
 {
+    uint32_t ulNow_core2;
+
     pxStm_core2[ portSTM_COMCON_core2 >> 2 ] =
             ( 0 << portSTM_CMCON_MSTART0_OFF_core2 ) | ( 31 << portSTM_CMCON_MSIZE0_OFF_core2 );
     pxStm_core2[ portSTM_ICR_core2 >> 2 ] &= ~( 1 << portSTM_ICR_CMP0OS_OFF_core2 );
     pxStmSrc_core2[ 0 ] = ( ( configCPU_NR_core2 > 0 ?
             configCPU_NR_core2 + 1 : configCPU_NR_core2 ) << portSRC_SRCR_TOS_OFF_core2 ) |
             ( ( configTIMER_INTERRUPT_PRIORITY_core2 ) << portSRC_SRCR_SRPN_OFF_core2 );
-    pxStmSrc_core2[ 0 ] |= ( 1 << portSRC_SRCR_SRE_OFF_core2 );
-    pxStm_core2[ portSTM_CMP0_core2 >> 2 ] = pxStm_core2[ portSTM_TIM0_core2 >> 2 ];
+    pxStmSrc_core2[ 0 ] |= ( 1 << portSRC_SRCR_CLRR_OFF_core2 ) | ( 1 << portSRC_SRCR_IOVCLR_OFF_core2 );
     pxStm_core2[ portSTM_ISCR_core2 >> 2 ] |= ( 1 << portSTM_ISCR_CMP0IRR_OFF_core2 );
+    ulNow_core2 = pxStm_core2[ portSTM_TIM0_core2 >> 2 ];
+    FreeRTOS_core2_TickLastNow = ulNow_core2;
+    FreeRTOS_core2_TickLastCompare = ulNow_core2 + portTICK_COUNT_core2;
+    pxStm_core2[ portSTM_CMP0_core2 >> 2 ] = FreeRTOS_core2_TickLastCompare;
     pxStm_core2[ portSTM_ICR_core2 >> 2 ] |= ( 1 << portSTM_ICR_CMP0EN_OFF_core2 );
-    pxStm_core2[ portSTM_CMP0_core2 >> 2 ] = pxStm_core2[ portSTM_TIM0_core2 >> 2 ] + portTICK_COUNT_core2;
+    pxStmSrc_core2[ 0 ] |= ( 1 << portSRC_SRCR_SRE_OFF_core2 );
     //pxStm_core2[ portSTM_OCS_core2 >> 2 ] = 0x12000000;
 }
 

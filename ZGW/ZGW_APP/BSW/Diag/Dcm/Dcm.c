@@ -2,8 +2,7 @@
 #include "Dcm.h"
 #include <string.h>
 #include "PduR.h"
-
-extern volatile uint32 OS_Counter_core0;
+#include "Os.h"
 
 /* ===================== Internal types ===================== */
 
@@ -18,7 +17,7 @@ typedef enum
 
 typedef struct
 {
-        uint8 data[DCM_MAX_PDU_LEN];
+        uint8 *data;
         Dcm_PduLengthType len;
         uint8 valid;
         Dcm_AddressingType addressing;
@@ -37,7 +36,7 @@ typedef struct
 {
         Dcm_ConnStateType state;
 
-        uint8 rxBuffer[DCM_MAX_PDU_LEN];
+        uint8 *rxBuffer;
         Dcm_PduLengthType rxExpectedLen;
         Dcm_PduLengthType rxCopiedLen;
         uint8 rxInProgress;
@@ -47,11 +46,11 @@ typedef struct
         uint8 qTail;
         uint8 qCount;
 
-        uint8 activeReq[DCM_MAX_PDU_LEN];
+        uint8 *activeReq;
         Dcm_PduLengthType activeReqLen;
         Dcm_AddressingType activeAddressing;
 
-        uint8 txBuffer[DCM_MAX_RESPONSE_LEN];
+        uint8 *txBuffer;
         Dcm_PduLengthType txLen;
         Dcm_PduLengthType txOffset;
 
@@ -75,10 +74,17 @@ typedef struct
         Dcm_SecStateType security[DCM_MAX_SECURITY_LEVELS];
 } Dcm_ConnectionStateType;
 
+
+long long Dcm_MainFunction_Counter = 0;
+
 /* ===================== Static ===================== */
 
 static const Dcm_ConfigType* Dcm_ConfigPtr = NULL_PTR;
 static Dcm_ConnectionStateType Dcm_Conn[DCM_MAX_CONNECTIONS];
+static uint8 Dcm_RxBuffer[DCM_MAX_PDU_LEN];
+static uint8 Dcm_ActiveReqBuffer[DCM_MAX_PDU_LEN];
+static uint8 Dcm_TxBuffer[DCM_MAX_RESPONSE_LEN];
+static uint8 Dcm_QueueBuffer[DCM_RX_QUEUE_DEPTH][DCM_MAX_PDU_LEN];
 static uint8 Dcm_ActiveProtocolConnection = 0xFFu;
 
 /* ===================== Forward ===================== */
@@ -89,6 +95,25 @@ static uint8 Dcm_FindTxConnection(Dcm_PduIdType txPduId);
 static void Dcm_ProcessConnection(uint8 connIdx);
 static void Dcm_LoadNextRequest(uint8 connIdx);
 static void Dcm_StartProcessing(uint8 connIdx, const uint8* req, Dcm_PduLengthType len, Dcm_AddressingType addressing);
+
+static uint32 Dcm_GetTick(void)
+{
+    return (uint32)OS_Counter_core0;
+}
+
+static void Dcm_AssignSharedBuffers(uint8 connIdx)
+{
+    uint8 q;
+
+    Dcm_Conn[connIdx].rxBuffer = Dcm_RxBuffer;
+    Dcm_Conn[connIdx].activeReq = Dcm_ActiveReqBuffer;
+    Dcm_Conn[connIdx].txBuffer = Dcm_TxBuffer;
+
+    for (q = 0u; q < DCM_RX_QUEUE_DEPTH; q++)
+    {
+        Dcm_Conn[connIdx].queue[q].data = Dcm_QueueBuffer[q];
+    }
+}
 
 static uint8 Dcm_ShouldSuppressFunctionalNrc(uint8 nrc)
 {
@@ -145,7 +170,7 @@ static void Dcm_StartProcessing(
     c->p2StarTimer = DCM_P2STAR_SERVER_TICKS;
     c->pendingTimer = DCM_RESPONSE_PENDING_PERIOD;
     c->pendingStarted = FALSE;
-    c->lastTimerTick = OS_Counter_core0;
+    c->lastTimerTick = Dcm_GetTick();
     c->suppressPositiveResponse = FALSE;
     c->s3Timer = DCM_S3_SERVER_TICKS;
 
@@ -196,7 +221,7 @@ static uint16 Dcm_ConsumeElapsedTicks(uint8 connIdx)
     uint32 elapsed;
 
     c = &Dcm_Conn[connIdx];
-    now = OS_Counter_core0;
+    now = Dcm_GetTick();
     elapsed = now - c->lastTimerTick;
     c->lastTimerTick = now;
 
@@ -405,14 +430,19 @@ void Dcm_Init(const Dcm_ConfigType* ConfigPtr)
     Dcm_ConfigPtr = (ConfigPtr == NULL_PTR) ? &Dcm_Config : ConfigPtr;
 
     memset(Dcm_Conn, 0, sizeof(Dcm_Conn));
+    memset(Dcm_RxBuffer, 0, sizeof(Dcm_RxBuffer));
+    memset(Dcm_ActiveReqBuffer, 0, sizeof(Dcm_ActiveReqBuffer));
+    memset(Dcm_TxBuffer, 0, sizeof(Dcm_TxBuffer));
+    memset(Dcm_QueueBuffer, 0, sizeof(Dcm_QueueBuffer));
     Dcm_ActiveProtocolConnection = 0xFFu;
 
     for (i = 0u; i < DCM_MAX_CONNECTIONS; i++)
     {
+        Dcm_AssignSharedBuffers(i);
         Dcm_Conn[i].state = DCM_CONN_IDLE;
         Dcm_Conn[i].session = DCM_SESSION_DEFAULT;
         Dcm_Conn[i].s3Timer = 0u;
-        Dcm_Conn[i].lastTimerTick = OS_Counter_core0;
+        Dcm_Conn[i].lastTimerTick = Dcm_GetTick();
         Dcm_Conn[i].downloadActive = FALSE;
         Dcm_Conn[i].expectedBlockSequenceCounter = 1u;
     }
@@ -448,6 +478,8 @@ void Dcm_MainFunction(void)
 
         Dcm_ProcessConnection(i);
     }
+
+    Dcm_MainFunction_Counter++;
 }
 
 void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
@@ -1295,7 +1327,7 @@ static Dcm_ReturnType Dcm_Service_0x27(
 
     sec = &Dcm_Conn[connIdx].security[level];
 
-    if (sec->lockUntil > OS_Counter_core0)
+    if (sec->lockUntil > Dcm_GetTick())
     {
         return DCM_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED;
     }
@@ -1340,7 +1372,7 @@ static Dcm_ReturnType Dcm_Service_0x27(
 
         if (sec->attempts >= 3u)
         {
-            sec->lockUntil = OS_Counter_core0 + 30000u;
+            sec->lockUntil = Dcm_GetTick() + 30000u;
             sec->attempts = 0u;
             sec->seedValid = FALSE;
             return DCM_NRC_EXCEED_NUMBER_OF_ATTEMPTS;
@@ -1639,7 +1671,7 @@ static uint32 Dcm_SecMix(uint32 x)
 
 static void Dcm_SecGenSeed(uint8 level, uint8 out[4])
 {
-    uint32 t = OS_Counter_core0;
+    uint32 t = Dcm_GetTick();
     uint32 v = Dcm_SecMix(t ^ ((uint32)level << 24u) ^ 1u);
 
     out[0] = (uint8)(v >> 24u);

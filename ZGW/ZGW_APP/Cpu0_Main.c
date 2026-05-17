@@ -29,15 +29,95 @@
 #include "Dem.h"
 #include "Fls.h"
 #include "Fee.h"
+#include "SafetyKit_InternalWatchdogs.h"
+#include "Cpu/Std/IfxCpu_Intrinsics.h"
 
-uint8 OsInit_C0 = 0u;
+volatile uint8 OsInit_C0 = 0u;
+volatile uint32 Core0_WaitForNvMIdleLoopCounter = 0u;
+volatile uint32 Core0_ServiceDemNvMLoopCounter = 0u;
+volatile uint32 Core0_StartupFailureReason = 0u;
+volatile uint32 Core0_StartupFailureInformation = 0u;
+
+#define CORE0_NVM_IDLE_WAIT_LOOP_LIMIT      1000000u
+#define CORE0_STARTUP_FAIL_NVM_INIT_IDLE    1u
+#define CORE0_STARTUP_FAIL_NVM_READALL_IDLE 2u
+#define CORE0_STARTUP_FAIL_NVM_DEM_IDLE     3u
+#define CORE0_STARTUP_FAIL_CANSM_CLASSIC    4u
+#define CORE0_STARTUP_FAIL_CANSM_FD         5u
+#define CORE0_STARTUP_FAIL_LINSM            6u
+#define CORE0_STARTUP_FAIL_NVM_READALL_REQ  7u
+#define CORE0_STARTUP_FAIL_DEM_CYCLE_START  8u
 
 extern void Ssw_StartCores(void);
 
+static void core0_ServiceWatchdogs(void)
+{
+    serviceCpuWatchdog();
+    serviceSafetyWatchdog();
+}
+
+static void core0_ServiceMemoryStack(void)
+{
+    Fls_MainFunction();
+    Fee_MainFunction();
+    NvM_MainFunction();
+    core0_ServiceWatchdogs();
+}
+
+static void core0_StartupFailure(uint32 Reason, uint32 Information)
+{
+    Core0_StartupFailureReason = Reason;
+    Core0_StartupFailureInformation = Information;
+
+    McuSm_PerformResetHook(382u, (Reason << 16u) | Information);
+
+    for(;;)
+    {
+        /* Wait for reset or debugger intervention. */
+    }
+}
+
+static void core0_WaitForNvMIdle(uint32 FailureReason)
+{
+    uint32 waitLoops = 0u;
+
+    while (NvM_GetStatus() != NVM_IDLE)
+    {
+        Core0_WaitForNvMIdleLoopCounter++;
+        waitLoops++;
+        core0_ServiceMemoryStack();
+
+        if (waitLoops >= CORE0_NVM_IDLE_WAIT_LOOP_LIMIT)
+        {
+            core0_StartupFailure(FailureReason, waitLoops);
+        }
+    }
+}
+
+static void core0_ServiceDemNvM(uint32 FailureReason)
+{
+    uint32 waitLoops = 0u;
+
+    do
+    {
+        Core0_ServiceDemNvMLoopCounter++;
+        waitLoops++;
+        core0_ServiceMemoryStack();
+        Dem_MainFunction();
+
+        if (waitLoops >= CORE0_NVM_IDLE_WAIT_LOOP_LIMIT)
+        {
+            core0_StartupFailure(FailureReason, waitLoops);
+        }
+    } while (NvM_GetStatus() != NVM_IDLE);
+}
+
 void core0_main(void)
 {
-    IfxScuWdt_disableCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
+    initCpuWatchdog(0u);
+    initSafetyWatchdog();
+    core0_ServiceWatchdogs();
+
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
@@ -49,10 +129,13 @@ void core0_main(void)
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    core0_ServiceWatchdogs();
 
     runSafeAppSwStartup();
+    core0_ServiceWatchdogs();
 
     Ssw_StartCores();
+    core0_ServiceWatchdogs();
 
     McuSm_InitializeBusMpu();
 
@@ -67,61 +150,61 @@ void core0_main(void)
     Com_Init();
     CanTp_Init(&CanTp_Config);
     CanSM_Init();
-    (void)CanSM_RequestComMode(CAN_CONTROLLER_CLASSIC, CANSM_COMM_FULL_COMMUNICATION);
-    (void)CanSM_RequestComMode(CAN_CONTROLLER_FD, CANSM_COMM_FULL_COMMUNICATION);
+    if (CanSM_RequestComMode(CAN_CONTROLLER_CLASSIC, CANSM_COMM_FULL_COMMUNICATION) != E_OK)
+    {
+        core0_StartupFailure(CORE0_STARTUP_FAIL_CANSM_CLASSIC, CAN_CONTROLLER_CLASSIC);
+    }
+
+    if (CanSM_RequestComMode(CAN_CONTROLLER_FD, CANSM_COMM_FULL_COMMUNICATION) != E_OK)
+    {
+        core0_StartupFailure(CORE0_STARTUP_FAIL_CANSM_FD, CAN_CONTROLLER_FD);
+    }
+
     Dcm_Init(&Dcm_Config);
     LinSM_Init();
     LinIf_Init();
     LinTp_Init(1);
+    if (LinSM_RequestComMode(0u, LINSM_FULL_COMMUNICATION) != E_OK)
+    {
+        core0_StartupFailure(CORE0_STARTUP_FAIL_LINSM, 0u);
+    }
 
     Dem_PreInit();
 
     NvM_Init(NULL_PTR);
 
-    while (NvM_GetStatus() != NVM_IDLE)
+    core0_WaitForNvMIdle(CORE0_STARTUP_FAIL_NVM_INIT_IDLE);
+
+    if (NvM_ReadAll() != E_OK)
     {
-        Fls_MainFunction();
-        Fee_MainFunction();
-        NvM_MainFunction();
+        core0_StartupFailure(CORE0_STARTUP_FAIL_NVM_READALL_REQ, 0u);
     }
 
-    (void)NvM_ReadAll();
-
-    while (NvM_GetStatus() != NVM_IDLE)
-    {
-        Fls_MainFunction();
-        Fee_MainFunction();
-        NvM_MainFunction();
-    }
+    core0_WaitForNvMIdle(CORE0_STARTUP_FAIL_NVM_READALL_IDLE);
 
     Dem_Init(&Dem_Config);
 
-    (void)Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE,
-            DEM_CYCLE_STATE_START);
+    core0_ServiceDemNvM(CORE0_STARTUP_FAIL_NVM_DEM_IDLE);
 
-    (void)NvM_WriteAll();
-
-    while (NvM_GetStatus() != NVM_IDLE)
+    if (Dem_IsReady() != FALSE)
     {
-        Fls_MainFunction();
-        Fee_MainFunction();
-        NvM_MainFunction();
-        Dem_MainFunction();
+        if (Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE,
+                DEM_CYCLE_STATE_START) != E_OK)
+        {
+            core0_StartupFailure(CORE0_STARTUP_FAIL_DEM_CYCLE_START, 0u);
+        }
+        core0_ServiceDemNvM(CORE0_STARTUP_FAIL_NVM_DEM_IDLE);
     }
 
     Os_Init_C0();
 
-    IfxCpu_enableInterrupts();
-
-    OsInit_C0 = 1u;
-
-    initCpuWatchdog(0u);
-    initSafetyWatchdog();
-
-    serviceCpuWatchdog();
-    serviceSafetyWatchdog();
+    core0_ServiceWatchdogs();
 
     initSafetyKit();
+    
+    __dsync();
+    OsInit_C0 = 1u;
+    __dsync();
 
     vTaskStartScheduler_core0();
 }

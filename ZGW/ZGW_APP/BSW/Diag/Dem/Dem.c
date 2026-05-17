@@ -1,8 +1,12 @@
 #include "Dem.h"
 #include "Dem_Int.h"
 #include "Dem_NvM.h"
+#include "IfxCpu.h"
 #include <string.h>
 #include <stddef.h>
+
+#define DEM_CRITICAL_SPIN_TIMEOUT 100000u
+#define DEM_CRITICAL_CORE_COUNT   6u
 
 typedef enum
 {
@@ -25,10 +29,67 @@ static Dem_FilterType Dem_Filter;
 static boolean Dem_Dirty = FALSE;
 static boolean Dem_OperationCycleActive = FALSE;
 static uint32 Dem_OperationCycleCounter = 0u;
-static uint32 Dem_ChangeCounter = 0u;
 
 static Dem_ClearDTCStatusType Dem_ClearStatus = DEM_CLEAR_IDLE;
 static uint8 Dem_NvMWriteRetry = 0u;
+static IfxCpu_spinLock Dem_CriticalSpinLock;
+static boolean Dem_CriticalIrqState[DEM_CRITICAL_CORE_COUNT];
+static volatile uint8 Dem_CriticalOwnedByCore[DEM_CRITICAL_CORE_COUNT];
+
+volatile uint32 Dem_ChangeCounter = 0u;
+volatile uint32 Dem_CriticalTimeoutCounter = 0u;
+volatile uint16 Dem_DtcStatusListCount = 0u;
+volatile Dem_DebugEventStatusType Dem_DtcStatusList[DEM_MAX_EVENTS];
+volatile uint32 Dem_SetEventStatusCounter[DEM_MAX_EVENTS][DEM_EVENT_STATUS_DEBUG_COUNT];
+volatile uint32 Dem_EventStatusChangeCounter[DEM_MAX_EVENTS];
+
+long long Dem_MainFunction_Counter = 0;
+
+void Dem_EnterCritical(void)
+{
+    uint32 coreIndex;
+
+    coreIndex = (uint32)IfxCpu_getCoreIndex();
+
+    if (coreIndex >= DEM_CRITICAL_CORE_COUNT)
+    {
+        coreIndex = 0u;
+    }
+
+    Dem_CriticalIrqState[coreIndex] = IfxCpu_disableInterrupts();
+
+    if (IfxCpu_setSpinLock(&Dem_CriticalSpinLock, DEM_CRITICAL_SPIN_TIMEOUT) != FALSE)
+    {
+        Dem_CriticalOwnedByCore[coreIndex] = TRUE;
+        __dsync();
+    }
+    else
+    {
+        Dem_CriticalTimeoutCounter++;
+    }
+}
+
+void Dem_ExitCritical(void)
+{
+    uint32 coreIndex;
+
+    coreIndex = (uint32)IfxCpu_getCoreIndex();
+
+    if (coreIndex >= DEM_CRITICAL_CORE_COUNT)
+    {
+        coreIndex = 0u;
+    }
+
+    __dsync();
+
+    if (Dem_CriticalOwnedByCore[coreIndex] != FALSE)
+    {
+        Dem_CriticalOwnedByCore[coreIndex] = FALSE;
+        IfxCpu_resetSpinLock(&Dem_CriticalSpinLock);
+    }
+
+    IfxCpu_restoreInterrupts(Dem_CriticalIrqState[coreIndex]);
+}
 
 static uint32 Dem_Crc32(const uint8 *data, uint32 length)
 {
@@ -62,6 +123,14 @@ static uint32 Dem_GetImageCrc(const Dem_NvImageType *image)
         (const uint8 *)image,
         (uint32)offsetof(Dem_NvImageType, crc32)
     );
+}
+
+static boolean Dem_TestFailedChanged(
+    Dem_UdsStatusByteType oldStatus,
+    Dem_UdsStatusByteType newStatus
+)
+{
+    return (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) != 0u) ? TRUE : FALSE;
 }
 
 static boolean Dem_IsValidDtcFormatAndOrigin(
@@ -108,6 +177,88 @@ static Std_ReturnType Dem_GetEventConfig(uint16 eventIndex, Dem_EventConfigType 
     return E_OK;
 }
 
+static void Dem_DebugUpdateEvent(uint16 eventIndex)
+{
+    Dem_EventConfigType eventConfig;
+
+    if ((Dem_ConfigPtr == NULL_PTR) || (eventIndex >= Dem_ConfigPtr->EventCount))
+    {
+        return;
+    }
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
+
+    Dem_DtcStatusList[eventIndex].eventId = eventConfig.EventId;
+    Dem_DtcStatusList[eventIndex].dtc = eventConfig.DTC & 0x00FFFFFFu;
+    Dem_DtcStatusList[eventIndex].udsStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
+    Dem_DtcStatusList[eventIndex].debounceCounter = Dem_RuntimeEvents[eventIndex].debounceCounter;
+    Dem_DtcStatusList[eventIndex].confirmationCounter = Dem_RuntimeEvents[eventIndex].confirmationCounter;
+    Dem_DtcStatusList[eventIndex].occurrenceCounter = Dem_RuntimeEvents[eventIndex].occurrenceCounter;
+    Dem_DtcStatusList[eventIndex].agingCounter = Dem_RuntimeEvents[eventIndex].agingCounter;
+    Dem_DtcStatusList[eventIndex].setPassedCount =
+        Dem_SetEventStatusCounter[eventIndex][DEM_EVENT_STATUS_PASSED];
+    Dem_DtcStatusList[eventIndex].setFailedCount =
+        Dem_SetEventStatusCounter[eventIndex][DEM_EVENT_STATUS_FAILED];
+    Dem_DtcStatusList[eventIndex].setPrePassedCount =
+        Dem_SetEventStatusCounter[eventIndex][DEM_EVENT_STATUS_PREPASSED];
+    Dem_DtcStatusList[eventIndex].setPreFailedCount =
+        Dem_SetEventStatusCounter[eventIndex][DEM_EVENT_STATUS_PREFAILED];
+    Dem_DtcStatusList[eventIndex].statusChangeCount = Dem_EventStatusChangeCounter[eventIndex];
+
+    Dem_DtcStatusListCount = Dem_ConfigPtr->EventCount;
+}
+
+static void Dem_DebugRefreshStatusList(void)
+{
+    uint16 i;
+
+    if (Dem_ConfigPtr == NULL_PTR)
+    {
+        Dem_DtcStatusListCount = 0u;
+        return;
+    }
+
+    Dem_DtcStatusListCount = Dem_ConfigPtr->EventCount;
+
+    for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
+    {
+        Dem_DebugUpdateEvent(i);
+    }
+}
+
+static void Dem_DebugReset(void)
+{
+    uint16 i;
+    uint8 statusIndex;
+
+    Dem_DtcStatusListCount = 0u;
+
+    for (i = 0u; i < (uint16)DEM_MAX_EVENTS; i++)
+    {
+        Dem_DtcStatusList[i].eventId = 0u;
+        Dem_DtcStatusList[i].dtc = 0u;
+        Dem_DtcStatusList[i].udsStatus = 0u;
+        Dem_DtcStatusList[i].debounceCounter = 0;
+        Dem_DtcStatusList[i].confirmationCounter = 0u;
+        Dem_DtcStatusList[i].occurrenceCounter = 0u;
+        Dem_DtcStatusList[i].agingCounter = 0u;
+        Dem_DtcStatusList[i].setPassedCount = 0u;
+        Dem_DtcStatusList[i].setFailedCount = 0u;
+        Dem_DtcStatusList[i].setPrePassedCount = 0u;
+        Dem_DtcStatusList[i].setPreFailedCount = 0u;
+        Dem_DtcStatusList[i].statusChangeCount = 0u;
+        Dem_EventStatusChangeCounter[i] = 0u;
+
+        for (statusIndex = 0u; statusIndex < DEM_EVENT_STATUS_DEBUG_COUNT; statusIndex++)
+        {
+            Dem_SetEventStatusCounter[i][statusIndex] = 0u;
+        }
+    }
+}
+
 static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
 {
     uint16 i;
@@ -116,6 +267,29 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
     if (Dem_ConfigPtr == NULL_PTR)
     {
         return DEM_MAX_EVENTS;
+    }
+
+    if (Dem_ConfigPtr == &Dem_Config)
+    {
+        if (eventId == DEM_EVENT_ID_MCUSM_SW_ERROR)
+        {
+            return 0u;
+        }
+
+        if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
+                (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT +
+                    (eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST));
+        }
+
+        if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST) &&
+                (eventId <= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_LAST))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT +
+                    DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT +
+                    (eventId - DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST));
+        }
     }
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
@@ -134,16 +308,44 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
 {
     uint16 i;
     Dem_EventConfigType eventConfig;
+    uint32 udsDtc;
+    uint32 baseDtc;
 
     if (Dem_ConfigPtr == NULL_PTR)
     {
         return DEM_MAX_EVENTS;
     }
 
+    udsDtc = dtc & 0x00FFFFFFu;
+
+    if (Dem_ConfigPtr == &Dem_Config)
+    {
+        if (udsDtc == (DEM_DTC_MCUSM_SW_ERROR & 0x00FFFFFFu))
+        {
+            return 0u;
+        }
+
+        baseDtc = DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT & 0x00FFFFFFu;
+        if ((udsDtc >= baseDtc) &&
+                (udsDtc < (baseDtc + (uint32)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT + (udsDtc - baseDtc));
+        }
+
+        baseDtc = DEM_DTC_GATEWAY_RX_SIGNAL_INVALID & 0x00FFFFFFu;
+        if ((udsDtc >= baseDtc) &&
+                (udsDtc < (baseDtc + (uint32)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT)))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT +
+                    DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT +
+                    (udsDtc - baseDtc));
+        }
+    }
+
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
         if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
-            ((eventConfig.DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu)))
+            ((eventConfig.DTC & 0x00FFFFFFu) == udsDtc))
         {
             return i;
         }
@@ -306,15 +508,21 @@ static void Dem_SetStatusByte(uint16 eventIndex, Dem_UdsStatusByteType newStatus
 
         DEM_ENTER_CRITICAL();
         Dem_RuntimeEvents[eventIndex].udsStatus = newStatus;
+        Dem_EventStatusChangeCounter[eventIndex]++;
         Dem_UpdatePrimaryEntryStatus(
             eventConfig.EventId,
             newStatus
         );
-        Dem_Dirty = TRUE;
+        if (Dem_TestFailedChanged(oldStatus, newStatus) != FALSE)
+        {
+            Dem_Dirty = TRUE;
+        }
         DEM_EXIT_CRITICAL();
 
         Dem_InvokeStatusChanged(eventIndex, oldStatus, newStatus);
     }
+
+    Dem_DebugUpdateEvent(eventIndex);
 }
 
 static void Dem_InitDefaultRuntime(void)
@@ -325,6 +533,7 @@ static void Dem_InitDefaultRuntime(void)
     memset(Dem_RuntimeEvents, 0, sizeof(Dem_RuntimeEvents));
     memset(Dem_PrimaryMemory, 0, sizeof(Dem_PrimaryMemory));
     memset(&Dem_Filter, 0, sizeof(Dem_Filter));
+    Dem_DebugReset();
 
     if (Dem_ConfigPtr == NULL_PTR)
     {
@@ -347,6 +556,8 @@ static void Dem_InitDefaultRuntime(void)
         Dem_RuntimeEvents[i].agingCounter = 0u;
         Dem_RuntimeEvents[i].available = TRUE;
     }
+
+    Dem_DebugRefreshStatusList();
 }
 
 static void Dem_BuildNvImage(void)
@@ -457,6 +668,8 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
             Dem_PrimaryMemory[i] = image->primaryEntries[i];
         }
     }
+
+    Dem_DebugRefreshStatusList();
 }
 
 static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
@@ -579,16 +792,20 @@ static void Dem_RemovePrimaryEntryByEvent(Dem_EventIdType eventId)
 
 static void Dem_ProcessFailed(uint16 eventIndex)
 {
+    Dem_UdsStatusByteType oldStatus;
     Dem_UdsStatusByteType status;
     uint8 confirmationThreshold;
     Dem_EventConfigType eventConfig;
+    boolean testFailedTransition;
 
     if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
     {
         return;
     }
 
-    status = Dem_RuntimeEvents[eventIndex].udsStatus;
+    oldStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
+    status = oldStatus;
+    testFailedTransition = (((oldStatus & DEM_UDS_STATUS_TF) == 0u) ? TRUE : FALSE);
 
     status &= (uint8)~DEM_UDS_STATUS_TNCSLC;
     status &= (uint8)~DEM_UDS_STATUS_TNCTOC;
@@ -604,34 +821,44 @@ static void Dem_ProcessFailed(uint16 eventIndex)
         confirmationThreshold = 1u;
     }
 
-    if (Dem_RuntimeEvents[eventIndex].confirmationCounter < 255u)
+    if (testFailedTransition != FALSE)
     {
-        Dem_RuntimeEvents[eventIndex].confirmationCounter++;
-    }
+        if (Dem_RuntimeEvents[eventIndex].confirmationCounter < 255u)
+        {
+            Dem_RuntimeEvents[eventIndex].confirmationCounter++;
+        }
 
-    if (Dem_RuntimeEvents[eventIndex].confirmationCounter >= confirmationThreshold)
-    {
-        status |= DEM_UDS_STATUS_CDTC;
-    }
+        if (Dem_RuntimeEvents[eventIndex].confirmationCounter >= confirmationThreshold)
+        {
+            status |= DEM_UDS_STATUS_CDTC;
+        }
 
-    if (Dem_RuntimeEvents[eventIndex].occurrenceCounter < 255u)
-    {
-        Dem_RuntimeEvents[eventIndex].occurrenceCounter++;
-    }
+        if (Dem_RuntimeEvents[eventIndex].occurrenceCounter < 255u)
+        {
+            Dem_RuntimeEvents[eventIndex].occurrenceCounter++;
+        }
 
-    Dem_RuntimeEvents[eventIndex].agingCounter = 0u;
+        Dem_RuntimeEvents[eventIndex].agingCounter = 0u;
+    }
 
     Dem_SetStatusByte(eventIndex, status);
-    Dem_StoreOrUpdatePrimaryEntry(eventIndex);
 
-    Dem_Dirty = TRUE;
+    if (testFailedTransition != FALSE)
+    {
+        Dem_StoreOrUpdatePrimaryEntry(eventIndex);
+        Dem_Dirty = TRUE;
+    }
 }
 
 static void Dem_ProcessPassed(uint16 eventIndex)
 {
+    Dem_UdsStatusByteType oldStatus;
     Dem_UdsStatusByteType status;
+    boolean testPassedTransition;
 
-    status = Dem_RuntimeEvents[eventIndex].udsStatus;
+    oldStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
+    status = oldStatus;
+    testPassedTransition = (((oldStatus & DEM_UDS_STATUS_TF) != 0u) ? TRUE : FALSE);
 
     status &= (uint8)~DEM_UDS_STATUS_TF;
     status &= (uint8)~DEM_UDS_STATUS_TNCSLC;
@@ -639,7 +866,10 @@ static void Dem_ProcessPassed(uint16 eventIndex)
 
     Dem_SetStatusByte(eventIndex, status);
 
-    Dem_Dirty = TRUE;
+    if (testPassedTransition != FALSE)
+    {
+        Dem_Dirty = TRUE;
+    }
 }
 
 static void Dem_ProcessPreFailed(uint16 eventIndex)
@@ -666,10 +896,6 @@ static void Dem_ProcessPreFailed(uint16 eventIndex)
     {
         Dem_ProcessFailed(eventIndex);
     }
-    else
-    {
-        Dem_Dirty = TRUE;
-    }
 }
 
 static void Dem_ProcessPrePassed(uint16 eventIndex)
@@ -695,10 +921,6 @@ static void Dem_ProcessPrePassed(uint16 eventIndex)
     if (counter <= eventConfig.PassedThreshold)
     {
         Dem_ProcessPassed(eventIndex);
-    }
-    else
-    {
-        Dem_Dirty = TRUE;
     }
 }
 
@@ -794,6 +1016,7 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
         return;
     }
 
+    DEM_ENTER_CRITICAL();
     Dem_RuntimeEvents[eventIndex].udsStatus = newStatus;
     Dem_RuntimeEvents[eventIndex].debounceCounter = 0;
     Dem_RuntimeEvents[eventIndex].confirmationCounter = 0u;
@@ -801,11 +1024,15 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
     Dem_RuntimeEvents[eventIndex].agingCounter = 0u;
 
     Dem_RemovePrimaryEntryByEvent(eventConfig.EventId);
+    DEM_EXIT_CRITICAL();
 
     if (oldStatus != newStatus)
     {
+        Dem_EventStatusChangeCounter[eventIndex]++;
         Dem_InvokeStatusChanged(eventIndex, oldStatus, newStatus);
     }
+
+    Dem_DebugUpdateEvent(eventIndex);
 }
 
 void Dem_PreInit(void)
@@ -824,6 +1051,7 @@ void Dem_PreInit(void)
     memset(Dem_PrimaryMemory, 0, sizeof(Dem_PrimaryMemory));
     memset(&Dem_NvImage, 0, sizeof(Dem_NvImage));
     memset(&Dem_Filter, 0, sizeof(Dem_Filter));
+    Dem_DebugReset();
 }
 
 void Dem_Init(const Dem_ConfigType *ConfigPtr)
@@ -880,10 +1108,13 @@ Std_ReturnType Dem_Shutdown(void)
     {
         Dem_BuildNvImage();
 
-        if (Dem_NvM_StartWrite(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
+        if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
         {
-            Dem_NvMState = DEM_NVM_STATE_WRITE_PENDING;
             Dem_Dirty = FALSE;
+            if (Dem_ClearStatus == DEM_CLEAR_PENDING)
+            {
+                Dem_ClearStatus = DEM_CLEAR_OK;
+            }
             return E_OK;
         }
 
@@ -978,8 +1209,6 @@ void Dem_MainFunction(void)
                 {
                     Dem_ClearStatus = DEM_CLEAR_FAILED;
                 }
-
-                Dem_Dirty = TRUE;
             }
         }
     }
@@ -988,10 +1217,13 @@ void Dem_MainFunction(void)
     {
         Dem_BuildNvImage();
 
-        if (Dem_NvM_StartWrite(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
+        if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
         {
-            Dem_NvMState = DEM_NVM_STATE_WRITE_PENDING;
             Dem_Dirty = FALSE;
+            if (Dem_ClearStatus == DEM_CLEAR_PENDING)
+            {
+                Dem_ClearStatus = DEM_CLEAR_OK;
+            }
         }
     }
 #else
@@ -1000,6 +1232,8 @@ void Dem_MainFunction(void)
         Dem_ClearStatus = DEM_CLEAR_OK;
     }
 #endif
+
+    Dem_MainFunction_Counter++;
 }
 
 Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType EventStatus)
@@ -1030,6 +1264,11 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
     }
 
     DEM_ENTER_CRITICAL();
+
+    if ((uint8)EventStatus < DEM_EVENT_STATUS_DEBUG_COUNT)
+    {
+        Dem_SetEventStatusCounter[eventIndex][(uint8)EventStatus]++;
+    }
 
     switch (EventStatus)
     {
@@ -1062,6 +1301,8 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
             return E_NOT_OK;
     }
 
+    Dem_DebugUpdateEvent(eventIndex);
+
     return E_OK;
 }
 
@@ -1090,7 +1331,9 @@ Std_ReturnType Dem_ResetEventStatus(Dem_EventIdType EventId)
     status = Dem_RuntimeEvents[eventIndex].udsStatus;
     status &= (uint8)~DEM_UDS_STATUS_TF;
 
+    DEM_ENTER_CRITICAL();
     Dem_RuntimeEvents[eventIndex].debounceCounter = 0;
+    DEM_EXIT_CRITICAL();
     Dem_SetStatusByte(eventIndex, status);
 
     return E_OK;
@@ -1296,7 +1539,6 @@ Std_ReturnType Dem_SetOperationCycleState(
             Dem_SetStatusByte(i, status);
         }
 
-        Dem_Dirty = TRUE;
         return E_OK;
     }
 
@@ -1341,7 +1583,6 @@ Std_ReturnType Dem_SetOperationCycleState(
             Dem_SetStatusByte(i, status);
         }
 
-        Dem_Dirty = TRUE;
         return E_OK;
     }
 
@@ -1402,8 +1643,6 @@ Std_ReturnType Dem_ClearDTC(
         return E_NOT_OK;
     }
 
-    DEM_ENTER_CRITICAL();
-
     if ((DTC & 0x00FFFFFFu) == DEM_DTC_GROUP_ALL_DTCS)
     {
         for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
@@ -1427,8 +1666,6 @@ Std_ReturnType Dem_ClearDTC(
             }
         }
     }
-
-    DEM_EXIT_CRITICAL();
 
     if (found == FALSE)
     {

@@ -78,7 +78,7 @@ extern void netif_status_cb(struct netif *netif);
 /* Static IPv4 address */
 #define IP_ADDR0                        (192U)
 #define IP_ADDR1                        (168U)
-#define IP_ADDR2                        (0U)
+#define IP_ADDR2                        (1U)
 #define IP_ADDR3                        (10U)
 
 /*IPv4 subnet mask*/
@@ -92,12 +92,12 @@ extern void netif_status_cb(struct netif *netif);
 /*Static IPv4 address*/
 #define GW_ADDR0                        (192U)
 #define GW_ADDR1                        (168U)
-#define GW_ADDR2                        (0U)
+#define GW_ADDR2                        (1U)
 #define GW_ADDR3                        (1U)
 
 #define CPU_WHICH_SERVICE_ETHERNET      2
-#define ISR_PRIORITY_GETH_TX            100
-#define ISR_PRIORITY_GETH_RX            101
+#define ISR_PRIORITY_GETH_TX            29
+#define ISR_PRIORITY_GETH_RX            30
 #define LWIP_GETH_IS_ISR                1
 
 #define LWIP_GETH_TASK_PRIO_RX          configMAX_PRIORITIES_core2 - 4
@@ -107,9 +107,11 @@ extern void netif_status_cb(struct netif *netif);
 
 #define LWIP_GETH_RTOS_ENABLED      1
 
+/* Lab bring-up: keep lwIP netif link-up even if PHY status readout is wrong. */
+#define LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP 1
+
 /* Callback function name */
 #define LWIP_GETH_NETIF_STATUS_CB_FUNCTION  netif_status_cb
 #endif /* ifndef LWIP_GETH_CONF_H_ */
 
 /* CODE_BLOCK_END */
-

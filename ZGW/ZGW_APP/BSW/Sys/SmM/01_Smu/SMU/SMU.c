@@ -412,7 +412,7 @@ void initSMUModule(void)
         g_SafetyKitStatus.smuStatus.unlockConfigRegisterSMU = fail;
     }
 
-    IfxSmu_configAlarmActionPES(pesAction);
+    //IfxSmu_configAlarmActionPES(pesAction);
     IfxSmu_temporaryLockConfigRegisters();
     /* Validation if PES configuration was successful */
     IfxScuWdt_clearSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline());

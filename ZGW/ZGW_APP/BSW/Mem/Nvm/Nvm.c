@@ -85,6 +85,63 @@ static NvM_StateType NvM_State =
 
 static NvM_BlockAdminType NvM_Admin[NVM_TOTAL_BLOCKS];
 
+volatile uint32 NvM_WriteAllRequestCounter = 0u;
+volatile uint32 NvM_WriteAllPlannedBytes = 0u;
+volatile uint32 NvM_WriteAllWriteStartedBytes = 0u;
+volatile uint32 NvM_WriteAllWrittenBytes = 0u;
+volatile uint32 NvM_WriteAllFailedBytes = 0u;
+volatile uint32 NvM_WriteAllSkippedBytes = 0u;
+volatile uint16 NvM_WriteAllBlocksPlanned = 0u;
+volatile uint16 NvM_WriteAllBlocksStarted = 0u;
+volatile uint16 NvM_WriteAllBlocksWritten = 0u;
+volatile uint16 NvM_WriteAllBlocksFailed = 0u;
+volatile uint16 NvM_WriteAllBlocksSkipped = 0u;
+volatile uint16 NvM_WriteAllActiveIndex = 0xFFFFu;
+volatile NvM_BlockIdType NvM_WriteAllActiveBlockId = 0u;
+volatile uint32 NvM_WriteAllBlockLength[NVM_TOTAL_BLOCKS];
+volatile uint8 NvM_WriteAllBlockPlanned[NVM_TOTAL_BLOCKS];
+volatile uint8 NvM_WriteAllBlockWritten[NVM_TOTAL_BLOCKS];
+volatile uint8 NvM_WriteAllBlockResult[NVM_TOTAL_BLOCKS];
+
+static void NvM_ResetWriteAllDebug(void)
+{
+    uint16 i;
+
+    NvM_WriteAllPlannedBytes = 0u;
+    NvM_WriteAllWriteStartedBytes = 0u;
+    NvM_WriteAllWrittenBytes = 0u;
+    NvM_WriteAllFailedBytes = 0u;
+    NvM_WriteAllSkippedBytes = 0u;
+    NvM_WriteAllBlocksPlanned = 0u;
+    NvM_WriteAllBlocksStarted = 0u;
+    NvM_WriteAllBlocksWritten = 0u;
+    NvM_WriteAllBlocksFailed = 0u;
+    NvM_WriteAllBlocksSkipped = 0u;
+    NvM_WriteAllActiveIndex = 0xFFFFu;
+    NvM_WriteAllActiveBlockId = 0u;
+
+    for (i = 0u; i < (uint16)NVM_TOTAL_BLOCKS; i++)
+    {
+        NvM_WriteAllBlockLength[i] = NvM_BlockDescriptor[i].nvBlockLength;
+        NvM_WriteAllBlockPlanned[i] = 0u;
+        NvM_WriteAllBlockWritten[i] = 0u;
+        NvM_WriteAllBlockResult[i] = 0u;
+
+        if ((NvM_Admin[i].ramValid == TRUE) &&
+            (NvM_Admin[i].ramChanged == TRUE))
+        {
+            NvM_WriteAllBlockPlanned[i] = 1u;
+            NvM_WriteAllPlannedBytes += NvM_BlockDescriptor[i].nvBlockLength;
+            NvM_WriteAllBlocksPlanned++;
+        }
+        else
+        {
+            NvM_WriteAllSkippedBytes += NvM_BlockDescriptor[i].nvBlockLength;
+            NvM_WriteAllBlocksSkipped++;
+        }
+    }
+}
+
 static sint16 NvM_FindBlockIndex(NvM_BlockIdType BlockId)
 {
     uint16 i;
@@ -131,11 +188,34 @@ static void NvM_Report(uint8 api, uint8 error, uint32 detail)
 static void NvM_RestoreDefaultsByIndex(uint16 idx, void *dest)
 {
     uint8 *target;
+    const uint8 *romPtr;
 
     target = (dest != NULL_PTR) ? (uint8 *)dest : NvM_GetRamPtr(idx);
-    if ((target != NULL_PTR) && (NvM_GetRomPtr(idx) != NULL_PTR))
+    if (target == NULL_PTR)
     {
-        memcpy(target, NvM_GetRomPtr(idx), NvM_BlockDescriptor[idx].nvBlockLength);
+        return;
+    }
+
+    romPtr = NvM_GetRomPtr(idx);
+    if (romPtr != NULL_PTR)
+    {
+        memcpy(target, romPtr, NvM_BlockDescriptor[idx].nvBlockLength);
+    }
+    else
+    {
+        memset(target, 0, NvM_BlockDescriptor[idx].nvBlockLength);
+    }
+}
+
+static void NvM_RestoreReadDefaults(uint16 idx)
+{
+    uint8 *ramPtr;
+
+    ramPtr = NvM_GetRamPtr(idx);
+    NvM_RestoreDefaultsByIndex(idx, ramPtr);
+    if ((NvM_State.activePtr != NULL_PTR) && (NvM_State.activePtr != ramPtr))
+    {
+        NvM_RestoreDefaultsByIndex(idx, NvM_State.activePtr);
     }
 }
 
@@ -153,6 +233,8 @@ void NvM_Init(const NvM_ConfigType *ConfigPtr)
         NvM_Admin[i].writeProtected = FALSE;
         NvM_RestoreDefaultsByIndex(i, NULL_PTR);
     }
+
+    NvM_ResetWriteAllDebug();
 
     Fee_Init(NULL_PTR);
     NvM_State.status = NVM_BUSY_INTERNAL;
@@ -231,6 +313,8 @@ Std_ReturnType NvM_WriteBlock(NvM_BlockIdType BlockId, const void *NvM_SrcPtr)
     }
 
     NvM_State.activeIndex = (uint16)idx;
+    NvM_Admin[(uint16)idx].ramValid = TRUE;
+    NvM_Admin[(uint16)idx].ramChanged = TRUE;
     NvM_Admin[(uint16)idx].result = NVM_REQ_PENDING;
     NvM_SetBusy(NVM_SERVICE_WRITE_BLOCK, NVM_STATE_WRITE_START);
     return E_OK;
@@ -329,6 +413,8 @@ Std_ReturnType NvM_WriteAll(void)
     }
 
     NvM_State.currentIndex = 0u;
+    NvM_WriteAllRequestCounter++;
+    NvM_ResetWriteAllDebug();
     NvM_SetBusy(NVM_SERVICE_WRITE_ALL, NVM_STATE_WRITEALL_NEXT);
     return E_OK;
 }
@@ -363,6 +449,10 @@ Std_ReturnType NvM_SetRamBlockStatus(NvM_BlockIdType BlockId, boolean BlockChang
     }
 
     NvM_Admin[(uint16)idx].ramChanged = BlockChanged;
+    if (BlockChanged == TRUE)
+    {
+        NvM_Admin[(uint16)idx].ramValid = TRUE;
+    }
 
     if ((BlockChanged == TRUE) && (NvM_BlockDescriptor[(uint16)idx].immediateData == TRUE))
     {
@@ -413,26 +503,28 @@ static void NvM_HandleReadCompletion(uint16 idx)
     }
     else if (result == MEMIF_BLOCK_INVALID)
     {
-        NvM_RestoreDefaultsByIndex(idx, NvM_State.activePtr);
+        NvM_RestoreReadDefaults(idx);
         NvM_Admin[idx].result = NVM_REQ_NV_INVALIDATED;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
     }
     else if (result == MEMIF_BLOCK_INCONSISTENT)
     {
-        NvM_RestoreDefaultsByIndex(idx, NvM_State.activePtr);
+        NvM_RestoreReadDefaults(idx);
         NvM_Admin[idx].result = NVM_REQ_INTEGRITY_FAILED;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
     }
     else
     {
-        NvM_RestoreDefaultsByIndex(idx, NvM_State.activePtr);
+        NvM_RestoreReadDefaults(idx);
         NvM_Admin[idx].result = NVM_REQ_NOT_OK;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
     }
 }
+
+long long NvM_MainFunction_Counter = 0;
 
 void NvM_MainFunction(void)
 {
@@ -468,7 +560,10 @@ void NvM_MainFunction(void)
                            (uint8 *)NvM_State.activePtr,
                            NvM_BlockDescriptor[idx].nvBlockLength) != E_OK)
             {
+                NvM_RestoreReadDefaults(idx);
                 NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                NvM_Admin[idx].ramValid = TRUE;
+                NvM_Admin[idx].ramChanged = TRUE;
                 NvM_Report(NVM_API_MAIN, NVM_E_LOWER_LAYER, NvM_BlockDescriptor[idx].blockId);
                 NvM_SetIdle();
             }
@@ -489,9 +584,11 @@ void NvM_MainFunction(void)
 
         case NVM_STATE_WRITE_START:
             idx = NvM_State.activeIndex;
+            NvM_Admin[idx].ramChanged = FALSE;
             if (MemIf_Write(MEMIF_FEE_DEVICE_INDEX, NvM_BlockDescriptor[idx].blockId, NvM_GetRamPtr(idx)) != E_OK)
             {
                 NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                NvM_Admin[idx].ramChanged = TRUE;
                 NvM_Report(NVM_API_MAIN, NVM_E_LOWER_LAYER, NvM_BlockDescriptor[idx].blockId);
                 NvM_SetIdle();
             }
@@ -509,7 +606,6 @@ void NvM_MainFunction(void)
                 {
                     NvM_Admin[idx].result = NVM_REQ_OK;
                     NvM_Admin[idx].ramValid = TRUE;
-                    NvM_Admin[idx].ramChanged = FALSE;
                     if (NvM_BlockDescriptor[idx].writeOnce == TRUE)
                     {
                         NvM_Admin[idx].writeProtected = TRUE;
@@ -518,6 +614,7 @@ void NvM_MainFunction(void)
                 else
                 {
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                    NvM_Admin[idx].ramChanged = TRUE;
                 }
                 NvM_SetIdle();
             }
@@ -535,6 +632,8 @@ void NvM_MainFunction(void)
         case NVM_STATE_READALL_NEXT:
             if (NvM_State.currentIndex >= NVM_TOTAL_BLOCKS)
             {
+                NvM_WriteAllActiveIndex = 0xFFFFu;
+                NvM_WriteAllActiveBlockId = 0u;
                 NvM_SetIdle();
             }
             else
@@ -551,6 +650,8 @@ void NvM_MainFunction(void)
                 {
                     NvM_RestoreDefaultsByIndex(idx, NULL_PTR);
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                    NvM_Admin[idx].ramValid = TRUE;
+                    NvM_Admin[idx].ramChanged = TRUE;
                     NvM_State.currentIndex++;
                 }
                 else
@@ -580,23 +681,34 @@ void NvM_MainFunction(void)
             {
                 idx = NvM_State.currentIndex;
                 if ((NvM_Admin[idx].ramValid == TRUE) &&
-                    ((NvM_Admin[idx].ramChanged == TRUE) || (NvM_BlockDescriptor[idx].immediateData == FALSE)))
+                    (NvM_Admin[idx].ramChanged == TRUE))
                 {
                     NvM_State.activeIndex = idx;
+                    NvM_WriteAllActiveIndex = idx;
+                    NvM_WriteAllActiveBlockId = NvM_BlockDescriptor[idx].blockId;
                     NvM_Admin[idx].result = NVM_REQ_PENDING;
+                    NvM_Admin[idx].ramChanged = FALSE;
                     if (MemIf_Write(MEMIF_FEE_DEVICE_INDEX, NvM_BlockDescriptor[idx].blockId, NvM_GetRamPtr(idx)) != E_OK)
                     {
                         NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                        NvM_Admin[idx].ramChanged = TRUE;
+                        NvM_WriteAllFailedBytes += NvM_BlockDescriptor[idx].nvBlockLength;
+                        NvM_WriteAllBlocksFailed++;
+                        NvM_WriteAllBlockResult[idx] = 3u;
                         NvM_State.currentIndex++;
                     }
                     else
                     {
+                        NvM_WriteAllWriteStartedBytes += NvM_BlockDescriptor[idx].nvBlockLength;
+                        NvM_WriteAllBlocksStarted++;
+                        NvM_WriteAllBlockResult[idx] = 1u;
                         NvM_State.state = NVM_STATE_WRITEALL_WAIT;
                     }
                 }
                 else
                 {
                     NvM_Admin[idx].result = NVM_REQ_BLOCK_SKIPPED;
+                    NvM_WriteAllBlockResult[idx] = 4u;
                     NvM_State.currentIndex++;
                 }
             }
@@ -609,11 +721,19 @@ void NvM_MainFunction(void)
                 if (MemIf_GetJobResult(MEMIF_FEE_DEVICE_INDEX) == MEMIF_JOB_OK)
                 {
                     NvM_Admin[idx].result = NVM_REQ_OK;
-                    NvM_Admin[idx].ramChanged = FALSE;
+                    NvM_Admin[idx].ramValid = TRUE;
+                    NvM_WriteAllWrittenBytes += NvM_BlockDescriptor[idx].nvBlockLength;
+                    NvM_WriteAllBlocksWritten++;
+                    NvM_WriteAllBlockWritten[idx] = 1u;
+                    NvM_WriteAllBlockResult[idx] = 2u;
                 }
                 else
                 {
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                    NvM_Admin[idx].ramChanged = TRUE;
+                    NvM_WriteAllFailedBytes += NvM_BlockDescriptor[idx].nvBlockLength;
+                    NvM_WriteAllBlocksFailed++;
+                    NvM_WriteAllBlockResult[idx] = 3u;
                 }
                 NvM_State.currentIndex++;
                 NvM_State.state = NVM_STATE_WRITEALL_NEXT;
@@ -656,4 +776,6 @@ void NvM_MainFunction(void)
             NvM_SetIdle();
             break;
     }
+
+    NvM_MainFunction_Counter++;
 }

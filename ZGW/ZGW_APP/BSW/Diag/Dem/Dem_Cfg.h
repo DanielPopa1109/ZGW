@@ -37,12 +37,15 @@
 #define DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT        0x00021000u
 #define DEM_DTC_GATEWAY_RX_SIGNAL_INVALID         0x00022000u
 
+void Dem_EnterCritical(void);
+void Dem_ExitCritical(void);
+
 #ifndef DEM_ENTER_CRITICAL
-#define DEM_ENTER_CRITICAL() do { } while (0)
+#define DEM_ENTER_CRITICAL() Dem_EnterCritical()
 #endif
 
 #ifndef DEM_EXIT_CRITICAL
-#define DEM_EXIT_CRITICAL() do { } while (0)
+#define DEM_EXIT_CRITICAL() Dem_ExitCritical()
 #endif
 
 extern const Dem_ConfigType Dem_Config;

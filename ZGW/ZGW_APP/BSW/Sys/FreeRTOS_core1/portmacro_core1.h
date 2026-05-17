@@ -108,6 +108,7 @@ extern void vPortExitCritical_core1( void );
 #define portENABLE_INTERRUPTS_core1()                                  vPortSetCCPN_core1( 0 );
 #define portDISABLE_INTERRUPTS_core1()                                 vPortSetCCPN_core1( configMAX_API_CALL_INTERRUPT_PRIORITY_core1 )
 #define portASSERT_IF_IN_ISR_core1()                                   configASSERT_core1( ( __mfcr( portCPU_PSW_core1 ) & ( 1 << portCPU_PSW_IS_OFF_core1 ) ) == 0 )
+#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID_core1()                configASSERT_core1( ( __mfcr( portCPU_ICR_core1 ) & portCPU_ICR_CCPN_MSK_core1 ) <= configMAX_API_CALL_INTERRUPT_PRIORITY_core1 )
 #define portCLEAR_INTERRUPT_MASK_FROM_ISR_core1( ulSavedMaskValue_core1 )    vPortSetICR_core1( ulSavedMaskValue_core1 )
 #define portSET_INTERRUPT_MASK_FROM_ISR_core1()                        xPortSetCCPN_core1( configMAX_API_CALL_INTERRUPT_PRIORITY_core1 )
 

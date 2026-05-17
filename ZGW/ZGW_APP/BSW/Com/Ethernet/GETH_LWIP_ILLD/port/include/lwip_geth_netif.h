@@ -42,7 +42,35 @@
 #ifndef LWIP_GETH_NETIF_H
 #define LWIP_GETH_NETIF_H
 
+#include "Ifx_Types.h"
+
+extern volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
+extern volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
+extern volatile uint32 lwip_geth_DebugLowLevelInitState;
+extern volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
+extern volatile uint32 lwip_geth_DebugRxAllocFailCnt;
+extern volatile uint32 lwip_geth_DebugTxNoBufferCnt;
+extern volatile uint32 lwip_geth_DebugLowLevelOutputCount;
+extern volatile uint32 lwip_geth_DebugLowLevelOutputOkCount;
+extern volatile uint32 lwip_geth_DebugLowLevelOutputErrCnt;
+extern volatile uint32 lwip_geth_DebugLowLevelInputCallCount;
+extern volatile uint32 lwip_geth_DebugLowLevelInputPacketCount;
+extern volatile uint32 lwip_geth_DebugNetifInputLoopCount;
+extern volatile uint32 lwip_geth_DebugNetifInputOnceCount;
+extern volatile uint32 lwip_geth_DebugNetifInputOkCount;
+extern volatile uint32 lwip_geth_DebugNetifInputFailCount;
+extern volatile uint32 lwip_geth_DebugNetifInputUnknownTypeCount;
+extern volatile uint32 lwip_geth_DebugRxWaitCount;
+extern volatile uint32 lwip_geth_DebugLastRxLen;
+extern volatile uint32 lwip_geth_DebugLastTxLen;
+extern volatile uint32 lwip_geth_DebugLastEthType;
+extern volatile uint32 lwip_geth_DebugLastTxDescrAddr;
+extern volatile uint32 lwip_geth_DebugLastTxBufferAddr;
+extern volatile uint32 lwip_geth_DebugLastRxDescrAddr;
+extern volatile uint32 lwip_geth_DebugLastRxBufferAddr;
+
 err_t lwip_geth_netif_init(struct netif *netif);
+uint8 lwip_geth_netif_input_once(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
 
 #endif

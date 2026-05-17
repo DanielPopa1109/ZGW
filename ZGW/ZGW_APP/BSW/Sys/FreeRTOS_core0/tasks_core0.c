@@ -67,6 +67,11 @@
     #define taskYIELD_IF_USING_PREEMPTION_core0()    portYIELD_WITHIN_API_core0()
 #endif
 
+extern void vPortFatalDiag_core0( uint32_t ulReason_core0, uint32_t ulInfo_core0 );
+
+#define tskDIAG_REASON_SUSPEND_BEFORE_SCHEDULER_core0    6u
+#define tskDIAG_REASON_SUSPEND_NULL_TCB_core0            7u
+
 /* Values that can be assigned to the ucNotifyState_core0 member of the TCB. */
 #define taskNOT_WAITING_NOTIFICATION_core0              ( ( uint8_t ) 0 ) /* Must be zero as it is the initialised value. */
 #define taskWAITING_NOTIFICATION_core0                  ( ( uint8_t ) 1 )
@@ -1676,9 +1681,18 @@ static void prvAddNewTaskToReadyList_core0( TCB_t_core0 * pxNewTCB_core0 )
 
         taskENTER_CRITICAL_core0();
         {
+            if( ( xTaskToSuspend_core0 == NULL ) && ( xSchedulerRunning_core0 == pdFALSE_core0 ) )
+            {
+                vPortFatalDiag_core0( tskDIAG_REASON_SUSPEND_BEFORE_SCHEDULER_core0, uxCurrentNumberOfTasks_core0 );
+            }
+
             /* If null is passed in here then it is the running task_core0 that is
              * being suspended. */
             pxTCB_core0 = prvGetTCBFromHandle_core0( xTaskToSuspend_core0 );
+            if( pxTCB_core0 == NULL )
+            {
+                vPortFatalDiag_core0( tskDIAG_REASON_SUSPEND_NULL_TCB_core0, ( uint32_t ) xTaskToSuspend_core0 );
+            }
 
             traceTASK_SUSPEND_core0( pxTCB_core0 );
 

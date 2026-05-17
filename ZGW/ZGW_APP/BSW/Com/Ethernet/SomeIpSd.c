@@ -5,6 +5,8 @@ static const SomeIpSd_ConfigType *SomeIpSd_Cfg;
 static uint32_t SomeIpSd_TimerMs;
 static SomeIpSd_SubscriptionType SomeIpSd_Subscriptions[SOMEIPSD_MAX_SUBSCRIPTIONS];
 
+long long SomeIpSd_MainFunction_Counter = 0;
+
 static uint16_t rd16(const uint8_t *p)
 {
     return (uint16_t)(((uint16_t)p[0] << 8u) | p[1]);
@@ -480,6 +482,8 @@ void SomeIpSd_MainFunction(uint32 elapsedMs)
             }
         }
     }
+
+    SomeIpSd_MainFunction_Counter++;
 }
 
 void SomeIpSd_SoAdRxIndication(SoAd_SoConIdType soConId,

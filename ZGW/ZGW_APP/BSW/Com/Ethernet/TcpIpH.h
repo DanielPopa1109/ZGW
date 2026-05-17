@@ -15,6 +15,30 @@ typedef struct
 
 #define TCPIP_INVALID_SOCKET   ((TcpIp_SocketIdType)-1)
 
+extern volatile uint8 TcpIp_LastLinkUp;
+extern volatile uint8 TcpIp_LastNetifFlags;
+extern volatile uint32 TcpIp_CreateFailCounter;
+extern volatile uint32 TcpIp_ApiLockCreateFailCounter;
+extern volatile uint32 TcpIp_ApiLockTakeFailCounter;
+extern volatile uint32 TcpIp_ApiLockGiveFailCounter;
+extern volatile sint32 TcpIp_LastSocketError;
+extern volatile sint32 TcpIp_LastCreateResult;
+extern volatile sint32 TcpIp_LastBindResult;
+extern volatile sint32 TcpIp_LastSetSockOptResult;
+extern volatile sint32 TcpIp_LastSendResult;
+extern volatile sint32 TcpIp_LastSendToResult;
+extern volatile TcpIp_SocketIdType TcpIp_LastSocketId;
+extern volatile uint16 TcpIp_LastLocalPort;
+extern volatile uint32 TcpIp_LastLocalAddr;
+extern volatile uint16 TcpIp_LastRemotePort;
+extern volatile uint32 TcpIp_LastRemoteAddr;
+extern volatile uint16 TcpIp_LastTxLength;
+extern volatile sint32 TcpIp_LastRecvResult;
+extern volatile sint32 TcpIp_LastRecvFromResult;
+extern volatile uint16 TcpIp_LastRxLength;
+extern volatile uint16 TcpIp_LastRxRemotePort;
+extern volatile uint32 TcpIp_LastRxRemoteAddr;
+
 void TcpIp_Init(void);
 void TcpIp_MainFunction(void);
 uint8 TcpIp_IsLinkAvailable(void);
@@ -22,6 +46,7 @@ uint8 TcpIp_IsSocketOpen(TcpIp_SocketIdType sock);
 
 TcpIp_SocketIdType TcpIp_Create(uint8 tcp);
 sint32 TcpIp_Bind(TcpIp_SocketIdType sock, uint16 port);
+sint32 TcpIp_BindAddr(TcpIp_SocketIdType sock, uint32 ip, uint16 port);
 sint32 TcpIp_Listen(TcpIp_SocketIdType sock);
 TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr);
 

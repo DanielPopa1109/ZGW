@@ -719,8 +719,8 @@
       <Update1>
        <RTUpdatePeriod>100</RTUpdatePeriod>
        <RTUpdateWhenRunning>true</RTUpdateWhenRunning>
-       <RTUpdateWhenStopped>true</RTUpdateWhenStopped>
-       <UpdateOnBP>true</UpdateOnBP>
+       <RTUpdateWhenStopped>false</RTUpdateWhenStopped>
+       <UpdateOnBP>false</UpdateOnBP>
        <Access>
         <AllowRealTimeAccess>true</AllowRealTimeAccess>
         <CacheAccesses>true</CacheAccesses>
@@ -842,9 +842,21 @@
         <Count>0</Count>
         <Enabled>true</Enabled>
         <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::27</Location>
+        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::156</Location>
         <ProcessFilter></ProcessFilter>
        </__.0>
+       <__.1>
+        <ActionEnabled>false</ActionEnabled>
+        <ActionParams></ActionParams>
+        <ActionScript></ActionScript>
+        <ActionShow>false</ActionShow>
+        <Condition>false</Condition>
+        <Count>0</Count>
+        <Enabled>true</Enabled>
+        <Expression></Expression>
+        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::58</Location>
+        <ProcessFilter></ProcessFilter>
+       </__.1>
       </BPs>
       <Processes.0>
        <URL></URL>
@@ -1035,8 +1047,8 @@
           <Enabled>0</Enabled>
           <BP.0>
            <Access>1</Access>
-           <Address>SysMgr_BusActivityCounter</Address>
-           <Enabled>0</Enabled>
+           <Address>isrRxCount,,ZGW_APP.elf</Address>
+           <Enabled>1</Enabled>
            <EntireObject>1</EntireObject>
            <Range>1</Range>
            <Event>
@@ -3759,11 +3771,11 @@
       <V_MINOR>21</V_MINOR>
       <BDM>
        <CallPoint>
-        <Attach_ConnectToSoC_Same>false</Attach_ConnectToSoC_Same>
-        <Attach_InitSoC_Same>false</Attach_InitSoC_Same>
-        <Attach_StopToExecute>false</Attach_StopToExecute>
-        <Debug_ConnectToSoC_Same>false</Debug_ConnectToSoC_Same>
-        <Debug_InitSoC_Same>false</Debug_InitSoC_Same>
+        <Attach_ConnectToSoC_Same>true</Attach_ConnectToSoC_Same>
+        <Attach_InitSoC_Same>true</Attach_InitSoC_Same>
+        <Attach_StopToExecute>true</Attach_StopToExecute>
+        <Debug_ConnectToSoC_Same>true</Debug_ConnectToSoC_Same>
+        <Debug_InitSoC_Same>true</Debug_InitSoC_Same>
         <Program_ResetAfterProgram>false</Program_ResetAfterProgram>
         <WDTDisable>false</WDTDisable>
         <Attach_ConnectToSoC>
@@ -3817,7 +3829,7 @@
          <ApplicationLBIST>true</ApplicationLBIST>
          <BRKIN>HIGH</BRKIN>
          <ClearICRIEWhenStopped>false</ClearICRIEWhenStopped>
-         <DAPClock>10000</DAPClock>
+         <DAPClock>4000</DAPClock>
          <DAPE>false</DAPE>
          <DAPE_Clock>10000</DAPE_Clock>
          <DAPE_DebugMode>DAP</DAPE_DebugMode>
@@ -4521,7 +4533,7 @@
            </CatchEvents>
           </ARMv8>
           <Common>
-           <ConnectDebug>true</ConnectDebug>
+           <ConnectDebug>false</ConnectDebug>
            <DCache_EnableWriteThrough>false</DCache_EnableWriteThrough>
            <DCache_FlushWhenStopped>false</DCache_FlushWhenStopped>
            <Endian>BE</Endian>

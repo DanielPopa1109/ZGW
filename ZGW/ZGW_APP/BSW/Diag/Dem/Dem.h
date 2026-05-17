@@ -4,6 +4,30 @@
 #include "Dem_Types.h"
 #include "Dem_Cfg.h"
 
+#define DEM_EVENT_STATUS_DEBUG_COUNT    4u
+
+typedef struct
+{
+    Dem_EventIdType eventId;
+    Dem_DTCType dtc;
+    Dem_UdsStatusByteType udsStatus;
+    sint16 debounceCounter;
+    uint8 confirmationCounter;
+    uint8 occurrenceCounter;
+    uint8 agingCounter;
+    uint32 setPassedCount;
+    uint32 setFailedCount;
+    uint32 setPrePassedCount;
+    uint32 setPreFailedCount;
+    uint32 statusChangeCount;
+} Dem_DebugEventStatusType;
+
+extern volatile uint32 Dem_ChangeCounter;
+extern volatile uint16 Dem_DtcStatusListCount;
+extern volatile Dem_DebugEventStatusType Dem_DtcStatusList[DEM_MAX_EVENTS];
+extern volatile uint32 Dem_SetEventStatusCounter[DEM_MAX_EVENTS][DEM_EVENT_STATUS_DEBUG_COUNT];
+extern volatile uint32 Dem_EventStatusChangeCounter[DEM_MAX_EVENTS];
+
 void Dem_PreInit(void);
 void Dem_Init(const Dem_ConfigType *ConfigPtr);
 Std_ReturnType Dem_Shutdown(void);

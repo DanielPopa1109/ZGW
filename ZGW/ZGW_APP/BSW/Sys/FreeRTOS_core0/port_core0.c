@@ -58,6 +58,13 @@
 
 extern volatile unsigned long * pxCurrentTCB_core0;
 
+#define portDIAG_REASON_LOAD_NULL_TCB_core0       1u
+#define portDIAG_REASON_LOAD_NULL_STACK_core0     2u
+#define portDIAG_REASON_LOAD_BAD_CSA_core0        3u
+#define portDIAG_REASON_SAVE_NULL_TCB_core0       4u
+#define portDIAG_REASON_SAVE_BAD_CSA_core0        5u
+#define portDIAG_REASON_YIELD_SCHED_NOT_RUNNING_core0    8u
+
 /* Tick and context switch config */
 #define portTICK_COUNT_core0    ( configSTM_CLOCK_HZ_core0 / configTICK_RATE_HZ_core0 )
 
@@ -77,6 +84,8 @@ static volatile uint32_t *const pxContextSrc_core0 = configCONTEXT_SRC_core0;
 #define portSTM_ICR_CMP0EN_OFF_core0       0
 #define portSTM_ICR_CMP0OS_OFF_core0       2
 #define portSTM_ISCR_CMP0IRR_OFF_core0     0
+#define portSRC_SRCR_CLRR_OFF_core0        25
+#define portSRC_SRCR_IOVCLR_OFF_core0      28
 
 static inline void vPortStartFirstTask_core0( void );
 static inline void vPortInitContextSrc_core0( void );
@@ -88,6 +97,43 @@ static inline void __attribute__( ( always_inline ) ) vPortSaveContext_core0( un
 static inline uint32_t * __attribute__( ( always_inline ) ) pxPortCsaToAddress_core0( uint32_t xCsa_core0 );
 
 static UBaseType_t_core0 uxCriticalNesting_core0 = 0xaaaaaaaa;
+
+volatile uint32_t FreeRTOS_core0_DiagFaultReason = 0u;
+volatile uint32_t FreeRTOS_core0_DiagFaultInfo = 0u;
+volatile uint32_t FreeRTOS_core0_DiagPcxi = 0u;
+volatile uint32_t FreeRTOS_core0_DiagPsw = 0u;
+volatile uint32_t FreeRTOS_core0_DiagIcr = 0u;
+volatile uint32_t FreeRTOS_core0_DiagFcx = 0u;
+volatile uint32_t FreeRTOS_core0_DiagTcb = 0u;
+volatile uint32_t FreeRTOS_core0_DiagCoreId = 0u;
+volatile uint32_t FreeRTOS_core0_TickCatchUpCounter = 0u;
+volatile uint32_t FreeRTOS_core0_TickLastNow = 0u;
+volatile uint32_t FreeRTOS_core0_TickLastCompare = 0u;
+volatile uint32_t FreeRTOS_core0_TickLastLateDelta = 0u;
+
+void vPortFatalDiag_core0( uint32_t ulReason_core0, uint32_t ulInfo_core0 )
+{
+    FreeRTOS_core0_DiagFaultInfo = ulInfo_core0;
+    FreeRTOS_core0_DiagPcxi = __mfcr( portCPU_PCXI_core0 );
+    FreeRTOS_core0_DiagPsw = __mfcr( portCPU_PSW_core0 );
+    FreeRTOS_core0_DiagIcr = __mfcr( portCPU_ICR_core0 );
+    FreeRTOS_core0_DiagFcx = __mfcr( portCPU_FCX_core0 );
+    FreeRTOS_core0_DiagTcb = ( uint32_t ) pxCurrentTCB_core0;
+    FreeRTOS_core0_DiagCoreId = __mfcr( portCPU_CORE_ID_core0 );
+    FreeRTOS_core0_DiagFaultReason = ulReason_core0;
+
+    __disable();
+    #ifdef __TASKING__
+        __debug();
+    #elif defined(__clang__)
+        __builtin_tricore_debug();
+    #endif
+
+    for( ;; )
+    {
+        __nop();
+    }
+}
 
 /* FreeRTOS_core0 required functions */
 BaseType_t_core0 xPortStartScheduler_core0( void )
@@ -186,9 +232,23 @@ void __interrupt( configTIMER_INTERRUPT_PRIORITY_core0 ) __vector_table( configC
         {
     unsigned long ulSavedInterruptMask;
     BaseType_t_core0 xYieldRequired_core0;
+    uint32_t ulNow_core0;
+    uint32_t ulNextCompare_core0;
 
-    /* Increment compare value by tick count */
-    pxStm_core0[ portSTM_CMP0_core0 >> 2 ] = pxStm_core0[ portSTM_CMP0_core0 >> 2 ] + portTICK_COUNT_core0;
+    ulNow_core0 = pxStm_core0[ portSTM_TIM0_core0 >> 2 ];
+    ulNextCompare_core0 = pxStm_core0[ portSTM_CMP0_core0 >> 2 ] + portTICK_COUNT_core0;
+
+    if( ( int32_t ) ( ulNextCompare_core0 - ulNow_core0 ) <= 0 )
+    {
+        FreeRTOS_core0_TickCatchUpCounter++;
+        FreeRTOS_core0_TickLastLateDelta = ulNow_core0 - ulNextCompare_core0;
+        ulNextCompare_core0 = ulNow_core0 + portTICK_COUNT_core0;
+    }
+
+    FreeRTOS_core0_TickLastNow = ulNow_core0;
+    FreeRTOS_core0_TickLastCompare = ulNextCompare_core0;
+
+    pxStm_core0[ portSTM_CMP0_core0 >> 2 ] = ulNextCompare_core0;
     pxStm_core0[ portSTM_ISCR_core0 >> 2 ] |= ( 1 << portSTM_ISCR_CMP0IRR_OFF_core0 );
 
     /* Check for possible tick drop.
@@ -233,17 +293,22 @@ vPortSyscallHandler_core0( unsigned char id )
 
 void vPortInitTickTimer_core0()
 {
+    uint32_t ulNow_core0;
+
     pxStm_core0[ portSTM_COMCON_core0 >> 2 ] =
             ( 0 << portSTM_CMCON_MSTART0_OFF_core0 ) | ( 31 << portSTM_CMCON_MSIZE0_OFF_core0 );
     pxStm_core0[ portSTM_ICR_core0 >> 2 ] &= ~( 1 << portSTM_ICR_CMP0OS_OFF_core0 );
     pxStmSrc_core0[ 0 ] = ( ( configCPU_NR_core0 > 0 ?
             configCPU_NR_core0 + 1 : configCPU_NR_core0 ) << portSRC_SRCR_TOS_OFF_core0 ) |
             ( ( configTIMER_INTERRUPT_PRIORITY_core0 ) << portSRC_SRCR_SRPN_OFF_core0 );
-    pxStmSrc_core0[ 0 ] |= ( 1 << portSRC_SRCR_SRE_OFF_core0 );
-    pxStm_core0[ portSTM_CMP0_core0 >> 2 ] = pxStm_core0[ portSTM_TIM0_core0 >> 2 ];
+    pxStmSrc_core0[ 0 ] |= ( 1 << portSRC_SRCR_CLRR_OFF_core0 ) | ( 1 << portSRC_SRCR_IOVCLR_OFF_core0 );
     pxStm_core0[ portSTM_ISCR_core0 >> 2 ] |= ( 1 << portSTM_ISCR_CMP0IRR_OFF_core0 );
+    ulNow_core0 = pxStm_core0[ portSTM_TIM0_core0 >> 2 ];
+    FreeRTOS_core0_TickLastNow = ulNow_core0;
+    FreeRTOS_core0_TickLastCompare = ulNow_core0 + portTICK_COUNT_core0;
+    pxStm_core0[ portSTM_CMP0_core0 >> 2 ] = FreeRTOS_core0_TickLastCompare;
     pxStm_core0[ portSTM_ICR_core0 >> 2 ] |= ( 1 << portSTM_ICR_CMP0EN_OFF_core0 );
-    pxStm_core0[ portSTM_CMP0_core0 >> 2 ] = pxStm_core0[ portSTM_TIM0_core0 >> 2 ] + portTICK_COUNT_core0;
+    pxStmSrc_core0[ 0 ] |= ( 1 << portSRC_SRCR_SRE_OFF_core0 );
     //pxStm_core0[ portSTM_OCS_core0 >> 2 ] = 0x12000000;
 }
 
@@ -286,8 +351,23 @@ void vPortLoadContext_core0( unsigned char ucCallDepth_core0 )
     __dsync();
 
     /* Load the new CSA id from the stack and update the stack pointer */
+    if( pxCurrentTCB_core0 == NULL )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_LOAD_NULL_TCB_core0, ( uint32_t ) ucCallDepth_core0 );
+    }
+
     ppxTopOfStack = ( uint32_t ** ) pxCurrentTCB_core0;
+    if( *ppxTopOfStack == NULL )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_LOAD_NULL_STACK_core0, ( uint32_t ) ucCallDepth_core0 );
+    }
+
     uxLowerCSA = **ppxTopOfStack;
+    if( uxLowerCSA == 0u )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_LOAD_BAD_CSA_core0, uxLowerCSA );
+    }
+
     ( *ppxTopOfStack )++;
     uxCriticalNesting_core0 = **ppxTopOfStack;
     ( *ppxTopOfStack )++;
@@ -305,9 +385,23 @@ void vPortLoadContext_core0( unsigned char ucCallDepth_core0 )
         uint32_t * pxCSA = pxPortCsaToAddress_core0( __mfcr( portCPU_PCXI_core0 ) );
         int i;
 
+        if( pxCSA == NULL )
+        {
+            vPortFatalDiag_core0( portDIAG_REASON_LOAD_BAD_CSA_core0, __mfcr( portCPU_PCXI_core0 ) );
+        }
+
         for(i = 0; i < ucCallDepth_core0 - 1; i++)
         {
+            if( pxCSA[ 0 ] == 0u )
+            {
+                vPortFatalDiag_core0( portDIAG_REASON_LOAD_BAD_CSA_core0, ( uint32_t ) i );
+            }
+
             pxCSA = pxPortCsaToAddress_core0( pxCSA[ 0 ] );
+            if( pxCSA == NULL )
+            {
+                vPortFatalDiag_core0( portDIAG_REASON_LOAD_BAD_CSA_core0, ( uint32_t ) i );
+            }
         }
 
         pxCSA[ 0 ] = uxLowerCSA;
@@ -326,6 +420,16 @@ void vPortSaveContext_core0( unsigned char ucCallDepth_core0 )
     /* Get the current context information. */
     uxLowerCSA = __mfcr( portCPU_PCXI_core0 );
 
+    if( pxCurrentTCB_core0 == NULL )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_SAVE_NULL_TCB_core0, ( uint32_t ) ucCallDepth_core0 );
+    }
+
+    if( uxLowerCSA == 0u )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, uxLowerCSA );
+    }
+
     /* If this function is used inside a function from the syscall or interrupt,
      * load the correct context from the call stack */
     if( ucCallDepth_core0 )
@@ -333,16 +437,49 @@ void vPortSaveContext_core0( unsigned char ucCallDepth_core0 )
         uint32_t * pxCSA = pxPortCsaToAddress_core0( uxLowerCSA );
         int i;
 
+        if( pxCSA == NULL )
+        {
+            vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, uxLowerCSA );
+        }
+
         for(i = 0; i < ucCallDepth_core0 - 1; i++)
         {
+            if( pxCSA[ 0 ] == 0u )
+            {
+                vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, ( uint32_t ) i );
+            }
+
             pxCSA = pxPortCsaToAddress_core0( pxCSA[ 0 ] );
+            if( pxCSA == NULL )
+            {
+                vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, ( uint32_t ) i );
+            }
+        }
+
+        if( pxCSA[ 0 ] == 0u )
+        {
+            vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, uxLowerCSA );
         }
 
         uxLowerCSA = pxCSA[ 0 ];
     }
 
     pxLowerCSA = pxPortCsaToAddress_core0( uxLowerCSA );
+    if( pxLowerCSA == NULL )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, uxLowerCSA );
+    }
+
+    if( pxLowerCSA[ 0 ] == 0u )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, uxLowerCSA );
+    }
+
     pxUpperCSA = pxPortCsaToAddress_core0( pxLowerCSA[ 0 ] );
+    if( pxUpperCSA == NULL )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_SAVE_BAD_CSA_core0, pxLowerCSA[ 0 ] );
+    }
 
     /* Load the stack pointer */
     ppxTopOfStack = ( uint32_t ** ) pxCurrentTCB_core0;
@@ -356,8 +493,15 @@ void vPortSaveContext_core0( unsigned char ucCallDepth_core0 )
     **ppxTopOfStack = uxLowerCSA;
 }
 
-void vPortSyscallYield_core0()
+void vPortSyscallYield_core0( void )
 {
+    BaseType_t_core0 xSchedulerState_core0 = xTaskGetSchedulerState_core0();
+
+    if( xSchedulerState_core0 != taskSCHEDULER_RUNNING_core0 )
+    {
+        vPortFatalDiag_core0( portDIAG_REASON_YIELD_SCHED_NOT_RUNNING_core0, ( uint32_t ) xSchedulerState_core0 );
+    }
+
     /* Do a save, switch, execute */
     vPortSaveContext_core0( configSYSCALL_CALL_DEPTH_core0 );
     vTaskSwitchContext_core0();

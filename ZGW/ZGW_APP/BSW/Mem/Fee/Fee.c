@@ -1048,6 +1048,8 @@ static void Fee_ProcessMarkerWait(Fee_InternalStateType waitState, Fee_InternalS
     Fee_State.state = nextState;
 }
 
+long long Fee_MainFunction_Counter =0;
+
 void Fee_MainFunction(void)
 {
     uint32 address;
@@ -1392,4 +1394,6 @@ void Fee_MainFunction(void)
             Fee_SetFailed(FEE_E_INTERNAL, (uint32)Fee_State.state);
             break;
     }
+
+    Fee_MainFunction_Counter++;
 }

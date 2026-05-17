@@ -15,6 +15,17 @@ extern uint32 McuSm_LastResetReason;
 extern uint32 McuSm_LastResetInformation;
 extern uint32 McuSm_IndexResetHistory;
 extern McuSm_ResetHistory_t McuSm_ResetHistory[20u];
+extern volatile uint32 McuSm_LastTrapClass;
+extern volatile uint32 McuSm_LastTrapId;
+extern volatile uint32 McuSm_LastTrapCoreId;
+extern volatile uint32 McuSm_LastTrapTAddr;
+extern volatile uint32 McuSm_LastTrapPcxi;
+extern volatile uint32 McuSm_LastTrapFcx;
+extern volatile uint32 McuSm_LastTrapLcx;
+extern volatile uint32 McuSm_LastTrapPsw;
+extern volatile uint32 McuSm_TrapCounter;
+extern volatile uint32 McuSm_EndinitWaitCounter;
+extern volatile uint32 McuSm_EndinitTimeoutCounter;
 
 extern void McuSm_InitializeBusMpu(void);
 extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);

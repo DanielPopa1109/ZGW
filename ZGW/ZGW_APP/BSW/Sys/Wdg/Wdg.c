@@ -11,40 +11,33 @@ void Wdg_DeInitializeCpu2Watchdog(void);
 void Wdg_DeInitializeSafetyWatchdog(void)
 {
     uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
-    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
-    IfxScuWdt_disableSafetyWatchdog(safetyWdtPw);
-    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    IfxScuWdt_enableSafetyWatchdog(safetyWdtPw);
+    IfxScuWdt_serviceSafetyWatchdog(safetyWdtPw);
 }
 
 void Wdg_DeInitializeCpu0Watchdog(void)
 {
     uint16 passwd;
-    /* Get the SCU watchdog password for CPU0 */
     passwd = IfxScuWdt_getCpuWatchdogPassword();
-    /* Reconfigure the reload value (timeout) */
     IfxScuWdt_changeCpuWatchdogReload(passwd, 15000U);
-    /* Enable the CPU watchdog if disabled (optional) */
-    IfxScuWdt_disableCpuWatchdog(passwd);
+    IfxScuWdt_enableCpuWatchdog(passwd);
+    IfxScuWdt_serviceCpuWatchdog(passwd);
 }
 
 void Wdg_DeInitializeCpu1Watchdog(void)
 {
     uint16 passwd;
-    /* Get the SCU watchdog password for CPU0 */
     passwd = IfxScuWdt_getCpuWatchdogPassword();
-    /* Reconfigure the reload value (timeout) */
     IfxScuWdt_changeCpuWatchdogReload(passwd, 15000U);
-    /* Enable the CPU watchdog if disabled (optional) */
-    IfxScuWdt_disableCpuWatchdog(passwd);
+    IfxScuWdt_enableCpuWatchdog(passwd);
+    IfxScuWdt_serviceCpuWatchdog(passwd);
 }
 
 void Wdg_DeInitializeCpu2Watchdog(void)
 {
     uint16 passwd;
-    /* Get the SCU watchdog password for CPU0 */
     passwd = IfxScuWdt_getCpuWatchdogPassword();
-    /* Reconfigure the reload value (timeout) */
     IfxScuWdt_changeCpuWatchdogReload(passwd, 15000U);
-    /* Enable the CPU watchdog if disabled (optional) */
-    IfxScuWdt_disableCpuWatchdog(passwd);
+    IfxScuWdt_enableCpuWatchdog(passwd);
+    IfxScuWdt_serviceCpuWatchdog(passwd);
 }

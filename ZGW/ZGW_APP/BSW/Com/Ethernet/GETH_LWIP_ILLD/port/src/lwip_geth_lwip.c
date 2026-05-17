@@ -108,8 +108,17 @@ Ifx_Lwip        g_Lwip;
 IfxGeth_Eth     g_IfxGeth;
 uint32          isrTxCount = 0;
 uint32          isrRxCount = 0;
-uint8           channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
-uint8           channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+IFX_ALIGN(32) uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
+IFX_ALIGN(32) uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+volatile uint8  g_LwipNetifReady;
+volatile uint8  g_LwipNetifFlagsAfterSet;
+volatile uint8  g_LwipNetifFlagsCurrent;
+volatile uint8  g_LwipNetifLinkUp;
+volatile uint8  g_LwipInitDone;
+volatile uint32 g_LwipTcpipInitDoneCounter;
+volatile uint32 g_LwipRxTaskCreateResult;
+volatile uint32 g_LwipLinkTaskCreateResult;
+volatile uint32 g_LwipRxIsrBeforeTaskCounter;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -154,11 +163,21 @@ static void lwip_geth_Lwip_applyLinkStatus(void)
 #else
     ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
 #endif
+    g_LwipNetifLinkUp = (uint8)ctrl_status.B.LNKSTS;
 
     if (ctrl_status.B.LNKSTS == 0u)
     {
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+        /* Bring-up fallback: the KIT_A2G_TC375_LITE RJ45 LED may show link while
+         * the PHY status helper still reports down. Keep lwIP up so ARP/ping/UDP
+         * can be validated. Replace this with real DP83825I link handling later.
+         */
+        lwip_geth_Lwip_forceNetifUp();
+        return;
+#else
         netif_set_link_down(&g_Lwip.netif);
         return;
+#endif
     }
 
     if (ctrl_status.B.LNKMOD == 1u)
@@ -179,7 +198,7 @@ static void lwip_geth_Lwip_applyLinkStatus(void)
         IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
     }
 
-    netif_set_link_up(&g_Lwip.netif);
+    lwip_geth_Lwip_forceNetifUp();
 }
 
 /** \brief Polling the timer event flags */
@@ -265,9 +284,37 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 void lwip_geth_Lwip_pollReceiveFlags(void)
 {
     /**
-     * We are assuming that the only interrupt source is an incoming packet
+     * Poll at most one frame. The RX task owns the blocking loop.
      */
-    lwip_geth_netif_input(&g_Lwip.netif);
+    (void)lwip_geth_netif_input_once(&g_Lwip.netif);
+}
+
+
+uint8 lwip_geth_Lwip_isNetifReady(void)
+{
+    g_LwipNetifFlagsCurrent = g_Lwip.netif.flags;
+    return g_LwipNetifReady;
+}
+
+void lwip_geth_Lwip_forceNetifUp(void)
+{
+    netif_set_default(&g_Lwip.netif);
+
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+    /* Bring-up fallback. Some TC375/DP83825I lab configurations report PHY-link
+     * incorrectly while the RJ45 LED and switch link are active. Force the lwIP
+     * admin/link flags so sockets can open and ARP/UDP can be validated.
+     */
+    g_Lwip.netif.flags |= (NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
+#else
+    netif_set_up(&g_Lwip.netif);
+    netif_set_link_up(&g_Lwip.netif);
+#endif
+
+    g_LwipNetifFlagsAfterSet = g_Lwip.netif.flags;
+    g_LwipNetifFlagsCurrent = g_Lwip.netif.flags;
+    g_LwipNetifLinkUp = ((g_Lwip.netif.flags & NETIF_FLAG_LINK_UP) != 0u) ? 1u : 0u;
+    g_LwipNetifReady = 1u;
 }
 
 #if LWIP_GETH_RTOS_ENABLED
@@ -311,8 +358,9 @@ void netif_state_changed(struct netif* netif, netif_nsc_reason_t reason, const n
 #endif
 
 /** \brief LWIP initialization function */
-void lwip_geth_Lwip_init()
+void lwip_geth_Lwip_init(void *arg)
 {
+    (void)arg;
     ip_addr_t default_ipaddr, default_netmask, default_gw;
 #if LWIP_DHCP
     IP4_ADDR(&default_gw, 0, 0, 0, 0);
@@ -331,18 +379,28 @@ void lwip_geth_Lwip_init()
     lwip_init();
 #endif
     /** - initialise and add a \ref netif */
-    g_Lwip.eth_addr = *(eth_addr_t *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress;
+    (void)memcpy(&g_Lwip.eth_addr,
+                 lwip_geth_handle->app_config->geth_lld_config->mac.macAddress,
+                 sizeof(g_Lwip.eth_addr));
 
 #if LWIP_GETH_RTOS_ENABLED
-    netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
-            (void *)0, lwip_geth_netif_init, tcpip_input);
+    if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+            (void *)0, lwip_geth_netif_init, tcpip_input) == NULL_PTR)
+    {
+        LWIP_ASSERT("netif_add failed", 0);
+        return;
+    }
     /* Create a Task for checking the Link */
-    xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
+    g_LwipLinkTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
     /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
-    xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
+    g_LwipRxTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
 #else
-    netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
-            (void *)0, lwip_geth_netif_init, ethernet_input);
+    if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+            (void *)0, lwip_geth_netif_init, ethernet_input) == NULL_PTR)
+    {
+        LWIP_ASSERT("netif_add failed", 0);
+        return;
+    }
 #endif
 
     netif_set_default(&g_Lwip.netif);
@@ -351,7 +409,10 @@ void lwip_geth_Lwip_init()
     /* Initialize interface status change callback */
     netif_set_status_callback(&g_Lwip.netif, LWIP_GETH_NETIF_STATUS_CB_FUNCTION);
 #endif
-    netif_set_up(&g_Lwip.netif);
+    lwip_geth_Lwip_forceNetifUp();
+#if !LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+    lwip_geth_Lwip_applyLinkStatus();
+#endif
 
 #if LWIP_NETIF_HOSTNAME
     g_Lwip.netif.hostname = lwip_geth_handle->app_config->hostname;
@@ -369,6 +430,8 @@ void lwip_geth_Lwip_init()
     netif_add_ext_callback(&g_extCallback, netif_state_changed);
 #endif
     LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init end!\n"));
+    g_LwipInitDone = 1u;
+    g_LwipTcpipInitDoneCounter++;
 }
 
 /** Returns the current time in milliseconds, may be the same as sys_jiffies or at least based on it. */
@@ -398,15 +461,22 @@ IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
 #if !LWIP_GETH_RTOS_ENABLED
     lwip_geth_netif_input(&g_Lwip.netif);
 #else
-    portBASE_TYPE_core2 xHigherPriorityTaskWoken = pdFALSE_core2;
-    vTaskNotifyGiveFromISR_core2( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );
+    if (g_Lwip.EthRxTask != NULL_PTR)
+    {
+        portBASE_TYPE_core2 xHigherPriorityTaskWoken = pdFALSE_core2;
+        vTaskNotifyGiveFromISR_core2( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );
 
-    /* If a task was woken by either a frame being received then we may need to
-     * switch to another task.  If the unblocked task was of higher priority then
-     * the interrupted task it will then execute immediately that the ISR
-     * completes.
-     */
-    portYIELD_FROM_ISR_core2(xHigherPriorityTaskWoken);
+        /* If a task was woken by either a frame being received then we may need to
+         * switch to another task.  If the unblocked task was of higher priority then
+         * the interrupted task it will then execute immediately that the ISR
+         * completes.
+         */
+        portYIELD_FROM_ISR_core2(xHigherPriorityTaskWoken);
+    }
+    else
+    {
+        g_LwipRxIsrBeforeTaskCounter++;
+    }
 #endif
     isrRxCount++;
 }

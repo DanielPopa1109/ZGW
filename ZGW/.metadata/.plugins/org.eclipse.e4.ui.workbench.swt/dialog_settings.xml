@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="ShowViewDialog">
-		<item key="ShowViewDialog.STORE_SELECTED_VIEW_ID" value="org.eclipse.cdt.dsf.gdb.ui.osresources.view"/>
+		<item key="ShowViewDialog.STORE_SELECTED_VIEW_ID" value="com.infineon.aurix.buildsystem.quicklinks.QuickLinksView"/>
 		<item key="DIALOG_X_ORIGIN" value="656"/>
 		<item key="DIALOG_Y_ORIGIN" value="232"/>
 		<item key="DIALOG_WIDTH" value="311"/>

@@ -31,6 +31,7 @@
 
 #include "Platform_Types.h"
 
+#define DEVICE_TC375DP                  1
 #define DEVICE_TC37X                    1
 #define IFX_PIN_PACKAGE_LQFP176         1
 

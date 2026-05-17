@@ -40,7 +40,7 @@ typedef uint8 Dcm_OpStatusType;
 
 /* ===================== Limits ===================== */
 
-#define DCM_MAX_CONNECTIONS          4u
+#define DCM_MAX_CONNECTIONS          6u
 #define DCM_MAX_PDU_LEN              4095u
 #define DCM_MAX_RESPONSE_LEN         4095u
 #define DCM_RX_QUEUE_DEPTH           2u

@@ -34,6 +34,8 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
+/* 0x10000 - (100 MHz / 16384): about 1s with the TC375 watchdog clock used here. */
+#define SAFETYKIT_WDT_RELOAD_1S     0xE829u
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -59,11 +61,8 @@ void initSafetyWatchdog(void)
 
     IfxScuWdt_initConfig(&cfgSafetyWatchdog);
 
-    float32 watchdogBaseFreq;
-
     cfgSafetyWatchdog.inputFrequency = IfxScu_WDTCON1_IR_divBy16384;
-    watchdogBaseFreq = IfxScuCcu_getSpbFrequency() / 16384.;
-    cfgSafetyWatchdog.reload = 0x0000U;
+    cfgSafetyWatchdog.reload = SAFETYKIT_WDT_RELOAD_1S;
 
     IfxScuWdt_initSafetyWatchdog(safetyWatchdog, &cfgSafetyWatchdog);
 
@@ -102,7 +101,7 @@ void serviceSafetyWatchdog(void)
 void initCpuWatchdog(uint8 cpuIndex)
 {
     IfxScuWdt_Config cpuXwdgCfg;
-    Ifx_SCU_WDTCPU *ptrCpuXwatchdog;
+    Ifx_SCU_WDTCPU *ptrCpuXwatchdog = (Ifx_SCU_WDTCPU *)0;
 
     switch (cpuIndex)
     {
@@ -123,13 +122,15 @@ void initCpuWatchdog(uint8 cpuIndex)
             break;
     }
 
+    if (ptrCpuXwatchdog == (Ifx_SCU_WDTCPU *)0)
+    {
+        return;
+    }
+
     IfxScuWdt_initConfig(&cpuXwdgCfg);
 
-    float32 watchdogBaseFreq;
-
     cpuXwdgCfg.inputFrequency = IfxScu_WDTCON1_IR_divBy16384;
-    watchdogBaseFreq = IfxScuCcu_getSpbFrequency() / 16384.;
-    cpuXwdgCfg.reload = 0x0u;
+    cpuXwdgCfg.reload = SAFETYKIT_WDT_RELOAD_1S;
 
     IfxScuWdt_initCpuWatchdog(ptrCpuXwatchdog, &cpuXwdgCfg);
     /* Only service Cpu Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in used somewhere else */

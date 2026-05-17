@@ -8,6 +8,9 @@ static uint8 CanIf_BusOffState[CAN_NUM_CONTROLLERS];
 static uint8 CanIf_ErrorPassiveState[CAN_NUM_CONTROLLERS];
 static uint8 CanIf_ErrorWarningState[CAN_NUM_CONTROLLERS];
 
+volatile uint32 CanIf_ComTxAsyncQueuedCounter = 0u;
+volatile uint32 CanIf_ComTxAsyncRejectedCounter = 0u;
+
 static const CanIf_RxPduConfigType CanIf_RxPduConfig[] =
 {
     { CANIF_PDU_CLASSIC_PHYS_RX, CAN_CONTROLLER_CLASSIC, 0x710u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 1u, 8u,  CANIF_RX_TARGET_CANTP },
@@ -299,7 +302,22 @@ Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLeng
     pdu.dlc = (uint8)len;
     pdu.sdu = data;
 
-    return Can_Write(cfg->hth, &pdu);
+    if (Can_Write(cfg->hth, &pdu) != E_OK)
+    {
+        if (cfg->target == CANIF_TX_TARGET_COM)
+        {
+            CanIf_ComTxAsyncRejectedCounter++;
+        }
+
+        return E_NOT_OK;
+    }
+
+    if (cfg->target == CANIF_TX_TARGET_COM)
+    {
+        CanIf_ComTxAsyncQueuedCounter++;
+    }
+
+    return E_OK;
 }
 
 void CanIf_RxIndication(const Can_FrameType* frame)

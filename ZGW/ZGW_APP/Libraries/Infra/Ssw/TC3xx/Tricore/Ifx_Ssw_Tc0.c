@@ -254,11 +254,8 @@ static void __Core0_start(void)
 
     Ifx_Ssw_setCpuEndinitInline(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
 
-    /* CPU and safety watchdogs are enabled by default,
-     * C initialization functions are not servicing the watchdogs.
-     */
-    Ifx_Ssw_disableCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
-    Ifx_Ssw_disableSafetyWatchdog(safetyWdtPassword);
+    Ifx_Ssw_serviceCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
+    Ifx_Ssw_serviceSafetyWatchdog(safetyWdtPassword);
 
     /* Hook functions to initialize application specific HW extensions */
 	hardware_init_hook();
@@ -269,14 +266,14 @@ static void __Core0_start(void)
 	/* Hook functions to initialize application specific SW extensions */
 	software_init_hook();
 
-    Ifx_Ssw_enableSafetyWatchdog(safetyWdtPassword);
+    Ifx_Ssw_serviceSafetyWatchdog(safetyWdtPassword);
 
 #if (IFX_CFG_SSW_ENABLE_TRICORE0 == 0)
     /* Set the CPU 0 to Idle mode, if it is not needed to be enabled */
     Ifx_Ssw_setCpu0Idle();
 #endif
 
-    Ifx_Ssw_enableCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
+    Ifx_Ssw_serviceCpuWatchdog(&MODULE_SCU.WDTCPU[0], cpuWdtPassword);
 
     /*Call main function of Cpu0 */
 #ifdef IFX_CFG_SSW_RETURN_FROM_MAIN

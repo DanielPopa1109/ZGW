@@ -47,6 +47,17 @@ Std_ReturnType Com_GetRxSignalDiagStatus(Com_SignalIdType SignalId,
 void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
 void Com_TxConfirmation(PduIdType TxPduId);
 
+extern volatile uint16 Com_DebugFindSignalLastId;
+extern volatile uint16 Com_DebugFindSignalIndex;
+extern volatile uint16 Com_DebugFindSignalCount;
+extern volatile uint16 Com_DebugFindSignalEntryId;
+extern volatile uint8 Com_DebugFindSignalHit;
+extern volatile uint16 Com_DebugReceiveSignalLastId;
+extern volatile uint16 Com_DebugReceiveSignalLastPduId;
+extern volatile uint8 Com_DebugReceiveSignalLastRxIdx;
+extern volatile uint8 Com_DebugReceiveSignalLastRet;
+extern volatile uint32 Com_DebugReceiveSignalLastValue;
+
 
 /* DBC generated CAN Classic COM I-PDU IDs and Signal IDs. */
 #define COM_TX_PDU_VEHICLESTATE                                 10u

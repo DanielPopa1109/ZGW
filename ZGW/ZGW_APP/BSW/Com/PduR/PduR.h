@@ -5,7 +5,7 @@
 #include "TcpIpH.h"
 
 #define PDUR_MAX_TP_BUFFER             4095u
-#define PDUR_MAX_TP_RX_ROUTES          8u
+#define PDUR_MAX_TP_RX_ROUTES          6u
 #define PDUR_MAX_IF_ROUTE_DATA_LEN     64u
 #define PDUR_SOAD_INVALID_SOCON        0xFFu
 
@@ -65,5 +65,7 @@ void PduR_DoIPRxIndication(uint16 sourceAddress,
                            uint16 targetAddress,
                            const uint8* uds,
                            uint16 udsLen);
+void PduR_DoIPCore0MainFunction(void);
+void PduR_DoIPCore2MainFunction(void);
 
 #endif

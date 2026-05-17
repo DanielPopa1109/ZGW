@@ -62,6 +62,9 @@ typedef enum LWIP_GETH_STATUS
   LWIP_GETH_STATUS_FAILURE                                  /**< Unknown error */
 
 } LWIP_GETH_STATUS_t;
+
+IFX_EXTERN volatile uint32 LWIP_GETH_InitCallCounter;
+IFX_EXTERN volatile uint32 LWIP_GETH_TcpipInitCallCounter;
 /**
  * @}
  */

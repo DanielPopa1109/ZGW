@@ -20,9 +20,12 @@ extern void Os_Init_C0(void);
 extern void Os_Init_C1(void);
 extern void Os_Init_C2(void);
 
-extern long long OS_Counter_core0;
-extern long long OS_Counter_core1;
-extern long long OS_Counter_core2;
+extern volatile long long OS_Counter_core0;
+extern volatile long long OS_Counter_core1;
+extern volatile long long OS_Counter_core2;
+extern volatile long long IDLE_Counter_core0;
+extern volatile long long IDLE_Counter_core1;
+extern volatile long long IDLE_Counter_core2;
 
 extern volatile uint8 Os_CpuLoadPercent_core0;
 extern volatile uint8 Os_CpuLoadPercent_core1;
@@ -31,6 +34,11 @@ extern volatile uint8 Os_CpuLoadPercent_core2;
 extern volatile uint16 Os_CpuLoadPermille_core0;
 extern volatile uint16 Os_CpuLoadPermille_core1;
 extern volatile uint16 Os_CpuLoadPermille_core2;
+extern volatile uint8 Os_EthStackInitialized;
+extern volatile uint8 Os_EthNetifReadyBeforeStackInit;
+extern volatile uint32 Os_EthNetifWaitLoops;
+extern volatile uint32 Os_Core2AsilApplStackHighWater;
+extern volatile uint32 Os_Core2QmBswStackHighWater;
 
 uint8 Os_GetCpuLoadPercent(uint8 CoreId);
 uint16 Os_GetCpuLoadPermille(uint8 CoreId);

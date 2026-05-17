@@ -36,6 +36,8 @@ typedef struct
 
 static LinTp_StateType LinTp_State;
 
+long long LinTp_MainFunction_Counter = 0;
+
 void LinTp_Init(uint8 configuredNad)
 {
     memset(&LinTp_State, 0, sizeof(LinTp_State));
@@ -192,6 +194,8 @@ void LinTp_MainFunction(void)
         PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
     }
+
+    LinTp_MainFunction_Counter++;
 }
 
 static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)

@@ -258,8 +258,7 @@ sys_sem_new(sys_sem_t *sem, u8_t initial_count)
     LWIP_ASSERT("initial_count invalid (not 0 or 1)",
             (initial_count == 0) || (initial_count == 1));
 
-    //sem->sem = xSemaphoreCreateBinary();
-    vSemaphoreCreateBinary_core2(sem->sem);
+    sem->sem = xSemaphoreCreateBinary_core2();
     if (sem->sem == NULL)
     {
         SYS_STATS_INC(sem.err);

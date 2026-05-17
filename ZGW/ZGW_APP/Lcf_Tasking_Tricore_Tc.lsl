@@ -1,14 +1,14 @@
-#define LCF_CSA0_SIZE 2k
-#define LCF_USTACK0_SIZE 512
-#define LCF_ISTACK0_SIZE 512
+#define LCF_CSA0_SIZE 5k
+#define LCF_USTACK0_SIZE 2k
+#define LCF_ISTACK0_SIZE 1k
 
-#define LCF_CSA1_SIZE 2k
-#define LCF_USTACK1_SIZE 512
-#define LCF_ISTACK1_SIZE 512
+#define LCF_CSA1_SIZE 5k
+#define LCF_USTACK1_SIZE 2k
+#define LCF_ISTACK1_SIZE 1k
 
-#define LCF_CSA2_SIZE 2k
-#define LCF_USTACK2_SIZE 512
-#define LCF_ISTACK2_SIZE 512
+#define LCF_CSA2_SIZE 5k
+#define LCF_USTACK2_SIZE 2k
+#define LCF_ISTACK2_SIZE 1k
 
 #define LCF_HEAP_SIZE  128
 
@@ -670,10 +670,182 @@ derivative tc37
             }
         }
 
+
+
+        /**************************************************************************************************************
+         * Ethernet/lwIP RAM offload.
+         * Keep the CPU0 DSPR catch-all below from overflowing when lwIP UDP/TCP pools are enlarged.
+         * These sections are still normal initialized/cleared RAM; only their run address changes.
+         *************************************************************************************************************/
+
+        group bsw_eth_lwip_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
+        {
+            select ".data.mem.*";
+            select ".bss.mem.*";
+            select ".data.memp.*";
+            select ".bss.memp.*";
+            select ".data.pbuf.*";
+            select ".bss.pbuf.*";
+            select ".data.netbuf.*";
+            select ".bss.netbuf.*";
+            select ".data.netconn.*";
+            select ".bss.netconn.*";
+            select ".data.api_lib.*";
+            select ".bss.api_lib.*";
+            select ".data.api_msg.*";
+            select ".bss.api_msg.*";
+            select ".data.sockets.*";
+            select ".bss.sockets.*";
+            select ".data.tcpip.*";
+            select ".bss.tcpip.*";
+            select ".data.tcp.*";
+            select ".bss.tcp.*";
+            select ".data.tcp_in.*";
+            select ".bss.tcp_in.*";
+            select ".data.tcp_out.*";
+            select ".bss.tcp_out.*";
+            select ".data.udp.*";
+            select ".bss.udp.*";
+            select ".data.raw.*";
+            select ".bss.raw.*";
+            select ".data.ip.*";
+            select ".bss.ip.*";
+            select ".data.ip4.*";
+            select ".bss.ip4.*";
+            select ".data.ip4_addr.*";
+            select ".bss.ip4_addr.*";
+            select ".data.ip4_frag.*";
+            select ".bss.ip4_frag.*";
+            select ".data.inet.*";
+            select ".bss.inet.*";
+            select ".data.inet_chksum.*";
+            select ".bss.inet_chksum.*";
+            select ".data.etharp.*";
+            select ".bss.etharp.*";
+            select ".data.ethernet.*";
+            select ".bss.ethernet.*";
+            select ".data.netif.*";
+            select ".bss.netif.*";
+            select ".data.netifapi.*";
+            select ".bss.netifapi.*";
+            select ".data.dhcp.*";
+            select ".bss.dhcp.*";
+            select ".data.dns.*";
+            select ".bss.dns.*";
+            select ".data.icmp.*";
+            select ".bss.icmp.*";
+            select ".data.igmp.*";
+            select ".bss.igmp.*";
+            select ".data.def.*";
+            select ".bss.def.*";
+            select ".data.err.*";
+            select ".bss.err.*";
+            select ".data.init.*";
+            select ".bss.init.*";
+            select ".data.sys.*";
+            select ".bss.sys.*";
+            select ".data.sys_arch.*";
+            select ".bss.sys_arch.*";
+        }
+
+        group bsw_eth_driver_dlmu2 (ordered, align = 8, attributes=rw, run_addr = mem:cpu2_dlmu)
+        {
+            select ".data.lwip_geth.*";
+            select ".bss.lwip_geth.*";
+            select ".data.lwip_geth_conf.*";
+            select ".bss.lwip_geth_conf.*";
+            select ".data.lwip_geth_lwip.*";
+            select ".bss.lwip_geth_lwip.*";
+            select ".data.lwip_geth_netif.*";
+            select ".bss.lwip_geth_netif.*";
+            select ".data.lwip_geth_private_phy_dp83825i.*";
+            select ".bss.lwip_geth_private_phy_dp83825i.*";
+            select ".data.lwip_geth_private_phy_rtl8211f.*";
+            select ".bss.lwip_geth_private_phy_rtl8211f.*";
+        }
+
+        group bsw_eth_glue_dlmu2 (ordered, align = 8, attributes=rw, run_addr = mem:cpu2_dlmu)
+        {
+            select ".data.EthStack.*";
+            select ".bss.EthStack.*";
+            select ".data.EthStack_Cfg.*";
+            select ".bss.EthStack_Cfg.*";
+            select ".data.TcpIpH.*";
+            select ".bss.TcpIpH.*";
+            select ".data.SoAd.*";
+            select ".bss.SoAd.*";
+            select ".data.DoIP.*";
+            select ".bss.DoIP.*";
+            select ".data.SomeIp.*";
+            select ".bss.SomeIp.*";
+            select ".data.SomeIpSd.*";
+            select ".bss.SomeIpSd.*";
+        }
+
+        group bsw_com_misc_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
+        {
+            select ".data.Assert.*";
+            select ".bss.Assert.*";
+            select ".data.Com.*";
+            select ".bss.Com.*";
+            select ".data.Com_Cfg.*";
+            select ".bss.Com_Cfg.*";
+            select ".data.ComM.*";
+            select ".bss.ComM.*";
+            select ".data.Nm.*";
+            select ".bss.Nm.*";
+            select ".data.CanSM.*";
+            select ".bss.CanSM.*";
+            select ".data.Lin.*";
+            select ".bss.Lin.*";
+            select ".data.LinIf.*";
+            select ".bss.LinIf.*";
+            select ".data.LinTp.*";
+            select ".bss.LinTp.*";
+            select ".data.LinSM.*";
+            select ".bss.LinSM.*";
+            select ".data.GatewaySwc.*";
+            select ".bss.GatewaySwc.*";
+        }
+
         /**************************************************************************************************************
          * Explicit BSW module placement.
          * These groups must appear before the default .data/.bss catch-all below.
          *************************************************************************************************************/
+
+        /**************************************************************************************************************
+         * Large BSW RAM placement.
+         * Fee work buffers are ~32 KiB each and must not stay in CPU2 DSPR.
+         * CAN runtime no longer uses cpu2_dlmu, because that DLMU is already used by Ethernet/lwIP glue.
+         *************************************************************************************************************/
+
+        /**************************************************************************************************************
+         * Fee work-buffer placement.
+         * Fee_JobData and Fee_PendingData are ~32 KiB each. Do NOT keep them in one ordered group,
+         * because TASKING then needs one contiguous ~64 KiB gap. Split them across DSPR0/DLMU0.
+         *************************************************************************************************************/
+
+        group bsw_mem_fee_jobdata_dsram0 (ordered, align = 8, attributes=rw, run_addr = mem:dsram0)
+        {
+            select ".bss.Fee.Fee_JobData";
+        }
+
+        group bsw_mem_fee_pendingdata_cpu0_dlmu (ordered, align = 8, attributes=rw, run_addr = mem:cpu0_dlmu)
+        {
+            select ".bss.Fee.Fee_PendingData";
+        }
+
+        group bsw_com_can_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        {
+            select ".data.Can.*";
+            select ".bss.Can.*";
+            select ".data.CAN_*";
+            select ".bss.CAN_*";
+            select ".data.can_*";
+            select ".bss.can_*";
+            select ".data.lmudata_can*";
+            select ".bss.lmubss_can*";
+        }
 
         group bsw_diag_dcm_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
         {
@@ -701,12 +873,6 @@ derivative tc37
             select ".bss.dem_*";
             select ".data.lmudata_dem*";
             select ".bss.lmubss_dem*";
-        }
-
-        group bsw_mem_fee_work_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
-        {
-            select ".bss.Fee.Fee_JobData";
-            select ".bss.Fee.Fee_PendingData";
         }
 
         group bsw_mem_nvm_fee_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
@@ -757,18 +923,6 @@ derivative tc37
             select ".bss.cantp_*";
             select ".data.lmudata_cantp*";
             select ".bss.lmubss_cantp*";
-        }
-
-        group bsw_com_can_dlmu2 (ordered, align = 8, attributes=rw, run_addr = mem:cpu2_dlmu)
-        {
-            select ".data.Can.*";
-            select ".bss.Can.*";
-            select ".data.CAN_*";
-            select ".bss.CAN_*";
-            select ".data.can_*";
-            select ".bss.can_*";
-            select ".data.lmudata_can*";
-            select ".bss.lmubss_can*";
         }
 
         group bsw_com_canif_pdur_dlmu1 (ordered, align = 8, attributes=rw, run_addr = mem:cpu1_dlmu)

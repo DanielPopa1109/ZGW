@@ -12,7 +12,7 @@
 #define GATEWAYSWC_MAIN_PERIOD_MS       5u
 #define GATEWAYSWC_ROUTE_PERIOD_MS      10u
 #define GATEWAYSWC_OUTPUT_PERIOD_MS     10u
-#define GATEWAYSWC_ETH_PERIOD_MS        100u
+#define GATEWAYSWC_ETH_PERIOD_MS        1000u //todo
 
 #define GATEWAYSWC_ETH_SOCON_ID         4u
 #define GATEWAYSWC_ETH_MAX_PAYLOAD      256u
@@ -69,6 +69,10 @@ typedef struct
     uint32 ethFramesSent;
     uint32 ethFramesFailed;
     uint32 ethSignalsPublished;
+    uint8 ethLastOpenResult;
+    uint8 ethLastSoAdResult;
+    uint8 ethLastTransmitOk;
+    uint16 ethLastPayloadLength;
     uint16 configuredRoutes;
     uint16 rxDiagConfiguredMessages;
     uint16 rxDiagConfiguredSignals;
@@ -133,6 +137,39 @@ typedef struct
     uint32 nmPn1;
 } GatewaySwc_CommandType;
 
+extern volatile uint16 GatewaySwc_RxMessageDiagDebugPduId[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint8 GatewaySwc_RxMessageDiagDebugStatus[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxMessageTimeoutCounter[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxMessageTimeoutActiveSamples[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint16 GatewaySwc_RxSignalDiagDebugSignalId[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint8 GatewaySwc_RxSignalDiagDebugStatus[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalDiagDebugValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalDiagDebugInvalidValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalTimeoutCounter[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalTimeoutActiveSamples[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalInvalidCounter[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalInvalidActiveSamples[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint16 GatewaySwc_DebugPublishFirstSignalId;
+extern volatile uint16 GatewaySwc_DebugPublishLastSignalId;
+extern volatile uint16 GatewaySwc_DebugPublishSignalId;
+extern volatile uint16 GatewaySwc_DebugPublishLen;
+extern volatile uint8 GatewaySwc_DebugPublishBus;
+extern volatile uint8 GatewaySwc_DebugPublishReceiveResult;
+extern volatile uint32 GatewaySwc_DebugPublishValue;
+extern volatile uint32 GatewaySwc_DebugLoadRequestCounter;
+extern volatile uint32 GatewaySwc_DebugLoadRequestCrc;
+extern volatile uint32 GatewaySwc_DebugLoadRequestAlive;
+extern volatile uint8 GatewaySwc_DebugLoadRequestChanged;
+extern volatile uint8 GatewaySwc_DebugDtcQueueHead;
+extern volatile uint8 GatewaySwc_DebugDtcQueueTail;
+extern volatile uint8 GatewaySwc_DebugDtcQueueCount;
+extern volatile uint32 GatewaySwc_DebugDtcDropped;
+extern volatile uint32 GatewaySwc_DebugDtcFlushed;
+extern volatile uint32 GatewaySwc_DebugDtcLastDtc;
+extern volatile uint8 GatewaySwc_DebugDtcLastStatus;
+extern volatile uint8 GatewaySwc_DebugDtcLastOpenResult;
+extern volatile uint8 GatewaySwc_DebugDtcLastTxResult;
+
 void GatewaySwc_Init(void);
 void GatewaySwc_MainFunction(void);
 
@@ -147,6 +184,7 @@ Std_ReturnType GatewaySwc_GetRxMessageDiagSnapshot(uint16 index, GatewaySwc_RxDi
 Std_ReturnType GatewaySwc_GetRxSignalDiagSnapshot(uint16 index, GatewaySwc_RxDiagSnapshotType *snapshot);
 Std_ReturnType GatewaySwc_CaptureRxDiagFreezeFrame(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 Std_ReturnType GatewaySwc_CaptureRxDiagExtendedData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
+void GatewaySwc_ReportDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteType status);
 
 void GatewaySwc_EthRxIndication(uint8 soConId,
                                 const TcpIp_SockAddrType *remoteAddr,

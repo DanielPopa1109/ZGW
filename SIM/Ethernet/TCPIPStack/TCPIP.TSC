@@ -1,4 +1,15 @@
 ﻿[TCPIP]
-ChnCount=0
+ChnCount=1
 vMaintainEthConfigurationCreateDynamically=0
 vSocketStackIndex=1
+
+[EthChn0]
+FActiveDelayAck=0
+NetworkCardNum=0
+IPMAC_NUM=3
+IPMAC_Key0=192.168.1.139
+IPMAC_IP0=FF:FF:FF:FF:FF:FF
+IPMAC_Key1=192.168.1.255
+IPMAC_IP1=FF:FF:FF:FF:FF:FF
+IPMAC_Key2=192.168.1.10
+IPMAC_IP2=FF:FF:FF:FF:FF:FF

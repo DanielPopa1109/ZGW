@@ -18,6 +18,8 @@
 #define FLS_E_PARAM_LENGTH         (0x04u)
 #define FLS_E_PARAM_POINTER        (0x05u)
 #define FLS_E_VERIFY               (0x06u)
+#define FLS_DMU_ERR_MASK           (0x7Fu)
+#define FLS_DMU_WAIT_ERROR         (0x80000000u)
 
 typedef enum
 {
@@ -53,6 +55,8 @@ static Fls_StateType Fls_State =
     MEMIF_MODE_SLOW
 };
 
+volatile uint32 Fls_LastDmuError = 0u;
+
 static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
 {
     if (length == 0u)
@@ -70,19 +74,32 @@ static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
     return TRUE;
 }
 
-static boolean Fls_IsBlank(Fls_AddressType address, Fls_LengthType length)
+static void Fls_ClearDmuStatus(void)
 {
-    const volatile uint8 *ptr = (const volatile uint8 *)Fls_GetPhysicalAddress(address);
-    Fls_LengthType i;
+    IfxFlash_clearStatus(FLS_FLASH_MODULE);
+    Fls_LastDmuError = 0u;
+}
 
-    for (i = 0u; i < length; i++)
+static boolean Fls_DmuHasError(void)
+{
+    Fls_LastDmuError = (uint32)(DMU_HF_ERRSR.U & FLS_DMU_ERR_MASK);
+    return (Fls_LastDmuError != 0u) ? TRUE : FALSE;
+}
+
+static Std_ReturnType Fls_WaitDmuReady(void)
+{
+    if (IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0) != 0u)
     {
-        if (ptr[i] != FLS_ERASED_VALUE)
-        {
-            return FALSE;
-        }
+        Fls_LastDmuError = FLS_DMU_WAIT_ERROR;
+        return E_NOT_OK;
     }
-    return TRUE;
+
+    if (Fls_DmuHasError() != FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    return E_OK;
 }
 
 uint32 Fls_GetPhysicalAddress(Fls_AddressType Address)
@@ -114,26 +131,50 @@ static Std_ReturnType Fls_ProgramOnePage(Fls_AddressType address, const uint8 *d
     memcpy(&word0, &data[0], sizeof(word0));
     memcpy(&word1, &data[4], sizeof(word1));
 
+    Fls_ClearDmuStatus();
+
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
     interruptState = IfxCpu_disableInterrupts();
 #endif
 
-    IfxFlash_enterPageMode(physicalAddress);
-    IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0);
+    if (IfxFlash_enterPageMode(physicalAddress) != 0u)
+    {
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+        IfxCpu_restoreInterrupts(interruptState);
+#endif
+        return E_NOT_OK;
+    }
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
     IfxFlash_loadPage2X32(physicalAddress, word0, word1);
 
     password = IfxScuWdt_getSafetyWatchdogPassword();
     IfxScuWdt_clearSafetyEndinit(password);
     IfxFlash_writePage(physicalAddress);
     IfxScuWdt_setSafetyEndinit(password);
-    IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0);
 
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
     IfxCpu_restoreInterrupts(interruptState);
 #endif
 
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
 #if (FLS_VERIFY_WRITE == STD_ON)
-    IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0);
     if (memcmp((const void *)physicalAddress, data, FLS_DFLASH0_PAGE_SIZE) != 0)
     {
         return E_NOT_OK;
@@ -150,6 +191,8 @@ static Std_ReturnType Fls_EraseOneSector(Fls_AddressType address)
     boolean interruptState;
 #endif
 
+    Fls_ClearDmuStatus();
+
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
     interruptState = IfxCpu_disableInterrupts();
 #endif
@@ -158,14 +201,30 @@ static Std_ReturnType Fls_EraseOneSector(Fls_AddressType address)
     IfxScuWdt_clearSafetyEndinit(password);
     IfxFlash_eraseMultipleSectors(physicalAddress, 1u);
     IfxScuWdt_setSafetyEndinit(password);
-    IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0);
 
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
     IfxCpu_restoreInterrupts(interruptState);
 #endif
 
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
 #if (FLS_VERIFY_ERASE == STD_ON)
-    if (Fls_IsBlank(address, FLS_DFLASH0_SECTOR_SIZE) == FALSE)
+    Fls_ClearDmuStatus();
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
+    IfxFlash_eraseVerifySector(physicalAddress);
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
     {
         return E_NOT_OK;
     }
@@ -313,6 +372,8 @@ void Fls_SetMode(MemIf_ModeType Mode)
     Fls_State.mode = Mode;
 }
 
+long long Fls_MainFunction_Counter = 0;
+
 void Fls_MainFunction(void)
 {
     Fls_AddressType current;
@@ -374,4 +435,6 @@ void Fls_MainFunction(void)
             Fls_FinishJob(MEMIF_JOB_FAILED);
             break;
     }
+
+    Fls_MainFunction_Counter++;
 }

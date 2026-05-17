@@ -47,6 +47,10 @@
 
 #include "IfxAsclin_Lin.h"
 
+#ifndef IFXASCLIN_LIN_WAIT_LOOP_LIMIT
+#define IFXASCLIN_LIN_WAIT_LOOP_LIMIT 100000u
+#endif
+
 /******************************************************************************/
 /*-------------------------Function Implementations---------------------------*/
 /******************************************************************************/
@@ -664,13 +668,15 @@ void IfxAsclin_Lin_sendResponse(IfxAsclin_Lin *asclin, uint8 *data, uint32 lengt
 boolean IfxAsclin_Lin_waitForReceivedHeader(IfxAsclin_Lin *asclin)
 {
     boolean result = 0;
+    uint32 waitLoops = IFXASCLIN_LIN_WAIT_LOOP_LIMIT;
 	
     /* clear all aknowledgement and error flags status */
     IfxAsclin_Lin_clearFlagsStatus(asclin);     
 
     /* wait until receive header end acknowledgemnet has been detected  */
-    while (asclin->acknowledgmentFlags.rxHeaderEnd != 1)
+    while ((asclin->acknowledgmentFlags.rxHeaderEnd != 1) && (waitLoops > 0u))
     {
+        waitLoops--;
         IfxAsclin_Lin_checkForReceivedHeaderFlags(asclin);
 
         if ((asclin->errorFlagsStatus.headerTimeout == 1)
@@ -684,6 +690,11 @@ boolean IfxAsclin_Lin_waitForReceivedHeader(IfxAsclin_Lin *asclin)
         }
     }
 
+    if (asclin->acknowledgmentFlags.rxHeaderEnd != 1)
+    {
+        result = 1;
+    }
+
     return result;
 }
 
@@ -691,13 +702,15 @@ boolean IfxAsclin_Lin_waitForReceivedHeader(IfxAsclin_Lin *asclin)
 boolean IfxAsclin_Lin_waitForReceivedResponse(IfxAsclin_Lin *asclin)
 {
     boolean result = 0;
+    uint32 waitLoops = IFXASCLIN_LIN_WAIT_LOOP_LIMIT;
 	
     /* clear all aknowledgement and error flags status */
     IfxAsclin_Lin_clearFlagsStatus(asclin);     
 
     /* wait until receive response end acknowledgemnet has been detected  */
-    while (asclin->acknowledgmentFlags.rxResponseEnd != 1)
+    while ((asclin->acknowledgmentFlags.rxResponseEnd != 1) && (waitLoops > 0u))
     {
+        waitLoops--;
         IfxAsclin_Lin_checkForReceivedResponseFlags(asclin);
 
         if ((asclin->errorFlagsStatus.rxFifoOverflow == 1)
@@ -712,6 +725,11 @@ boolean IfxAsclin_Lin_waitForReceivedResponse(IfxAsclin_Lin *asclin)
         }
     }
 
+    if (asclin->acknowledgmentFlags.rxResponseEnd != 1)
+    {
+        result = 1;
+    }
+
     return result;
 }
 
@@ -719,13 +737,15 @@ boolean IfxAsclin_Lin_waitForReceivedResponse(IfxAsclin_Lin *asclin)
 boolean IfxAsclin_Lin_waitForTransmittedHeader(IfxAsclin_Lin *asclin)
 {
     boolean result = 0;
+    uint32 waitLoops = IFXASCLIN_LIN_WAIT_LOOP_LIMIT;
 	
     /* clear all aknowledgement and error flags status */
     IfxAsclin_Lin_clearFlagsStatus(asclin);     
 
     /* wait until transmit header end acknowledgemnet has been detected */
-    while (asclin->acknowledgmentFlags.txHeaderEnd != 1)
+    while ((asclin->acknowledgmentFlags.txHeaderEnd != 1) && (waitLoops > 0u))
     {
+        waitLoops--;
         IfxAsclin_Lin_checkForTransmittedHeaderFlags(asclin);
 
         if ((asclin->errorFlagsStatus.headerTimeout == 1)
@@ -738,6 +758,11 @@ boolean IfxAsclin_Lin_waitForTransmittedHeader(IfxAsclin_Lin *asclin)
         }
     }
 
+    if (asclin->acknowledgmentFlags.txHeaderEnd != 1)
+    {
+        result = 1;
+    }
+
     return result;
 }
 
@@ -745,13 +770,15 @@ boolean IfxAsclin_Lin_waitForTransmittedHeader(IfxAsclin_Lin *asclin)
 boolean IfxAsclin_Lin_waitForTransmittedResponse(IfxAsclin_Lin *asclin)
 {
     boolean result = 0;
+    uint32 waitLoops = IFXASCLIN_LIN_WAIT_LOOP_LIMIT;
 	
     /* clear all aknowledgement and error flags status */
     IfxAsclin_Lin_clearFlagsStatus(asclin);     
 
     /* wait until transmit response end acknowledgemnet has been detected */
-    while (asclin->acknowledgmentFlags.txResponseEnd != 1)
+    while ((asclin->acknowledgmentFlags.txResponseEnd != 1) && (waitLoops > 0u))
     {
+        waitLoops--;
         IfxAsclin_Lin_checkForTransmittedResponseFlags(asclin);
 
         if ((asclin->errorFlagsStatus.txFifoOverflow == 1)
@@ -762,6 +789,11 @@ boolean IfxAsclin_Lin_waitForTransmittedResponse(IfxAsclin_Lin *asclin)
             result = 1;
             break;
         }
+    }
+
+    if (asclin->acknowledgmentFlags.txResponseEnd != 1)
+    {
+        result = 1;
     }
 
     return result;

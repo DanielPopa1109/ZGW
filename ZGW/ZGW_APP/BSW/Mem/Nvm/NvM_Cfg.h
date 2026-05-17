@@ -2,6 +2,7 @@
 #define NVM_CFG_H
 
 #include "Std_Types.h"
+#include "Dem_Int.h"
 #include "Fee_Cfg.h"
 
 typedef uint16 NvM_BlockIdType;
@@ -30,7 +31,7 @@ typedef struct
 #define NVM_BLOCK_ID_DEM_PRIMARY            (1u)
 #define NVM_BLOCK_ID_APP_DATA               (2u)
 
-#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (32u * 1024u)
+#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (sizeof(Dem_NvImageType))
 #define NVM_BLOCK_APP_DATA_LENGTH           (2048u)
 
 #define NVM_MAX_BLOCK_LENGTH                (32u * 1024u)

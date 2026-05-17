@@ -9,20 +9,20 @@
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
 			<item value="GATEWAYSWC_DIAG_PERIOD_MS"/>
-			<item value="GatewaySwc_Command"/>
-			<item value="GatewaySwc_SetCommands"/>
-			<item value="LoadRequest"/>
-			<item value="CAN_TX_HW_PENDING_TIMEOUT_MS "/>
-			<item value="WCAN_ClearEvents"/>
-			<item value="SCR_RequestStandbyWake"/>
-			<item value="Can_ReadRxFifo"/>
-			<item value="SysMgr_NoBusActivity"/>
-			<item value="P33_4"/>
-			<item value="p33_6"/>
-			<item value="p33_5"/>
-			<item value="IfxPort_P33_5"/>
-			<item value="Can_Init"/>
-			<item value="can_init"/>
+			<item value="IFXCFG_P21_3_IO_CONFIG_IN"/>
+			<item value="GATEWAYSWC_ETH_PERIOD_MS"/>
+			<item value="vTaskDelay"/>
+			<item value="ASIL_APPL_Task_C2"/>
+			<item value="QM_BSW_Task_C2"/>
+			<item value=" volatile uint8 g_LwipNetifFlagsAfterSet;"/>
+			<item value="lwip_geth_Lwip_init"/>
+			<item value="tcpip_create"/>
+			<item value="tcpcreate"/>
+			<item value="MCUSM_ENDINIT_WAIT_LIMIT"/>
+			<item value="GatewaySwc_UpdateRxDiagnostics"/>
+			<item value="gateway"/>
+			<item value="IfxCpu_disableInterruptsAllExceptMaster"/>
+			<item value="isr"/>
 		</list>
 		<list key="replacehistory">
 		</list>
