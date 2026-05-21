@@ -78,15 +78,6 @@ typedef enum
 } SmuSR;
 typedef enum
 {
-    disablePES     = 0x0u,
-    onPESIGCS0     = 0x1u,
-    onPESIGCS1     = 0x2u,
-    onPESIGCS2     = 0x4u,
-    onPESNMI       = 0x8u,
-    onPESCPU_RESET = 0x10u,
-} TargetPES;
-typedef enum
-{
     NA     = -1,
     fail   = 0u,
     pass   = 1u,
@@ -104,8 +95,6 @@ typedef struct
 {
     IfxSmu_Alarm                alarm;
     IfxSmu_InternalAlarmAction  alarmReaction;
-    boolean                     externalReactionEnabled;
-    boolean                     triggerRecoveryTimer;
     void                        (*functionToCallOnDetection)(void);
 } AlarmConfigStruct;
 /* Bind an IGCS reaction with its config */
@@ -135,17 +124,10 @@ typedef struct
     SmuStatusType smuCoreAliveTestClearSts;
     SmuStatusType smuCoreKeysTestSts;
     SmuStatusType smuCoreKeysTestClearSts;
-    SmuStatusType stdbySmuFspReactionEnableSts;
-    SmuStatusType smuStdbyFSP0DrivingEnableSts;
-    SmuStatusType smuStdbyFSP1DrivingEnableSts;
     SmuStatusType smuCoreInitSts;
-    SmuStatusType smuCoreAlarmPESSetSts;
-    SmuStatusType smuCoreFSPConfigSts;
-    SmuStatusType smuCoreFSPReactionToAlarmConfigSts;
     SmuStatusType smuSafetyFlipFlopTriggerTestSts;
     SmuStatusType smuSafetyFlipFlopTestResultCheckSts;
     SmuStatusType smuSafetyFlipFlopTestAlarmFlagClearSts;
-    SmuStatusType smuRecoveryTimerConfigSts;
     SmuStatusType smuCoreSWAlarmTriggerSts;
 } SmuExecutionStatusType;
 /*********************************************************************************************************************/

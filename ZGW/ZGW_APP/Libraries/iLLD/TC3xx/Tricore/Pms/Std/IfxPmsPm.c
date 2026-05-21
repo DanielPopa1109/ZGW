@@ -128,7 +128,7 @@ void IfxPmsPm_setStandbyMode(Ifx_PMS *pms, IfxPmsPm_WakeupConfig *config, IfxPms
         IfxScuWdt_setCpuEndinit(cpuWdtPw);
     }
 #ifndef DEVICE_TC33X
-    uint8 index = IfxCpu_getCoreIndex();
+    uint8 index = (uint8)IfxCpu_getCoreIndex();
     IfxScuWdt_clearCpuEndinit(cpuWdtPw);
 
     switch (index)
@@ -175,7 +175,7 @@ boolean IfxPmsPm_setCoreMode(IfxCpu_ResourceCpu cpuIndex, IfxCpu_CoreMode mode)
     boolean  retValue;
     Ifx_CPU *cpu;
 #ifndef DEVICE_TC33X
-    uint8    pmcIndex = cpuIndex;
+    uint8    pmcIndex = (uint8)cpuIndex;
 #endif
     /*Modes such as HALT and STBY are not handled at CPU level */
     retValue = ((mode == IfxCpu_CoreMode_halt) || (mode == IfxCpu_CoreMode_stby)) ? FALSE : TRUE;

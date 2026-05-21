@@ -158,7 +158,6 @@ static Fee_StateType Fee_State;
 static Fee_BlockRuntimeType Fee_Runtime[FEE_CONFIGURED_BLOCKS];
 static uint8 Fee_JobData[FEE_MAX_BLOCK_SIZE + FLS_DFLASH0_PAGE_SIZE];
 static uint8 Fee_PendingData[FEE_MAX_BLOCK_SIZE + FLS_DFLASH0_PAGE_SIZE];
-static uint8 Fee_RecordData[FEE_MAX_BLOCK_SIZE + FLS_DFLASH0_PAGE_SIZE];
 static Fee_RecordHeaderType Fee_RecordHeader;
 static Fee_RecordTrailerType Fee_RecordTrailer;
 static Fee_SectorHeaderType Fee_SectorHeader;
@@ -269,8 +268,6 @@ static void Fee_PrepareSectorHeader(uint32 generation)
 
 static void Fee_PrepareRecord(uint16 blockNumber, uint16 flags, const uint8 *data, uint32 length, uint32 sequence)
 {
-    uint32 i;
-
     Fee_RecordHeader.magic = FEE_RECORD_MAGIC;
     Fee_RecordHeader.blockNumber = blockNumber;
     Fee_RecordHeader.flags = flags;
@@ -278,16 +275,24 @@ static void Fee_PrepareRecord(uint16 blockNumber, uint16 flags, const uint8 *dat
     Fee_RecordHeader.sequence = sequence;
 
     Fee_RecordPaddedLength = Fee_Align8(length);
-    memset(Fee_RecordData, FLS_ERASED_VALUE, sizeof(Fee_RecordData));
-    if ((data != NULL_PTR) && (length > 0u))
+    if (length > 0u)
     {
-        for (i = 0u; i < length; i++)
+        if (data == NULL_PTR)
         {
-            Fee_RecordData[i] = data[i];
+            memset(Fee_JobData, FLS_ERASED_VALUE, Fee_RecordPaddedLength);
+        }
+        else if (data != Fee_JobData)
+        {
+            memcpy(Fee_JobData, data, length);
+        }
+
+        if (Fee_RecordPaddedLength > length)
+        {
+            memset(&Fee_JobData[length], FLS_ERASED_VALUE, (size_t)(Fee_RecordPaddedLength - length));
         }
     }
 
-    Fee_RecordHeader.dataCrc = Crc_CalculateCRC32(Fee_RecordData, length, 0u, TRUE);
+    Fee_RecordHeader.dataCrc = Crc_CalculateCRC32(Fee_JobData, length, 0u, TRUE);
     Fee_RecordHeader.headerCrc = Fee_CalcHeaderCrc(&Fee_RecordHeader);
     Fee_RecordTrailer.commitMagic = FEE_RECORD_COMMIT_MAGIC;
     Fee_RecordTrailer.commitMagicInv = ~FEE_RECORD_COMMIT_MAGIC;
@@ -578,7 +583,7 @@ static Std_ReturnType Fee_StartDataWrite(uint32 address)
     {
         return E_OK;
     }
-    return Fls_Write(address, Fee_RecordData, Fee_RecordPaddedLength);
+    return Fls_Write(address, Fee_JobData, Fee_RecordPaddedLength);
 }
 
 static Std_ReturnType Fee_StartTrailerWrite(uint32 address)

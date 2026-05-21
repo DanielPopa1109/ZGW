@@ -968,7 +968,7 @@ void IfxCan_Can_readMessage(IfxCan_Can_Node *node, IfxCan_Message *message, uint
     message->frameMode = IfxCan_Node_getFrameMode(rxBufferElement);
 
     /*get message bufferNumber*/
-    message->bufferNumber = bufferId;
+    message->bufferNumber = (uint8)bufferId;
 
     /* read data */
     IfxCan_Node_readData(rxBufferElement, message->dataLengthCode, data);

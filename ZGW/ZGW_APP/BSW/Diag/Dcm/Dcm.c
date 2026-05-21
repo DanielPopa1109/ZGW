@@ -313,26 +313,39 @@ static void Dcm_ReleaseProtocol(uint8 connIdx)
 }
 
 
-static void Dcm_BuildNegativeResponse(uint8 connIdx, uint8 sid, uint8 nrc);
-static uint8 Dcm_ShouldSuppressFunctionalNrc(uint8 nrc);
-static const Dcm_ServiceType* Dcm_FindService(uint8 sid);
+static const Dcm_ServiceType* Dcm_FindService(uint8 sid); // @suppress("Unused function declaration")
 static uint8 Dcm_GetSubFunction(uint8 rawSubFunction);
 static uint8 Dcm_IsSuppressPosRspBitSet(uint8 rawSubFunction);
+static Dcm_ReturnType Dcm_Service_ForwardStandard(uint8 sid, uint8 connIdx, Dcm_OpStatusType opStatus, const uint8* req, Dcm_PduLengthType len, uint8* resp, Dcm_PduLengthType* respLen);
 
 /* Services */
 static Dcm_ReturnType Dcm_Service_0x10(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x11(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x14(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x19(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x22(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x23(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x24(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x27(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x28(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x29(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x2A(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x2C(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x2E(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x2F(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x31(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x34(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x35(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x36(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x37(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x38(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x3D(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x3E(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x83(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x84(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x85(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x86(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_0x87(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 
 /* Security */
 static uint32 Dcm_SecMix(uint32 x);
@@ -346,17 +359,31 @@ const Dcm_ServiceType Dcm_DefaultServices[] =
 {
         { DCM_SID_DIAGNOSTIC_SESSION_CONTROL, Dcm_Service_0x10 },
         { DCM_SID_ECU_RESET,                  Dcm_Service_0x11 },
+        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, Dcm_Service_0x14 },
         { DCM_SID_READ_DTC_INFORMATION,       Dcm_Service_0x19 },
         { DCM_SID_READ_DATA_BY_IDENTIFIER,    Dcm_Service_0x22 },
+        { DCM_SID_READ_MEMORY_BY_ADDRESS,     Dcm_Service_0x23 },
+        { DCM_SID_READ_SCALING_DATA_BY_IDENTIFIER, Dcm_Service_0x24 },
         { DCM_SID_SECURITY_ACCESS,            Dcm_Service_0x27 },
         { DCM_SID_COMMUNICATION_CONTROL,      Dcm_Service_0x28 },
+        { DCM_SID_AUTHENTICATION,             Dcm_Service_0x29 },
+        { DCM_SID_READ_DATA_BY_PERIODIC_IDENTIFIER, Dcm_Service_0x2A },
+        { DCM_SID_DYNAMICALLY_DEFINE_DATA_IDENTIFIER, Dcm_Service_0x2C },
         { DCM_SID_WRITE_DATA_BY_IDENTIFIER,   Dcm_Service_0x2E },
+        { DCM_SID_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER, Dcm_Service_0x2F },
         { DCM_SID_ROUTINE_CONTROL,            Dcm_Service_0x31 },
         { DCM_SID_REQUEST_DOWNLOAD,           Dcm_Service_0x34 },
+        { DCM_SID_REQUEST_UPLOAD,             Dcm_Service_0x35 },
         { DCM_SID_TRANSFER_DATA,              Dcm_Service_0x36 },
         { DCM_SID_REQUEST_TRANSFER_EXIT,      Dcm_Service_0x37 },
+        { DCM_SID_REQUEST_FILE_TRANSFER,      Dcm_Service_0x38 },
+        { DCM_SID_WRITE_MEMORY_BY_ADDRESS,    Dcm_Service_0x3D },
         { DCM_SID_TESTER_PRESENT,             Dcm_Service_0x3E },
-        { DCM_SID_CONTROL_DTC_SETTING,        Dcm_Service_0x85 }
+        { DCM_SID_ACCESS_TIMING_PARAMETER,    Dcm_Service_0x83 },
+        { DCM_SID_SECURED_DATA_TRANSMISSION,  Dcm_Service_0x84 },
+        { DCM_SID_CONTROL_DTC_SETTING,        Dcm_Service_0x85 },
+        { DCM_SID_RESPONSE_ON_EVENT,          Dcm_Service_0x86 },
+        { DCM_SID_LINK_CONTROL,               Dcm_Service_0x87 }
 };
 
 typedef struct
@@ -370,17 +397,31 @@ static const Dcm_ServiceAccessType Dcm_ServiceAccessTable[] =
 {
         { DCM_SID_DIAGNOSTIC_SESSION_CONTROL, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED, DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_ECU_RESET,                  DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED, DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_READ_DTC_INFORMATION,       DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED,                              DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_READ_DATA_BY_IDENTIFIER,    DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED,                              DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_READ_MEMORY_BY_ADDRESS,     DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_READ_SCALING_DATA_BY_IDENTIFIER, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED,                         DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_SECURITY_ACCESS,            DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_PROGRAMMING,                          DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_COMMUNICATION_CONTROL,      DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_AUTHENTICATION,             DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED, DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_READ_DATA_BY_PERIODIC_IDENTIFIER, DCM_SESSION_MASK_EXTENDED,                                                   DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_DYNAMICALLY_DEFINE_DATA_IDENTIFIER, DCM_SESSION_MASK_EXTENDED,                                                 DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_WRITE_DATA_BY_IDENTIFIER,   DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER, DCM_SESSION_MASK_EXTENDED,                                                 DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_ROUTINE_CONTROL,            DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_PROGRAMMING,                          DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_REQUEST_DOWNLOAD,           DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_REQUEST_UPLOAD,             DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_TRANSFER_DATA,              DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_REQUEST_TRANSFER_EXIT,      DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_REQUEST_FILE_TRANSFER,      DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_WRITE_MEMORY_BY_ADDRESS,    DCM_SESSION_MASK_PROGRAMMING,                                                     DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
         { DCM_SID_TESTER_PRESENT,             DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED, DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
-        { DCM_SID_CONTROL_DTC_SETTING,        DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 }
+        { DCM_SID_ACCESS_TIMING_PARAMETER,    DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_SECURED_DATA_TRANSMISSION,  DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_PROGRAMMING,                          DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_CONTROL_DTC_SETTING,        DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_RESPONSE_ON_EVENT,          DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_LOCKED | DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 },
+        { DCM_SID_LINK_CONTROL,               DCM_SESSION_MASK_EXTENDED,                                                        DCM_SEC_MASK_L1 | DCM_SEC_MASK_L2 | DCM_SEC_MASK_L3 }
 };
 
 /* ===================== API ===================== */
@@ -786,6 +827,7 @@ void Dcm_TpTxConfirmation(Dcm_PduIdType id, Dcm_NotifResultType result)
         c->service = NULL_PTR;
         c->state = DCM_CONN_IDLE;
         Dcm_LoadNextRequest(connIdx);
+        Dcm_ReleaseProtocol(connIdx);
     }
 }
 
@@ -1131,6 +1173,18 @@ static uint8 Dcm_IsSuppressPosRspBitSet(uint8 rawSubFunction)
     return ((rawSubFunction & DCM_SUPPRESS_POS_RSP_MSG_INDICATION_BIT) != 0u) ? TRUE : FALSE;
 }
 
+static Dcm_ReturnType Dcm_Service_ForwardStandard(
+        uint8 sid,
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    return DcmAppl_StandardService(connIdx, opStatus, sid, req, len, resp, respLen);
+}
+
 /* ===================== Services ===================== */
 
 static Dcm_ReturnType Dcm_Service_0x10(
@@ -1214,6 +1268,31 @@ static Dcm_ReturnType Dcm_Service_0x11(
     return ret;
 }
 
+static Dcm_ReturnType Dcm_Service_0x14(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    uint32 dtcGroup;
+
+    (void)resp;
+
+    if (len != 3u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    dtcGroup = ((uint32)req[0] << 16u) |
+            ((uint32)req[1] << 8u) |
+            (uint32)req[2];
+
+    *respLen = 0u;
+    return DcmAppl_ClearDiagnosticInformation(connIdx, opStatus, dtcGroup);
+}
+
 static Dcm_ReturnType Dcm_Service_0x19(
         uint8 connIdx,
         Dcm_OpStatusType opStatus,
@@ -1287,6 +1366,38 @@ static Dcm_ReturnType Dcm_Service_0x22(
 
     *respLen = pos;
     return DCM_E_OK;
+}
+
+static Dcm_ReturnType Dcm_Service_0x23(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_READ_MEMORY_BY_ADDRESS, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x24(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len != 2u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_READ_SCALING_DATA_BY_IDENTIFIER, connIdx, opStatus, req, len, resp, respLen);
 }
 
 static Dcm_ReturnType Dcm_Service_0x27(
@@ -1421,6 +1532,54 @@ static Dcm_ReturnType Dcm_Service_0x28(
     return ret;
 }
 
+static Dcm_ReturnType Dcm_Service_0x29(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_AUTHENTICATION, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x2A(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 2u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_READ_DATA_BY_PERIODIC_IDENTIFIER, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x2C(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_DYNAMICALLY_DEFINE_DATA_IDENTIFIER, connIdx, opStatus, req, len, resp, respLen);
+}
+
 static Dcm_ReturnType Dcm_Service_0x2E(
         uint8 connIdx,
         Dcm_OpStatusType opStatus,
@@ -1449,6 +1608,22 @@ static Dcm_ReturnType Dcm_Service_0x2E(
     }
 
     return ret;
+}
+
+static Dcm_ReturnType Dcm_Service_0x2F(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 3u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER, connIdx, opStatus, req, len, resp, respLen);
 }
 
 static Dcm_ReturnType Dcm_Service_0x31(
@@ -1518,6 +1693,22 @@ static Dcm_ReturnType Dcm_Service_0x34(
     }
 
     return ret;
+}
+
+static Dcm_ReturnType Dcm_Service_0x35(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 3u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_REQUEST_UPLOAD, connIdx, opStatus, req, len, resp, respLen);
 }
 
 static Dcm_ReturnType Dcm_Service_0x36(
@@ -1594,6 +1785,38 @@ static Dcm_ReturnType Dcm_Service_0x37(
     return ret;
 }
 
+static Dcm_ReturnType Dcm_Service_0x38(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_REQUEST_FILE_TRANSFER, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x3D(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 2u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_WRITE_MEMORY_BY_ADDRESS, connIdx, opStatus, req, len, resp, respLen);
+}
+
 static Dcm_ReturnType Dcm_Service_0x3E(
         uint8 connIdx,
         Dcm_OpStatusType opStatus,
@@ -1627,6 +1850,39 @@ static Dcm_ReturnType Dcm_Service_0x3E(
     return DCM_E_OK;
 }
 
+static Dcm_ReturnType Dcm_Service_0x83(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    Dcm_Conn[connIdx].suppressPositiveResponse = Dcm_IsSuppressPosRspBitSet(req[0]);
+    return Dcm_Service_ForwardStandard(DCM_SID_ACCESS_TIMING_PARAMETER, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x84(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    return Dcm_Service_ForwardStandard(DCM_SID_SECURED_DATA_TRANSMISSION, connIdx, opStatus, req, len, resp, respLen);
+}
+
 static Dcm_ReturnType Dcm_Service_0x85(
         uint8 connIdx,
         Dcm_OpStatusType opStatus,
@@ -1655,6 +1911,40 @@ static Dcm_ReturnType Dcm_Service_0x85(
     }
 
     return ret;
+}
+
+static Dcm_ReturnType Dcm_Service_0x86(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    Dcm_Conn[connIdx].suppressPositiveResponse = Dcm_IsSuppressPosRspBitSet(req[0]);
+    return Dcm_Service_ForwardStandard(DCM_SID_RESPONSE_ON_EVENT, connIdx, opStatus, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_0x87(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    if (len < 1u)
+    {
+        return DCM_NRC_INCORRECT_LENGTH;
+    }
+
+    Dcm_Conn[connIdx].suppressPositiveResponse = Dcm_IsSuppressPosRspBitSet(req[0]);
+    return Dcm_Service_ForwardStandard(DCM_SID_LINK_CONTROL, connIdx, opStatus, req, len, resp, respLen);
 }
 
 /* ===================== Security algorithm ===================== */
@@ -1750,6 +2040,17 @@ DCM_WEAK Dcm_ReturnType DcmAppl_EcuReset(
     (void)respData;
     (void)respLen;
     return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
+}
+
+DCM_WEAK Dcm_ReturnType DcmAppl_ClearDiagnosticInformation(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        uint32 dtcGroup)
+{
+    (void)connIdx;
+    (void)opStatus;
+    (void)dtcGroup;
+    return DCM_NRC_REQUEST_OUT_OF_RANGE;
 }
 
 DCM_WEAK Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
@@ -1898,6 +2199,26 @@ DCM_WEAK Dcm_ReturnType DcmAppl_RequestTransferExit(
     (void)respLen;
 
     return DCM_NRC_REQUEST_SEQUENCE_ERROR;
+}
+
+DCM_WEAK Dcm_ReturnType DcmAppl_StandardService(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        uint8 sid,
+        const uint8* reqData,
+        Dcm_PduLengthType reqLen,
+        uint8* respData,
+        Dcm_PduLengthType* respLen)
+{
+    (void)connIdx;
+    (void)opStatus;
+    (void)sid;
+    (void)reqData;
+    (void)reqLen;
+    (void)respData;
+    (void)respLen;
+
+    return DCM_NRC_REQUEST_OUT_OF_RANGE;
 }
 
 uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len)

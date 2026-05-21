@@ -140,6 +140,7 @@ const DoIP_ConfigType DoIP_Config =
     .eid = {0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u},
     .gid = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u},
     .logicalAddress = 0x1001u,
+    .testerLogicalAddress = 0x0710u,
     .udpSoConId = SOAD_SOCON_DOIP_UDP,
     .tcpSoConId = SOAD_SOCON_DOIP_TCP
 };

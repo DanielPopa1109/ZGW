@@ -77,7 +77,7 @@ extern  LWIP_GETH_t *lwip_geth_handle;
 /* Static IPv4 address */
 #define IP_ADDR0                        (192U)
 #define IP_ADDR1                        (168U)
-#define IP_ADDR2                        (0U)
+#define IP_ADDR2                        (1U)
 #define IP_ADDR3                        (10U)
 
 /*IPv4 subnet mask*/
@@ -91,7 +91,7 @@ extern  LWIP_GETH_t *lwip_geth_handle;
 /*Static IPv4 address*/
 #define GW_ADDR0                        (192U)
 #define GW_ADDR1                        (168U)
-#define GW_ADDR2                        (0U)
+#define GW_ADDR2                        (1U)
 #define GW_ADDR3                        (1U)
 
 #define CPU_WHICH_SERVICE_ETHERNET      0

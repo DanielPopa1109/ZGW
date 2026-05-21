@@ -14,5 +14,11 @@ const Fee_BlockConfigType Fee_BlockConfig[FEE_CONFIGURED_BLOCKS] =
         NVM_BLOCK_APP_DATA_LENGTH,
         FEE_BLOCK_REDUNDANT,
         FALSE
+    },
+    {
+        NVM_BLOCK_ID_TIMEBASE,
+        NVM_BLOCK_TIMEBASE_LENGTH,
+        FEE_BLOCK_REDUNDANT,
+        FALSE
     }
 };

@@ -16,8 +16,8 @@
 #define CAN_HTH_FD             1u
 
 #define CAN_MAX_DLC            64u
-#define CAN_TX_QUEUE_SIZE      128u
-#define CAN_RX_QUEUE_SIZE      192u
+#define CAN_TX_QUEUE_SIZE      64u
+#define CAN_RX_QUEUE_SIZE      100u
 
 #define CAN_ID_STANDARD        0u
 #define CAN_ID_EXTENDED        1u

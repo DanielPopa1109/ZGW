@@ -182,7 +182,7 @@ void safetyKitSswSmuRegMonitorTest(void)
         }
 #endif
         /* Enable the test */
-        IfxSmu_setRegMonTestModeEnable(testModeEnable);
+        IfxSmu_setRegMonTestModeEnable((uint8)testModeEnable);
 
         tStart = IfxStm_get(&MODULE_STM0);
         /* Wait until test is done, as long test is not finished measure the execution time */
@@ -193,7 +193,7 @@ void safetyKitSswSmuRegMonitorTest(void)
             timeout--;
         } while(!(IfxSmu_getRegisterMonitorStatus() & (1U << testModeEnable)) && (timeout > 0));
         /* Disable the test */
-        IfxSmu_clearRegMonTestModeEnable(testModeEnable);
+        IfxSmu_clearRegMonTestModeEnable((uint8)testModeEnable);
         /* Convert the time to seconds */
         tExecutionInSec = tExecution / IfxStm_getFrequency(&MODULE_STM0);
         /* Validation */

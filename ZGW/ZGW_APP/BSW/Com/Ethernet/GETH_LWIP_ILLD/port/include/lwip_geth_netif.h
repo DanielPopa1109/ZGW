@@ -49,6 +49,8 @@ extern volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
 extern volatile uint32 lwip_geth_DebugLowLevelInitState;
 extern volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
 extern volatile uint32 lwip_geth_DebugRxAllocFailCnt;
+extern volatile uint32 lwip_geth_DebugRxNullBufferCnt;
+extern volatile uint32 lwip_geth_DebugRxNullPayloadCnt;
 extern volatile uint32 lwip_geth_DebugTxNoBufferCnt;
 extern volatile uint32 lwip_geth_DebugLowLevelOutputCount;
 extern volatile uint32 lwip_geth_DebugLowLevelOutputOkCount;

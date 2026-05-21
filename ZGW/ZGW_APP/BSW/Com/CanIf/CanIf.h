@@ -12,11 +12,11 @@
 #define CANIF_PDU_MODE_ONLINE    3u
 
 #define CANIF_PDU_CLASSIC_PHYS_RX 0u
-#define CANIF_PDU_CLASSIC_FUNC_RX 1u
 #define CANIF_PDU_FD_PHYS_RX      2u
-#define CANIF_PDU_FD_FUNC_RX      3u
 #define CANIF_PDU_CLASSIC_PHYS_TX 0u
 #define CANIF_PDU_FD_PHYS_TX      1u
+#define CANIF_DIAGREQUEST_CLASSIC_CAN_ID 0x706u
+#define CANIF_DIAGREQUEST_CANFD_CAN_ID   0x720u
 #define CANIF_RX_PDU_CENTRALLOCKDATA                          10u
 #define CANIF_RX_PDU_LIGHTDATA1                               11u
 #define CANIF_RX_PDU_STATUSACTUATOR                           12u

@@ -1,0 +1,440 @@
+#include <string.h>
+#include "Fls.h"
+#include "MemStack_Error.h"
+#include "IfxFlash.h"
+#include "IfxScuWdt.h"
+#include "IfxCpu.h"
+
+#define FLS_API_INIT               (0x00u)
+#define FLS_API_ERASE              (0x01u)
+#define FLS_API_WRITE              (0x02u)
+#define FLS_API_READ               (0x03u)
+#define FLS_API_CANCEL             (0x04u)
+#define FLS_API_MAIN               (0x05u)
+
+#define FLS_E_UNINIT               (0x01u)
+#define FLS_E_BUSY                 (0x02u)
+#define FLS_E_PARAM_ADDRESS        (0x03u)
+#define FLS_E_PARAM_LENGTH         (0x04u)
+#define FLS_E_PARAM_POINTER        (0x05u)
+#define FLS_E_VERIFY               (0x06u)
+#define FLS_DMU_ERR_MASK           (0x7Fu)
+#define FLS_DMU_WAIT_ERROR         (0x80000000u)
+
+typedef enum
+{
+    FLS_JOB_NONE = 0,
+    FLS_JOB_ERASE,
+    FLS_JOB_WRITE,
+    FLS_JOB_READ
+} Fls_JobType;
+
+typedef struct
+{
+    MemIf_StatusType status;
+    MemIf_JobResultType result;
+    Fls_JobType job;
+    Fls_AddressType start;
+    Fls_LengthType length;
+    Fls_LengthType progress;
+    const uint8 *src;
+    uint8 *dst;
+    MemIf_ModeType mode;
+} Fls_StateType;
+
+static Fls_StateType Fls_State =
+{
+    MEMIF_UNINIT,
+    MEMIF_JOB_FAILED,
+    FLS_JOB_NONE,
+    0u,
+    0u,
+    0u,
+    NULL_PTR,
+    NULL_PTR,
+    MEMIF_MODE_SLOW
+};
+
+volatile uint32 Fls_LastDmuError = 0u;
+
+static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
+{
+    if (length == 0u)
+    {
+        return FALSE;
+    }
+    if (address >= FLS_DFLASH0_TOTAL_SIZE)
+    {
+        return FALSE;
+    }
+    if (length > (FLS_DFLASH0_TOTAL_SIZE - address))
+    {
+        return FALSE;
+    } // @suppress("Unused static function")
+    return TRUE;
+}
+
+static void Fls_ClearDmuStatus(void)
+{
+    IfxFlash_clearStatus(FLS_FLASH_MODULE);
+    Fls_LastDmuError = 0u;
+}
+
+static boolean Fls_DmuHasError(void)
+{
+    Fls_LastDmuError = (uint32)(DMU_HF_ERRSR.U & FLS_DMU_ERR_MASK);
+    return (Fls_LastDmuError != 0u) ? TRUE : FALSE;
+}
+
+static Std_ReturnType Fls_WaitDmuReady(void)
+{
+    if (IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0) != 0u)
+    {
+        Fls_LastDmuError = FLS_DMU_WAIT_ERROR;
+        return E_NOT_OK;
+    }
+
+    if (Fls_DmuHasError() != FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    return E_OK;
+}
+
+uint32 Fls_GetPhysicalAddress(Fls_AddressType Address)
+{
+    return FLS_DFLASH0_BASE_ADDRESS + Address;
+}
+
+static void Fls_FinishJob(MemIf_JobResultType result)
+{
+    Fls_State.result = result;
+    Fls_State.status = MEMIF_IDLE;
+    Fls_State.job = FLS_JOB_NONE;
+    Fls_State.progress = 0u;
+    Fls_State.length = 0u;
+    Fls_State.src = NULL_PTR;
+    Fls_State.dst = NULL_PTR;
+}
+
+static Std_ReturnType Fls_ProgramOnePage(Fls_AddressType address, const uint8 *data)
+{
+    uint32 physicalAddress = Fls_GetPhysicalAddress(address);
+    uint32 word0;
+    uint32 word1;
+    uint16 password;
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    boolean interruptState;
+#endif
+
+    memcpy(&word0, &data[0], sizeof(word0));
+    memcpy(&word1, &data[4], sizeof(word1));
+
+    Fls_ClearDmuStatus();
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
+    if (IfxFlash_enterPageMode(physicalAddress) != 0u)
+    {
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+        IfxCpu_restoreInterrupts(interruptState);
+#endif
+        return E_NOT_OK;
+    }
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
+    IfxFlash_loadPage2X32(physicalAddress, word0, word1);
+
+    password = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(password);
+    IfxFlash_writePage(physicalAddress);
+    IfxScuWdt_setSafetyEndinit(password);
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+#if (FLS_VERIFY_WRITE == STD_ON)
+    if (memcmp((const void *)physicalAddress, data, FLS_DFLASH0_PAGE_SIZE) != 0)
+    {
+        return E_NOT_OK;
+    }
+#endif
+    return E_OK;
+}
+
+static Std_ReturnType Fls_EraseOneSector(Fls_AddressType address)
+{
+    uint32 physicalAddress = Fls_GetPhysicalAddress(address);
+    uint16 password;
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    boolean interruptState;
+#endif
+
+    Fls_ClearDmuStatus();
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
+    password = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(password);
+    IfxFlash_eraseMultipleSectors(physicalAddress, 1u);
+    IfxScuWdt_setSafetyEndinit(password);
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+#if (FLS_VERIFY_ERASE == STD_ON)
+    Fls_ClearDmuStatus();
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    interruptState = IfxCpu_disableInterrupts();
+#endif
+
+    IfxFlash_eraseVerifySector(physicalAddress);
+
+#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
+    IfxCpu_restoreInterrupts(interruptState);
+#endif
+
+    if (Fls_WaitDmuReady() != E_OK)
+    {
+        return E_NOT_OK;
+    }
+#endif
+    return E_OK;
+}
+
+void Fls_Init(const Fls_ConfigType *ConfigPtr)
+{
+    (void)ConfigPtr;
+    Fls_State.status = MEMIF_IDLE;
+    Fls_State.result = MEMIF_JOB_OK;
+    Fls_State.job = FLS_JOB_NONE;
+    Fls_State.start = 0u;
+    Fls_State.length = 0u;
+    Fls_State.progress = 0u;
+    Fls_State.src = NULL_PTR;
+    Fls_State.dst = NULL_PTR;
+    Fls_State.mode = MEMIF_MODE_SLOW;
+}
+
+Std_ReturnType Fls_Erase(Fls_AddressType TargetAddress, Fls_LengthType Length)
+{
+    if (Fls_State.status == MEMIF_UNINIT)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_ERASE, FLS_E_UNINIT, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_State.status != MEMIF_IDLE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_ERASE, FLS_E_BUSY, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_IsRangeValid(TargetAddress, Length) == FALSE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_ERASE, FLS_E_PARAM_ADDRESS, TargetAddress);
+        return E_NOT_OK;
+    }
+    if (((TargetAddress % FLS_DFLASH0_SECTOR_SIZE) != 0u) || ((Length % FLS_DFLASH0_SECTOR_SIZE) != 0u))
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_ERASE, FLS_E_PARAM_LENGTH, Length);
+        return E_NOT_OK;
+    }
+
+    Fls_State.status = MEMIF_BUSY;
+    Fls_State.result = MEMIF_JOB_PENDING;
+    Fls_State.job = FLS_JOB_ERASE;
+    Fls_State.start = TargetAddress;
+    Fls_State.length = Length;
+    Fls_State.progress = 0u;
+    return E_OK;
+}
+
+Std_ReturnType Fls_Write(Fls_AddressType TargetAddress, const uint8 *SourceAddressPtr, Fls_LengthType Length)
+{
+    if (Fls_State.status == MEMIF_UNINIT)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_WRITE, FLS_E_UNINIT, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_State.status != MEMIF_IDLE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_WRITE, FLS_E_BUSY, 0u);
+        return E_NOT_OK;
+    }
+    if (SourceAddressPtr == NULL_PTR)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_WRITE, FLS_E_PARAM_POINTER, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_IsRangeValid(TargetAddress, Length) == FALSE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_WRITE, FLS_E_PARAM_ADDRESS, TargetAddress);
+        return E_NOT_OK;
+    }
+    if (((TargetAddress % FLS_DFLASH0_PAGE_SIZE) != 0u) || ((Length % FLS_DFLASH0_PAGE_SIZE) != 0u))
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_WRITE, FLS_E_PARAM_LENGTH, Length);
+        return E_NOT_OK;
+    }
+
+    Fls_State.status = MEMIF_BUSY;
+    Fls_State.result = MEMIF_JOB_PENDING;
+    Fls_State.job = FLS_JOB_WRITE;
+    Fls_State.start = TargetAddress;
+    Fls_State.length = Length;
+    Fls_State.progress = 0u;
+    Fls_State.src = SourceAddressPtr;
+    return E_OK;
+}
+
+Std_ReturnType Fls_Read(Fls_AddressType SourceAddress, uint8 *TargetAddressPtr, Fls_LengthType Length)
+{
+    if (Fls_State.status == MEMIF_UNINIT)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_READ, FLS_E_UNINIT, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_State.status != MEMIF_IDLE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_READ, FLS_E_BUSY, 0u);
+        return E_NOT_OK;
+    }
+    if (TargetAddressPtr == NULL_PTR)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_READ, FLS_E_PARAM_POINTER, 0u);
+        return E_NOT_OK;
+    }
+    if (Fls_IsRangeValid(SourceAddress, Length) == FALSE)
+    {
+        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_READ, FLS_E_PARAM_ADDRESS, SourceAddress);
+        return E_NOT_OK;
+    }
+
+    Fls_State.status = MEMIF_BUSY;
+    Fls_State.result = MEMIF_JOB_PENDING;
+    Fls_State.job = FLS_JOB_READ;
+    Fls_State.start = SourceAddress;
+    Fls_State.length = Length;
+    Fls_State.progress = 0u;
+    Fls_State.dst = TargetAddressPtr;
+    return E_OK;
+}
+
+void Fls_Cancel(void)
+{
+    if (Fls_State.status == MEMIF_BUSY)
+    {
+        Fls_FinishJob(MEMIF_JOB_CANCELED);
+    }
+}
+
+MemIf_StatusType Fls_GetStatus(void)
+{
+    return Fls_State.status;
+}
+
+MemIf_JobResultType Fls_GetJobResult(void)
+{
+    return Fls_State.result;
+}
+
+void Fls_SetMode(MemIf_ModeType Mode)
+{
+    Fls_State.mode = Mode;
+}
+
+long long Fls_MainFunction_Counter = 0;
+
+void Fls_MainFunction(void)
+{
+    Fls_AddressType current;
+    const uint8 *src;
+    uint8 *dst;
+    Std_ReturnType result;
+
+    if (Fls_State.status != MEMIF_BUSY)
+    {
+        return;
+    }
+
+    current = Fls_State.start + Fls_State.progress;
+
+    switch (Fls_State.job)
+    {
+        case FLS_JOB_READ:
+            dst = &Fls_State.dst[Fls_State.progress];
+            memcpy(dst, (const void *)Fls_GetPhysicalAddress(current), (size_t)(Fls_State.length - Fls_State.progress));
+            Fls_FinishJob(MEMIF_JOB_OK);
+            break;
+
+        case FLS_JOB_WRITE:
+            src = &Fls_State.src[Fls_State.progress];
+            result = Fls_ProgramOnePage(current, src);
+            if (result != E_OK)
+            {
+                MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_MAIN, FLS_E_VERIFY, current);
+                Fls_FinishJob(MEMIF_JOB_FAILED);
+            }
+            else
+            {
+                Fls_State.progress += FLS_DFLASH0_PAGE_SIZE;
+                if (Fls_State.progress >= Fls_State.length)
+                {
+                    Fls_FinishJob(MEMIF_JOB_OK);
+                }
+            }
+            break;
+
+        case FLS_JOB_ERASE:
+            result = Fls_EraseOneSector(current);
+            if (result != E_OK)
+            {
+                MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_MAIN, FLS_E_VERIFY, current);
+                Fls_FinishJob(MEMIF_JOB_FAILED);
+            }
+            else
+            {
+                Fls_State.progress += FLS_DFLASH0_SECTOR_SIZE;
+                if (Fls_State.progress >= Fls_State.length)
+                {
+                    Fls_FinishJob(MEMIF_JOB_OK);
+                }
+            }
+            break;
+
+        default:
+            Fls_FinishJob(MEMIF_JOB_FAILED);
+            break;
+    }
+
+    Fls_MainFunction_Counter++;
+}

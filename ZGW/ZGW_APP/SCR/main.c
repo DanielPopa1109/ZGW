@@ -30,24 +30,223 @@
 #include "scr_scu_sdcc.h"
 #include "scr_wcan_sdcc.h"
 #include "scr_irq_sdcc.h"
+#include "scr_rtc_sdcc.h"
+#include "scr_wdt_sdcc.h"
 #include "scr_common.h"
+#include "scr_time_shared.h"
 
 #define MaskWCANRXDIS   (0x0Fu)
 #define SetWCANRXDA     (0x00u)
 #define SetWCANRXDD     (0x03u)
 
 #define CANFD_RXD_PIN_MASK             (0x20u)
-#define WCAN_INT_MASK_ALL              (0x0Fu)
-#define WCAN_INT_MASK_WUP_ONLY         (0x07u)
-#define WCAN_STATUS0_WAKE_MASK         (0x80u)
-#define WCAN_STATUS1_WAKE_MASK         (0x03u)
+
+#define WCAN_INT_ENABLE_WUF_ONLY       (0x04u)
+#define WCAN_STATUS0_SWACK_MASK        (0x01u)
+#define WCAN_STATUS1_WUF_MASK          (0x01u)
+#define WCAN_STATUS1_SYNC_MASK         (0x02u)
+#define WCAN_STATUS1_FDF_MASK          (0x10u)
 #define WCAN_STATUS0_CLEAR_MASK        (0xFCu)
 #define WCAN_STATUS1_CLEAR_MASK        (0x0Bu)
 
-#define G_COUNTER_ADDR   ((volatile __xdata uint8 *)0x1760u)
+#define WCAN_CFG_WCAN_EN               (0x01u)
+#define WCAN_CFG_SELWK_EN              (0x04u)
+#define WCAN_CFG_CCE                   (0x08u)
+
+/* Standard ID 0x90 is stored shifted by 18; mask bits 3:2 to accept 0x90..0x93. */
+#define WCAN_WAKE_ID2_VALUE            (0x40u)
+#define WCAN_WAKE_ID3_VALUE            (0x08u)
+#define WCAN_WAKE_ID2_MASK             (0xF3u)
+#define WCAN_WAKE_ID3_MASK             (0x7Du)
+#define WCAN_WAKE_DLC_VALUE            (0x08u)
+
+/*
+ * The 0x90..0x93 messages in the CANFD DBC are StandardCAN_FD frames. WCAN does not expose the FD frame ID to
+ * SCR software, so valid-frame detection is used as the CAN FD fallback while WUF remains the ID-filtered classic CAN
+ * path. SYNC requires a CAN frame without a decode error and avoids waking on raw RXD disturbances/error frames.
+ */
+#define WCAN_WAKE_ON_FD_FRAME          (1u)
+#define WCAN_WAKE_ON_SYNC_FRAME        (1u)
+
+#define WCAN_WAKE_REASON_WUF           SCR_TIME_WAKE_REASON_WCAN_WUF
+#define WCAN_WAKE_REASON_SYNC          SCR_TIME_WAKE_REASON_WCAN_SYNC
+#define WCAN_WAKE_REASON_FDF           SCR_TIME_WAKE_REASON_WCAN_FDF
+#define WCAN_INIT_SWACK_CLEAR_TIMEOUT  (0x01u)
+#define WCAN_INIT_SWACK_SET_TIMEOUT    (0x02u)
+#define WCAN_SWACK_WAIT_LIMIT          (0xFFFFu)
+
+#define SCR_FAULT_REASON_ECC_DBE       SCR_TIME_WAKE_REASON_ECC_DBE
+#define SCR_FAULT_REASON_WDT           SCR_TIME_WAKE_REASON_WDT
+#define SCR_FAULT_STATUS_ECC_DBE       SCR_TIME_FAULT_STATUS_ECC_DBE
+#define SCR_FAULT_STATUS_WDT           SCR_TIME_FAULT_STATUS_WDT
+#define SCR_FAULT_NMISR_MASK           (0x03u)
+#define SCR_FAULT_RSTST_MASK           (ECCRST_MASK | WDTRST_MASK)
+#define SCR_NMICON_WDT_MASK            (0x01u)
+#define SCR_NMICON_RAMECC_MASK         (0x02u)
+#define SCR_NMICON_WAKE_MASK           (0x40u)
+
+/*
+ * With DIV5 the SCR PCLK is 20 MHz. WDTIN selects the divided watchdog input
+ * clock; 0xC3 gives approximately 100 ms for the 16-bit WDT reload path.
+ */
+#define SCR_WDT_RELOAD_100MS           (0xC3u)
+
+#define G_COUNTER_ADDR    ((volatile __xdata uint8 *)0x1760u)
 #define G_WCAN_STAT0_ADDR ((volatile __xdata uint8 *)0x1761u)
 #define G_WCAN_STAT1_ADDR ((volatile __xdata uint8 *)0x1762u)
 #define G_P00_IN_ADDR     ((volatile __xdata uint8 *)0x1763u)
+#define G_RX_LOW_COUNT_ADDR ((volatile __xdata uint8 *)0x1764u)
+#define G_WAKE_REASON_ADDR  ((volatile __xdata uint8 *)0x1765u)
+#define G_WCAN_INIT_ADDR    ((volatile __xdata uint8 *)0x1766u)
+#define G_STDBYWKP_ADDR     ((volatile __xdata uint8 *)0x1767u)
+#define G_FDF_BASELINE_ADDR ((volatile __xdata uint8 *)0x1768u)
+#define G_BOOT_STAGE_ADDR   ((volatile __xdata uint8 *)0x1769u)
+
+#define BOOT_STAGE_MAIN_ENTRY          (0x11u)
+#define BOOT_STAGE_CLOCK_SET           (0x12u)
+#define BOOT_STAGE_WCAN_INIT_ENTRY     (0x21u)
+#define BOOT_STAGE_WCAN_PIN_CFG        (0x22u)
+#define BOOT_STAGE_WCAN_WAKE_CFG       (0x23u)
+#define BOOT_STAGE_WCAN_CLOCK_ENABLED  (0x24u)
+#define BOOT_STAGE_WCAN_PIN_SELECTED   (0x25u)
+#define BOOT_STAGE_WCAN_CFG_WRITTEN    (0x26u)
+#define BOOT_STAGE_WCAN_BITTIMING      (0x27u)
+#define BOOT_STAGE_SWACK_CLEAR_DONE    (0x28u)
+#define BOOT_STAGE_WUF_CFG_DONE        (0x29u)
+#define BOOT_STAGE_SWACK_SET_DONE      (0x2Au)
+#define BOOT_STAGE_WCAN_INIT_DONE      (0x2Bu)
+#define BOOT_STAGE_LOOP_RUNNING        (0x40u)
+
+static volatile __xdata uint8 *SCR_TimeAddr(uint8 offset)
+{
+    return (volatile __xdata uint8 *)(SCR_TIME_XRAM_BASE + offset);
+}
+
+static uint8 SCR_TimeLoadU8(uint8 offset)
+{
+    return *SCR_TimeAddr(offset);
+}
+
+static void SCR_TimeStoreU8(uint8 offset, uint8 value)
+{
+    *SCR_TimeAddr(offset) = value;
+}
+
+static uint32 SCR_TimeLoadU32(uint8 offset)
+{
+    uint32 value;
+
+    value = ((uint32)SCR_TimeLoadU8(offset) << 24);
+    value |= ((uint32)SCR_TimeLoadU8((uint8)(offset + 1u)) << 16);
+    value |= ((uint32)SCR_TimeLoadU8((uint8)(offset + 2u)) << 8);
+    value |= (uint32)SCR_TimeLoadU8((uint8)(offset + 3u));
+
+    return value;
+}
+
+static void SCR_TimeStoreU32(uint8 offset, uint32 value)
+{
+    SCR_TimeStoreU8(offset, (uint8)(value >> 24));
+    SCR_TimeStoreU8((uint8)(offset + 1u), (uint8)(value >> 16));
+    SCR_TimeStoreU8((uint8)(offset + 2u), (uint8)(value >> 8));
+    SCR_TimeStoreU8((uint8)(offset + 3u), (uint8)value);
+}
+
+static uint32 SCR_RtcReadCounter(void)
+{
+    uint8 cnt3Before;
+    uint8 cnt3After;
+    uint8 cnt2Before;
+    uint8 cnt2After;
+    uint8 cnt1Before;
+    uint8 cnt1After;
+    uint8 cnt2;
+    uint8 cnt1;
+    uint8 cnt0;
+
+    do
+    {
+        cnt3Before = SCR_RTC_CNT3;
+        cnt2Before = SCR_RTC_CNT2;
+        cnt1Before = SCR_RTC_CNT1;
+        cnt0 = SCR_RTC_CNT0;
+        cnt3After = SCR_RTC_CNT3;
+        cnt2After = SCR_RTC_CNT2;
+        cnt1After = SCR_RTC_CNT1;
+    } while((cnt3Before != cnt3After) ||
+            (cnt2Before != cnt2After) ||
+            (cnt1Before != cnt1After));
+
+    cnt2 = cnt2After;
+    cnt1 = cnt1After;
+
+    return (((uint32)cnt3After << 24) |
+            ((uint32)cnt2 << 16) |
+            ((uint32)cnt1 << 8) |
+            (uint32)cnt0);
+}
+
+static void SCR_TimeInit(void)
+{
+    uint8 flags;
+
+    flags = SCR_TimeLoadU8(SCR_TIME_OFFSET_FLAGS);
+
+    SCR_SCU_PAGE = MOD_PAGE_1;
+    SCR_SCU_PMCON1 &= (uint8)(~RTC_DIS_MASK);
+
+    Scr_stop_rtc();
+    SCR_RTC_CON &= (uint8)(~(RTPBYP_MASK | ECRTC_MASK));
+#if (SCR_TIME_RTC_USE_PCLK_20MHZ != 0u)
+    SCR_RTC_CON |= RTCCLKSEL_MASK;
+#else
+    SCR_RTC_CON &= (uint8)(~RTCCLKSEL_MASK);
+#endif
+
+    if ((SCR_TimeLoadU32(SCR_TIME_OFFSET_MAGIC) == SCR_TIME_MAGIC) &&
+        (SCR_TimeLoadU8(SCR_TIME_OFFSET_VERSION) == SCR_TIME_VERSION) &&
+        (SCR_TimeLoadU8(SCR_TIME_OFFSET_VALID) == SCR_TIME_VALID) &&
+        ((flags & SCR_TIME_FLAG_ARMED) != 0u))
+    {
+        Scr_set_count_registers(0u);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_START_TICKS, 0u);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, 0u);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, 0u);
+    }
+
+    Scr_start_rtc();
+}
+
+static void SCR_TimeUpdate(void)
+{
+    uint32 counter;
+    uint32 startCounter;
+    uint8 flags;
+
+    counter = SCR_RtcReadCounter();
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, counter);
+
+    flags = SCR_TimeLoadU8(SCR_TIME_OFFSET_FLAGS);
+    if ((flags & SCR_TIME_FLAG_ARMED) != 0u)
+    {
+        startCounter = SCR_TimeLoadU32(SCR_TIME_OFFSET_RTC_START_TICKS);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, counter - startCounter);
+    }
+}
+
+static uint8 WCAN_WaitForSelectiveWakeAck(uint8 expected)
+{
+    uint16 timeout = WCAN_SWACK_WAIT_LIMIT;
+
+    SCR_WCAN_PAGE = MOD_PAGE_1;
+
+    while(((SCR_WCAN_INTESTAT0 & WCAN_STATUS0_SWACK_MASK) != expected) && (timeout > 0u))
+    {
+        timeout--;
+    }
+
+    return (timeout > 0u) ? 1u : 0u;
+}
 
 static void WCAN_ClearEvents(void)
 {
@@ -56,10 +255,101 @@ static void WCAN_ClearEvents(void)
     SCR_WCAN_INTESCLR1 = WCAN_STATUS1_CLEAR_MASK;
 }
 
-static void SCR_RequestStandbyWake(void)
+static void SCR_RequestStandbyWake(uint8 wakeReason)
+{
+    uint8 combinedWakeReason;
+
+    combinedWakeReason = (uint8)(*G_WAKE_REASON_ADDR | wakeReason);
+    *G_WAKE_REASON_ADDR = combinedWakeReason;
+    SCR_TimeStoreU8(
+            SCR_TIME_OFFSET_WAKE_REASON,
+            (uint8)(SCR_TimeLoadU8(SCR_TIME_OFFSET_WAKE_REASON) | wakeReason));
+
+    SCR_SCU_PAGE = MOD_PAGE_1;
+    SCR_SCU_STDBYWKP = (uint8)(SCR_SCU_STDBYWKP |
+            WCANWKSEL_MASK | WDTWKSEL_MASK | ECCWKSEL_MASK | SCRWKP_MASK);
+}
+
+static void SCR_ConfigureFaultWake(void)
 {
     SCR_SCU_PAGE = MOD_PAGE_1;
-    SCR_SCU_STDBYWKP = (SCR_SCU_STDBYWKP | WCANWKSEL_MASK | SCRWKP_MASK);
+    SCR_SCU_PMCON1 &= (uint8)(~WDT_DIS_MASK);
+    SCR_SCU_RSTCON &= (uint8)(~(ECCRSTEN_MASK | WDTRSTEN_MASK));
+    SCR_SCU_NMISR = SCR_FAULT_NMISR_MASK;
+    SCR_SCU_NMICON = (uint8)(SCR_SCU_NMICON |
+            SCR_NMICON_WDT_MASK | SCR_NMICON_RAMECC_MASK | SCR_NMICON_WAKE_MASK);
+    SCR_SCU_STDBYWKP = (uint8)(SCR_SCU_STDBYWKP |
+            WCANWKSEL_MASK | WDTWKSEL_MASK | ECCWKSEL_MASK);
+
+    SCR_WDT_REL = SCR_WDT_RELOAD_100MS;
+    SCR_WDT_WINB = 0u;
+    SCR_WDT_CON = (uint8)(WDTIN_MASK | WDTRS_MASK | WDTEN_MASK);
+}
+
+static void SCR_WatchdogService(void)
+{
+    SCR_WDT_CON = (uint8)(SCR_WDT_CON | WDTRS_MASK);
+}
+
+static void SCR_CheckFaultWake(void)
+{
+    uint8 nmiStatus;
+    uint8 rstStatus;
+    uint8 faultStatus = 0u;
+    uint8 wakeReason = 0u;
+
+    SCR_SCU_PAGE = MOD_PAGE_1;
+    nmiStatus = SCR_SCU_NMISR;
+    rstStatus = SCR_SCU_RSTST;
+
+    if (((nmiStatus & 0x02u) != 0u) || ((rstStatus & ECCRST_MASK) != 0u))
+    {
+        faultStatus |= SCR_FAULT_STATUS_ECC_DBE;
+        wakeReason |= SCR_FAULT_REASON_ECC_DBE;
+    }
+
+    if (((nmiStatus & 0x01u) != 0u) || ((rstStatus & WDTRST_MASK) != 0u))
+    {
+        faultStatus |= SCR_FAULT_STATUS_WDT;
+        wakeReason |= SCR_FAULT_REASON_WDT;
+    }
+
+    if (faultStatus != 0u)
+    {
+        SCR_TimeStoreU8(
+                SCR_TIME_OFFSET_SCR_FAULT_STATUS,
+                (uint8)(SCR_TimeLoadU8(SCR_TIME_OFFSET_SCR_FAULT_STATUS) | faultStatus));
+        SCR_TimeStoreU8(SCR_TIME_OFFSET_SCR_NMI_STATUS, nmiStatus);
+        SCR_TimeStoreU8(SCR_TIME_OFFSET_SCR_RST_STATUS, rstStatus);
+        SCR_RequestStandbyWake(wakeReason);
+
+        SCR_SCU_PAGE = MOD_PAGE_1;
+        SCR_SCU_NMISR = (uint8)(nmiStatus & SCR_FAULT_NMISR_MASK);
+        SCR_SCU_RSTST = (uint8)(rstStatus & SCR_FAULT_RSTST_MASK);
+    }
+}
+
+static void WCAN_ConfigureWakeFrame(void)
+{
+    SCR_WCAN_PAGE = MOD_PAGE_2;
+    SCR_WCAN_ID0_CTRL = 0x00u;
+    SCR_WCAN_ID1_CTRL = 0x00u;
+    SCR_WCAN_ID2_CTRL = WCAN_WAKE_ID2_VALUE;
+    SCR_WCAN_ID3_CTRL = WCAN_WAKE_ID3_VALUE;
+    SCR_WCAN_MASK_ID0_CTRL = 0xFFu;
+    SCR_WCAN_MASK_ID1_CTRL = 0xFFu;
+    SCR_WCAN_MASK_ID2_CTRL = WCAN_WAKE_ID2_MASK;
+    SCR_WCAN_MASK_ID3_CTRL = WCAN_WAKE_ID3_MASK;
+
+    SCR_WCAN_PAGE = MOD_PAGE_3;
+    SCR_WCAN_DATA0_CTRL = 0xFFu;
+    SCR_WCAN_DATA1_CTRL = 0xFFu;
+    SCR_WCAN_DATA2_CTRL = 0xFFu;
+    SCR_WCAN_DATA3_CTRL = 0xFFu;
+    SCR_WCAN_DATA4_CTRL = 0xFFu;
+    SCR_WCAN_DATA5_CTRL = 0xFFu;
+    SCR_WCAN_DATA6_CTRL = 0xFFu;
+    SCR_WCAN_DATA7_CTRL = 0xFFu;
 }
 
 static void WCAN_CheckWake(void)
@@ -67,6 +357,7 @@ static void WCAN_CheckWake(void)
     uint8 wcanStatus0;
     uint8 wcanStatus1;
     uint8 p00In;
+    uint8 wakeReason = 0u;
 
     SCR_WCAN_PAGE = MOD_PAGE_1;
     wcanStatus0 = SCR_WCAN_INTESTAT0;
@@ -79,11 +370,32 @@ static void WCAN_CheckWake(void)
     *G_WCAN_STAT1_ADDR = wcanStatus1;
     *G_P00_IN_ADDR = p00In;
 
-    if(((wcanStatus0 & WCAN_STATUS0_WAKE_MASK) != 0u) ||
-       ((wcanStatus1 & WCAN_STATUS1_WAKE_MASK) != 0u) ||
-       ((p00In & CANFD_RXD_PIN_MASK) == 0u))
+    SCR_SCU_PAGE = MOD_PAGE_1;
+    *G_STDBYWKP_ADDR = SCR_SCU_STDBYWKP;
+
+    if((p00In & CANFD_RXD_PIN_MASK) == 0u)
     {
-        SCR_RequestStandbyWake();
+        (*G_RX_LOW_COUNT_ADDR)++;
+    }
+
+    if((wcanStatus1 & WCAN_STATUS1_WUF_MASK) != 0u)
+    {
+        wakeReason = WCAN_WAKE_REASON_WUF;
+    }
+    else if((WCAN_WAKE_ON_FD_FRAME != 0u) &&
+            ((wcanStatus1 & WCAN_STATUS1_FDF_MASK) != 0u) &&
+            ((*G_FDF_BASELINE_ADDR & WCAN_STATUS1_FDF_MASK) == 0u))
+    {
+        wakeReason = WCAN_WAKE_REASON_FDF;
+    }
+    else if((WCAN_WAKE_ON_SYNC_FRAME != 0u) && ((wcanStatus1 & WCAN_STATUS1_SYNC_MASK) != 0u))
+    {
+        wakeReason = WCAN_WAKE_REASON_SYNC;
+    }
+
+    if(wakeReason != 0u)
+    {
+        SCR_RequestStandbyWake(wakeReason);
     }
 }
 
@@ -91,6 +403,8 @@ char WCAN_Init(void)
 {
     char result = 0;
     unsigned char volatile TempVar = 0;
+
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_INIT_ENTRY;
 
     /////////////////////////////////////////////////////////////////////////////
     // Setup WCAN as wakeup source
@@ -104,10 +418,12 @@ char WCAN_Init(void)
 
     SCR_IO_PAGE = 0x2;
     SCR_IO_P00_PDISC = 0xDF ; // WCANRXDD(P33.5 / SCR_P00.5)
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_PIN_CFG;
 
     SCR_SCU_PAGE = 0x1;
     SCR_SCU_RSTCON = 0x0 ; // Disable WDT and ECC reset
-    SCR_SCU_STDBYWKP = 0x4; // Select WCAN as wakeup source
+    SCR_SCU_STDBYWKP = (uint8)(WCANWKSEL_MASK | WDTWKSEL_MASK | ECCWKSEL_MASK);
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_WAKE_CFG;
 
     /* From SCR ITS
      * 17.2.5 WCAN Initialization Sequence
@@ -116,7 +432,9 @@ char WCAN_Init(void)
      * 3. Configure CDR,CAN FD and Baud Rate Configuration registers
      * 4. Reset CFG.CCE = 0
      * 5. Reset CFG.SELWK_EN = 0
-     * 6. Keep selective wake disabled; wake on any valid CAN wake-up pattern
+     * 6. Configure WUF Configuration registers
+     * 7. Set CFG.SELWK_EN = 1
+     * 8. Wait until INTESTAT0.SWACK = 1
      */
 
     /**************************
@@ -125,33 +443,63 @@ char WCAN_Init(void)
      **************************/
     SCR_SCU_PAGE = 1;
     SCR_SCU_PMCON1 &= ~(1<< 3); // enable WCAN clock (bit_3), default: WCAN is disabled
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_CLOCK_ENABLED;
 
     SCR_SCU_PAGE = 0x2;
     TempVar = SCR_SCU_MODPISEL0 & MaskWCANRXDIS; // Mask WCAN bits
     SCR_SCU_MODPISEL0 = TempVar | (SetWCANRXDD<<4); // Enable CAN on P33.5
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_PIN_SELECTED;
 
     SCR_WCAN_PAGE = 0x0 ;
-    SCR_WCAN_CFG = (1<<3)|(0<<2)|(1<<0) ; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
-    SCR_WCAN_INTMRSLT = WCAN_INT_MASK_ALL;
+    SCR_WCAN_CFG = WCAN_CFG_CCE | WCAN_CFG_WCAN_EN; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
+    SCR_WCAN_INTMRSLT = WCAN_INT_ENABLE_WUF_ONLY;
     SCR_WCAN_FD_CTRL = 0x01 ; // Enable CAN FD tolerant mode
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_CFG_WRITTEN;
 
     /*****************************************************************
      * 3. Configure CDR,CAN FD and Baud Rate Configuration registers
      *****************************************************************/
     SCR_WCAN_PAGE = 0x1;
     SCR_WCAN_FRMERRCNT = (1<<6); // Do not count CAN FD frames as wake-up frame errors
-    SCR_WCAN_DLC_CTRL = 0x8 ; // 8 bytes of data
-    SCR_WCAN_BTL1_CTRL = 0xC8 ; // Configure nominal Baud Rate of 500 kbit/s
-    SCR_WCAN_BTL2_CTRL = (0<<6) | (0x33<<0) ; // BRP=00(Divide by 1) and SP=0x33 represents ~80%SP
+    SCR_WCAN_DLC_CTRL = WCAN_WAKE_DLC_VALUE ; // 8 bytes of wake data
+    SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure nominal Baud Rate of 500 kbit/s
+    SCR_WCAN_BTL2_CTRL = (1<<6) | (0x33<<0) ; // BRP=01(Divide by 2) and SP=0x33 represents ~80%SP
     WCAN_ClearEvents();
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_BITTIMING;
 
     /*****************************
      * 4. Reset CFG.CCE = 0
      * 5. Reset CFG.SELWK_EN = 0
      *****************************/
     SCR_WCAN_PAGE = 0x0 ;
-    SCR_WCAN_INTMRSLT = WCAN_INT_MASK_WUP_ONLY; // Enable WUP wake; mask WUF/SYSERR/CANTO
-    SCR_WCAN_CFG &= ~((1<<3)|(1<<2)); // CCE=0, SELWK_EN=0, WCAN_EN remains enabled
+    SCR_WCAN_INTMRSLT = WCAN_INT_ENABLE_WUF_ONLY;
+    SCR_WCAN_CFG &= ~(WCAN_CFG_CCE | WCAN_CFG_SELWK_EN); // CCE=0, SELWK_EN=0, WCAN_EN remains enabled
+
+    if(WCAN_WaitForSelectiveWakeAck(0u) == 0u)
+    {
+        result |= WCAN_INIT_SWACK_CLEAR_TIMEOUT;
+    }
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_SWACK_CLEAR_DONE;
+
+    WCAN_ConfigureWakeFrame();
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WUF_CFG_DONE;
+
+    WCAN_ClearEvents();
+
+    SCR_WCAN_PAGE = MOD_PAGE_0;
+    SCR_WCAN_CFG |= WCAN_CFG_SELWK_EN;
+
+    if(WCAN_WaitForSelectiveWakeAck(WCAN_STATUS0_SWACK_MASK) == 0u)
+    {
+        result |= WCAN_INIT_SWACK_SET_TIMEOUT;
+    }
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_SWACK_SET_DONE;
+
+    WCAN_ClearEvents();
+    SCR_WCAN_PAGE = MOD_PAGE_1;
+    *G_FDF_BASELINE_ADDR = (SCR_WCAN_INTESTAT1 & WCAN_STATUS1_FDF_MASK);
+    *G_WCAN_INIT_ADDR = (uint8)result;
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_INIT_DONE;
 
     return result;
 }
@@ -162,11 +510,24 @@ void main(void)
     *G_WCAN_STAT0_ADDR = 0u;
     *G_WCAN_STAT1_ADDR = 0u;
     *G_P00_IN_ADDR = 0u;
+    *G_RX_LOW_COUNT_ADDR = 0u;
+    *G_WAKE_REASON_ADDR = 0u;
+    *G_WCAN_INIT_ADDR = 0u;
+    *G_STDBYWKP_ADDR = 0u;
+    *G_FDF_BASELINE_ADDR = 0u;
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_MAIN_ENTRY;
     Scr_set_fsys(DIV5);
+    *G_BOOT_STAGE_ADDR = BOOT_STAGE_CLOCK_SET;
+    SCR_TimeInit();
     WCAN_Init();
+    SCR_ConfigureFaultWake();
 
     while(1)
     {
+        *G_BOOT_STAGE_ADDR = BOOT_STAGE_LOOP_RUNNING;
+        SCR_TimeUpdate();
+        SCR_CheckFaultWake();
+        SCR_WatchdogService();
         WCAN_CheckWake();
         (*G_COUNTER_ADDR)++;
     }

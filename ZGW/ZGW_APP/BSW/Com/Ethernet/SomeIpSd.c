@@ -1,11 +1,46 @@
 #include "SomeIpSd.h"
+#include "../../Time/TimeBase.h"
 #include <string.h>
 
 static const SomeIpSd_ConfigType *SomeIpSd_Cfg;
-static uint32_t SomeIpSd_TimerMs;
+static uint64 SomeIpSd_NextOfferTimeNs;
+static uint64 SomeIpSd_LastMainTimeNs;
 static SomeIpSd_SubscriptionType SomeIpSd_Subscriptions[SOMEIPSD_MAX_SUBSCRIPTIONS];
 
 long long SomeIpSd_MainFunction_Counter = 0;
+
+static uint32 SomeIpSd_GetElapsedMs(uint64 nowNs)
+{
+    uint64 elapsedNs;
+    uint64 maxElapsedNs;
+    uint32 elapsedMs;
+
+    if (SomeIpSd_LastMainTimeNs == 0ull)
+    {
+        SomeIpSd_LastMainTimeNs = nowNs;
+        return 0u;
+    }
+
+    elapsedNs = nowNs - SomeIpSd_LastMainTimeNs;
+    SomeIpSd_LastMainTimeNs = nowNs;
+
+    maxElapsedNs = (uint64)0xFFFFFFFFu * TIMEBASE_NS_PER_MS;
+    if (elapsedNs > maxElapsedNs)
+    {
+        elapsedMs = 0xFFFFFFFFu;
+    }
+    else
+    {
+        elapsedMs = (uint32)(elapsedNs / TIMEBASE_NS_PER_MS);
+    }
+
+    return elapsedMs;
+}
+
+static void SomeIpSd_UpdateNextOfferDeadline(uint64 nowNs, uint64 offerPeriodNs)
+{
+    SomeIpSd_NextOfferTimeNs = nowNs + offerPeriodNs;
+}
 
 static uint16_t rd16(const uint8_t *p)
 {
@@ -445,36 +480,52 @@ static void SomeIpSd_ProcessEntry(const TcpIp_SockAddrType *remoteAddr,
 void SomeIpSd_Init(const SomeIpSd_ConfigType *config)
 {
     SomeIpSd_Cfg = config;
-    SomeIpSd_TimerMs = 0u;
+    SomeIpSd_NextOfferTimeNs = 0ull;
+    SomeIpSd_LastMainTimeNs = 0ull;
     memset(SomeIpSd_Subscriptions, 0, sizeof(SomeIpSd_Subscriptions));
 }
 
 void SomeIpSd_MainFunction(uint32 elapsedMs)
 {
     uint8_t i;
+    uint32 actualElapsedMs;
+    uint64 nowNs;
+    uint64 offerPeriodNs;
 
     if (SomeIpSd_Cfg == 0)
     {
         return;
     }
 
-    SomeIpSd_TimerMs += elapsedMs;
+    (void)elapsedMs;
 
-    if (SomeIpSd_TimerMs >= SomeIpSd_Cfg->offerPeriodMs)
+    nowNs = TimeBase_PlatformGetCounterNs();
+    actualElapsedMs = SomeIpSd_GetElapsedMs(nowNs);
+    offerPeriodNs = (uint64)SomeIpSd_Cfg->offerPeriodMs * TIMEBASE_NS_PER_MS;
+
+    if (offerPeriodNs == 0ull)
     {
-        SomeIpSd_TimerMs = 0u;
         SomeIpSd_SendAllOffers();
+    }
+    else if (SomeIpSd_NextOfferTimeNs == 0ull)
+    {
+        SomeIpSd_NextOfferTimeNs = nowNs + offerPeriodNs;
+    }
+    else if (nowNs >= SomeIpSd_NextOfferTimeNs)
+    {
+        SomeIpSd_SendAllOffers();
+        SomeIpSd_UpdateNextOfferDeadline(nowNs, offerPeriodNs);
     }
 
     for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
     {
         SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
 
-        if (s->active != 0u)
+        if ((s->active != 0u) && (actualElapsedMs != 0u))
         {
-            if (s->ttlMs > elapsedMs)
+            if (s->ttlMs > actualElapsedMs)
             {
-                s->ttlMs -= elapsedMs;
+                s->ttlMs -= actualElapsedMs;
             }
             else
             {

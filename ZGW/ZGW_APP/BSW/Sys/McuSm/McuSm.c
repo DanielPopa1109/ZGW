@@ -102,6 +102,7 @@ void McuSm_TRAP2(IfxCpu_Trap trapInfo)
 
 void McuSm_TRAP4(IfxCpu_Trap trapInfo)
 {
+  while (1) {__debug();}
     MCUSM_RECORD_TRAP(4u, trapInfo);
     McuSm_PerformResetHook(374u, trapInfo.tId);
 }

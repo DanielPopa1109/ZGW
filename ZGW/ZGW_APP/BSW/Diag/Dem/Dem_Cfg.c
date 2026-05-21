@@ -1,4 +1,5 @@
 #include "Dem_Cfg.h"
+#include "SysMgr.h"
 #include <string.h>
 
 static Std_ReturnType Dem_DefaultFreezeFrameCapture(
@@ -88,6 +89,18 @@ static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType 
         return E_OK;
     }
 
+    if (eventId == DEM_EVENT_ID_CODING_ECU_NOT_CODED)
+    {
+        *dtc = DEM_DTC_CODING_ECU_NOT_CODED;
+        return E_OK;
+    }
+
+    if (eventId == DEM_EVENT_ID_CODING_INVALID)
+    {
+        *dtc = DEM_DTC_CODING_INVALID;
+        return E_OK;
+    }
+
     if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
         (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
     {
@@ -141,6 +154,40 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         TRUE,
         40u,
         TRUE,
+        SysMgr_CaptureMcuSmFreezeFrame,
+        SysMgr_CaptureMcuSmExtendedData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_CODING_ECU_NOT_CODED,
+        DEM_DTC_CODING_ECU_NOT_CODED,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        Dem_DefaultFreezeFrameCapture,
+        Dem_DefaultExtendedDataCapture,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_CODING_INVALID,
+        DEM_DTC_CODING_INVALID,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
         Dem_DefaultFreezeFrameCapture,
         Dem_DefaultExtendedDataCapture,
         NULL_PTR
@@ -170,6 +217,19 @@ static void Dem_FillGatewayEventConfig(
     eventConfig->StatusChangedCallback = NULL_PTR;
 }
 
+static void Dem_ApplyStoredDataLimit(
+    uint16 eventIndex,
+    Dem_EventConfigType *eventConfig
+)
+{
+    if (eventIndex >= DEM_STORED_DATA_EVENT_LIMIT)
+    {
+        eventConfig->StorageEnabled = FALSE;
+        eventConfig->FreezeFrameCapture = NULL_PTR;
+        eventConfig->ExtendedDataCapture = NULL_PTR;
+    }
+}
+
 Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *eventConfig)
 {
     uint16 offset;
@@ -182,6 +242,7 @@ Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *ev
     if (eventIndex < DEM_STATIC_EVENT_COUNT)
     {
         *eventConfig = Dem_StaticEventConfigList[eventIndex];
+        Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
         return E_OK;
     }
 
@@ -193,6 +254,7 @@ Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *ev
                 eventConfig,
                 (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST + offset),
                 (Dem_DTCType)(DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + offset));
+        Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
         return E_OK;
     }
 
@@ -204,6 +266,7 @@ Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *ev
                 eventConfig,
                 (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST + offset),
                 (Dem_DTCType)(DEM_DTC_GATEWAY_RX_SIGNAL_INVALID + offset));
+        Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
         return E_OK;
     }
 

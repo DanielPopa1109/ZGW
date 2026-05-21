@@ -309,7 +309,7 @@ void
 icmp_dest_unreach(struct pbuf *p, enum icmp_dur_type t)
 {
   MIB2_STATS_INC(mib2.icmpoutdestunreachs);
-  icmp_send_response(p, ICMP_DUR, t);
+  icmp_send_response(p, ICMP_DUR, (u8_t)t);
 }
 
 #if IP_FORWARD || IP_REASSEMBLY

@@ -149,7 +149,7 @@ IFX_EXTERN uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BU
  **********************************************************************************************************************/
 /** \addtogroup lib_lwIP
  * \{ */
-IFX_EXTERN void     lwip_geth_Lwip_init();
+IFX_EXTERN void     lwip_geth_Lwip_init(void);
 IFX_EXTERN void     lwip_geth_Lwip_WaitForInput(void);
 IFX_INLINE netif_t *lwip_geth_Lwip_getNetIf(void);
 IFX_INLINE uint8   *lwip_geth_Lwip_getIpAddrPtr(void);

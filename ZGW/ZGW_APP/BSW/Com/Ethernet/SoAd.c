@@ -1,4 +1,5 @@
 #include "SoAd.h"
+#include "../ComM/ComM.h"
 #include "SysMgr.h"
 #include "FreeRTOS_core2.h"
 #include "semphr_core2.h"
@@ -152,10 +153,11 @@ static void SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
         ackDst = *remoteAddr;
     }
 
-    if (TcpIp_SendTo(rt->listenSock,
+    if ((ComM_IsTxAllowed(COMM_CH_ETH) != FALSE) &&
+        (TcpIp_SendTo(rt->listenSock,
                      &ackDst,
                      ackPayload,
-                     (uint16)(sizeof(ackPayload) - 1u)) > 0)
+                     (uint16)(sizeof(ackPayload) - 1u)) > 0))
     {
         SoAd_DebugPcHeartbeatAckCounter++;
     }
@@ -246,7 +248,7 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     rt->remoteAddr.addr = 0u;
     rt->remoteAddr.port = 0u;
     rt->state = SOAD_SOCON_CLOSED;
-    SoAd_DebugState[id] = rt->state;
+    SoAd_DebugState[id] = (uint8)rt->state;
     SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
     rt->cfg = 0;
     rt->requestedOpen = reopen;
@@ -393,7 +395,7 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
     }
 
     rt->state = SOAD_SOCON_OPEN;
-    SoAd_DebugState[id] = rt->state;
+    SoAd_DebugState[id] = (uint8)rt->state;
     SoAd_DebugLastOpenResult[id] = 1u;
 
     SoAd_Unlock();
@@ -436,7 +438,7 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     rt->listenSock = TCPIP_INVALID_SOCKET;
     rt->activeSock = TCPIP_INVALID_SOCKET;
     rt->state = SOAD_SOCON_CLOSED;
-    SoAd_DebugState[id] = rt->state;
+    SoAd_DebugState[id] = (uint8)rt->state;
     SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
     rt->cfg = 0;
     rt->requestedOpen = 0u;
@@ -490,7 +492,7 @@ void SoAd_MainFunction(void)
                 if (rt->activeSock >= 0)
                 {
                     rt->state = SOAD_SOCON_CONNECTED;
-                    SoAd_DebugState[id] = rt->state;
+                    SoAd_DebugState[id] = (uint8)rt->state;
 
                     if (rt->cfg->tcpConnected != 0)
                     {
@@ -515,7 +517,8 @@ void SoAd_MainFunction(void)
                 }
                 else if (len > 0)
                 {
-                    if (rt->cfg->rxIndication != 0)
+                    if ((rt->cfg->rxIndication != 0) &&
+                        (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE))
                     {
                         rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, (uint16)len);
                         SysMgr_NotifyBusActivity();
@@ -545,7 +548,8 @@ void SoAd_MainFunction(void)
 
                     SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len);
 
-                    if (rt->cfg->rxIndication != 0)
+                    if ((rt->cfg->rxIndication != 0) &&
+                        (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE))
                     {
                         rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
                         SysMgr_NotifyBusActivity();
@@ -583,6 +587,11 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
     SoAd_DebugLastTxLength = len;
     SoAd_DebugLastTxTcpIpResult = -1;
     SoAd_DebugLastTxResult = SOAD_NOT_OK;
+
+    if (ComM_IsTxAllowed(COMM_CH_ETH) == FALSE)
+    {
+        return SOAD_NOT_OK;
+    }
 
     if (SoAd_Lock() == 0u)
     {

@@ -787,7 +787,7 @@ IFX_INLINE void IfxPmsPm_setSleepMode(IfxPmsPm_RequestPowerMode powerMode)
 {
     uint16 cpuWdtPw = IfxScuWdt_getCpuWatchdogPassword();
 #ifndef DEVICE_TC33X
-    uint8  index    = IfxCpu_getCoreIndex();
+    uint8  index    = (uint8)IfxCpu_getCoreIndex();
     IfxScuWdt_clearCpuEndinit(cpuWdtPw);
 
     switch (index)

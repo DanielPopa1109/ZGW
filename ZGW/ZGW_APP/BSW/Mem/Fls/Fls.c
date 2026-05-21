@@ -70,7 +70,7 @@ static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
     if (length > (FLS_DFLASH0_TOTAL_SIZE - address))
     {
         return FALSE;
-    }
+    } // @suppress("Unused static function")
     return TRUE;
 }
 
@@ -88,7 +88,7 @@ static boolean Fls_DmuHasError(void)
 
 static Std_ReturnType Fls_WaitDmuReady(void)
 {
-    if (IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0) != 0u)
+    if (IfxFlash_waitUnbusy(FLS_FLASH_MODULE, IfxFlash_FlashType_D0) != 0u) // @suppress("Symbol is not resolved")
     {
         Fls_LastDmuError = FLS_DMU_WAIT_ERROR;
         return E_NOT_OK;

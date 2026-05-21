@@ -78,6 +78,7 @@ typedef struct
     uint8 eid[DOIP_MAX_EID_LEN];
     uint8 gid[DOIP_MAX_GID_LEN];
     uint16 logicalAddress;
+    uint16 testerLogicalAddress;
     SoAd_SoConIdType udpSoConId;
     SoAd_SoConIdType tcpSoConId;
 } DoIP_ConfigType;

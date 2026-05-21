@@ -73,16 +73,27 @@ boolean safetyKitEvaluateStandby(void);
 void runSafeAppSwStartup(void)
 {
     safetyKitSswLbist();
+
     g_SafetyKitStatus.resetCode = safetyKitEvaluateReset();
+
     g_SafetyKitStatus.wakeupFromStandby = safetyKitEvaluateStandby();
+
     g_SafetyKitStatus.sswStatus.monbistStatus = failed;
+
     Ifx_Ssw_Monbist();
+
     g_SafetyKitStatus.sswStatus.monbistStatus = passed;
+
     safetyKitSswMcuFwCheck();
+
     safetyKitSswMcuStartup();
+
     safetyKitSswAliveAlarmTest();
+
     safetyKitSswSmuRegMonitorTest();
+
     safetyKitSswMbist();
+
     safetyKitEnableAllSMUAlarms();
 }
 /*

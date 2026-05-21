@@ -401,7 +401,7 @@ uint16 IfxScuWdt_getSafetyWatchdogPassword(void)
 void IfxScuWdt_initConfig(IfxScuWdt_Config *config)
 {
     config->password                      = IFXSCUWDT_RESET_PASSWORD;
-    config->reload                        = 0;//0xF9E5u;
+    config->reload                        = 63974;
     config->inputFrequency                = IfxScu_WDTCON1_IR_divBy16384;
     config->disableWatchdog               = FALSE;
     config->enableSmuRestriction          = FALSE;

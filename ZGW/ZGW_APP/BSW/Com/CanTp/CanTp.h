@@ -3,7 +3,8 @@
 
 #include "CanIf.h"
 
-#define CANTP_MAX_CHANNELS       4u
+#define CANTP_MAX_CHANNELS       8u
+#define CANTP_MAX_TX_BUFFERS     4u
 #define CANTP_MAX_PAYLOAD_LEN    4095u
 #define CANTP_MAIN_PERIOD_MS     5u
 
@@ -72,6 +73,7 @@ typedef struct
 
     uint8 addressFormat;
     uint8 nTa;
+    uint8 txNta;
     uint8 paddingActivation;
 
     uint16 nAsTicks;

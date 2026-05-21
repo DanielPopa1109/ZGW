@@ -21,6 +21,9 @@
 #include "Fee.h"
 #include "Fls.h"
 #include "SCR.h"
+#include "IfxPms_reg.h"
+#include "BSW/Time/TimeBase.h"
+#include "../../../SCR/scr_time_shared.h"
 
 #define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 200u
 #define SYSMGR_KEEP_AWAKE_WHILE_FULL_COM  1u
@@ -30,6 +33,11 @@
 #define SYSMGR_FAIL_DEM_CYCLE_END         3u
 #define SYSMGR_FAIL_DEM_SHUTDOWN          4u
 #define SYSMGR_FAIL_NVM_WRITEALL_REQ      5u
+#define SYSMGR_SCR_FAULT_ECC_DBE          0x01u
+#define SYSMGR_SCR_FAULT_WDT              0x02u
+#define SYSMGR_MCUSM_SOURCE_RESET         0x01u
+#define SYSMGR_MCUSM_SOURCE_SCR_ECC_DBE   0x02u
+#define SYSMGR_MCUSM_SOURCE_SCR_WDT       0x04u
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
@@ -43,6 +51,14 @@ volatile uint32 SysMgr_PcsrLockWaitCounter = 0u;
 volatile SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
 volatile uint8 SysMgr_NoBusActivity = 0u;
 float SysMgr_McuTemperature = 0u;
+volatile uint32 SysMgr_LastPmsWcr2Status = 0u;
+volatile uint32 SysMgr_LastPmsWstat2Status = 0u;
+volatile uint8 SysMgr_LastScrWakeReason = 0u;
+volatile uint8 SysMgr_LastScrFaultStatus = 0u;
+volatile uint8 SysMgr_LastScrNmiStatus = 0u;
+volatile uint8 SysMgr_LastScrRstStatus = 0u;
+volatile uint8 SysMgr_ScrFaultPending = 0u;
+volatile uint32 SysMgr_ScrFaultWakeCounter = 0u;
 
 void SysMgr_ProcessResetDtc(void);
 void SysMgr_EcuStateMachine(void);
@@ -52,6 +68,13 @@ void SysMgr_GoSleep(void);
 static boolean SysMgr_IsFullComActive(void);
 static void SysMgr_KeepRunState(void);
 static void SysMgr_GoSleepFailure(uint32 FailureInformation);
+static uint8 SysMgr_ReadScrXramU8(uint16 offset);
+static void SysMgr_CaptureScrFaultStatus(void);
+static void SysMgr_ClearScrFaultStatus(void);
+static boolean SysMgr_HasScrFaultError(void);
+static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value);
+static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value);
+static uint8 SysMgr_GetMcuSmFaultSource(void);
 
 void SysMgr_NotifyBusActivity(void)
 {
@@ -97,6 +120,207 @@ static void SysMgr_KeepRunState(void)
     }
 }
 
+static uint8 SysMgr_ReadScrXramU8(uint16 offset)
+{
+    volatile uint8 *xram = (volatile uint8 *)PMS_XRAM;
+
+    return xram[(uint16)(SCR_TIME_XRAM_BASE + offset)];
+}
+
+static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value)
+{
+    buffer[offset] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)(value & 0xFFu);
+}
+
+static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value)
+{
+    buffer[offset] = (uint8)((value >> 24u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)((value >> 16u) & 0xFFu);
+    buffer[(uint16)(offset + 2u)] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 3u)] = (uint8)(value & 0xFFu);
+}
+
+static void SysMgr_CaptureScrFaultStatus(void)
+{
+    uint8 pending = 0u;
+    uint8 newPending;
+
+    SysMgr_LastPmsWcr2Status = PMS_PMSWCR2.U;
+    SysMgr_LastPmsWstat2Status = PMS_PMSWSTAT2.U;
+    SysMgr_LastScrWakeReason = SysMgr_ReadScrXramU8(SCR_TIME_OFFSET_WAKE_REASON);
+    SysMgr_LastScrFaultStatus = SysMgr_ReadScrXramU8(SCR_TIME_OFFSET_SCR_FAULT_STATUS);
+    SysMgr_LastScrNmiStatus = SysMgr_ReadScrXramU8(SCR_TIME_OFFSET_SCR_NMI_STATUS);
+    SysMgr_LastScrRstStatus = SysMgr_ReadScrXramU8(SCR_TIME_OFFSET_SCR_RST_STATUS);
+
+    if ((PMS_PMSWCR2.B.SCRECC != 0u) ||
+            ((SysMgr_LastScrWakeReason & SCR_TIME_WAKE_REASON_ECC_DBE) != 0u) ||
+            ((SysMgr_LastScrFaultStatus & SCR_TIME_FAULT_STATUS_ECC_DBE) != 0u))
+    {
+        pending |= SYSMGR_SCR_FAULT_ECC_DBE;
+    }
+
+    if ((PMS_PMSWCR2.B.SCRWDT != 0u) ||
+            ((SysMgr_LastScrWakeReason & SCR_TIME_WAKE_REASON_WDT) != 0u) ||
+            ((SysMgr_LastScrFaultStatus & SCR_TIME_FAULT_STATUS_WDT) != 0u))
+    {
+        pending |= SYSMGR_SCR_FAULT_WDT;
+    }
+
+    if (pending != 0u)
+    {
+        newPending = (uint8)(pending & (uint8)~SysMgr_ScrFaultPending);
+
+        SysMgr_ScrFaultPending |= pending;
+
+        if (newPending != 0u)
+        {
+            SysMgr_ScrFaultWakeCounter++;
+        }
+    }
+}
+
+void SysMgr_CaptureScrFaultBeforeScrReset(void)
+{
+    SysMgr_CaptureScrFaultStatus();
+}
+
+static boolean SysMgr_HasScrFaultError(void)
+{
+    SysMgr_CaptureScrFaultStatus();
+
+    return (SysMgr_ScrFaultPending != 0u) ? TRUE : FALSE;
+}
+
+static void SysMgr_ClearScrFaultStatus(void)
+{
+    uint16 safetyWdtPw;
+    Ifx_PMS_PMSWCR2 pmswcr2Clear;
+    Ifx_PMS_PMSWSTATCLR pmswstatClear;
+
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+
+    pmswcr2Clear.U = 0u;
+    pmswcr2Clear.B.TCINT = PMS_PMSWCR2.B.TCINT;
+    if ((SysMgr_ScrFaultPending & SYSMGR_SCR_FAULT_ECC_DBE) != 0u)
+    {
+        pmswcr2Clear.B.SCRECC = 1u;
+    }
+    if ((SysMgr_ScrFaultPending & SYSMGR_SCR_FAULT_WDT) != 0u)
+    {
+        pmswcr2Clear.B.SCRWDT = 1u;
+    }
+    PMS_PMSWCR2.U = pmswcr2Clear.U;
+
+    pmswstatClear.U = 0u;
+    pmswstatClear.B.SCRWKPCLR = 1u;
+    pmswstatClear.B.SCROVRUNCLR = 1u;
+    PMS_PMSWSTATCLR.U = pmswstatClear.U;
+
+    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+}
+
+static uint8 SysMgr_GetMcuSmFaultSource(void)
+{
+    uint8 source = 0u;
+
+    if (McuSm_LastResetReason != 0u)
+    {
+        source |= SYSMGR_MCUSM_SOURCE_RESET;
+    }
+
+    if ((SysMgr_ScrFaultPending & SYSMGR_SCR_FAULT_ECC_DBE) != 0u)
+    {
+        source |= SYSMGR_MCUSM_SOURCE_SCR_ECC_DBE;
+    }
+
+    if ((SysMgr_ScrFaultPending & SYSMGR_SCR_FAULT_WDT) != 0u)
+    {
+        source |= SYSMGR_MCUSM_SOURCE_SCR_WDT;
+    }
+
+    return source;
+}
+
+Std_ReturnType SysMgr_CaptureMcuSmFreezeFrame(
+    Dem_EventIdType eventId,
+    uint8 *buffer,
+    uint16 *length
+)
+{
+    uint16 i;
+
+    if ((eventId != DEM_EVENT_ID_MCUSM_SW_ERROR) ||
+            (buffer == NULL_PTR) ||
+            (length == NULL_PTR) ||
+            (*length < 32u))
+    {
+        return E_NOT_OK;
+    }
+
+    SysMgr_CaptureScrFaultStatus();
+
+    for (i = 0u; i < 32u; i++)
+    {
+        buffer[i] = 0u;
+    }
+
+    SysMgr_StoreU16(buffer, 0u, eventId);
+    buffer[2] = SysMgr_GetMcuSmFaultSource();
+    buffer[3] = SysMgr_LastScrWakeReason;
+    SysMgr_StoreU32(buffer, 4u, McuSm_LastResetReason);
+    SysMgr_StoreU32(buffer, 8u, McuSm_LastResetInformation);
+    SysMgr_StoreU32(buffer, 12u, SysMgr_LastPmsWcr2Status);
+    SysMgr_StoreU32(buffer, 16u, SysMgr_LastPmsWstat2Status);
+    buffer[20] = SysMgr_LastScrFaultStatus;
+    buffer[21] = SysMgr_LastScrNmiStatus;
+    buffer[22] = SysMgr_LastScrRstStatus;
+    buffer[23] = SysMgr_ScrFaultPending;
+    SysMgr_StoreU32(buffer, 24u, SysMgr_ScrFaultWakeCounter);
+    SysMgr_StoreU32(buffer, 28u, SysMgr_GoSleepCounter);
+
+    *length = 32u;
+    return E_OK;
+}
+
+Std_ReturnType SysMgr_CaptureMcuSmExtendedData(
+    Dem_EventIdType eventId,
+    uint8 *buffer,
+    uint16 *length
+)
+{
+    uint16 i;
+
+    if ((eventId != DEM_EVENT_ID_MCUSM_SW_ERROR) ||
+            (buffer == NULL_PTR) ||
+            (length == NULL_PTR) ||
+            (*length < 16u))
+    {
+        return E_NOT_OK;
+    }
+
+    SysMgr_CaptureScrFaultStatus();
+
+    for (i = 0u; i < 16u; i++)
+    {
+        buffer[i] = 0u;
+    }
+
+    SysMgr_StoreU16(buffer, 0u, eventId);
+    buffer[2] = SysMgr_GetMcuSmFaultSource();
+    buffer[3] = SysMgr_LastScrWakeReason;
+    SysMgr_StoreU32(buffer, 4u, SysMgr_LastPmsWcr2Status);
+    SysMgr_StoreU32(buffer, 8u, SysMgr_LastPmsWstat2Status);
+    buffer[12] = SysMgr_LastScrFaultStatus;
+    buffer[13] = SysMgr_LastScrNmiStatus;
+    buffer[14] = SysMgr_LastScrRstStatus;
+    buffer[15] = SysMgr_ScrFaultPending;
+
+    *length = 16u;
+    return E_OK;
+}
+
 void SysMgr_GoSleep(void)
 {
     uint16 cpuWdtPw;
@@ -136,6 +360,8 @@ void SysMgr_GoSleep(void)
             SysMgr_GoSleepFailure(SYSMGR_FAIL_NVM_PRE_WRITEALL_IDLE);
         }
     }
+
+    (void)TimeBase_PrepareStandbyRtc();
 
     if (NvM_WriteAll() != E_OK)
     {
@@ -301,6 +527,8 @@ void SysMgr_GoSleep(void)
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    IfxMtu_clearSram((IfxMtu_MbistSel)77);
+    IfxMtu_clearSram((IfxMtu_MbistSel)78);
     IfxScr_enableSCR();
     IfxScr_copyProgram();
     IfxScr_init(1);
@@ -324,6 +552,9 @@ void SysMgr_GoSleep(void)
     IfxScuWdt_clearCpuEndinit(cpuWdtPw);
 
     PMS_PMSWSTATCLR.U = 0xFFFFFFFFu;
+    PMS_PMSIEN.B.SCRINT = 1u;
+    PMS_PMSIEN.B.SCRECC = 1u;
+    PMS_PMSIEN.B.SCRWDT = 1u;
     pmswcr0.U = PMS_PMSWCR0.U;
     pmswcr0.B.STBYRAMSEL = 7u;
     pmswcr0.B.SCRWKEN = 1u;
@@ -356,9 +587,16 @@ void SysMgr_ProcessResetDtc(void)
 {
     if(0u == SysMgr_MainCounter)
     {
-        if(0u != McuSm_LastResetReason)
+        boolean scrFaultDetected = SysMgr_HasScrFaultError();
+
+        if((0u != McuSm_LastResetReason) || (scrFaultDetected != FALSE))
         {
             Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_FAILED);
+
+            if (scrFaultDetected != FALSE)
+            {
+                SysMgr_ClearScrFaultStatus();
+            }
         }
         else
         {
@@ -373,6 +611,11 @@ void SysMgr_ProcessResetDtc(void)
 
 void SysMgr_EcuStateMachine(void)
 {
+    if(SYSMGR_INIT == SysMgr_EcuState)
+    {
+        SysMgr_EcuState = SYSMGR_STARTUP;
+    }
+
     if(SYSMGR_STARTUP == SysMgr_EcuState)
     {
         SysMgr_EcuState = SYSMGR_RUN;

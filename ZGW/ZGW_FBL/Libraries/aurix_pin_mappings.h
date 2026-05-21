@@ -46,6 +46,10 @@
 #define IFXCFG_P33_9_IO_CONFIG                  { &IfxPort_P33_9, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 #define IFXCFG_P33_10_IO_CONFIG                 { &IfxPort_P33_10, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
 
+// can1_node3
+#define IFXCFG_P33_4_IO_CONFIG                  { &IfxPort_P33_4, IfxPort_Mode_outputPushPullAlt7, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P33_5_IO_CONFIG                  { &IfxPort_P33_5, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+
 // rmii0
 #define IFXCFG_P11_2_IO_CONFIG                  { &IfxPort_P11_2, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 #define IFXCFG_P11_3_IO_CONFIG                  { &IfxPort_P11_3, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
@@ -67,6 +71,8 @@ extern void gpio_init_pins(void);
 extern void can0_node0_init_pins(void);
 
 extern void can0_node1_init_pins(void);
+
+extern void can1_node3_init_pins(void);
 
 extern void rmii0_init_pins(void);
 

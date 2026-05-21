@@ -23,7 +23,7 @@ static Dem_InternalNvMStateType Dem_NvMState = DEM_NVM_STATE_IDLE;
 static Dem_RuntimeEventType Dem_RuntimeEvents[DEM_MAX_EVENTS];
 static Dem_PrimaryEntryType Dem_PrimaryMemory[DEM_PRIMARY_MEMORY_SIZE];
 
-static Dem_NvImageType Dem_NvImage;
+Dem_NvImageType Dem_NvImage;
 static Dem_FilterType Dem_Filter;
 
 static boolean Dem_Dirty = FALSE;
@@ -175,6 +175,11 @@ static Std_ReturnType Dem_GetEventConfig(uint16 eventIndex, Dem_EventConfigType 
 
     *eventConfig = Dem_ConfigPtr->Events[eventIndex];
     return E_OK;
+}
+
+static boolean Dem_IsStoredDataAllowed(uint16 eventIndex)
+{
+    return (eventIndex < DEM_STORED_DATA_EVENT_LIMIT) ? TRUE : FALSE;
 }
 
 static void Dem_DebugUpdateEvent(uint16 eventIndex)
@@ -662,8 +667,11 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
 
     for (i = 0u; i < image->primaryEntryCount; i++)
     {
+        uint16 eventIndex = Dem_FindEventIndex(image->primaryEntries[i].eventId);
+
         if ((image->primaryEntries[i].valid != 0u) &&
-            (Dem_FindEventIndex(image->primaryEntries[i].eventId) < DEM_MAX_EVENTS))
+            (eventIndex < DEM_MAX_EVENTS) &&
+            (Dem_IsStoredDataAllowed(eventIndex) != FALSE))
         {
             Dem_PrimaryMemory[i] = image->primaryEntries[i];
         }
@@ -678,6 +686,11 @@ static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
     Dem_EventConfigType eventConfig;
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
+    {
+        return;
+    }
+
+    if (Dem_IsStoredDataAllowed(eventIndex) == FALSE)
     {
         return;
     }
@@ -733,6 +746,11 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
     Dem_EventConfigType eventConfig;
 
     if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return;
+    }
+
+    if (Dem_IsStoredDataAllowed(eventIndex) == FALSE)
     {
         return;
     }

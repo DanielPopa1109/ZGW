@@ -341,7 +341,7 @@ void netif_state_changed(struct netif* netif, netif_nsc_reason_t reason, const n
 #endif
 
 /** \brief LWIP initialization function */
-void lwip_geth_Lwip_init()
+void lwip_geth_Lwip_init(void)
 {
   ip_addr_t default_ipaddr, default_netmask, default_gw;
 #if LWIP_DHCP

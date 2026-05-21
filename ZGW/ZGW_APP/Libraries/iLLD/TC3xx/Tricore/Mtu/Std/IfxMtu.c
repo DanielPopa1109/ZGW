@@ -218,28 +218,28 @@ uint32 IfxMtu_getSystemAddress(IfxMtu_MbistSel mbistSel, Ifx_MTU_MC_ETRR tracked
 
     switch (mbistSel)
     {
-    case IfxMtu_MbistSel_cpu0Pspr:
+    case IfxMtu_MbistSel_cpu0Pspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x70100000 | ((sramAddress << 5) | ((mbi & 1) << 4));
         break;
 
-    case IfxMtu_MbistSel_cpu0Dspr:
+    case IfxMtu_MbistSel_cpu0Dspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x70000000 | ((sramAddress << 4) | ((mbi & 3) << 2));
         break;
 #if IFXCPU_NUM_MODULES > 1
-    case IfxMtu_MbistSel_cpu1Pspr:
+    case IfxMtu_MbistSel_cpu1Pspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x60100000 | ((sramAddress << 5) | ((mbi & 1) << 4));
         break;
 
-    case IfxMtu_MbistSel_cpu1Dspr:
+    case IfxMtu_MbistSel_cpu1Dspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x60000000 | ((sramAddress << 4) | ((mbi & 3) << 2));
         break;
 #endif
 #if IFXCPU_NUM_MODULES > 2
-    case IfxMtu_MbistSel_cpu2Pspr:
+    case IfxMtu_MbistSel_cpu2Pspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x50100000 | ((sramAddress << 5) | ((mbi & 1) << 4));
         break;
 
-    case IfxMtu_MbistSel_cpu2Dspr:
+    case IfxMtu_MbistSel_cpu2Dspr: // @suppress("Symbol is not resolved")
         systemAddress = 0x50000000 | ((sramAddress << 4) | ((mbi & 3) << 2));
         break;
 #endif
@@ -275,16 +275,16 @@ uint32 IfxMtu_getSystemAddress(IfxMtu_MbistSel mbistSel, Ifx_MTU_MC_ETRR tracked
         break;
 #endif
 
-    case IfxMtu_MbistSel_cpu0Dlmu:
+    case IfxMtu_MbistSel_cpu0Dlmu: // @suppress("Symbol is not resolved")
         systemAddress = 0xb0000000 | (sramAddress << 4);
         break;
 #if IFXCPU_NUM_MODULES > 1
-    case IfxMtu_MbistSel_cpu1Dlmu:
+    case IfxMtu_MbistSel_cpu1Dlmu: // @suppress("Symbol is not resolved")
         systemAddress = 0xb0010000 | (sramAddress << 4);
         break;
 #endif
 #if IFXCPU_NUM_MODULES > 2
-    case IfxMtu_MbistSel_cpu2Dlmu:
+    case IfxMtu_MbistSel_cpu2Dlmu: // @suppress("Symbol is not resolved")
         systemAddress = 0xb0020000 | (sramAddress << 4);
         break;
 #endif
@@ -303,7 +303,7 @@ uint32 IfxMtu_getSystemAddress(IfxMtu_MbistSel mbistSel, Ifx_MTU_MC_ETRR tracked
         systemAddress = 0xb0150000 | (sramAddress << 4);
         break;
 #endif
-    case IfxMtu_MbistSel_dma:
+    case IfxMtu_MbistSel_dma: // @suppress("Symbol is not resolved")
         systemAddress = 0xf0012000 | ((sramAddress << 5) | ((mbi & 3) << 3));
         break;
 #if defined(DEVICE_TC37XED) || defined(DEVICE_TC39XB)
@@ -349,11 +349,11 @@ uint32 IfxMtu_getSystemAddress(IfxMtu_MbistSel mbistSel, Ifx_MTU_MC_ETRR tracked
         break;
 #endif
 #if defined(DEVICE_TC37X) || defined(DEVICE_TC38EVOX) || defined(DEVICE_TC38X)
-	case IfxMtu_MbistSel_miniMcds:
+	case IfxMtu_MbistSel_miniMcds: // @suppress("Symbol is not resolved")
         systemAddress = 0x90200000 | (sramAddress << 5);
         break;
 #endif
-    case IfxMtu_MbistSel_mcan0:
+    case IfxMtu_MbistSel_mcan0: // @suppress("Symbol is not resolved")
         systemAddress = 0xF0200000 | (sramAddress << 2);
         break;
 #if IFXCAN_NUM_MODULES > 1
@@ -367,18 +367,18 @@ uint32 IfxMtu_getSystemAddress(IfxMtu_MbistSel mbistSel, Ifx_MTU_MC_ETRR tracked
         break;
 #endif
 #if !defined(DEVICE_TC33XED) && !defined(DEVICE_TC33X) && !defined (DEVICE_TC35X)
-    case IfxMtu_MbistSel_psi5:
+    case IfxMtu_MbistSel_psi5: // @suppress("Symbol is not resolved")
         systemAddress = 0xf0005600 | (sramAddress << 2);
         break;
 #endif
-    case IfxMtu_MbistSel_scrXram:
+    case IfxMtu_MbistSel_scrXram: // @suppress("Symbol is not resolved")
         systemAddress = 0xF0240000 | (sramAddress << 2);
         break;
-    case IfxMtu_MbistSel_scrIram:
+    case IfxMtu_MbistSel_scrIram: // @suppress("Symbol is not resolved")
 #ifndef DEVICE_TC33XED
-    case IfxMtu_MbistSel_eray0Obf:
-    case IfxMtu_MbistSel_eray0IbfTbf:
-    case IfxMtu_MbistSel_eray0Mbf:
+    case IfxMtu_MbistSel_eray0Obf: // @suppress("Symbol is not resolved")
+    case IfxMtu_MbistSel_eray0IbfTbf: // @suppress("Symbol is not resolved")
+    case IfxMtu_MbistSel_eray0Mbf: // @suppress("Symbol is not resolved")
 #endif
 #if IFXERAY_NUM_MODULES > 1
     case IfxMtu_MbistSel_eray1Obf:
@@ -743,9 +743,9 @@ uint8 IfxMtu_runNonDestructiveInversionTest(IfxMtu_MbistSel mbistSel, uint8 rang
                                                    IfxMtu_MbistSel_cpu3Pspr, IfxMtu_MbistSel_cpu3Ptag
 												   };
 #elif IFXCPU_NUM_MODULES == 3
-    uint32 mbistSelPspr[IFXCPU_NUM_MODULES * 2] = {IfxMtu_MbistSel_cpu0Pspr, IfxMtu_MbistSel_cpu0Ptag,
-                                                   IfxMtu_MbistSel_cpu1Pspr, IfxMtu_MbistSel_cpu1Ptag,
-                                                   IfxMtu_MbistSel_cpu2Pspr, IfxMtu_MbistSel_cpu2Ptag
+    uint32 mbistSelPspr[IFXCPU_NUM_MODULES * 2] = {IfxMtu_MbistSel_cpu0Pspr, IfxMtu_MbistSel_cpu0Ptag, // @suppress("Symbol is not resolved")
+                                                   IfxMtu_MbistSel_cpu1Pspr, IfxMtu_MbistSel_cpu1Ptag, // @suppress("Symbol is not resolved")
+                                                   IfxMtu_MbistSel_cpu2Pspr, IfxMtu_MbistSel_cpu2Ptag // @suppress("Symbol is not resolved")
                                                    };
 #elif IFXCPU_NUM_MODULES == 1
     uint32 mbistSelPspr[IFXCPU_NUM_MODULES * 2] = {IfxMtu_MbistSel_cpu0Pspr, IfxMtu_MbistSel_cpu0Ptag};

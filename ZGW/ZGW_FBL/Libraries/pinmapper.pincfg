@@ -167,4 +167,20 @@
   <v1:propertySetting propertyId="p11_2.symbolicname" value="RMII0_TXD1"/>
   <v1:propertySetting propertyId="p33_10.symbolicname" value="CAN0_NODE1_RXD"/>
   <v1:propertySetting propertyId="p11_3.symbolicname" value="RMII0_TXD0"/>
+  <v1:configSetting configurationId="p33_4.dir" altId="p33_4.dir.out"/>
+  <v1:configSetting configurationId="p33_4.out.bind" altId="p33_4.out.bind.alt7">
+    <v1:connectionSetting altId="can1_node3.txd.bind.out"/>
+  </v1:configSetting>
+  <v1:configSetting configurationId="p33_4.function" altId="p33_4.function.digital"/>
+  <v1:configSetting configurationId="can1_node3.txd.bind" altId="can1_node3.txd.bind.out">
+    <v1:connectionSetting altId="p33_4.out.bind.alt7"/>
+  </v1:configSetting>
+  <v1:configSetting configurationId="p33_5.in.bind" altId="p33_5.in.bind.in">
+    <v1:connectionSetting altId="can1_node3.rxd.bind.rxd1"/>
+  </v1:configSetting>
+  <v1:configSetting configurationId="can1_node3.rxd.bind" altId="can1_node3.rxd.bind.rxd1">
+    <v1:connectionSetting altId="p33_5.in.bind.in"/>
+  </v1:configSetting>
+  <v1:propertySetting propertyId="p33_4.symbolicname" value="CAN1_NODE3_TXD"/>
+  <v1:propertySetting propertyId="p33_5.symbolicname" value="CAN1_NODE3_RXD"/>
 </v1:pinSettings>

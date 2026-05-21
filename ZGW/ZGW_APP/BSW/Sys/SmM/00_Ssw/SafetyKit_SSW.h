@@ -38,7 +38,9 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define SSW_STATUS_DATA_ADDRESS (*(volatile SswStatusXramType*)PMS_XRAM)
+/* Keep SSW retained counters away from the SCR image copied at PMS_XRAM base. */
+#define SSW_STATUS_DATA_OFFSET  (0x1F00U)
+#define SSW_STATUS_DATA_ADDRESS (*(volatile SswStatusXramType*)((volatile uint8*)PMS_XRAM + SSW_STATUS_DATA_OFFSET))
 #define SAFETKIT_LBIST_MAX_RUNS     (3)
 #define SAFETKIT_FW_CHECK_MAX_RUNS  (2)
 #define LAST_IFXSCURCU_RESETTYPE_ENUM IfxScuRcu_ResetType_undefined /* Validate this parameter in case of iLLD update*/

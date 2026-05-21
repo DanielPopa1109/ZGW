@@ -79,13 +79,13 @@
 /** \brief Max number of TX descriptors per list
  */
 #ifndef IFXGETH_MAX_TX_DESCRIPTORS
-#define IFXGETH_MAX_TX_DESCRIPTORS (8)
+#define IFXGETH_MAX_TX_DESCRIPTORS (4)
 #endif
 
 /** \brief Max number of RX descriptors per list
  */
 #ifndef IFXGETH_MAX_RX_DESCRIPTORS
-#define IFXGETH_MAX_RX_DESCRIPTORS (8)
+#define IFXGETH_MAX_RX_DESCRIPTORS (4)
 #endif
 
 /** \brief Waits until GMII is busy

@@ -3,7 +3,7 @@
  * RAM updater for AURIX TC375 FBL self-update.
  *
  * Supported receive transports while old FBL is still intact:
- *   1) CAN-FD + ISO-TP, request ID 0x710, response ID 0x709
+ *   1) CAN-FD + ISO-TP, request ID 0x710, response ID 0x711
  *   2) Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
  *
  * Ethernet payload is direct UDS payload over UDP, not DoIP/TCP.
@@ -27,6 +27,7 @@
 #include "IfxCan_Can.h"
 #include "IfxGeth_Eth.h"
 #include "IfxPort.h"
+#include "IfxPort_reg.h"
 #include "aurix_pin_mappings.h"
 #include "lwip_geth_conf.h"
 #include "lwip_geth_private_phy_dp83825i.h"
@@ -53,11 +54,11 @@
 #define PFLASH_SECTOR_SIZE               0x4000u
 
 #define FLASH_MODULE                     0u
-#define PROGRAM_FLASH_BANK_A             ((IfxFlash_FlashType)3u)
-#define PROGRAM_FLASH_BANK_B             ((IfxFlash_FlashType)4u)
+#define PROGRAM_FLASH_BANK_A             IfxFlash_FlashType_P0
+#define PROGRAM_FLASH_BANK_B             IfxFlash_FlashType_P1
 
 #define FBL_CAN_REQ_ID                   0x710u
-#define FBL_CAN_RES_ID                   0x709u
+#define FBL_CAN_RES_ID                   0x711u
 #define FBL_CAN_RX_PRIO                  2u
 #define FBL_CAN_MAX_DL                   64u
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
@@ -75,15 +76,23 @@
 
 #define UDS_SID_SESSION                  0x10u
 #define UDS_SID_RESET                    0x11u
+#define UDS_SID_RDBI                     0x22u
+#define UDS_SID_SECURITY_ACCESS          0x27u
+#define UDS_SID_COMM_CONTROL             0x28u
 #define UDS_SID_ROUTINE                  0x31u
 #define UDS_SID_REQ_DOWNLOAD             0x34u
 #define UDS_SID_TRANSFER_DATA            0x36u
 #define UDS_SID_TRANSFER_EXIT            0x37u
+#define UDS_SID_TESTER_PRESENT           0x3Eu
+#define UDS_SID_CONTROL_DTC_SETTING      0x85u
 #define UDS_NEG_RESP                     0x7Fu
 
+#define UDS_NRC_SUBFUNC_NOT_SUPPORTED    0x12u
 #define UDS_NRC_INCORRECT_LEN            0x13u
 #define UDS_NRC_COND_NOT_CORRECT         0x22u
+#define UDS_NRC_SEQUENCE_ERROR           0x24u
 #define UDS_NRC_OUT_OF_RANGE             0x31u
+#define UDS_NRC_INVALID_KEY              0x35u
 #define UDS_NRC_TRANSFER_FAIL            0x70u
 #define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
 
@@ -168,6 +177,8 @@ static RamDownload_Type g_dl;
 static RamEthPeer_Type g_ethPeer;
 static IfxGeth_Eth *g_geth = &LWIP_GETH_0_lld_handle;
 
+static uint32 g_secSeed;
+static uint8 g_secSeedValid;
 static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
 static uint32 g_pageAddr = 0xFFFFFFFFu;
 static uint32 g_pageFill = 0u;
@@ -181,6 +192,7 @@ static uint8 g_udsReqReady;
 
 IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
+static void Ram_CanReleaseFdRxPinFromScr(void);
 static void Ram_CanInit(void);
 static void Ram_CanSend(const uint8 *data, uint8 len);
 static uint8 Ram_DlcFromLen(uint8 len);
@@ -204,6 +216,8 @@ static uint16 Ram_IpChecksum(const uint8 *data, uint16 len);
 static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
 static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport);
 static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
+static void Ram_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport);
+static uint32 Ram_SecCalcKey(uint32 seed, uint8 level);
 
 RAM_CODE  static void Ram_FlashInit(void);
 static uint32 Ram_CommitFblImage(void);
@@ -228,6 +242,8 @@ void FblRamUpdater_Entry(void)
     memset(&g_iso, 0u, sizeof(g_iso));
     memset(&g_dl, 0u, sizeof(g_dl));
     memset(&g_ethPeer, 0u, sizeof(g_ethPeer));
+    g_secSeed = 0u;
+    g_secSeedValid = 0u;
     memset((void *)FBL_IMAGE_RAM_ADDR, 0x36, FBL_IMAGE_RAM_SIZE);
 
     if(g_FblTransportSelect == FBL_TRANSPORT_ETH_RAW_UDP)
@@ -265,19 +281,34 @@ void FblRamUpdater_Entry(void)
     }
 }
 
+static void Ram_CanReleaseFdRxPinFromScr(void)
+{
+    uint16 safetyWdtPw;
+
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+    while(P33_PCSR.B.LCK)
+    {
+    }
+    P33_PCSR.B.SEL5 = 0u;
+    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+}
+
 static void Ram_CanInit(void)
 {
+    Ram_CanReleaseFdRxPinFromScr();
+    can1_node3_init_pins();
+
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    can0_node0_init_pins();
-
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN0);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN1);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
+    g_can.nodeConfig.nodeId = IfxCan_NodeId_3;
     g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
@@ -310,13 +341,13 @@ static void Ram_CanInit(void)
     g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
     g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_PRIO;
     g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
-    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0;
+    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0; // @suppress("Symbol is not resolved")
 
     g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x000u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x080u;
-    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x100u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0x500u;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x800u;
+    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x880u;
+    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x980u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0xD00u;
 
     IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
 
@@ -326,8 +357,8 @@ static void Ram_CanInit(void)
     g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
     IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
 
-    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
@@ -834,6 +865,10 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     if(sid == UDS_SID_SESSION)
     {
         if(len < 2u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+        if((req[1u] & 0x7Fu) == 0x01u)
+        {
+            g_secSeedValid = 0u;
+        }
 
         res[0u] = 0x50u;
         res[1u] = req[1u];
@@ -842,6 +877,39 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         res[4u] = 0x01u;
         res[5u] = 0xF4u;
         Ram_UdsSend(res, 6u, transport);
+    }
+    else if(sid == UDS_SID_TESTER_PRESENT)
+    {
+        res[0u] = 0x7Eu;
+        res[1u] = 0x00u;
+        Ram_UdsSend(res, 2u, transport);
+    }
+    else if(sid == UDS_SID_RDBI)
+    {
+        if((len >= 3u) && (req[1u] == 0xF1u) && (req[2u] == 0x86u))
+        {
+            res[0u] = 0x62u;
+            res[1u] = 0xF1u;
+            res[2u] = 0x86u;
+            res[3u] = 0x02u;
+            Ram_UdsSend(res, 4u, transport);
+        }
+        else
+        {
+            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+        }
+    }
+    else if(sid == UDS_SID_SECURITY_ACCESS)
+    {
+        Ram_UdsSecurityAccess(req, len, transport);
+    }
+    else if(sid == UDS_SID_COMM_CONTROL)
+    {
+        if(len != 3u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        res[0u] = 0x68u;
+        res[1u] = (uint8)(req[1u] & 0x7Fu);
+        Ram_UdsSend(res, 2u, transport);
     }
     else if(sid == UDS_SID_REQ_DOWNLOAD)
     {
@@ -939,6 +1007,23 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         res[0u] = 0x77u;
         Ram_UdsSend(res, 1u, transport);
     }
+    else if(sid == UDS_SID_CONTROL_DTC_SETTING)
+    {
+        uint8 settingType;
+
+        if(len != 2u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        settingType = (uint8)(req[1u] & 0x7Fu);
+        if((settingType != 0x01u) && (settingType != 0x02u))
+        {
+            Ram_UdsNeg(sid, UDS_NRC_SUBFUNC_NOT_SUPPORTED, transport);
+            return;
+        }
+
+        res[0u] = 0xC5u;
+        res[1u] = settingType;
+        Ram_UdsSend(res, 2u, transport);
+    }
     else if(sid == UDS_SID_ROUTINE)
     {
         if(len < 4u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
@@ -1021,6 +1106,88 @@ static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
     res[2u] = nrc;
 
     Ram_UdsSend(res, 3u, transport);
+}
+
+static void Ram_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
+{
+    uint8 res[6];
+    uint8 sub;
+    uint8 level;
+    uint32 key;
+    uint32 expected;
+
+    if(len < 2u)
+    {
+        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+        return;
+    }
+
+    sub = req[1u];
+
+    if((sub == 0u) || (sub > 0x08u))
+    {
+        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_OUT_OF_RANGE, transport);
+        return;
+    }
+
+    level = (uint8)((sub - 1u) / 2u);
+
+    if((sub & 0x01u) != 0u)
+    {
+        if(len != 2u)
+        {
+            Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        g_secSeed = 0x5A5A0000u ^ ((uint32)level << 8u) ^ g_dl.received ^ g_dl.targetAddr;
+        g_secSeedValid = 1u;
+
+        res[0u] = 0x67u;
+        res[1u] = sub;
+        Ram_Wr32(&res[2u], g_secSeed);
+        Ram_UdsSend(res, 6u, transport);
+        return;
+    }
+
+    if(len != 6u)
+    {
+        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+        return;
+    }
+
+    if(g_secSeedValid == 0u)
+    {
+        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_SEQUENCE_ERROR, transport);
+        return;
+    }
+
+    key = Ram_Rd32(&req[2u]);
+    expected = Ram_SecCalcKey(g_secSeed, level);
+
+    if(key != expected)
+    {
+        g_secSeedValid = 0u;
+        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INVALID_KEY, transport);
+        return;
+    }
+
+    g_secSeedValid = 0u;
+    res[0u] = 0x67u;
+    res[1u] = sub;
+    Ram_UdsSend(res, 2u, transport);
+}
+
+static uint32 Ram_SecCalcKey(uint32 seed, uint8 level)
+{
+    uint32 key;
+
+    key = seed ^ 0x6A09E667u;
+    key += 0x13572468u + ((uint32)level * 0x1F3D5B79u);
+    key = (key << 3u) | (key >> 29u);
+    key ^= ((seed << 16u) | (seed >> 16u));
+
+    return key;
 }
 
 static void Ram_FlashInit(void)
@@ -1245,10 +1412,10 @@ static IfxFlash_FlashType Ram_Bank(uint32 addr)
 {
     if((addr >= PFLASH_BANK_B_START) && (addr <= PFLASH_BANK_B_END))
     {
-        return PROGRAM_FLASH_BANK_B;
+        return PROGRAM_FLASH_BANK_B; // @suppress("Symbol is not resolved")
     }
 
-    return PROGRAM_FLASH_BANK_A;
+    return PROGRAM_FLASH_BANK_A; // @suppress("Symbol is not resolved")
 }
 
 static uint32 Ram_Crc32(uint32 addr, uint32 len)
@@ -1311,7 +1478,7 @@ static void Ram_Wr32(uint8 *p, uint32 v)
 }
 
 static void Ram_Reset(void)
-{
+{ // @suppress("Unused static function")
     IfxCpu_disableInterrupts();
     g_cmd.reset(2u, 0u);
     while(1) {}

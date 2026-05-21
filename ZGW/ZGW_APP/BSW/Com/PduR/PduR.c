@@ -3,6 +3,7 @@
 #include "CanIf.h"
 #include "CanTp.h"
 #include "Com.h"
+#include "../ComM/ComM.h"
 #include "Dcm.h"
 #include "Dcm_Cfg.h"
 #include "DoIP.h"
@@ -10,6 +11,7 @@
 #include "LinIf.h"
 #include "LinTp.h"
 #include "SoAd.h"
+#include "../UdpNm/UdpNm.h"
 
 #include <string.h>
 
@@ -96,14 +98,6 @@ typedef struct
     PduR_TpLowerType lower;
     PduIdType lowerTxPduId;
 } PduR_DcmTxRouteType;
-
-typedef struct
-{
-    uint8 buffer[PDUR_MAX_TP_BUFFER];
-    PduLengthType expectedLen;
-    PduLengthType offset;
-    uint8 active;
-} PduR_TpBufferType;
 
 typedef struct
 {
@@ -335,25 +329,24 @@ static const PduR_SoAdRxRouteType PduR_SoAdRxRoutes[] =
 
 static const PduR_TpRxRouteType PduR_TpRxRoutes[] =
 {
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_PHYS,   DCM_RX_CAN_PHYS   },
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_FUNC,   DCM_RX_CAN_FUNC   },
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_PHYS, DCM_RX_CANFD_PHYS },
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_FUNC, DCM_RX_CANFD_FUNC },
-    { TRUE, PDUR_TP_LOWER_LINTP, DCM_RX_LIN_PHYS,   DCM_RX_LIN_PHYS   },
-    { TRUE, PDUR_TP_LOWER_DOIP,  DCM_RX_ETH_PHYS,   DCM_RX_ETH_PHYS   }
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_PHYS,        DCM_RX_CAN_PHYS        },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_PHYS,      DCM_RX_CANFD_PHYS      },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS,    DCM_RX_CAN_EXT_PHYS    },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_EXT_PHYS,  DCM_RX_CANFD_EXT_PHYS  },
+    { TRUE, PDUR_TP_LOWER_LINTP, DCM_RX_LIN_PHYS,        DCM_RX_LIN_PHYS        },
+    { TRUE, PDUR_TP_LOWER_DOIP,  DCM_RX_ETH_PHYS,        DCM_RX_ETH_PHYS        }
 };
 
 static const PduR_DcmTxRouteType PduR_DcmTxRoutes[] =
 {
-    { TRUE, DCM_TX_CAN_PHYS,   PDUR_TP_LOWER_CANTP, DCM_TX_CAN_PHYS   },
-    { TRUE, DCM_TX_CAN_FUNC,   PDUR_TP_LOWER_CANTP, DCM_TX_CAN_FUNC   },
-    { TRUE, DCM_TX_CANFD_PHYS, PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_PHYS },
-    { TRUE, DCM_TX_CANFD_FUNC, PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_FUNC },
-    { TRUE, DCM_TX_LIN_PHYS,   PDUR_TP_LOWER_LINTP, DCM_TX_LIN_PHYS   },
-    { TRUE, DCM_TX_ETH_PHYS,   PDUR_TP_LOWER_DOIP,  DCM_TX_ETH_PHYS   }
+    { TRUE, DCM_TX_CAN_PHYS,        PDUR_TP_LOWER_CANTP, DCM_TX_CAN_PHYS        },
+    { TRUE, DCM_TX_CANFD_PHYS,      PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_PHYS      },
+    { TRUE, DCM_TX_CAN_EXT_PHYS,    PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS    },
+    { TRUE, DCM_TX_CANFD_EXT_PHYS,  PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_EXT_PHYS  },
+    { TRUE, DCM_TX_LIN_PHYS,        PDUR_TP_LOWER_LINTP, DCM_TX_LIN_PHYS        },
+    { TRUE, DCM_TX_ETH_PHYS,        PDUR_TP_LOWER_DOIP,  DCM_TX_ETH_PHYS        }
 };
 
-static PduR_TpBufferType PduR_TpRxBuf[PDUR_MAX_TP_RX_ROUTES];
 static PduR_DoIPContextType PduR_DoIPCtx;
 static PduR_DoIPRxMailboxType PduR_DoIPRxMailbox;
 static PduR_DoIPTxMailboxType PduR_DoIPTxMailbox;
@@ -435,13 +428,165 @@ static const PduR_DcmTxRouteType* PduR_FindDcmTxRouteByLower(PduR_TpLowerType lo
     return NULL_PTR;
 }
 
+static uint8 PduR_ComMChannelForCanIfTx(PduIdType canIfTxPduId,
+                                        ComM_ChannelType* channel)
+{
+    if (channel == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    if ((canIfTxPduId == CANIF_PDU_FD_PHYS_TX) ||
+        ((canIfTxPduId >= CANIF_TX_PDU_CANFD_INFOTAINMENTDATA1) &&
+         (canIfTxPduId <= CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3)))
+    {
+        *channel = COMM_CH_CANFD;
+        return TRUE;
+    }
+
+    if ((canIfTxPduId == CANIF_PDU_CLASSIC_PHYS_TX) ||
+        ((canIfTxPduId >= CANIF_TX_PDU_VEHICLESTATE) &&
+         (canIfTxPduId <= CANIF_TX_PDU_DIAGREQUEST_700)))
+    {
+        *channel = COMM_CH_CAN;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static uint8 PduR_ComMChannelForCanIfRx(PduIdType canIfRxPduId,
+                                        ComM_ChannelType* channel)
+{
+    if (channel == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    if ((canIfRxPduId >= CANIF_RX_PDU_CANFD_PDM4_LOADSTATUS) &&
+        (canIfRxPduId <= CANIF_RX_PDU_CANFD_PDM4_DIAGRESPONSE))
+    {
+        *channel = COMM_CH_CANFD;
+        return TRUE;
+    }
+
+    if ((canIfRxPduId >= CANIF_RX_PDU_CENTRALLOCKDATA) &&
+        (canIfRxPduId <= CANIF_RX_PDU_BATTCAPRES))
+    {
+        *channel = COMM_CH_CAN;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static uint8 PduR_ComMChannelForIfLower(PduR_IfLowerType lower,
+                                        PduIdType lowerPduId,
+                                        ComM_ChannelType* channel)
+{
+    if (channel == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    switch (lower)
+    {
+        case PDUR_IF_LOWER_CANIF:
+            return PduR_ComMChannelForCanIfTx(lowerPduId, channel);
+
+        case PDUR_IF_LOWER_LINIF:
+            *channel = COMM_CH_LIN;
+            return TRUE;
+
+        case PDUR_IF_LOWER_SOAD:
+            *channel = COMM_CH_ETH;
+            return TRUE;
+
+        default:
+            return FALSE;
+    }
+}
+
+static uint8 PduR_ComMChannelForIfDest(PduR_IfDestType dest,
+                                       PduIdType destPduId,
+                                       ComM_ChannelType* channel)
+{
+    if (channel == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    switch (dest)
+    {
+        case PDUR_IF_DEST_CANIF:
+            return PduR_ComMChannelForCanIfTx(destPduId, channel);
+
+        case PDUR_IF_DEST_LINIF:
+            *channel = COMM_CH_LIN;
+            return TRUE;
+
+        case PDUR_IF_DEST_SOAD:
+        case PDUR_IF_DEST_GATEWAY:
+            *channel = COMM_CH_ETH;
+            return TRUE;
+
+        default:
+            return FALSE;
+    }
+}
+
+static uint8 PduR_ComMChannelForDcmRoute(const PduR_DcmTxRouteType* route,
+                                         ComM_ChannelType* channel)
+{
+    if ((route == NULL_PTR) || (channel == NULL_PTR))
+    {
+        return FALSE;
+    }
+
+    if (route->lower == PDUR_TP_LOWER_CANTP)
+    {
+        if ((route->dcmTxPduId == DCM_TX_CANFD_PHYS) ||
+            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS))
+        {
+            *channel = COMM_CH_CANFD;
+        }
+        else
+        {
+            *channel = COMM_CH_CAN;
+        }
+        return TRUE;
+    }
+
+    if (route->lower == PDUR_TP_LOWER_LINTP)
+    {
+        *channel = COMM_CH_LIN;
+        return TRUE;
+    }
+
+    if (route->lower == PDUR_TP_LOWER_DOIP)
+    {
+        *channel = COMM_CH_ETH;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static Std_ReturnType PduR_TransmitIf(PduR_IfLowerType lower,
                                       PduIdType lowerPduId,
                                       uint8 soConId,
                                       const uint8* data,
                                       PduLengthType len)
 {
+    ComM_ChannelType channel;
+
     if ((data == NULL_PTR) || (len == 0u))
+    {
+        return E_NOT_OK;
+    }
+
+    if ((PduR_ComMChannelForIfLower(lower, lowerPduId, &channel) != FALSE) &&
+        (ComM_IsTxAllowed(channel) == FALSE))
     {
         return E_NOT_OK;
     }
@@ -472,7 +617,15 @@ static Std_ReturnType PduR_DispatchIfDest(PduR_IfDestType dest,
                                           const uint8* data,
                                           PduLengthType len)
 {
+    ComM_ChannelType channel;
+
     if ((data == NULL_PTR) || (len == 0u))
+    {
+        return E_NOT_OK;
+    }
+
+    if ((PduR_ComMChannelForIfDest(dest, destPduId, &channel) != FALSE) &&
+        (ComM_IsTxAllowed(channel) == FALSE))
     {
         return E_NOT_OK;
     }
@@ -509,29 +662,23 @@ static Std_ReturnType PduR_DispatchIfDest(PduR_IfDestType dest,
     }
 }
 
-static void PduR_ResetTpBuffer(PduR_TpBufferType* buf)
-{
-    if (buf != NULL_PTR)
-    {
-        buf->expectedLen = 0u;
-        buf->offset = 0u;
-        buf->active = FALSE;
-    }
-}
-
 static Std_ReturnType PduR_TpStartOfReception(PduR_TpLowerType lower,
                                               PduIdType lowerRxPduId,
                                               PduLengthType len)
 {
     uint8 routeIdx;
-    PduR_TpBufferType* buf;
+    const PduR_TpRxRouteType* route;
+    Dcm_PduInfoType info;
+    Dcm_PduLengthType available;
 
     if ((PduR_Initialized == FALSE) || (len == 0u) || (len > PDUR_MAX_TP_BUFFER))
     {
         return E_NOT_OK;
     }
 
-    if (PduR_FindTpRxRoute(lower, lowerRxPduId, &routeIdx) == NULL_PTR)
+    route = PduR_FindTpRxRoute(lower, lowerRxPduId, &routeIdx);
+
+    if (route == NULL_PTR)
     {
         return E_NOT_OK;
     }
@@ -541,12 +688,14 @@ static Std_ReturnType PduR_TpStartOfReception(PduR_TpLowerType lower,
         return E_NOT_OK;
     }
 
-    buf = &PduR_TpRxBuf[routeIdx];
-    buf->expectedLen = len;
-    buf->offset = 0u;
-    buf->active = TRUE;
+    info.SduDataPtr = NULL_PTR;
+    info.SduLength = 0u;
+    available = 0u;
 
-    return E_OK;
+    return (Dcm_StartOfReception(route->dcmRxPduId,
+                                 &info,
+                                 (Dcm_PduLengthType)len,
+                                 &available) == BUFREQ_OK) ? E_OK : E_NOT_OK;
 }
 
 static Std_ReturnType PduR_TpCopyRxData(PduR_TpLowerType lower,
@@ -555,14 +704,18 @@ static Std_ReturnType PduR_TpCopyRxData(PduR_TpLowerType lower,
                                         PduLengthType len)
 {
     uint8 routeIdx;
-    PduR_TpBufferType* buf;
+    const PduR_TpRxRouteType* route;
+    Dcm_PduInfoType info;
+    Dcm_PduLengthType available;
 
     if ((PduR_Initialized == FALSE) || (data == NULL_PTR))
     {
         return E_NOT_OK;
     }
 
-    if (PduR_FindTpRxRoute(lower, lowerRxPduId, &routeIdx) == NULL_PTR)
+    route = PduR_FindTpRxRoute(lower, lowerRxPduId, &routeIdx);
+
+    if (route == NULL_PTR)
     {
         return E_NOT_OK;
     }
@@ -572,27 +725,11 @@ static Std_ReturnType PduR_TpCopyRxData(PduR_TpLowerType lower,
         return E_NOT_OK;
     }
 
-    buf = &PduR_TpRxBuf[routeIdx];
+    info.SduDataPtr = (uint8*)data;
+    info.SduLength = (Dcm_PduLengthType)len;
+    available = 0u;
 
-    if (buf->active == FALSE)
-    {
-        return E_NOT_OK;
-    }
-
-    if (((PduLengthType)(buf->offset + len) < buf->offset) ||
-        ((PduLengthType)(buf->offset + len) > buf->expectedLen))
-    {
-        PduR_ResetTpBuffer(buf);
-        return E_NOT_OK;
-    }
-
-    if (len > 0u)
-    {
-        memcpy(&buf->buffer[buf->offset], data, len);
-        buf->offset = (PduLengthType)(buf->offset + len);
-    }
-
-    return E_OK;
+    return (Dcm_CopyRxData(route->dcmRxPduId, &info, &available) == BUFREQ_OK) ? E_OK : E_NOT_OK;
 }
 
 static void PduR_TpRxIndication(PduR_TpLowerType lower,
@@ -601,7 +738,6 @@ static void PduR_TpRxIndication(PduR_TpLowerType lower,
 {
     uint8 routeIdx;
     const PduR_TpRxRouteType* route;
-    PduR_TpBufferType* buf;
 
     if (PduR_Initialized == FALSE)
     {
@@ -615,30 +751,15 @@ static void PduR_TpRxIndication(PduR_TpLowerType lower,
         return;
     }
 
-    buf = &PduR_TpRxBuf[routeIdx];
-
-    if ((result == E_OK) &&
-        (buf->active != FALSE) &&
-        (buf->offset == buf->expectedLen))
-    {
-        Dcm_RxIndication(route->dcmRxPduId, buf->buffer, buf->expectedLen);
-    }
-
-    PduR_ResetTpBuffer(buf);
+    Dcm_TpRxIndication(route->dcmRxPduId,
+                       (result == E_OK) ? NTFRSLT_OK : NTFRSLT_E_NOT_OK);
 }
 
 /* ===================== Public API ===================== */
 
 void PduR_Init(void)
 {
-    uint8 i;
-
     PduR_Initialized = FALSE;
-
-    for (i = 0u; i < PDUR_MAX_TP_RX_ROUTES; i++)
-    {
-        PduR_ResetTpBuffer(&PduR_TpRxBuf[i]);
-    }
 
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
@@ -716,6 +837,7 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
 {
     const PduR_DcmTxRouteType* route;
     uint8 keepContext;
+    ComM_ChannelType channel;
 
     if ((PduR_Initialized == FALSE) ||
         (data == NULL_PTR) ||
@@ -728,6 +850,13 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
     route = PduR_FindDcmTxRoute(DcmTxPduId);
 
     if (route == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    if ((route->lower != PDUR_TP_LOWER_CANTP) &&
+        (PduR_ComMChannelForDcmRoute(route, &channel) != FALSE) &&
+        (ComM_IsTxAllowed(channel) == FALSE))
     {
         return E_NOT_OK;
     }
@@ -777,8 +906,15 @@ void PduR_CanIfRxIndication(PduIdType CanIfRxPduId,
                             PduLengthType len)
 {
     uint8 i;
+    ComM_ChannelType channel;
 
     if ((PduR_Initialized == FALSE) || (data == NULL_PTR) || (len == 0u))
+    {
+        return;
+    }
+
+    if ((PduR_ComMChannelForCanIfRx(CanIfRxPduId, &channel) != FALSE) &&
+        (ComM_IsRxAllowed(channel) == FALSE))
     {
         return;
     }
@@ -828,6 +964,11 @@ void PduR_LinIfRxIndication(PduIdType LinIfRxPduId,
         return;
     }
 
+    if (ComM_IsRxAllowed(COMM_CH_LIN) == FALSE)
+    {
+        return;
+    }
+
     for (i = 0u; i < (uint8)(sizeof(PduR_LinIfRxRoutes) / sizeof(PduR_LinIfRxRoutes[0])); i++)
     {
         if ((PduR_LinIfRxRoutes[i].enabled != FALSE) &&
@@ -872,6 +1013,16 @@ void PduR_SoAdIfRxIndication(uint8 soConId,
     (void)remoteAddr;
 
     if ((PduR_Initialized == FALSE) || (data == NULL_PTR) || (len == 0u))
+    {
+        return;
+    }
+
+    if (UdpNm_SoAdRxIndication(soConId, remoteAddr, data, len) != FALSE)
+    {
+        return;
+    }
+
+    if (ComM_IsRxAllowed(COMM_CH_ETH) == FALSE)
     {
         return;
     }

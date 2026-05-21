@@ -30,12 +30,15 @@ SECONDARY_SIZE :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
+APP/CodingApp \
 APP/GatewaySwc \
 BSW/Com/Can \
 BSW/Com/CanIf \
+BSW/Com/CanNm \
 BSW/Com/CanSM \
 BSW/Com/CanTp \
 BSW/Com \
+BSW/Com/ComM \
 BSW/Com/Ethernet \
 BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/api \
 BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/core \
@@ -47,7 +50,9 @@ BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/netif/ppp/polarssl \
 BSW/Com/Ethernet/GETH_LWIP_ILLD \
 BSW/Com/Ethernet/GETH_LWIP_ILLD/port/src \
 BSW/Com/Lin \
+BSW/Com/Nm \
 BSW/Com/PduR \
+BSW/Com/UdpNm \
 BSW/Diag/Dcm \
 BSW/Diag/Dem \
 BSW/Mem/Fee \
@@ -69,6 +74,7 @@ BSW/Sys/SmM/02_Safety_Mechanisms \
 BSW/Sys/SmM \
 BSW/Sys/SysMgr \
 BSW/Sys/Wdg \
+BSW/Time \
 Configurations/Debug \
 Configurations \
 . \

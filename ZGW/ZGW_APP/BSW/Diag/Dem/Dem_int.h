@@ -59,6 +59,8 @@ typedef struct
     uint32 crc32;
 } Dem_NvImageType;
 
+extern Dem_NvImageType Dem_NvImage;
+
 typedef struct
 {
     boolean active;

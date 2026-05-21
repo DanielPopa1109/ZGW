@@ -239,7 +239,8 @@ static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
     testerAddr = rd16(&p[0]);
     activationType = p[2];
 
-    if (testerAddr == 0u)
+    if ((testerAddr == 0u) ||
+        (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
     {
         DoIP_SendRoutingActivationRes(testerAddr, DOIP_RA_RES_DENIED_UNKNOWN_SOURCE);
         return;
@@ -284,7 +285,8 @@ static void DoIP_HandleDiagnostic(const uint8_t *p, uint32_t len)
         return;
     }
 
-    if (testerAddr != DoIP_Rt.testerLogicalAddress)
+    if ((testerAddr != DoIP_Rt.testerLogicalAddress) ||
+        (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
     {
         DoIP_SendDiagNack(testerAddr, ecuAddr, DOIP_NACK_INVALID_SOURCE_ADDR);
         return;

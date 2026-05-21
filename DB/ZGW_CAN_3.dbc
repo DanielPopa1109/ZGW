@@ -36,7 +36,7 @@ BS_:
 BU_: Tester FRBE DSC DME AGS DMU CBM ELC ZGW
 
 
-BO_ 48 VehicleState: 1 ZGW
+BO_ 928 VehicleState: 1 ZGW
  SG_ VehicleStatus : 0|4@1+ (1,0) [0|15] ""  FRBE,ELC,DSC,DMU,DME,CBM,AGS
 
 BO_ 595 CentralLockData: 2 FRBE
@@ -204,9 +204,13 @@ BO_ 514 SDAT: 7 ZGW
  SG_ CSB_SDAT_Second : 8|6@1+ (1,0) [0|63] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
  SG_ CSB_SDAT_Month : 40|4@1+ (1,0) [0|15] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
  SG_ CSB_SDAT_Minute : 0|6@1+ (1,0) [0|63] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Millisecond : 48|8@1+ (1,0) [0|255] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_Millisecond : 48|8@1+ (4,0) [0|1020] "ms"  DMU,CBM,DSC,DME,FRBE,ELC,AGS
  SG_ CSB_SDAT_Hour : 32|5@1+ (1,0) [0|31] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
  SG_ CSB_SDAT_Day : 24|5@1+ (1,0) [0|31] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_TimeSource : 6|2@1+ (1,0) [0|3] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_UtcValid : 14|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_DefaultTime : 15|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_NvmRestored : 22|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
 
 BO_ 1023 NM3: 1 ZGW
  SG_ Nm3_Pn1 : 0|8@1+ (1,0) [0|255] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
@@ -286,10 +290,54 @@ BO_ 1780 BattCapRes: 8 ELC
 BO_TX_BU_ 1992 : Tester,ZGW;
 
 
+CM_ SG_ 514 CSB_SDAT_Year "UTC year minus 2000; ZGW saturates values above 2063 to raw 63.";
+CM_ SG_ 514 CSB_SDAT_Millisecond "UTC millisecond encoded with 4 ms resolution.";
+CM_ SG_ 514 CSB_SDAT_TimeSource "0=default compile-time UTC, 1=UDS RoutineControl set time, 2=gPTP master, 3=invalid/unavailable.";
+CM_ SG_ 514 CSB_SDAT_UtcValid "1 when UTC/calendar fields are valid for display.";
+CM_ SG_ 514 CSB_SDAT_DefaultTime "1 when UTC comes from the compile-time default and shall be shown as not synchronized.";
+CM_ SG_ 514 CSB_SDAT_NvmRestored "1 when UTC was restored from NvM; no powered-off elapsed time is added without an external RTC.";
+VAL_ 514 CSB_SDAT_TimeSource 0 "DefaultCompileTime" 1 "UdsRoutine" 2 "GptpMaster" 3 "Invalid" ;
+VAL_ 514 CSB_SDAT_UtcValid 0 "Invalid" 1 "Valid" ;
+VAL_ 514 CSB_SDAT_DefaultTime 0 "NotDefault" 1 "DefaultCompileTime" ;
+VAL_ 514 CSB_SDAT_NvmRestored 0 "NotRestored" 1 "RestoredFromNvM" ;
 BA_DEF_  "MultiplexExtEnabled" ENUM  "No","Yes";
 BA_DEF_  "BusType" STRING ;
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 65535;
 BA_DEF_DEF_  "MultiplexExtEnabled" "No";
 BA_DEF_DEF_  "BusType" "CAN";
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_ "GenMsgCycleTime" BO_ 514 800;
+BA_ "GenMsgCycleTime" BO_ 81 1000;
+BA_ "GenMsgCycleTime" BO_ 128 5;
+BA_ "GenMsgCycleTime" BO_ 129 1000;
+BA_ "GenMsgCycleTime" BO_ 130 1000;
+BA_ "GenMsgCycleTime" BO_ 131 1000;
+BA_ "GenMsgCycleTime" BO_ 132 1000;
+BA_ "GenMsgCycleTime" BO_ 133 1000;
+BA_ "GenMsgCycleTime" BO_ 134 1000;
+BA_ "GenMsgCycleTime" BO_ 144 5;
+BA_ "GenMsgCycleTime" BO_ 145 5;
+BA_ "GenMsgCycleTime" BO_ 146 100;
+BA_ "GenMsgCycleTime" BO_ 256 100;
+BA_ "GenMsgCycleTime" BO_ 269 100;
+BA_ "GenMsgCycleTime" BO_ 512 1000;
+BA_ "GenMsgCycleTime" BO_ 513 1000;
+BA_ "GenMsgCycleTime" BO_ 576 100;
+BA_ "GenMsgCycleTime" BO_ 592 200;
+BA_ "GenMsgCycleTime" BO_ 593 1000;
+BA_ "GenMsgCycleTime" BO_ 594 100;
+BA_ "GenMsgCycleTime" BO_ 595 200;
+BA_ "GenMsgCycleTime" BO_ 665 1000;
+BA_ "GenMsgCycleTime" BO_ 1774 5;
+BA_ "GenMsgCycleTime" BO_ 1775 5;
+BA_ "GenMsgCycleTime" BO_ 1776 5;
+BA_ "GenMsgCycleTime" BO_ 1777 1000;
+BA_ "GenMsgCycleTime" BO_ 1778 1000;
+BA_ "GenMsgCycleTime" BO_ 1779 1000;
+BA_ "GenMsgCycleTime" BO_ 1780 1000;
+BA_ "GenMsgCycleTime" BO_ 1781 5;
+BA_ "GenMsgCycleTime" BO_ 1782 1000;
+BA_ "GenMsgCycleTime" BO_ 1783 1000;
 SIG_VALTYPE_ 545 CommandDisplayOutsideTemperature : 1;
 SIG_VALTYPE_ 593 OutsideTemperature : 1;
 SIG_VALTYPE_ 134 IntakeTemperature : 1;

@@ -61,23 +61,23 @@ extern "C" {
 
 #define LWIP_HAVE_SLIPIF 0
 
-#define DEFAULT_TCP_RECVMBOX_SIZE           16
-#define DEFAULT_UDP_RECVMBOX_SIZE           32
-#define DEFAULT_ACCEPTMBOX_SIZE             16
+#define DEFAULT_TCP_RECVMBOX_SIZE           8
+#define DEFAULT_UDP_RECVMBOX_SIZE           16
+#define DEFAULT_ACCEPTMBOX_SIZE             8
 #define DEFAULT_RAW_RECVMBOX_SIZE           8
-#define TCPIP_MBOX_SIZE                     32
-#define MEMP_NUM_NETCONN                    16
-#define MEMP_NUM_TCPIP_MSG_API              32
-#define MEMP_NUM_TCPIP_MSG_INPKT            32
+#define TCPIP_MBOX_SIZE                     16
+#define MEMP_NUM_NETCONN                    8
+#define MEMP_NUM_TCPIP_MSG_API              16
+#define MEMP_NUM_TCPIP_MSG_INPKT            16
 #define MEMP_NUM_SYS_TIMEOUT                (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 8)
 
 /* FreeRTOS/lwIP thread sizing. Required when NO_SYS == 0.
  * Values are in stack words for the Infineon FreeRTOS port.
  */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS 1
-#define TCPIP_THREAD_STACKSIZE             1536
-#define TCPIP_THREAD_PRIO                  3
-#define DEFAULT_THREAD_STACKSIZE           768
+#define TCPIP_THREAD_STACKSIZE             1024
+#define TCPIP_THREAD_PRIO                  29
+#define DEFAULT_THREAD_STACKSIZE           512
 #define DEFAULT_THREAD_PRIO                2
 
 #define LWIP_NETIF_HOSTNAME                 0
@@ -87,20 +87,20 @@ extern "C" {
 #define LWIP_NETIF_TX_SINGLE_PBUF           1
 #define TCP_LISTEN_BACKLOG                  1
 #define LWIP_SO_RCVTIMEO                    1
-#define MEM_SIZE                            8192
-#define PBUF_POOL_SIZE                      48
+#define MEM_SIZE                            4096
+#define PBUF_POOL_SIZE                      24
 #define PBUF_POOL_BUFSIZE                   512
-#define MEMP_NUM_PBUF                       48
+#define MEMP_NUM_PBUF                       24
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
 #define LWIP_UDP                            1
-#define MEMP_NUM_UDP_PCB                    8
+#define MEMP_NUM_UDP_PCB                    4
 
 #define LWIP_TCP                            1
-#define MEMP_NUM_TCP_PCB                    5
-#define MEMP_NUM_TCP_PCB_LISTEN             5
-#define MEMP_NUM_TCP_SEG                    16
+#define MEMP_NUM_TCP_PCB                    3
+#define MEMP_NUM_TCP_PCB_LISTEN             3
+#define MEMP_NUM_TCP_SEG                    8
 #define TCP_MSS                             536
 #define TCP_WND                             2144
 #define TCP_SND_BUF                         1072
@@ -110,7 +110,7 @@ extern "C" {
 
 #define LWIP_ARP                            1
 #define ARP_TABLE_SIZE                      10
-#define MEMP_NUM_ARP_QUEUE                  30
+#define MEMP_NUM_ARP_QUEUE                  10
 
 #define LWIP_AUTOIP                         0
 

@@ -65,13 +65,13 @@
 **                      Imported Function Declarations                        **
 *******************************************************************************/
 IFX_SSW_COMMON_LINKER_SYMBOLS(); // @suppress("Unused variable declaration in file scope")
-IFX_SSW_CORE_LINKER_SYMBOLS(1);
+IFX_SSW_CORE_LINKER_SYMBOLS(1); // @suppress("Unused variable declaration in file scope")
 
 #if defined(__TASKING__)
 __asm("\t .extern core1_main");
 #endif
 
-/*******************************************************************************
+/******************************************************************************* // @suppress("Unused variable declaration in file scope")
 **                      Private Constant Definitions                          **
 *******************************************************************************/
 

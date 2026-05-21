@@ -36,20 +36,6 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-/* TC39x-BD has different signature than that of TC39x-BA/BB/BC
- * have a look to Appendix*/
-#ifndef IFXSCULBIST_CFG_SIGNATURE_A_TC39X_BD
-#ifndef IFX_CFG_LBIST_BODY_ENABLED
-#define IFXSCULBIST_CFG_SIGNATURE_A_TC39X_BD    (0x95F1EC84)
-#else
-#define IFXSCULBIST_CFG_SIGNATURE_A_TC39X_BD    (0x6CBBBA57)
-#endif
-#endif
-/* TC39x-BA, TC39x-BB,TC39x-BC and TC39x-BD has Chip revision ID as
- *  0x10,     0x11,    0x12     and 0x13 */
-#ifndef IFX_SCU_CHIPID_CHREV_TC39X_BD
-#define IFX_SCU_CHIPID_CHREV_TC39X_BD   0x13
-#endif
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -62,30 +48,10 @@
 /*********************************************************************************************************************/
 /*------------------------------------------Exported Variables/Constants---------------------------------------------*/
 /*********************************************************************************************************************/
-IFX_CONST IfxScuLbist_ParameterSet IfxScuLbist_defaultConfig_tc39x_bd =
-{
-#ifndef IFX_CFG_LBIST_BODY_ENABLED
-
-        .application     = IfxScuLbist_Application_pt,
-        .freq            = IfxScuLbist_Freq_div6,
-        .splitShiftSel   = IfxScuLbist_SplitShiftSel_fourScanPartitions,
-        .seed            = IFXSCULBIST_CFG_SEED,
-        .pattern         = IFXSCULBIST_CFG_PATTERN_A,
-        .scanChainLength = IFXSCULBIST_CFG_SCANCHAINLENGTH,
-        .signature       = IFXSCULBIST_CFG_SIGNATURE_A_TC39X_BD,
-#else
-        .application     = IfxScuLbist_Application_body,
-        .freq            = IfxScuLbist_Freq_div6,
-        .splitShiftSel   = IfxScuLbist_SplitShiftSel_fourScanPartitions,
-        .seed            = IFXSCULBIST_CFG_SEED,
-        .pattern         = IFXSCULBIST_CFG_PATTERN_A,
-        .scanChainLength = IFXSCULBIST_CFG_SCANCHAINLENGTH,
-        .signature       = IFXSCULBIST_CFG_SIGNATURE_A_TC39X_BD,
-#endif
-};
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+boolean IfxScuLbist_isTerminatedProperly(void);
 boolean IfxScuLbist_isTerminatedPORST(void);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
@@ -98,22 +64,30 @@ boolean IfxScuLbist_isTerminatedPORST(void);
 void safetyKitSswLbist(void)
 {
     boolean lbistHasPassed;
+    volatile SswStatusXramType *sswStatusXram = &SSW_STATUS_DATA_ADDRESS;
+
+    if (Ifx_Ssw_isColdPoweronReset())
+    {
+        sswStatusXram->lbistRuns = 0u;
+        sswStatusXram->lbistAppSwReq = 0u;
+    }
+
     /* check if LBIST was terminated by a PORST */
     if (FALSE == IfxScuLbist_isTerminatedPORST())
     {
         /* Check if LBIST was already executed, either within firmware of within application SSW */
         if (IfxScuLbist_isDone())
         {
-            /* SM:LBIST_RESULT */
-            if ( IFX_SCU_CHIPID_CHREV_TC39X_BD == MODULE_SCU.CHIPID.B.CHREV)
+            sswStatusXram->lbistRuns++;
+
+            if (TRUE == IfxScuLbist_isTerminatedProperly())
             {
-                /* Default signature for TC39X-BD device i.e. look to Appendix  */
-                lbistHasPassed = IfxScuLbist_evaluateResult(IfxScuLbist_defaultConfig_tc39x_bd.signature);
+                /* TC375DP/TC37x uses the derivative default signature provided by the iLLD configuration. */
+                lbistHasPassed = IfxScuLbist_evaluateResult(IfxScuLbist_defaultConfig.signature);
             }
             else
             {
-                /* Default signature for TC39X-BA/BB/BC device i.e. look to Appendix  */
-                lbistHasPassed = IfxScuLbist_evaluateResult(IfxScuLbist_defaultConfig.signature);
+                lbistHasPassed = FALSE;
             }
 
             uint16 password = IfxScuWdt_getSafetyWatchdogPasswordInline();
@@ -139,8 +113,19 @@ void safetyKitSswLbist(void)
             else
             {
                 g_SafetyKitStatus.sswStatus.lbistStatus = failed;
-                /* SM:LBIST_CFG */
-                safetyKitTriggerLbist();
+
+                if (sswStatusXram->lbistRuns < SAFETKIT_LBIST_MAX_RUNS)
+                {
+                    /* SM:LBIST_CFG */
+                    safetyKitTriggerLbist();
+                }
+                else
+                {
+                    while(1)
+                    {
+                        __debug();
+                    }
+                }
             }
         }
         else
@@ -172,23 +157,29 @@ boolean IfxScuLbist_isTerminatedPORST(void)
 {
     return (boolean)MODULE_SCU.RSTSTAT.B.LBPORST;
 }
+
+/*
+ * The RSTSTAT.LBTERM status bit indicates if LBIST execution was properly terminated
+ * */
+boolean IfxScuLbist_isTerminatedProperly(void)
+{
+    return (boolean)MODULE_SCU.RSTSTAT.B.LBTERM;
+}
 /*
  * SM:LBIST_CFG
  * */
 void safetyKitTriggerLbist(void)
 {
+    volatile SswStatusXramType *sswStatusXram = &SSW_STATUS_DATA_ADDRESS;
+
+    sswStatusXram->lbistAppSwReq++;
+    sswStatusXram->RSTSTAT.U = MODULE_SCU.RSTSTAT.U;
+
     /* Clear COLD PORST reason to preserve the data on the SCR XRAM */
     IfxScuRcu_clearColdResetStatus();
-    /* Trigger LBIST */
-    if ( IFX_SCU_CHIPID_CHREV_TC39X_BD == MODULE_SCU.CHIPID.B.CHREV)
-    {
-        /* Default signature for TC39X-BD device i.e. look to Appendix  */
-        IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig_tc39x_bd);
-    }
-    else
-    {
-        IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig);
-    }
+
+    /* Trigger LBIST with the derivative default configuration for TC375DP/TC37x. */
+    IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig);
 
     while(1)
     {

@@ -5,6 +5,7 @@
 #include "IfxScuRcu.h"
 #include "IfxFlash.h"
 #include "IfxCan_Can.h"
+#include "IfxPort_reg.h"
 #include "aurix_pin_mappings.h"
 
 #define FBL_TRANSPORT_CANFD              1u
@@ -30,7 +31,7 @@
 #define PROGRAM_FLASH_BANK_B             IfxFlash_FlashType_P1
 
 #define FBL_CAN_REQ_ID                   0x710u
-#define FBL_CAN_RES_ID                   0x709u
+#define FBL_CAN_RES_ID                   0x711u
 #define FBL_CAN_RX_PRIO                  1u
 #define FBL_CAN_MAX_DL                   64u
 
@@ -42,16 +43,22 @@
 #define UDS_SID_SESSION                  0x10u
 #define UDS_SID_RESET                    0x11u
 #define UDS_SID_RDBI                     0x22u
+#define UDS_SID_SECURITY_ACCESS          0x27u
+#define UDS_SID_COMM_CONTROL             0x28u
 #define UDS_SID_ROUTINE                  0x31u
 #define UDS_SID_REQ_DOWNLOAD             0x34u
 #define UDS_SID_TRANSFER_DATA            0x36u
 #define UDS_SID_TRANSFER_EXIT            0x37u
 #define UDS_SID_TESTER_PRESENT           0x3Eu
+#define UDS_SID_CONTROL_DTC_SETTING      0x85u
 #define UDS_NEG_RESP                     0x7Fu
 
+#define UDS_NRC_SUBFUNC_NOT_SUPPORTED    0x12u
 #define UDS_NRC_INCORRECT_LEN            0x13u
 #define UDS_NRC_COND_NOT_CORRECT         0x22u
+#define UDS_NRC_SEQUENCE_ERROR           0x24u
 #define UDS_NRC_OUT_OF_RANGE             0x31u
+#define UDS_NRC_INVALID_KEY              0x35u
 #define UDS_NRC_TRANSFER_FAIL            0x70u
 #define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
 
@@ -67,10 +74,26 @@
 #define DOIP_PT_VID_RES                  0x0004u
 #define DOIP_PT_ROUTING_ACT_REQ          0x0005u
 #define DOIP_PT_ROUTING_ACT_RES          0x0006u
+#define DOIP_PT_ALIVE_CHECK_REQ          0x0007u
+#define DOIP_PT_ALIVE_CHECK_RES          0x0008u
 #define DOIP_PT_DIAG_MSG                 0x8001u
 #define DOIP_PT_DIAG_ACK                 0x8002u
-#define DOIP_TESTER_ADDR                 0x0E00u
-#define DOIP_ECU_ADDR                    0x1000u
+#define DOIP_PT_DIAG_NACK                0x8003u
+#define DOIP_TESTER_ADDR                 0x0710u
+#define DOIP_ECU_ADDR                    0x1001u
+#define DOIP_HEADER_LEN                  8u
+#define DOIP_VID_RES_LEN                 33u
+#define DOIP_RA_RES_LEN                  13u
+#define DOIP_ALIVE_RES_LEN               2u
+#define DOIP_DIAG_ACK_LEN                5u
+#define DOIP_TCP_RX_STREAM_SIZE          8192u
+#define DOIP_RA_RES_DENIED_UNKNOWN_SRC   0x00u
+#define DOIP_RA_RES_UNSUPPORTED_ACT      0x05u
+#define DOIP_RA_RES_OK                   0x10u
+#define DOIP_NACK_INVALID_SOURCE_ADDR    0x02u
+#define DOIP_NACK_UNKNOWN_TARGET_ADDR    0x03u
+#define DOIP_NACK_DIAG_MSG_TOO_LARGE     0x04u
+#define DOIP_NACK_TRANSPORT_ERROR        0x08u
 
 #define FBL_FLASH_FUNC_BASE              0x70100000u
 #define FBL_FLASH_FUNC_LEN               192u
@@ -80,10 +103,7 @@
 #define FBL_FLASH_LOAD_ADDR              (FBL_FLASH_ENTER_ADDR + FBL_FLASH_FUNC_LEN)
 #define FBL_FLASH_WRITE_ADDR             (FBL_FLASH_LOAD_ADDR + FBL_FLASH_FUNC_LEN)
 
-extern uint8 __ram_code_start[];
-extern uint8 __ram_code_end[];
-extern uint8 __ram_code_load[];
-extern void FblRamUpdater_Entry(void);
+extern void FblRamUpdater_Entry(void); // @suppress("Unused variable declaration in file scope")
 
 extern void FblEth_Init(void);
 extern void FblEth_MainFunction(void);
@@ -150,13 +170,24 @@ static FblCan_Type g_can;
 static FblIsoTp_Type g_iso;
 static FblFlashCmd_Type g_flash;
 static FblDownload_Type g_dl;
+static uint32 g_secSeed;
+static uint8 g_secSeedValid;
 static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
 static uint32 g_pageAddr = 0xFFFFFFFFu;
 static uint32 g_pageFill = 0u;
+static uint8 g_doipTcpStream[DOIP_TCP_RX_STREAM_SIZE];
+static uint16 g_doipTcpStreamLen;
+static uint16 g_doipTesterAddr;
+static uint8 g_doipRoutingActive;
+
+static const uint8 Fbl_DoIpVin[17] = "LABTC375DOIP0001";
+static const uint8 Fbl_DoIpEid[6] = {0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
+static const uint8 Fbl_DoIpGid[6] = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
 
 IFX_INTERRUPT(Fbl_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
 static void Fbl_PlatformInit(void);
+static void Fbl_CanReleaseFdRxPinFromScr(void);
 static void Fbl_CanInit(void);
 static void Fbl_CanSend(const uint8 *data, uint8 len);
 static uint8 Fbl_CanDlcFromLen(uint8 len);
@@ -170,9 +201,17 @@ static void Fbl_IsoTpDelayStMin(uint8 stMin);
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
 static void Fbl_UdsSend(const uint8 *res, uint16 len, uint8 transport);
 static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
+static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport);
+static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level);
 static void Fbl_DoIpMain(void);
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len);
 static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len);
+static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len);
+static void Fbl_DoIpSendVehicleId(void);
+static void Fbl_DoIpSendRoutingActivationRes(uint16 testerAddr, uint8 code);
+static void Fbl_DoIpSendAliveRes(void);
+static void Fbl_DoIpSendDiagAck(uint16 testerAddr, uint16 ecuAddr);
+static void Fbl_DoIpSendDiagNack(uint16 testerAddr, uint16 ecuAddr, uint8 nack);
 static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen);
 static void Fbl_FlashInit(void);
 static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len);
@@ -236,21 +275,38 @@ static void Fbl_PlatformInit(void)
     IfxScuWdt_disableCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
     gpio_init_pins();
-    can0_node0_init_pins();
+    can1_node3_init_pins();
     IfxCpu_enableInterrupts();
+}
+
+static void Fbl_CanReleaseFdRxPinFromScr(void)
+{
+    uint16 safetyWdtPw;
+
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+    while(P33_PCSR.B.LCK)
+    {
+    }
+    P33_PCSR.B.SEL5 = 0u;
+    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
 static void Fbl_CanInit(void)
 {
+    Fbl_CanReleaseFdRxPinFromScr();
+    can1_node3_init_pins();
+
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN0);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN1);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
+    g_can.nodeConfig.nodeId = IfxCan_NodeId_3;
     g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
@@ -283,13 +339,13 @@ static void Fbl_CanInit(void)
     g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
     g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_PRIO;
     g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
-    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0;
+    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0; // @suppress("Symbol is not resolved")
 
     g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x000u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x080u;
-    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x100u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0x500u;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x800u;
+    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x880u;
+    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x980u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0xD00u;
 
     IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
 
@@ -299,8 +355,8 @@ static void Fbl_CanInit(void)
     g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
     IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
 
-    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
@@ -616,6 +672,11 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     if(sid == UDS_SID_SESSION)
     {
         if(len < 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+        if((req[1u] & 0x7Fu) == 0x01u)
+        {
+            g_secSeedValid = 0u;
+        }
+
         res[0u] = 0x50u;
         res[1u] = req[1u];
         res[2u] = 0x00u;
@@ -644,6 +705,18 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         {
             Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
         }
+    }
+    else if(sid == UDS_SID_SECURITY_ACCESS)
+    {
+        Fbl_UdsSecurityAccess(req, len, transport);
+    }
+    else if(sid == UDS_SID_COMM_CONTROL)
+    {
+        if(len != 3u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        res[0u] = 0x68u;
+        res[1u] = (uint8)(req[1u] & 0x7Fu);
+        Fbl_UdsSend(res, 2u, transport);
     }
     else if(sid == UDS_SID_ROUTINE)
     {
@@ -813,6 +886,23 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         res[0u] = 0x77u;
         Fbl_UdsSend(res, 1u, transport);
     }
+    else if(sid == UDS_SID_CONTROL_DTC_SETTING)
+    {
+        uint8 settingType;
+
+        if(len != 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        settingType = (uint8)(req[1u] & 0x7Fu);
+        if((settingType != 0x01u) && (settingType != 0x02u))
+        {
+            Fbl_UdsNeg(sid, UDS_NRC_SUBFUNC_NOT_SUPPORTED, transport);
+            return;
+        }
+
+        res[0u] = 0xC5u;
+        res[1u] = settingType;
+        Fbl_UdsSend(res, 2u, transport);
+    }
     else if(sid == UDS_SID_RESET)
     {
         if(len < 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
@@ -854,6 +944,88 @@ static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
     Fbl_UdsSend(res, 3u, transport);
 }
 
+static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
+{
+    uint8 res[6];
+    uint8 sub;
+    uint8 level;
+    uint32 key;
+    uint32 expected;
+
+    if(len < 2u)
+    {
+        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+        return;
+    }
+
+    sub = req[1u];
+
+    if((sub == 0u) || (sub > 0x08u))
+    {
+        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_OUT_OF_RANGE, transport);
+        return;
+    }
+
+    level = (uint8)((sub - 1u) / 2u);
+
+    if((sub & 0x01u) != 0u)
+    {
+        if(len != 2u)
+        {
+            Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        g_secSeed = 0x5A5A0000u ^ ((uint32)level << 8u) ^ g_dl.received ^ g_dl.curAddr;
+        g_secSeedValid = 1u;
+
+        res[0u] = 0x67u;
+        res[1u] = sub;
+        Fbl_Wr32(&res[2u], g_secSeed);
+        Fbl_UdsSend(res, 6u, transport);
+        return;
+    }
+
+    if(len != 6u)
+    {
+        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
+        return;
+    }
+
+    if(g_secSeedValid == 0u)
+    {
+        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_SEQUENCE_ERROR, transport);
+        return;
+    }
+
+    key = Fbl_Rd32(&req[2u]);
+    expected = Fbl_SecCalcKey(g_secSeed, level);
+
+    if(key != expected)
+    {
+        g_secSeedValid = 0u;
+        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INVALID_KEY, transport);
+        return;
+    }
+
+    g_secSeedValid = 0u;
+    res[0u] = 0x67u;
+    res[1u] = sub;
+    Fbl_UdsSend(res, 2u, transport);
+}
+
+static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level)
+{
+    uint32 key;
+
+    key = seed ^ 0x6A09E667u;
+    key += 0x13572468u + ((uint32)level * 0x1F3D5B79u);
+    key = (key << 3u) | (key >> 29u);
+    key ^= ((seed << 16u) | (seed >> 16u));
+
+    return key;
+}
+
 static void Fbl_DoIpMain(void)
 {
     uint8 buf[1600];
@@ -874,86 +1046,285 @@ static void Fbl_DoIpMain(void)
 
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len)
 {
-    uint8 res[64];
     uint16 payloadType;
 
-    if(len < 8u) { return; }
+    if(len < DOIP_HEADER_LEN) { return; }
     if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER)) { return; }
 
     payloadType = Fbl_Rd16(&buf[2u]);
 
     if(payloadType == DOIP_PT_VID_REQ)
     {
-        res[0u] = DOIP_PROTO_VER;
-        res[1u] = DOIP_INV_PROTO_VER;
-        Fbl_Wr16(&res[2u], DOIP_PT_VID_RES);
-        Fbl_Wr32(&res[4u], 17u);
-        memcpy(&res[8u], "AURIXTC375FBL0001", 17u);
-        FblEth_UdpSend(res, 25u);
+        Fbl_DoIpSendVehicleId();
     }
 }
 
 static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
 {
-    uint16 payloadType;
     uint32 payloadLen;
-    uint8 res[32];
+    uint16 frameLen;
+    uint16 remaining;
 
-    if(len < 8u) { return; }
+    if((buf == NULL) || (len == 0u)) { return; }
+
+    if(len > (uint16)(sizeof(g_doipTcpStream) - g_doipTcpStreamLen))
+    {
+        g_doipTcpStreamLen = 0u;
+        return;
+    }
+
+    memcpy(&g_doipTcpStream[g_doipTcpStreamLen], buf, len);
+    g_doipTcpStreamLen = (uint16)(g_doipTcpStreamLen + len);
+
+    while(g_doipTcpStreamLen >= DOIP_HEADER_LEN)
+    {
+        if((g_doipTcpStream[0u] != DOIP_PROTO_VER) ||
+           (g_doipTcpStream[1u] != DOIP_INV_PROTO_VER))
+        {
+            g_doipTcpStreamLen = 0u;
+            return;
+        }
+
+        payloadLen = Fbl_Rd32(&g_doipTcpStream[4u]);
+
+        if(payloadLen > (uint32)(sizeof(g_doipTcpStream) - DOIP_HEADER_LEN))
+        {
+            g_doipTcpStreamLen = 0u;
+            return;
+        }
+
+        frameLen = (uint16)(payloadLen + DOIP_HEADER_LEN);
+
+        if(g_doipTcpStreamLen < frameLen)
+        {
+            return;
+        }
+
+        Fbl_DoIpHandleTcpFrame(g_doipTcpStream, frameLen);
+
+        remaining = (uint16)(g_doipTcpStreamLen - frameLen);
+        if(remaining > 0u)
+        {
+            memmove(g_doipTcpStream, &g_doipTcpStream[frameLen], remaining);
+        }
+        g_doipTcpStreamLen = remaining;
+    }
+}
+
+static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len)
+{
+    uint16 payloadType;
+    uint16 testerAddr;
+    uint16 ecuAddr;
+    uint16 udsLen;
+    uint32 payloadLen;
+
+    if(len < DOIP_HEADER_LEN) { return; }
     if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER)) { return; }
 
     payloadType = Fbl_Rd16(&buf[2u]);
     payloadLen = Fbl_Rd32(&buf[4u]);
 
-    if((payloadLen + 8u) > len) { return; }
+    if((payloadLen + DOIP_HEADER_LEN) != len) { return; }
 
     if(payloadType == DOIP_PT_ROUTING_ACT_REQ)
     {
-        res[0u] = DOIP_PROTO_VER;
-        res[1u] = DOIP_INV_PROTO_VER;
-        Fbl_Wr16(&res[2u], DOIP_PT_ROUTING_ACT_RES);
-        Fbl_Wr32(&res[4u], 9u);
-        res[8u] = buf[8u];
-        res[9u] = buf[9u];
-        Fbl_Wr16(&res[10u], DOIP_ECU_ADDR);
-        res[12u] = 0x10u;
-        res[13u] = 0x00u;
-        res[14u] = 0x00u;
-        res[15u] = 0x00u;
-        res[16u] = 0x00u;
-        FblEth_TcpSend(res, 17u);
+        if(payloadLen < 7u) { return; }
+
+        testerAddr = Fbl_Rd16(&buf[8u]);
+
+        if((testerAddr == 0u) || (testerAddr != DOIP_TESTER_ADDR))
+        {
+            Fbl_DoIpSendRoutingActivationRes(testerAddr, DOIP_RA_RES_DENIED_UNKNOWN_SRC);
+            return;
+        }
+
+        if((buf[10u] != 0x00u) && (buf[10u] != 0x01u))
+        {
+            Fbl_DoIpSendRoutingActivationRes(testerAddr, DOIP_RA_RES_UNSUPPORTED_ACT);
+            return;
+        }
+
+        g_doipTesterAddr = testerAddr;
+        g_doipRoutingActive = 1u;
+
+        Fbl_DoIpSendRoutingActivationRes(testerAddr, DOIP_RA_RES_OK);
+    }
+    else if(payloadType == DOIP_PT_ALIVE_CHECK_REQ)
+    {
+        if(payloadLen == 0u)
+        {
+            Fbl_DoIpSendAliveRes();
+        }
     }
     else if(payloadType == DOIP_PT_DIAG_MSG)
     {
-        if(payloadLen < 4u) { return; }
+        if(payloadLen < 5u) { return; }
 
-        res[0u] = DOIP_PROTO_VER;
-        res[1u] = DOIP_INV_PROTO_VER;
-        Fbl_Wr16(&res[2u], DOIP_PT_DIAG_ACK);
-        Fbl_Wr32(&res[4u], 5u);
-        res[8u] = buf[8u];
-        res[9u] = buf[9u];
-        res[10u] = buf[10u];
-        res[11u] = buf[11u];
-        res[12u] = 0x00u;
-        FblEth_TcpSend(res, 13u);
+        testerAddr = Fbl_Rd16(&buf[8u]);
+        ecuAddr = Fbl_Rd16(&buf[10u]);
 
-        Fbl_UdsHandle(&buf[12u], (uint16)(payloadLen - 4u), FBL_TRANSPORT_ETH);
+        if(g_doipRoutingActive == 0u)
+        {
+            Fbl_DoIpSendDiagNack(testerAddr, ecuAddr, DOIP_NACK_TRANSPORT_ERROR);
+            return;
+        }
+
+        if((testerAddr != g_doipTesterAddr) || (testerAddr != DOIP_TESTER_ADDR))
+        {
+            Fbl_DoIpSendDiagNack(testerAddr, ecuAddr, DOIP_NACK_INVALID_SOURCE_ADDR);
+            return;
+        }
+
+        if(ecuAddr != DOIP_ECU_ADDR)
+        {
+            Fbl_DoIpSendDiagNack(testerAddr, ecuAddr, DOIP_NACK_UNKNOWN_TARGET_ADDR);
+            return;
+        }
+
+        if((payloadLen - 4u) > FBL_ISOTP_MAX_PAYLOAD)
+        {
+            Fbl_DoIpSendDiagNack(testerAddr, ecuAddr, DOIP_NACK_DIAG_MSG_TOO_LARGE);
+            return;
+        }
+
+        udsLen = (uint16)(payloadLen - 4u);
+        Fbl_DoIpSendDiagAck(testerAddr, ecuAddr);
+        Fbl_UdsHandle(&buf[12u], udsLen, FBL_TRANSPORT_ETH);
     }
+}
+
+static void Fbl_DoIpSendVehicleId(void)
+{
+    uint8 res[DOIP_HEADER_LEN + DOIP_VID_RES_LEN];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_VID_RES);
+    Fbl_Wr32(&res[4u], DOIP_VID_RES_LEN);
+
+    idx = DOIP_HEADER_LEN;
+    memcpy(&res[idx], Fbl_DoIpVin, sizeof(Fbl_DoIpVin));
+    idx = (uint16)(idx + sizeof(Fbl_DoIpVin));
+
+    Fbl_Wr16(&res[idx], DOIP_ECU_ADDR);
+    idx = (uint16)(idx + 2u);
+
+    memcpy(&res[idx], Fbl_DoIpEid, sizeof(Fbl_DoIpEid));
+    idx = (uint16)(idx + sizeof(Fbl_DoIpEid));
+
+    memcpy(&res[idx], Fbl_DoIpGid, sizeof(Fbl_DoIpGid));
+    idx = (uint16)(idx + sizeof(Fbl_DoIpGid));
+
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+
+    FblEth_UdpSend(res, idx);
+}
+
+static void Fbl_DoIpSendRoutingActivationRes(uint16 testerAddr, uint8 code)
+{
+    uint8 res[DOIP_HEADER_LEN + DOIP_RA_RES_LEN];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_ROUTING_ACT_RES);
+    Fbl_Wr32(&res[4u], DOIP_RA_RES_LEN);
+
+    idx = DOIP_HEADER_LEN;
+    Fbl_Wr16(&res[idx], testerAddr);
+    idx = (uint16)(idx + 2u);
+    Fbl_Wr16(&res[idx], DOIP_ECU_ADDR);
+    idx = (uint16)(idx + 2u);
+    res[idx++] = code;
+
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+    res[idx++] = 0x00u;
+
+    FblEth_TcpSend(res, idx);
+}
+
+static void Fbl_DoIpSendAliveRes(void)
+{
+    uint8 res[DOIP_HEADER_LEN + DOIP_ALIVE_RES_LEN];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_ALIVE_CHECK_RES);
+    Fbl_Wr32(&res[4u], DOIP_ALIVE_RES_LEN);
+
+    idx = DOIP_HEADER_LEN;
+    Fbl_Wr16(&res[idx], DOIP_ECU_ADDR);
+    idx = (uint16)(idx + 2u);
+
+    FblEth_TcpSend(res, idx);
+}
+
+static void Fbl_DoIpSendDiagAck(uint16 testerAddr, uint16 ecuAddr)
+{
+    uint8 res[DOIP_HEADER_LEN + DOIP_DIAG_ACK_LEN];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_DIAG_ACK);
+    Fbl_Wr32(&res[4u], DOIP_DIAG_ACK_LEN);
+
+    idx = DOIP_HEADER_LEN;
+    Fbl_Wr16(&res[idx], testerAddr);
+    idx = (uint16)(idx + 2u);
+    Fbl_Wr16(&res[idx], ecuAddr);
+    idx = (uint16)(idx + 2u);
+    res[idx++] = 0x00u;
+
+    FblEth_TcpSend(res, idx);
+}
+
+static void Fbl_DoIpSendDiagNack(uint16 testerAddr, uint16 ecuAddr, uint8 nack)
+{
+    uint8 res[DOIP_HEADER_LEN + DOIP_DIAG_ACK_LEN];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_DIAG_NACK);
+    Fbl_Wr32(&res[4u], DOIP_DIAG_ACK_LEN);
+
+    idx = DOIP_HEADER_LEN;
+    Fbl_Wr16(&res[idx], testerAddr);
+    idx = (uint16)(idx + 2u);
+    Fbl_Wr16(&res[idx], ecuAddr);
+    idx = (uint16)(idx + 2u);
+    res[idx++] = nack;
+
+    FblEth_TcpSend(res, idx);
 }
 
 static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen)
 {
     uint8 buf[512];
+    uint16 targetAddr;
 
     if((udsLen + 12u) > sizeof(buf)) { return; }
+    if(g_doipRoutingActive == 0u) { return; }
+
+    targetAddr = (g_doipTesterAddr != 0u) ? g_doipTesterAddr : DOIP_TESTER_ADDR;
 
     buf[0u] = DOIP_PROTO_VER;
     buf[1u] = DOIP_INV_PROTO_VER;
     Fbl_Wr16(&buf[2u], DOIP_PT_DIAG_MSG);
     Fbl_Wr32(&buf[4u], (uint32)udsLen + 4u);
     Fbl_Wr16(&buf[8u], DOIP_ECU_ADDR);
-    Fbl_Wr16(&buf[10u], DOIP_TESTER_ADDR);
+    Fbl_Wr16(&buf[10u], targetAddr);
     memcpy(&buf[12u], uds, udsLen);
 
     FblEth_TcpSend(buf, (uint16)(udsLen + 12u));
@@ -1112,10 +1483,10 @@ static IfxFlash_FlashType Fbl_FlashBank(uint32 addr)
 {
     if((addr >= PFLASH_BANK_B_START) && (addr <= PFLASH_BANK_B_END))
     {
-        return PROGRAM_FLASH_BANK_B;
+        return PROGRAM_FLASH_BANK_B; // @suppress("Symbol is not resolved")
     }
 
-    return PROGRAM_FLASH_BANK_A;
+    return PROGRAM_FLASH_BANK_A; // @suppress("Symbol is not resolved")
 }
 
 static uint32 Fbl_Crc32(uint32 addr, uint32 len)

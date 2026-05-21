@@ -294,21 +294,21 @@ derivative tc37
     {
         group (ordered)
         {
-            group ustack2(align = 8, run_addr = mem:dsram2[LCF_USTACK2_OFFSET])
+            group ustack2(align = 4, run_addr = mem:dsram2[LCF_USTACK2_OFFSET])
             {
                 stack "ustack_tc2" (size = LCF_USTACK2_SIZE);
             }
             "__USTACK2" := sizeof(group:ustack2) > 0 ? "_lc_ue_ustack_tc2" : 0;
             "__USTACK2_END" = "_lc_gb_ustack2";
 
-            group istack2(align = 8, run_addr = mem:dsram2[LCF_ISTACK2_OFFSET])
+            group istack2(align = 4, run_addr = mem:dsram2[LCF_ISTACK2_OFFSET])
             {
                 stack "istack_tc2" (size = LCF_ISTACK2_SIZE);
             }
             "__ISTACK2" := sizeof(group:istack2) > 0 ? "_lc_ue_istack_tc2" : 0;
             "__ISTACK2_END" = "_lc_gb_istack2";
 
-            group (align = 64, attributes=rw, run_addr=mem:dsram2[LCF_CSA2_OFFSET])
+            group (align = 4, attributes=rw, run_addr=mem:dsram2[LCF_CSA2_OFFSET])
                 reserved "csa_tc2" (size = LCF_CSA2_SIZE);
             "__CSA2" := "_lc_ub_csa_tc2";
             "__CSA2_END" := "_lc_ue_csa_tc2";
@@ -316,21 +316,21 @@ derivative tc37
 
         group (ordered)
         {
-            group ustack1(align = 8, run_addr = mem:dsram1[LCF_USTACK1_OFFSET])
+            group ustack1(align = 4, run_addr = mem:dsram1[LCF_USTACK1_OFFSET])
             {
                 stack "ustack_tc1" (size = LCF_USTACK1_SIZE);
             }
             "__USTACK1" := sizeof(group:ustack1) > 0 ? "_lc_ue_ustack_tc1" : 0;
             "__USTACK1_END" = "_lc_gb_ustack1";
 
-            group istack1(align = 8, run_addr = mem:dsram1[LCF_ISTACK1_OFFSET])
+            group istack1(align = 4, run_addr = mem:dsram1[LCF_ISTACK1_OFFSET])
             {
                 stack "istack_tc1" (size = LCF_ISTACK1_SIZE);
             }
             "__ISTACK1" := sizeof(group:istack1) > 0 ? "_lc_ue_istack_tc1" : 0;
             "__ISTACK1_END" = "_lc_gb_istack1";
 
-            group (align = 64, attributes=rw, run_addr=mem:dsram1[LCF_CSA1_OFFSET])
+            group (align = 4, attributes=rw, run_addr=mem:dsram1[LCF_CSA1_OFFSET])
                 reserved "csa_tc1" (size = LCF_CSA1_SIZE);
             "__CSA1" := "_lc_ub_csa_tc1";
             "__CSA1_END" := "_lc_ue_csa_tc1";
@@ -338,21 +338,21 @@ derivative tc37
 
         group (ordered)
         {
-            group ustack0(align = 8, run_addr = mem:dsram0[LCF_USTACK0_OFFSET])
+            group ustack0(align = 4, run_addr = mem:dsram0[LCF_USTACK0_OFFSET])
             {
                 stack "ustack_tc0" (size = LCF_USTACK0_SIZE);
             }
             "__USTACK0" := sizeof(group:ustack0) > 0 ? "_lc_ue_ustack_tc0" : 0;
             "__USTACK0_END" = "_lc_gb_ustack0";
 
-            group istack0(align = 8, run_addr = mem:dsram0[LCF_ISTACK0_OFFSET])
+            group istack0(align = 4, run_addr = mem:dsram0[LCF_ISTACK0_OFFSET])
             {
                 stack "istack_tc0" (size = LCF_ISTACK0_SIZE);
             }
             "__ISTACK0" := sizeof(group:istack0) > 0 ? "_lc_ue_istack_tc0" : 0;
             "__ISTACK0_END" = "_lc_gb_istack0";
 
-            group (align = 64, attributes=rw, run_addr=mem:dsram0[LCF_CSA0_OFFSET])
+            group (align = 4, attributes=rw, run_addr=mem:dsram0[LCF_CSA0_OFFSET])
                 reserved "csa_tc0" (size = LCF_CSA0_SIZE);
             "__CSA0" := "_lc_ub_csa_tc0";
             "__CSA0_END" := "_lc_ue_csa_tc0";
@@ -678,7 +678,7 @@ derivative tc37
          * These sections are still normal initialized/cleared RAM; only their run address changes.
          *************************************************************************************************************/
 
-        group bsw_eth_lwip_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
+        group bsw_eth_lwip_dsram2 (ordered, align = 4, attributes=rw, run_addr = mem:dsram2)
         {
             select ".data.mem.*";
             select ".bss.mem.*";
@@ -748,7 +748,7 @@ derivative tc37
             select ".bss.sys_arch.*";
         }
 
-        group bsw_eth_driver_dlmu2 (ordered, align = 8, attributes=rw, run_addr = mem:cpu2_dlmu)
+        group bsw_eth_driver_dlmu1 (ordered, align = 4, attributes=rw, run_addr = mem:cpu1_dlmu)
         {
             select ".data.lwip_geth.*";
             select ".bss.lwip_geth.*";
@@ -764,7 +764,7 @@ derivative tc37
             select ".bss.lwip_geth_private_phy_rtl8211f.*";
         }
 
-        group bsw_eth_glue_dlmu2 (ordered, align = 8, attributes=rw, run_addr = mem:cpu2_dlmu)
+        group bsw_eth_glue_dlmu2 (ordered, align = 4, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
             select ".data.EthStack.*";
             select ".bss.EthStack.*";
@@ -782,7 +782,7 @@ derivative tc37
             select ".bss.SomeIpSd.*";
         }
 
-        group bsw_com_misc_dsram2 (ordered, align = 8, attributes=rw, run_addr = mem:dsram2)
+        group bsw_com_misc_dsram2 (ordered, align = 4, attributes=rw, run_addr = mem:dsram2)
         {
             select ".data.Assert.*";
             select ".bss.Assert.*";
@@ -822,20 +822,22 @@ derivative tc37
         /**************************************************************************************************************
          * Fee work-buffer placement.
          * Fee_JobData and Fee_PendingData are ~32 KiB each. Do NOT keep them in one ordered group,
-         * because TASKING then needs one contiguous ~64 KiB gap. Split them across DSPR0/DLMU0.
+         * because TASKING then needs one contiguous ~64 KiB gap. Keep them as separate DSRAM0
+         * groups so each buffer only needs its own ~32 KiB gap and DLMU0 remains available for
+         * NCR/transport runtime data.
          *************************************************************************************************************/
 
-        group bsw_mem_fee_jobdata_dsram0 (ordered, align = 8, attributes=rw, run_addr = mem:dsram0)
+        group bsw_mem_fee_jobdata_dsram0 (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
         {
             select ".bss.Fee.Fee_JobData";
         }
 
-        group bsw_mem_fee_pendingdata_cpu0_dlmu (ordered, align = 8, attributes=rw, run_addr = mem:cpu0_dlmu)
+        group bsw_mem_fee_pendingdata_dsram0 (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
         {
             select ".bss.Fee.Fee_PendingData";
         }
 
-        group bsw_com_can_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        group bsw_com_can_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".data.Can.*";
             select ".bss.Can.*";
@@ -847,7 +849,7 @@ derivative tc37
             select ".bss.lmubss_can*";
         }
 
-        group bsw_diag_dcm_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        group bsw_diag_dcm_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".data.Dcm.*";
             select ".bss.Dcm.*";
@@ -859,7 +861,7 @@ derivative tc37
             select ".bss.lmubss_dcm*";
         }
 
-        group bsw_diag_dem_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        group bsw_diag_dem_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".data.Dem.*";
             select ".bss.Dem.*";
@@ -875,7 +877,7 @@ derivative tc37
             select ".bss.lmubss_dem*";
         }
 
-        group bsw_mem_nvm_fee_dsram1 (ordered, align = 8, attributes=rw, run_addr = mem:dsram1)
+        group bsw_mem_nvm_fee_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".data.NvM_Cfg.*";
             select ".bss.NvM_Cfg.*";
@@ -886,7 +888,6 @@ derivative tc37
             select ".data.nvm_*";
             select ".bss.nvm_*";
 
-            select ".bss.Fee.Fee_RecordData";
         }
         
         group NCR (ordered, attributes = rws, run_addr = mem:cpu0_dlmu, align = 4)
@@ -913,7 +914,7 @@ derivative tc37
         "__NCR_START" := "_lc_gb_NCR";
         "__NCR_END"   := "_lc_ge_NCR";
 
-        group bsw_com_cantp_dlmu0 (ordered, align = 8, attributes=rw, run_addr = mem:cpu0_dlmu)
+        group bsw_com_cantp_dlmu0 (ordered, align = 4, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
             select ".data.CanTp.*";
             select ".bss.CanTp.*";
@@ -925,7 +926,7 @@ derivative tc37
             select ".bss.lmubss_cantp*";
         }
 
-        group bsw_com_canif_pdur_dlmu1 (ordered, align = 8, attributes=rw, run_addr = mem:cpu1_dlmu)
+        group bsw_com_canif_pdur_dlmu1 (ordered, align = 4, attributes=rw, run_addr = mem:cpu1_dlmu)
         {
             select ".data.CanIf.*";
             select ".bss.CanIf.*";

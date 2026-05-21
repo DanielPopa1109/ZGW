@@ -40,7 +40,7 @@ typedef uint8 Dcm_OpStatusType;
 
 /* ===================== Limits ===================== */
 
-#define DCM_MAX_CONNECTIONS          6u
+#define DCM_MAX_CONNECTIONS          10u
 #define DCM_MAX_PDU_LEN              4095u
 #define DCM_MAX_RESPONSE_LEN         4095u
 #define DCM_RX_QUEUE_DEPTH           2u
@@ -95,17 +95,31 @@ typedef struct
 
 #define DCM_SID_DIAGNOSTIC_SESSION_CONTROL              0x10u
 #define DCM_SID_ECU_RESET                               0x11u
+#define DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION            0x14u
 #define DCM_SID_READ_DTC_INFORMATION                    0x19u
 #define DCM_SID_READ_DATA_BY_IDENTIFIER                 0x22u
+#define DCM_SID_READ_MEMORY_BY_ADDRESS                  0x23u
+#define DCM_SID_READ_SCALING_DATA_BY_IDENTIFIER         0x24u
 #define DCM_SID_SECURITY_ACCESS                         0x27u
 #define DCM_SID_COMMUNICATION_CONTROL                   0x28u
+#define DCM_SID_AUTHENTICATION                          0x29u
+#define DCM_SID_READ_DATA_BY_PERIODIC_IDENTIFIER        0x2Au
+#define DCM_SID_DYNAMICALLY_DEFINE_DATA_IDENTIFIER      0x2Cu
 #define DCM_SID_WRITE_DATA_BY_IDENTIFIER                0x2Eu
+#define DCM_SID_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER      0x2Fu
 #define DCM_SID_ROUTINE_CONTROL                         0x31u
 #define DCM_SID_REQUEST_DOWNLOAD                        0x34u
+#define DCM_SID_REQUEST_UPLOAD                          0x35u
 #define DCM_SID_TRANSFER_DATA                           0x36u
 #define DCM_SID_REQUEST_TRANSFER_EXIT                   0x37u
+#define DCM_SID_REQUEST_FILE_TRANSFER                   0x38u
+#define DCM_SID_WRITE_MEMORY_BY_ADDRESS                 0x3Du
 #define DCM_SID_TESTER_PRESENT                          0x3Eu
+#define DCM_SID_ACCESS_TIMING_PARAMETER                 0x83u
+#define DCM_SID_SECURED_DATA_TRANSMISSION               0x84u
 #define DCM_SID_CONTROL_DTC_SETTING                     0x85u
+#define DCM_SID_RESPONSE_ON_EVENT                       0x86u
+#define DCM_SID_LINK_CONTROL                            0x87u
 
 #define DCM_SUPPRESS_POS_RSP_MSG_INDICATION_BIT         0x80u
 
@@ -229,6 +243,12 @@ Dcm_ReturnType DcmAppl_EcuReset(
     Dcm_PduLengthType* respLen
 );
 
+Dcm_ReturnType DcmAppl_ClearDiagnosticInformation(
+    uint8 connIdx,
+    Dcm_OpStatusType opStatus,
+    uint32 dtcGroup
+);
+
 Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
     uint8 connIdx,
     Dcm_OpStatusType opStatus,
@@ -300,6 +320,16 @@ Dcm_ReturnType DcmAppl_TransferData(
 Dcm_ReturnType DcmAppl_RequestTransferExit(
     uint8 connIdx,
     Dcm_OpStatusType opStatus,
+    const uint8* reqData,
+    Dcm_PduLengthType reqLen,
+    uint8* respData,
+    Dcm_PduLengthType* respLen
+);
+
+Dcm_ReturnType DcmAppl_StandardService(
+    uint8 connIdx,
+    Dcm_OpStatusType opStatus,
+    uint8 sid,
     const uint8* reqData,
     Dcm_PduLengthType reqLen,
     uint8* respData,

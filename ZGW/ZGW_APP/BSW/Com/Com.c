@@ -1,5 +1,6 @@
 #include "Com.h"
 #include "PduR.h"
+#include "ComM/ComM.h"
 #include <string.h>
 
 #define COM_TRUE  1u
@@ -50,6 +51,7 @@ typedef struct
     uint8 dirty;
     uint8 txInProgress;
     uint16 periodTimer;
+    uint8 periodDue;
     uint16 mdtTimer;
     uint8 repetitionsLeft;
     uint16 repetitionTimer;
@@ -262,6 +264,10 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_TX_SDAT_CSB_SDAT_MILLISECOND                              , COM_TRUE,  COM_TX_PDU_SDAT                                        , 48u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_SDAT_CSB_SDAT_HOUR                                     , COM_TRUE,  COM_TX_PDU_SDAT                                        , 32u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
     { COM_SIG_TX_SDAT_CSB_SDAT_DAY                                      , COM_TRUE,  COM_TX_PDU_SDAT                                        , 24u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
+    { COM_SIG_TX_SDAT_CSB_SDAT_TIMESOURCE                               , COM_TRUE,  COM_TX_PDU_SDAT                                        , 6u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
+    { COM_SIG_TX_SDAT_CSB_SDAT_UTCVALID                                 , COM_TRUE,  COM_TX_PDU_SDAT                                        , 14u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_SDAT_CSB_SDAT_DEFAULTTIME                              , COM_TRUE,  COM_TX_PDU_SDAT                                        , 15u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_SDAT_CSB_SDAT_NVMRESTORED                              , COM_TRUE,  COM_TX_PDU_SDAT                                        , 22u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_TX_NM3_NM3_PN1                                           , COM_TRUE,  COM_TX_PDU_NM3                                         , 0u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_LOADREQUEST_LOADREQUESTSTATUS                                 , COM_TRUE,  COM_TX_PDU_LOADREQUEST                                 , 7u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_TX_LOADREQUEST_LOADREQUESTDATAID                                 , COM_TRUE,  COM_TX_PDU_LOADREQUEST                                 , 4u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
@@ -404,6 +410,10 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_MILLISECOND                                           , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 16u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_HOUR                                                  , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 8u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
     { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DAY                                                   , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 0u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
+    { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_TIMESOURCE                                            , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 5u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
+    { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_UTCVALID                                              , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 7u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DEFAULTTIME                                           , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 13u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_NVMRESTORED                                           , COM_TRUE,  COM_TX_PDU_CANFD_SDAT                                                   , 14u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_TURNSIGNALSSTATUS                                            , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 16u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_TURNSIGNALCOMMAND                                            , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 12u, 4u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFu        , 0u },
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_REVERSELIGTHSTATUS                                           , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 10u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
@@ -1798,6 +1808,53 @@ static void Com_StoreValue(void* ptr, uint8 size, uint32 value)
     }
 }
 
+static uint8 Com_IsTxModeSendOnChange(uint8 txMode)
+{
+    if ((txMode == COM_TX_MODE_DIRECT) ||
+        (txMode == COM_TX_MODE_MIXED))
+    {
+        return COM_TRUE;
+    }
+
+    return COM_FALSE;
+}
+
+static uint8 Com_IsTxSignalChangeTriggerExcluded(Com_SignalIdType signalId)
+{
+    switch (signalId)
+    {
+        case COM_SIG_TX_LOADREQUEST_LOADREQUESTCRC:
+        case COM_SIG_TX_LOADREQUEST_LOADREQUESTALIVECOUNTER:
+        case COM_SIG_TX_CANFD_INFOTAINMENTDATA1_IT1_ALIVEINDICATION:
+        case COM_SIG_TX_SDAT_CSB_SDAT_YEAR:
+        case COM_SIG_TX_SDAT_CSB_SDAT_SECOND:
+        case COM_SIG_TX_SDAT_CSB_SDAT_MONTH:
+        case COM_SIG_TX_SDAT_CSB_SDAT_MINUTE:
+        case COM_SIG_TX_SDAT_CSB_SDAT_MILLISECOND:
+        case COM_SIG_TX_SDAT_CSB_SDAT_HOUR:
+        case COM_SIG_TX_SDAT_CSB_SDAT_DAY:
+        case COM_SIG_TX_SDAT_CSB_SDAT_TIMESOURCE:
+        case COM_SIG_TX_SDAT_CSB_SDAT_UTCVALID:
+        case COM_SIG_TX_SDAT_CSB_SDAT_DEFAULTTIME:
+        case COM_SIG_TX_SDAT_CSB_SDAT_NVMRESTORED:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_YEAR:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_SECOND:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_MONTH:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_MINUTE:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_MILLISECOND:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_HOUR:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DAY:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_TIMESOURCE:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_UTCVALID:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DEFAULTTIME:
+        case COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_NVMRESTORED:
+            return COM_TRUE;
+
+        default:
+            return COM_FALSE;
+    }
+}
+
 static uint16 Com_GetTxRetryTimeoutTicks(const Com_TxIpduConfigType* cfg)
 {
     uint16 timeoutTicks;
@@ -1822,6 +1879,58 @@ static uint16 Com_GetTxRetryTimeoutTicks(const Com_TxIpduConfigType* cfg)
     }
 
     return timeoutTicks;
+}
+
+static uint16 Com_MsToMainTicks(uint16 timeMs)
+{
+    uint32 ticks;
+
+    if (timeMs == 0u)
+    {
+        return 0u;
+    }
+
+    ticks = ((uint32)timeMs + ((uint32)COM_MAIN_PERIOD_MS - 1u)) /
+            (uint32)COM_MAIN_PERIOD_MS;
+
+    return (ticks > 0xFFFFu) ? 0xFFFFu : (uint16)ticks;
+}
+
+static uint16 Com_GetRxDeadlineMainTicks(const Com_RxIpduConfigType* cfg)
+{
+    if (cfg == NULL_PTR)
+    {
+        return 0u;
+    }
+
+    return Com_MsToMainTicks(cfg->deadlineTicks);
+}
+
+static uint8 Com_TxIpduBelongsToChannel(PduIdType pduId, uint8 channel)
+{
+    switch (channel)
+    {
+        case COMM_CH_CAN:
+            return ((pduId >= COM_TX_PDU_VEHICLESTATE) &&
+                    (pduId <= COM_TX_PDU_DIAGREQUEST_700)) ?
+                   COM_TRUE :
+                   COM_FALSE;
+
+        case COMM_CH_CANFD:
+            return ((pduId >= COM_TX_PDU_CANFD_INFOTAINMENTDATA1) &&
+                    (pduId <= COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3)) ?
+                   COM_TRUE :
+                   COM_FALSE;
+
+        case COMM_CH_LIN:
+            return ((pduId >= COM_TX_PDU_LIN_ZGW_NM3) &&
+                    (pduId <= COM_TX_PDU_LIN_ZGW_REQUEST_PCU48)) ?
+                   COM_TRUE :
+                   COM_FALSE;
+
+        default:
+            return COM_FALSE;
+    }
 }
 
 static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
@@ -1901,6 +2010,7 @@ void Com_Init(void)
         }
         Com_TxRt[i].deadlineTimer = Com_TxIpduCfg[i].deadlineTicks;
         Com_TxRt[i].active = COM_TRUE;
+        Com_TxRt[i].periodDue = COM_FALSE;
         Com_TxLastTriggerSequence[i] = 0u;
         Com_TxTriggerCounter[i] = 0u;
         Com_TxDuplicateSuppressedCounter[i] = 0u;
@@ -1910,7 +2020,7 @@ void Com_Init(void)
     for (i = 0u; i < COM_RX_IPDU_COUNT; i++)
     {
         memcpy(Com_RxRt[i].buffer, Com_RxIpduCfg[i].init, Com_RxIpduCfg[i].len);
-        Com_RxRt[i].deadlineTimer = Com_RxIpduCfg[i].deadlineTicks;
+        Com_RxRt[i].deadlineTimer = Com_GetRxDeadlineMainTicks(&Com_RxIpduCfg[i]);
         Com_RxRt[i].active = COM_TRUE;
     }
 }
@@ -1961,6 +2071,26 @@ Std_ReturnType Com_IpduGroupStop(Com_IpduGroupIdType groupId)
     return E_OK;
 }
 
+void Com_TriggerFullComRestartBurst(uint8 channel)
+{
+    uint8 i;
+
+    for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
+    {
+        if ((Com_TxRt[i].active == COM_FALSE) ||
+            (Com_TxIpduBelongsToChannel(Com_TxIpduCfg[i].pduId, channel) == COM_FALSE))
+        {
+            continue;
+        }
+
+        Com_TxRt[i].txInProgress = COM_FALSE;
+        Com_TxRt[i].mdtTimer = 0u;
+        Com_TxRt[i].dirty = COM_TRUE;
+        Com_TxRt[i].periodDue = COM_TRUE;
+        (void)Com_TriggerTransmit(i);
+    }
+}
+
 Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataPtr)
 {
     const Com_SignalConfigType* sig;
@@ -1968,6 +2098,7 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     uint32 value;
     uint32 previousValue;
     uint8 pduChanged = COM_FALSE;
+    uint8 triggerOnChange = COM_FALSE;
 
     if (SignalDataPtr == NULL_PTR)
     {
@@ -2018,17 +2149,23 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     }
 
     if ((pduChanged != COM_FALSE) &&
-        (Com_TxIpduCfg[txIdx].txMode != COM_TX_MODE_PERIODIC))
+        (Com_IsTxSignalChangeTriggerExcluded(sig->signalId) == COM_FALSE) &&
+        (Com_IsTxModeSendOnChange(Com_TxIpduCfg[txIdx].txMode) != COM_FALSE))
     {
+        triggerOnChange = COM_TRUE;
         Com_TxRt[txIdx].dirty = COM_TRUE;
     }
 
-    if ((pduChanged != COM_FALSE) &&
+    if ((triggerOnChange != COM_FALSE) &&
         ((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_DIRECT) ||
         (Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_MIXED)))
     {
         Com_TxRt[txIdx].repetitionsLeft = Com_TxIpduCfg[txIdx].repetitions;
         Com_TxRt[txIdx].repetitionTimer = 0u;
+    }
+
+    if (triggerOnChange != COM_FALSE)
+    {
         (void)Com_TriggerTransmit(txIdx);
     }
 
@@ -2137,17 +2274,9 @@ Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
         return E_NOT_OK;
     }
 
-    timeoutTicks = Com_RxIpduCfg[rxIdx].deadlineTicks;
+    timeoutTicks = Com_GetRxDeadlineMainTicks(&Com_RxIpduCfg[rxIdx]);
     *TimeoutTicksPtr = timeoutTicks;
-
-    if (timeoutTicks >= 10u)
-    {
-        *CycleTicksPtr = (uint16)(timeoutTicks / 10u);
-    }
-    else
-    {
-        *CycleTicksPtr = timeoutTicks;
-    }
+    *CycleTicksPtr = timeoutTicks;
 
     return E_OK;
 }
@@ -2220,14 +2349,19 @@ Std_ReturnType Com_InvalidateSignal(Com_SignalIdType SignalId)
     }
 
     Com_WriteBits(Com_TxRt[txIdx].buffer, sig->bitPosition, sig->bitSize, sig->invalidValue);
-    Com_TxRt[txIdx].dirty = COM_TRUE;
 
     if (sig->hasUpdateBit != COM_FALSE)
     {
         Com_WriteBits(Com_TxRt[txIdx].buffer, sig->updateBitPosition, 1u, 1u);
     }
 
-    return Com_TriggerTransmit(txIdx);
+    if (Com_IsTxSignalChangeTriggerExcluded(sig->signalId) == COM_FALSE)
+    {
+        Com_TxRt[txIdx].dirty = COM_TRUE;
+        return Com_TriggerTransmit(txIdx);
+    }
+
+    return E_OK;
 }
 
 void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len)
@@ -2257,7 +2391,7 @@ void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len)
     }
 
     memcpy(Com_RxRt[rxIdx].buffer, data, len);
-    Com_RxRt[rxIdx].deadlineTimer = Com_RxIpduCfg[rxIdx].deadlineTicks;
+    Com_RxRt[rxIdx].deadlineTimer = Com_GetRxDeadlineMainTicks(&Com_RxIpduCfg[rxIdx]);
     Com_RxRt[rxIdx].timeout = COM_FALSE;
 }
 
@@ -2273,6 +2407,14 @@ void Com_TxConfirmation(PduIdType TxPduId)
     }
 
     Com_TxRt[txIdx].txInProgress = COM_FALSE;
+
+    if (((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_PERIODIC) ||
+            (Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_MIXED)) &&
+            (Com_TxRt[txIdx].periodDue != COM_FALSE))
+    {
+        Com_TxRt[txIdx].periodTimer = Com_TxIpduCfg[txIdx].periodTicks;
+        Com_TxRt[txIdx].periodDue = COM_FALSE;
+    }
 }
 
 void Com_MainFunctionTx(void)
@@ -2333,14 +2475,18 @@ void Com_MainFunctionTx(void)
         if ((Com_TxIpduCfg[i].txMode == COM_TX_MODE_PERIODIC) ||
             (Com_TxIpduCfg[i].txMode == COM_TX_MODE_MIXED))
         {
-            if (Com_TxRt[i].periodTimer > 0u)
+            if (Com_TxRt[i].txInProgress == COM_FALSE)
             {
-                Com_TxRt[i].periodTimer--;
-            }
-            else
-            {
-                Com_TxRt[i].dirty = COM_TRUE;
-                Com_TxRt[i].periodTimer = Com_TxIpduCfg[i].periodTicks;
+                if (Com_TxRt[i].periodTimer > 0u)
+                {
+                    Com_TxRt[i].periodTimer--;
+                }
+
+                if (Com_TxRt[i].periodTimer == 0u)
+                {
+                    Com_TxRt[i].dirty = COM_TRUE;
+                    Com_TxRt[i].periodDue = COM_TRUE;
+                }
             }
         }
 
@@ -2375,12 +2521,14 @@ void Com_MainFunctionRx(void)
         if (Com_RxRt[i].deadlineTimer > 0u)
         {
             Com_RxRt[i].deadlineTimer--;
+            if (Com_RxRt[i].deadlineTimer > 0u)
+            {
+                continue;
+            }
         }
-        else
-        {
-            Com_RxRt[i].timeout = COM_TRUE;
-            memcpy(Com_RxRt[i].buffer, Com_RxIpduCfg[i].init, Com_RxIpduCfg[i].len);
-        }
+
+        Com_RxRt[i].timeout = COM_TRUE;
+        memcpy(Com_RxRt[i].buffer, Com_RxIpduCfg[i].init, Com_RxIpduCfg[i].len);
     }
 
     Com_MainFunctionRx_Counter++;

@@ -94,7 +94,7 @@ BO_ 260 EnergyManagementData1: 64 ZGW
  SG_ EM1_AvgDischargeCurrent : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
  SG_ EM1_AvgChargeCurrent : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
 
-BO_ 48 VehicleState: 1 ZGW
+BO_ 928 VehicleState: 1 ZGW
  SG_ VehicleStatus : 0|4@1+ (1,0) [0|15] ""  Tester
 
 BO_ 1023 NM3: 1 ZGW
@@ -105,9 +105,13 @@ BO_ 514 SDAT: 7 ZGW
  SG_ CANFD_SDAT_Second : 40|6@1+ (1,0) [0|63] ""  Tester
  SG_ CANFD_SDAT_Month : 32|4@1+ (1,0) [0|15] ""  Tester
  SG_ CANFD_SDAT_Minute : 24|6@1+ (1,0) [0|63] ""  Tester
- SG_ CANFD_SDAT_Millisecond : 16|8@1+ (1,0) [0|255] ""  Tester
+ SG_ CANFD_SDAT_Millisecond : 16|8@1+ (4,0) [0|1020] "ms"  Tester
  SG_ CANFD_SDAT_Hour : 8|5@1+ (1,0) [0|31] ""  Tester
  SG_ CANFD_SDAT_Day : 0|5@1+ (1,0) [0|31] ""  Tester
+ SG_ CANFD_SDAT_TimeSource : 5|2@1+ (1,0) [0|3] ""  Tester
+ SG_ CANFD_SDAT_UtcValid : 7|1@1+ (1,0) [0|1] ""  Tester
+ SG_ CANFD_SDAT_DefaultTime : 13|1@1+ (1,0) [0|1] ""  Tester
+ SG_ CANFD_SDAT_NvmRestored : 14|1@1+ (1,0) [0|1] ""  Tester
 
 BO_ 259 LightData1: 3 ZGW
  SG_ LD1_TurnSignalsStatus : 16|3@1+ (1,0) [0|7] ""  Tester
@@ -1360,12 +1364,97 @@ BO_ 263 EnergyManagementData3: 20 ZGW
 
 
 BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 65535;
 BA_DEF_  "MultiplexExtEnabled" ENUM  "No","Yes";
 BA_DEF_  "BusType" STRING ;
 BA_DEF_DEF_  "VFrameFormat" "ExtendedCAN_FD";
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
 BA_DEF_DEF_  "MultiplexExtEnabled" "No";
 BA_DEF_DEF_  "BusType" "CAN";
+CM_ SG_ 514 CANFD_SDAT_Year "UTC year minus 2000; ZGW saturates values above 2063 to raw 63.";
+CM_ SG_ 514 CANFD_SDAT_Millisecond "UTC millisecond encoded with 4 ms resolution.";
+CM_ SG_ 514 CANFD_SDAT_TimeSource "0=default compile-time UTC, 1=UDS RoutineControl set time, 2=gPTP master, 3=invalid/unavailable.";
+CM_ SG_ 514 CANFD_SDAT_UtcValid "1 when UTC/calendar fields are valid for display.";
+CM_ SG_ 514 CANFD_SDAT_DefaultTime "1 when UTC comes from the compile-time default and shall be shown as not synchronized.";
+CM_ SG_ 514 CANFD_SDAT_NvmRestored "1 when UTC was restored from NvM; no powered-off elapsed time is added without an external RTC.";
+VAL_ 514 CANFD_SDAT_TimeSource 0 "DefaultCompileTime" 1 "UdsRoutine" 2 "GptpMaster" 3 "Invalid" ;
+VAL_ 514 CANFD_SDAT_UtcValid 0 "Invalid" 1 "Valid" ;
+VAL_ 514 CANFD_SDAT_DefaultTime 0 "NotDefault" 1 "DefaultCompileTime" ;
+VAL_ 514 CANFD_SDAT_NvmRestored 0 "NotRestored" 1 "RestoredFromNvM" ;
 BA_ "BusType" "CAN FD";
+BA_ "GenMsgCycleTime" BO_ 514 800;
+BA_ "GenMsgCycleTime" BO_ 144 1000;
+BA_ "GenMsgCycleTime" BO_ 145 1000;
+BA_ "GenMsgCycleTime" BO_ 146 1000;
+BA_ "GenMsgCycleTime" BO_ 147 1000;
+BA_ "GenMsgCycleTime" BO_ 768 200;
+BA_ "GenMsgCycleTime" BO_ 769 200;
+BA_ "GenMsgCycleTime" BO_ 770 200;
+BA_ "GenMsgCycleTime" BO_ 771 200;
+BA_ "GenMsgCycleTime" BO_ 772 200;
+BA_ "GenMsgCycleTime" BO_ 773 50;
+BA_ "GenMsgCycleTime" BO_ 774 50;
+BA_ "GenMsgCycleTime" BO_ 775 50;
+BA_ "GenMsgCycleTime" BO_ 776 50;
+BA_ "GenMsgCycleTime" BO_ 777 50;
+BA_ "GenMsgCycleTime" BO_ 778 1000;
+BA_ "GenMsgCycleTime" BO_ 779 1000;
+BA_ "GenMsgCycleTime" BO_ 780 1000;
+BA_ "GenMsgCycleTime" BO_ 781 1000;
+BA_ "GenMsgCycleTime" BO_ 782 1000;
+BA_ "GenMsgCycleTime" BO_ 783 1000;
+BA_ "GenMsgCycleTime" BO_ 784 1000;
+BA_ "GenMsgCycleTime" BO_ 785 200;
+BA_ "GenMsgCycleTime" BO_ 786 200;
+BA_ "GenMsgCycleTime" BO_ 787 200;
+BA_ "GenMsgCycleTime" BO_ 788 200;
+BA_ "GenMsgCycleTime" BO_ 789 200;
+BA_ "GenMsgCycleTime" BO_ 790 50;
+BA_ "GenMsgCycleTime" BO_ 791 50;
+BA_ "GenMsgCycleTime" BO_ 792 50;
+BA_ "GenMsgCycleTime" BO_ 793 50;
+BA_ "GenMsgCycleTime" BO_ 794 50;
+BA_ "GenMsgCycleTime" BO_ 795 1000;
+BA_ "GenMsgCycleTime" BO_ 796 1000;
+BA_ "GenMsgCycleTime" BO_ 797 1000;
+BA_ "GenMsgCycleTime" BO_ 798 1000;
+BA_ "GenMsgCycleTime" BO_ 799 1000;
+BA_ "GenMsgCycleTime" BO_ 800 1000;
+BA_ "GenMsgCycleTime" BO_ 801 1000;
+BA_ "GenMsgCycleTime" BO_ 802 200;
+BA_ "GenMsgCycleTime" BO_ 803 200;
+BA_ "GenMsgCycleTime" BO_ 804 200;
+BA_ "GenMsgCycleTime" BO_ 805 200;
+BA_ "GenMsgCycleTime" BO_ 806 200;
+BA_ "GenMsgCycleTime" BO_ 807 50;
+BA_ "GenMsgCycleTime" BO_ 808 50;
+BA_ "GenMsgCycleTime" BO_ 809 50;
+BA_ "GenMsgCycleTime" BO_ 810 50;
+BA_ "GenMsgCycleTime" BO_ 811 50;
+BA_ "GenMsgCycleTime" BO_ 812 1000;
+BA_ "GenMsgCycleTime" BO_ 813 1000;
+BA_ "GenMsgCycleTime" BO_ 814 1000;
+BA_ "GenMsgCycleTime" BO_ 815 1000;
+BA_ "GenMsgCycleTime" BO_ 816 1000;
+BA_ "GenMsgCycleTime" BO_ 817 1000;
+BA_ "GenMsgCycleTime" BO_ 818 1000;
+BA_ "GenMsgCycleTime" BO_ 819 200;
+BA_ "GenMsgCycleTime" BO_ 820 200;
+BA_ "GenMsgCycleTime" BO_ 821 200;
+BA_ "GenMsgCycleTime" BO_ 822 200;
+BA_ "GenMsgCycleTime" BO_ 823 200;
+BA_ "GenMsgCycleTime" BO_ 824 50;
+BA_ "GenMsgCycleTime" BO_ 825 50;
+BA_ "GenMsgCycleTime" BO_ 826 50;
+BA_ "GenMsgCycleTime" BO_ 827 50;
+BA_ "GenMsgCycleTime" BO_ 828 50;
+BA_ "GenMsgCycleTime" BO_ 829 1000;
+BA_ "GenMsgCycleTime" BO_ 830 1000;
+BA_ "GenMsgCycleTime" BO_ 831 1000;
+BA_ "GenMsgCycleTime" BO_ 832 1000;
+BA_ "GenMsgCycleTime" BO_ 833 1000;
+BA_ "GenMsgCycleTime" BO_ 834 1000;
+BA_ "GenMsgCycleTime" BO_ 835 1000;
 BA_ "VFrameFormat" BO_ 147 14;
 BA_ "VFrameFormat" BO_ 146 14;
 BA_ "VFrameFormat" BO_ 145 14;
@@ -1373,7 +1462,7 @@ BA_ "VFrameFormat" BO_ 144 14;
 BA_ "VFrameFormat" BO_ 262 14;
 BA_ "VFrameFormat" BO_ 261 14;
 BA_ "VFrameFormat" BO_ 260 14;
-BA_ "VFrameFormat" BO_ 48 14;
+BA_ "VFrameFormat" BO_ 928 14;
 BA_ "VFrameFormat" BO_ 1023 14;
 BA_ "VFrameFormat" BO_ 514 14;
 BA_ "VFrameFormat" BO_ 259 14;

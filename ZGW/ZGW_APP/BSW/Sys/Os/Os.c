@@ -35,9 +35,18 @@
 #include "Fls.h"
 #include "Dem.h"
 #include "GatewaySwc.h"
+#include "APP/CodingApp/CodingApp.h"
 #include "SafetyKit_InternalWatchdogs.h"
 #include "lwip_geth_conf.h"
 #include "lwip_geth_lwip.h"
+#include "Nm.h"
+#include "CanNm.h"
+#include "ComM.h"
+#include "UdpNm.h"
+#include "EthSM.h"
+#include "BSW/Time/TimeBase.h"
+#include "BSW/Time/EthTimeSync.h"
+#include "BSW/Time/Gptp_Lab.h"
 
 void Os_Init_C0(void);
 void Os_Init_C1(void);
@@ -75,6 +84,8 @@ void Alarm5ms_Callback_QM_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2);
 #define OS_TASK_STACK_CORE0_QM_LIN     ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE2_APPL       ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_STACK_CORE2_QM_BSW     ( configMINIMAL_STACK_SIZE_core2 * 8u )
+#define OS_TASK_PRIO_CORE2_QM_BSW      29u
+#define OS_TASK_PRIO_CORE2_APPL        28u
 #define OS_NVM_MAIN_CYCLES_PER_ACTIVATION 8u
 #define OS_CPU_LOAD_MAX_PERCENT        100u
 #define OS_CPU_LOAD_MAX_PERMILLE       1000u
@@ -376,12 +387,12 @@ void Os_Init_C1(void)
 
 void Os_Init_C2(void)
 {
-    if(xTaskCreate_core2(ASIL_APPL_Task_C2, "ASIL_APPL_Task_C2", OS_TASK_STACK_CORE2_APPL, NULL, 29u, &ASIL_APPL_Task_C2_THandle) != pdPASS_core2)
+    if(xTaskCreate_core2(ASIL_APPL_Task_C2, "ASIL_APPL_Task_C2", OS_TASK_STACK_CORE2_APPL, NULL, OS_TASK_PRIO_CORE2_APPL, &ASIL_APPL_Task_C2_THandle) != pdPASS_core2)
     {
         Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_APPL_TASK);
     }
 
-    if(xTaskCreate_core2(QM_BSW_Task_C2, "QM_BSW_Task_C2", OS_TASK_STACK_CORE2_QM_BSW, NULL, 28u, &QM_BSW_Task_C2_THandle) != pdPASS_core2)
+    if(xTaskCreate_core2(QM_BSW_Task_C2, "QM_BSW_Task_C2", OS_TASK_STACK_CORE2_QM_BSW, NULL, OS_TASK_PRIO_CORE2_QM_BSW, &QM_BSW_Task_C2_THandle) != pdPASS_core2)
     {
         Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_QM_TASK);
     }
@@ -855,6 +866,9 @@ void QM_BSW_Task_C0(void *pvParameters)
             Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
             Com_MainFunctionTx();
             Com_MainFunctionRx();
+            ComM_MainFunction();
+            Nm_MainFunction();
+            CanNm_MainFunction();
             QM_BSW_Task_C0_Counter ++;
         }
         else
@@ -916,9 +930,11 @@ void QM_DIAG_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_QM_DIAG_Task_C0)
         {
             Alarm5ms_Flag_QM_DIAG_Task_C0 = 0u;
+            TimeBase_MainFunction();
             PduR_DoIPCore0MainFunction();
             Dcm_MainFunction();
             Dem_MainFunction();
+            CodingApp_MainFunction();
             QM_DIAG_Task_C0_Counter ++;
         }
         else
@@ -974,12 +990,12 @@ void ASIL_APPL_Task_C2(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASIL_APPL_Task_C2)
         {
             Alarm5ms_Flag_ASIL_APPL_Task_C2 = 0u;
-            if (Os_EthStackInitialized != 0u)
+            if (Os_EthStackInitialized != 0u && SYSMGR_RUN == SysMgr_EcuState)
             {
                 GatewaySwc_MainFunction();
             }
             Os_Core2AsilApplStackHighWater =
-                (uint32)uxTaskGetStackHighWaterMark_core2(ASIL_APPL_Task_C2_THandle);
+                    (uint32)uxTaskGetStackHighWaterMark_core2(ASIL_APPL_Task_C2_THandle);
             serviceCpuWatchdog();
             ASIL_APPL_Task_C2_Counter++;
         }
@@ -1007,6 +1023,10 @@ static uint8 Os_TryInitEthStackCore2(void)
     Os_EthNetifReadyBeforeStackInit = 1u;
 
     EthStack_Init();
+    EthTimeSync_Init();
+    Gptp_Lab_Init();
+    UdpNm_Init();
+    EthSM_Init();
     GatewaySwc_Init();
     Os_EthStackInitialized = 1u;
 
@@ -1023,6 +1043,7 @@ void QM_BSW_Task_C2(void *pvParameters)
      * LWIP_GETH_Init() calls tcpip_init(), which creates tcpip_thread; the
      * netif is initialized inside tcpip_thread, not synchronously in core2_main().
      */
+
     (void)LWIP_GETH_Init(lwip_geth_handle);
 
     for (waitLoops = 0u; waitLoops < 200u; waitLoops++)
@@ -1050,20 +1071,27 @@ void QM_BSW_Task_C2(void *pvParameters)
 
             if (Os_EthStackInitialized != 0u)
             {
+                UdpNm_MainFunction();
+                EthTimeSync_MainFunction(5u);
+                Gptp_Lab_MainFunction(5u);
+                SomeIpSd_MainFunction(5);
+
                 TcpIp_MainFunction();
                 SoAd_MainFunction();
-                /* Safety net: the RX task is interrupt-driven, but this one-shot
-                 * poll makes RX processing observable and prevents missed RX
-                 * notifications from blocking ARP/ping during bring-up.
+                /* The dedicated RX task owns the DMA descriptor ring in RTOS
+                 * builds. Keep the polling fallback only for non-RTOS ports.
                  */
+#if !LWIP_GETH_RTOS_ENABLED
                 lwip_geth_Lwip_pollReceiveFlags();
+#endif
                 DoIP_MainFunction(5);
                 PduR_DoIPCore2MainFunction();
                 SomeIp_MainFunction(5);
-                SomeIpSd_MainFunction(5);
+
+                EthSM_MainFunction();
             }
-            Os_Core2QmBswStackHighWater =
-                (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
+
+            Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
             QM_BSW_Task_C2_Counter++;
         }
         else

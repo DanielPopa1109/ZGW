@@ -83,7 +83,7 @@ SmuStatusType clearCoreKeysTestSMU(void)
 
     AGC.U = SMU_AGC.U;
 
-    /* Modify the FSP to check that the register is no longer locked */
+    /* Modify IGCS0 to check that the register is no longer locked */
     IfxScuWdt_clearSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
     SMU_AGC.B.IGCS0 = 0x7;

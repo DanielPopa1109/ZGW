@@ -20,6 +20,9 @@
         ((CAN_TX_HW_PENDING_TIMEOUT_MS + CAN_MAINFUNCTION_PERIOD_MS - 1u) / CAN_MAINFUNCTION_PERIOD_MS)
 #define CAN_TX_ATTEMPTS_PER_MAIN \
         (CAN_TX_BUDGET_PER_MAIN + CAN_NUM_CONTROLLERS)
+#define CAN_TX_HW_BUFFER_COUNT_CLASSIC 1u
+#define CAN_TX_HW_BUFFER_COUNT_FD      4u
+#define CAN_TX_HW_BUFFER_COUNT_MAX     CAN_TX_HW_BUFFER_COUNT_FD
 
 typedef struct
 {
@@ -131,15 +134,14 @@ static const Can_StdIdFilterConfigType Can_FdStdIdFilters[] =
     { 0x723u, "PDM2_DiagResponse" }, /* PDM2_DiagResponse, sender PDM2 */
     { 0x725u, "PDM3_DiagResponse" }, /* PDM3_DiagResponse, sender PDM3 */
     { 0x727u, "PDM4_DiagResponse" }, /* PDM4_DiagResponse, sender PDM4 */
-    { 0x711u, "LegacyCanFdDiagPhysRx_711" }, /* preserved previous CAN-FD physical diagnostic RX */
-    { 0x7E0u, "LegacyCanFdDiagFuncRx_7E0" } /* preserved previous CAN-FD functional diagnostic RX */
+    { 0x710u, "DiagRequest_710" } /* DiagRequest_710, sender Tester */
 };
 
 #define CAN_CLASSIC_STD_FILTER_COUNT ((uint8)(sizeof(Can_ClassicStdIdFilters) / sizeof(Can_ClassicStdIdFilters[0])))
 
 static const Can_StdIdFilterConfigType Can_ClassicStdIdFilters[] =
 {
-    { 0x030u, "VehicleState" }, /* VehicleState, sender ZGW */
+    { 0x3A0u, "VehicleState" }, /* VehicleState, sender ZGW */
     { 0x253u, "CentralLockData" }, /* CentralLockData, sender FRBE */
     { 0x252u, "LightData1" }, /* LightData1, sender FRBE */
     { 0x221u, "DisplayOutTemp" }, /* DisplayOutTemp, sender ZGW */
@@ -199,7 +201,6 @@ static const Can_StdIdFilterConfigType Can_ClassicStdIdFilters[] =
     { 0x6F5u, "BattCurrent" }, /* BattCurrent, sender ELC */
     { 0x6F1u, "BattCapDischarge" }, /* BattCapDischarge, sender ELC */
     { 0x6F4u, "BattCapRes" }, /* BattCapRes, sender ELC */
-    { 0x7DFu, "FunctionalDiag_7DF" }, /* FunctionalDiag_7DF, sender LOCAL */
     { 0x500u, "LegacyWakeOrLab_500" }, /* LegacyWakeOrLab_500, sender LOCAL */
 };
 
@@ -243,7 +244,7 @@ static uint8 Can_TxHead;
 static uint8 Can_TxTail;
 static uint8 Can_TxCount;
 static uint8 Can_TxSyncPolling;
-static Can_TxPendingType Can_TxPending[CAN_NUM_CONTROLLERS];
+static Can_TxPendingType Can_TxPending[CAN_NUM_CONTROLLERS][CAN_TX_HW_BUFFER_COUNT_MAX];
 
 static Can_RxQueueElementType Can_RxQueue[CAN_RX_QUEUE_SIZE];
 static uint8 Can_RxHead;
@@ -289,7 +290,22 @@ static void Can_ReleaseFdRxPinFromScr(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
-static boolean Can_CancelPendingTxBuffer(IfxCan_Can_Node* node)
+static uint8 Can_GetTxBufferCount(uint8 controllerId)
+{
+    if (controllerId == CAN_CONTROLLER_FD)
+    {
+        return CAN_TX_HW_BUFFER_COUNT_FD;
+    }
+
+    if (controllerId == CAN_CONTROLLER_CLASSIC)
+    {
+        return CAN_TX_HW_BUFFER_COUNT_CLASSIC;
+    }
+
+    return 0u;
+}
+
+static boolean Can_CancelTxBuffer(IfxCan_Can_Node* node, IfxCan_TxBufferId txBufferId)
 {
     uint16 timeout;
 
@@ -298,19 +314,34 @@ static boolean Can_CancelPendingTxBuffer(IfxCan_Can_Node* node)
         return FALSE;
     }
 
-    if (IfxCan_Can_isTxBufferRequestPending(node, IfxCan_TxBufferId_0) != FALSE)
+    if (IfxCan_Can_isTxBufferRequestPending(node, txBufferId) != FALSE)
     {
-        IfxCan_Node_setTxBufferCancellationRequest(node->node, IfxCan_TxBufferId_0);
+        IfxCan_Node_setTxBufferCancellationRequest(node->node, txBufferId);
 
         timeout = CAN_TX_CANCEL_TIMEOUT;
-        while ((IfxCan_Can_isTxBufferRequestPending(node, IfxCan_TxBufferId_0) != FALSE) &&
+        while ((IfxCan_Can_isTxBufferRequestPending(node, txBufferId) != FALSE) &&
                (timeout > 0u))
         {
             timeout--;
         }
     }
 
-    return (IfxCan_Can_isTxBufferRequestPending(node, IfxCan_TxBufferId_0) == FALSE) ? TRUE : FALSE;
+    return (IfxCan_Can_isTxBufferRequestPending(node, txBufferId) == FALSE) ? TRUE : FALSE;
+}
+
+static boolean Can_CancelPendingTxBuffers(IfxCan_Can_Node* node, uint8 txBufferCount)
+{
+    uint8 bufferIdx;
+
+    for (bufferIdx = 0u; bufferIdx < txBufferCount; bufferIdx++)
+    {
+        if (Can_CancelTxBuffer(node, (IfxCan_TxBufferId)bufferIdx) == FALSE)
+        {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 static uint8 Can_DlcToBytes(uint8 dlc)
@@ -445,6 +476,7 @@ static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
     boolean irqState;
     uint8 idx;
     uint8 count;
+    uint8 bufferIdx;
 
     if ((pdu == NULL_PTR) || (pdu->sdu == NULL_PTR) || (pdu->dlc > CAN_MAX_DLC))
     {
@@ -453,12 +485,17 @@ static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
 
     irqState = Can_EnterCritical();
 
-    if ((pdu->controllerId < CAN_NUM_CONTROLLERS) &&
-            (Can_TxPending[pdu->controllerId].active != FALSE) &&
-            (Can_TxPending[pdu->controllerId].swPduHandle == pdu->swPduHandle))
+    if (pdu->controllerId < CAN_NUM_CONTROLLERS)
     {
-        Can_ExitCritical(irqState);
-        return E_NOT_OK;
+        for (bufferIdx = 0u; bufferIdx < Can_GetTxBufferCount(pdu->controllerId); bufferIdx++)
+        {
+            if ((Can_TxPending[pdu->controllerId][bufferIdx].active != FALSE) &&
+                    (Can_TxPending[pdu->controllerId][bufferIdx].swPduHandle == pdu->swPduHandle))
+            {
+                Can_ExitCritical(irqState);
+                return E_NOT_OK;
+            }
+        }
     }
 
     idx = Can_TxTail;
@@ -626,6 +663,7 @@ static boolean Can_TxPduIsQueuedOrPending(PduIdType swPduHandle, uint8 controlle
     boolean found = FALSE;
     uint8 idx;
     uint8 count;
+    uint8 bufferIdx;
     const Can_TxQueueElementType* e;
 
     if (controllerId >= CAN_NUM_CONTROLLERS)
@@ -635,10 +673,13 @@ static boolean Can_TxPduIsQueuedOrPending(PduIdType swPduHandle, uint8 controlle
 
     irqState = Can_EnterCritical();
 
-    if ((Can_TxPending[controllerId].active != FALSE) &&
-        (Can_TxPending[controllerId].swPduHandle == swPduHandle))
+    for (bufferIdx = 0u; (found == FALSE) && (bufferIdx < Can_GetTxBufferCount(controllerId)); bufferIdx++)
     {
-        found = TRUE;
+        if ((Can_TxPending[controllerId][bufferIdx].active != FALSE) &&
+            (Can_TxPending[controllerId][bufferIdx].swPduHandle == swPduHandle))
+        {
+            found = TRUE;
+        }
     }
 
     idx = Can_TxTail;
@@ -665,30 +706,54 @@ static boolean Can_TxPduIsQueuedOrPending(PduIdType swPduHandle, uint8 controlle
     return found;
 }
 
-static void Can_RequeuePendingTx(uint8 controllerId)
+static void Can_RequeuePendingTxBuffer(uint8 controllerId, uint8 bufferIdx)
 {
+    Can_TxPendingType* pending;
     Can_PduType pdu;
     uint8 data[CAN_MAX_DLC];
 
     if ((controllerId >= CAN_NUM_CONTROLLERS) ||
-            (Can_TxPending[controllerId].active == FALSE))
+            (bufferIdx >= Can_GetTxBufferCount(controllerId)))
     {
         return;
     }
 
-    pdu = Can_TxPending[controllerId].pdu;
-    memcpy(data, Can_TxPending[controllerId].data, pdu.dlc);
+    pending = &Can_TxPending[controllerId][bufferIdx];
+
+    if (pending->active == FALSE)
+    {
+        return;
+    }
+
+    pdu = pending->pdu;
+    memcpy(data, pending->data, pdu.dlc);
     pdu.sdu = data;
 
-    Can_TxPending[controllerId].active = FALSE;
+    pending->active = FALSE;
 
     if (Can_TxQueuePush(&pdu) != E_OK)
     {
-        Can_TxPending[controllerId].pdu = pdu;
-        memcpy(Can_TxPending[controllerId].data, data, pdu.dlc);
-        Can_TxPending[controllerId].pdu.sdu = Can_TxPending[controllerId].data;
-        Can_TxPending[controllerId].swPduHandle = pdu.swPduHandle;
-        Can_TxPending[controllerId].active = TRUE;
+        pending->pdu = pdu;
+        memcpy(pending->data, data, pdu.dlc);
+        pending->pdu.sdu = pending->data;
+        pending->swPduHandle = pdu.swPduHandle;
+        pending->active = TRUE;
+        pending->ageTicks = 0u;
+    }
+}
+
+static void Can_RequeuePendingTx(uint8 controllerId)
+{
+    uint8 bufferIdx;
+
+    if (controllerId >= CAN_NUM_CONTROLLERS)
+    {
+        return;
+    }
+
+    for (bufferIdx = 0u; bufferIdx < Can_GetTxBufferCount(controllerId); bufferIdx++)
+    {
+        Can_RequeuePendingTxBuffer(controllerId, bufferIdx);
     }
 }
 
@@ -785,7 +850,7 @@ static void Can_InitClassicNode(void)
     Can_Hw.nodeConfigClassic.frame.type = IfxCan_FrameType_transmitAndReceive;
 
     Can_Hw.nodeConfigClassic.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
-    Can_Hw.nodeConfigClassic.txConfig.dedicatedTxBuffersNumber = 1u;
+    Can_Hw.nodeConfigClassic.txConfig.dedicatedTxBuffersNumber = CAN_TX_HW_BUFFER_COUNT_CLASSIC;
     Can_Hw.nodeConfigClassic.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_8;
 
     Can_Hw.nodeConfigClassic.rxConfig.rxMode = IfxCan_RxMode_fifo0;
@@ -816,7 +881,7 @@ static void Can_InitClassicNode(void)
     Can_Hw.nodeConfigClassic.messageRAM.txBuffersStartAddress = 0x400u;
 
     IfxCan_Can_initNode(&Can_Hw.nodeClassic, &Can_Hw.nodeConfigClassic);
-    Can_CancelPendingTxBuffer(&Can_Hw.nodeClassic);
+    Can_CancelPendingTxBuffers(&Can_Hw.nodeClassic, CAN_TX_HW_BUFFER_COUNT_CLASSIC);
 
     IfxCan_Node_initRxPin(Can_Hw.nodeClassic.node,
             &IfxCan_RXD00B_P20_7_IN,
@@ -864,11 +929,11 @@ static void Can_InitFdNode(void)
     Can_Hw.nodeConfigFd.fastBaudRate.syncJumpWidth = 1u;
     /* The iLLD wrapper applies baudrate fields only when this is TRUE. */
     Can_Hw.nodeConfigFd.calculateBitTimingValues = TRUE;
-    Can_Hw.nodeConfigFd.frame.mode = IfxCan_FrameMode_fdLongAndFast;
+    Can_Hw.nodeConfigFd.frame.mode = IfxCan_FrameMode_fdLong;
     Can_Hw.nodeConfigFd.frame.type = IfxCan_FrameType_transmitAndReceive;
 
     Can_Hw.nodeConfigFd.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
-    Can_Hw.nodeConfigFd.txConfig.dedicatedTxBuffersNumber = 1u;
+    Can_Hw.nodeConfigFd.txConfig.dedicatedTxBuffersNumber = CAN_TX_HW_BUFFER_COUNT_FD;
     Can_Hw.nodeConfigFd.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
 
     Can_Hw.nodeConfigFd.rxConfig.rxMode = IfxCan_RxMode_fifo0;
@@ -899,7 +964,7 @@ static void Can_InitFdNode(void)
     Can_Hw.nodeConfigFd.messageRAM.txBuffersStartAddress = 0xD00u;
 
     IfxCan_Can_initNode(&Can_Hw.nodeFd, &Can_Hw.nodeConfigFd);
-    Can_CancelPendingTxBuffer(&Can_Hw.nodeFd);
+    Can_CancelPendingTxBuffers(&Can_Hw.nodeFd, CAN_TX_HW_BUFFER_COUNT_FD);
 
     IfxCan_Node_initRxPin(Can_Hw.nodeFd.node,
             &IfxCan_RXD13B_P33_5_IN,
@@ -1074,63 +1139,97 @@ static IfxCan_Can_Node* Can_GetNode(uint8 controllerId)
     return NULL_PTR;
 }
 
+static boolean Can_FindFreeTxBuffer(uint8 controllerId, IfxCan_Can_Node* node, uint8* bufferIdx)
+{
+    uint8 idx;
+
+    if ((controllerId >= CAN_NUM_CONTROLLERS) ||
+            (node == NULL_PTR) ||
+            (bufferIdx == NULL_PTR))
+    {
+        return FALSE;
+    }
+
+    for (idx = 0u; idx < Can_GetTxBufferCount(controllerId); idx++)
+    {
+        if ((Can_TxPending[controllerId][idx].active == FALSE) &&
+            (IfxCan_Can_isTxBufferRequestPending(node, (IfxCan_TxBufferId)idx) == FALSE))
+        {
+            *bufferIdx = idx;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 static void Can_ProcessTxConfirmations(void)
 {
     IfxCan_Can_Node* node;
     PduIdType swPduHandle;
     uint8 controller;
+    uint8 bufferIdx;
+    uint8 bufferCount;
+    IfxCan_TxBufferId txBufferId;
 
     for (controller = 0u; controller < CAN_NUM_CONTROLLERS; controller++)
     {
-        if (Can_TxPending[controller].active == FALSE)
-        {
-            continue;
-        }
-
         node = Can_GetNode(controller);
-        if ((node == NULL_PTR) || (Can_ControllerState[controller] != CAN_READY))
-        {
-            Can_RequeuePendingTx(controller);
-            continue;
-        }
+        bufferCount = Can_GetTxBufferCount(controller);
 
-        if (IfxCan_Node_isTxBufferTransmissionOccured(node->node, IfxCan_TxBufferId_0) != FALSE)
+        for (bufferIdx = 0u; bufferIdx < bufferCount; bufferIdx++)
         {
-            swPduHandle = Can_TxPending[controller].swPduHandle;
-            Can_TxPending[controller].active = FALSE;
-            CanIf_TxConfirmation(swPduHandle);
-        }
-        else if (IfxCan_Can_isTxBufferRequestPending(node, IfxCan_TxBufferId_0) == FALSE)
-        {
-            Can_RequeuePendingTx(controller);
-            Can_Runtime[controller].txFailCounter++;
-        }
-        else
-        {
-            if (Can_TxSyncPolling == FALSE)
+            txBufferId = (IfxCan_TxBufferId)bufferIdx;
+
+            if (Can_TxPending[controller][bufferIdx].active == FALSE)
             {
-                Can_TxPending[controller].ageTicks++;
+                continue;
+            }
 
-                if (Can_TxPending[controller].ageTicks >= CAN_TX_HW_PENDING_TIMEOUT_TICKS)
+            if ((node == NULL_PTR) || (Can_ControllerState[controller] != CAN_READY))
+            {
+                Can_RequeuePendingTxBuffer(controller, bufferIdx);
+                continue;
+            }
+
+            if (IfxCan_Node_isTxBufferTransmissionOccured(node->node, txBufferId) != FALSE)
+            {
+                swPduHandle = Can_TxPending[controller][bufferIdx].swPduHandle;
+                Can_TxPending[controller][bufferIdx].active = FALSE;
+                CanIf_TxConfirmation(swPduHandle);
+            }
+            else if (IfxCan_Can_isTxBufferRequestPending(node, txBufferId) == FALSE)
+            {
+                Can_RequeuePendingTxBuffer(controller, bufferIdx);
+                Can_Runtime[controller].txFailCounter++;
+            }
+            else
+            {
+                if (Can_TxSyncPolling == FALSE)
                 {
-                    if (Can_CancelPendingTxBuffer(node) != FALSE)
+                    Can_TxPending[controller][bufferIdx].ageTicks++;
+
+                    if (Can_TxPending[controller][bufferIdx].ageTicks >= CAN_TX_HW_PENDING_TIMEOUT_TICKS)
                     {
-                        if (IfxCan_Node_isTxBufferTransmissionOccured(node->node, IfxCan_TxBufferId_0) != FALSE)
+                        if (Can_CancelTxBuffer(node, txBufferId) != FALSE)
                         {
-                            swPduHandle = Can_TxPending[controller].swPduHandle;
-                            Can_TxPending[controller].active = FALSE;
-                            CanIf_TxConfirmation(swPduHandle);
+                            if (IfxCan_Node_isTxBufferTransmissionOccured(node->node, txBufferId) != FALSE)
+                            {
+                                swPduHandle = Can_TxPending[controller][bufferIdx].swPduHandle;
+                                Can_TxPending[controller][bufferIdx].active = FALSE;
+                                CanIf_TxConfirmation(swPduHandle);
+                            }
+                            else
+                            {
+                                Can_RequeuePendingTxBuffer(controller, bufferIdx);
+                                Can_Runtime[controller].txFailCounter++;
+                            }
                         }
                         else
                         {
-                            Can_RequeuePendingTx(controller);
+                            Can_TxPending[controller][bufferIdx].ageTicks = 0u;
                             Can_Runtime[controller].txFailCounter++;
                         }
-                    }
-                    else
-                    {
-                        Can_TxPending[controller].ageTicks = 0u;
-                        Can_Runtime[controller].txFailCounter++;
                     }
                 }
             }
@@ -1172,6 +1271,8 @@ static void Can_ProcessTx(void)
     IfxCan_Can_Node* node;
     uint8 budget = CAN_TX_BUDGET_PER_MAIN;
     uint8 attempts = CAN_TX_ATTEMPTS_PER_MAIN;
+    uint8 txBufferIdx;
+    Can_TxPendingType* pending;
 
     Can_ProcessTxConfirmations();
 
@@ -1210,7 +1311,7 @@ static void Can_ProcessTx(void)
             continue;
         }
 
-        if (Can_TxPending[pdu.controllerId].active != FALSE)
+        if (Can_FindFreeTxBuffer(pdu.controllerId, node, &txBufferIdx) == FALSE)
         {
             Can_TxPendingBusyCounter++;
 
@@ -1233,16 +1334,18 @@ static void Can_ProcessTx(void)
                 (pdu.idType == CAN_ID_EXTENDED) ? IfxCan_MessageIdLength_extended : IfxCan_MessageIdLength_standard;
 
         Can_Hw.txMsg.frameMode =
-                (pdu.frameType == CAN_FRAME_FD) ? IfxCan_FrameMode_fdLongAndFast : IfxCan_FrameMode_standard;
+                (pdu.frameType == CAN_FRAME_FD) ? IfxCan_FrameMode_fdLong : IfxCan_FrameMode_standard;
+        Can_Hw.txMsg.bufferNumber = txBufferIdx;
 
         if (IfxCan_Can_sendMessage(node, &Can_Hw.txMsg, Can_Hw.txWords) == IfxCan_Status_ok)
         {
-            Can_TxPending[pdu.controllerId].active = TRUE;
-            Can_TxPending[pdu.controllerId].swPduHandle = pdu.swPduHandle;
-            Can_TxPending[pdu.controllerId].pdu = pdu;
-            memcpy(Can_TxPending[pdu.controllerId].data, pdu.sdu, pdu.dlc);
-            Can_TxPending[pdu.controllerId].pdu.sdu = Can_TxPending[pdu.controllerId].data;
-            Can_TxPending[pdu.controllerId].ageTicks = 0u;
+            pending = &Can_TxPending[pdu.controllerId][txBufferIdx];
+            pending->active = TRUE;
+            pending->swPduHandle = pdu.swPduHandle;
+            pending->pdu = pdu;
+            memcpy(pending->data, pdu.sdu, pdu.dlc);
+            pending->pdu.sdu = pending->data;
+            pending->ageTicks = 0u;
             (void)Can_TxQueueDrop();
             budget--;
         }
@@ -1405,7 +1508,7 @@ static void Can_ReadRxFifo(uint8 controllerId)
         frame.id = rxMsg.messageId;
         frame.idType = (rxMsg.messageIdLength == IfxCan_MessageIdLength_extended) ? CAN_ID_EXTENDED : CAN_ID_STANDARD;
         frame.frameType = (rxMsg.frameMode == IfxCan_FrameMode_standard) ? CAN_FRAME_CLASSIC : CAN_FRAME_FD;
-        frame.dlc = Can_DlcToBytes(rxMsg.dataLengthCode);
+        frame.dlc = Can_DlcToBytes((uint8)rxMsg.dataLengthCode);
 
         if ((controllerId == CAN_CONTROLLER_CLASSIC) && (frame.frameType != CAN_FRAME_CLASSIC))
         {

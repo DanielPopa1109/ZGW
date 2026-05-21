@@ -26,21 +26,24 @@ typedef struct
     boolean immediateData;
 } NvM_BlockDescriptorType;
 
-#define NVM_TOTAL_BLOCKS                    (2u)
+#define NVM_TOTAL_BLOCKS                    (3u)
 
 #define NVM_BLOCK_ID_DEM_PRIMARY            (1u)
 #define NVM_BLOCK_ID_APP_DATA               (2u)
+#define NVM_BLOCK_ID_TIMEBASE               (3u)
 
-#define NVM_BLOCK_DEM_PRIMARY_LENGTH        (sizeof(Dem_NvImageType))
-#define NVM_BLOCK_APP_DATA_LENGTH           (2048u)
+#define NVM_BLOCK_DEM_PRIMARY_LENGTH        FEE_BLOCK_DEM_PRIMARY_SIZE
+#define NVM_BLOCK_APP_DATA_LENGTH           FEE_BLOCK_APP_DATA_SIZE
+#define NVM_BLOCK_TIMEBASE_LENGTH           FEE_BLOCK_TIMEBASE_SIZE
 
-#define NVM_MAX_BLOCK_LENGTH                (32u * 1024u)
+#define NVM_MAX_BLOCK_LENGTH                FEE_MAX_BLOCK_SIZE
 
-extern uint8 NvM_DemPrimary_Ram[NVM_BLOCK_DEM_PRIMARY_LENGTH];
 extern uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];
+extern uint8 NvM_TimeBase_Ram[NVM_BLOCK_TIMEBASE_LENGTH];
 
 extern const uint8 NvM_DemPrimary_Rom[NVM_BLOCK_DEM_PRIMARY_LENGTH];
 extern const uint8 NvM_AppData_Rom[NVM_BLOCK_APP_DATA_LENGTH];
+extern const uint8 NvM_TimeBase_Rom[NVM_BLOCK_TIMEBASE_LENGTH];
 
 extern const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS];
 

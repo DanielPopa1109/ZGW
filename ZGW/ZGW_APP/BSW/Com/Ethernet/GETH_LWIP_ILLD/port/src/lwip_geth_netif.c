@@ -119,6 +119,8 @@ volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
 volatile uint32 lwip_geth_DebugLowLevelInitState;
 volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
 volatile uint32 lwip_geth_DebugRxAllocFailCnt;
+volatile uint32 lwip_geth_DebugRxNullBufferCnt;
+volatile uint32 lwip_geth_DebugRxNullPayloadCnt;
 volatile uint32 lwip_geth_DebugTxNoBufferCnt;
 volatile uint32 lwip_geth_DebugLowLevelOutputCount;
 volatile uint32 lwip_geth_DebugLowLevelOutputOkCount;
@@ -158,6 +160,7 @@ struct ethernetif
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
  **********************************************************************************************************************/
+#if (PHY_DEVICE_NAME != PHY_DP83825I)
 static uint8 lwip_geth_MdioWaitReadyBounded(void)
 {
   uint32 timeout = LWIP_GETH_MDIO_WAIT_POLLS;
@@ -214,7 +217,7 @@ static uint8 lwip_geth_MdioWriteBounded(uint32 layerAddr, uint32 regAddr, uint32
       (1u << 2) |
       (1u << 0);
 
-  return lwip_geth_MdioWaitReadyBounded();
+  return lwip_geth_MdioWaitReadyBounded(); // @suppress("Unused static function")
 }
 
 static uint8 lwip_geth_PhyWaitResetDoneBounded(void)
@@ -240,6 +243,7 @@ static uint8 lwip_geth_PhyWaitResetDoneBounded(void)
   lwip_geth_DebugPhyResetTimeoutCnt++;
   return 0u;
 }
+#endif
 
 static void *lwip_geth_WaitTransmitBufferBounded(IfxGeth_Eth *ethernetif)
 {
@@ -594,12 +598,28 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     u8_t *src = IfxGeth_Eth_getReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
     lwip_geth_DebugLastRxBufferAddr = (uint32)src;
     lwip_geth_DebugLastRxLen = (uint32)len;
+
+    if (src == NULL_PTR)
+    {
+      lwip_geth_DebugRxNullBufferCnt++;
+      pbuf_free(p);
+      return (pbuf_t *)0;
+    }
+
     lwip_geth_DebugLowLevelInputPacketCount++;
 
     /* We iterate over the pbuf chain until we have read the entire
      * packet into the pbuf. */
     for (q = p; q != NULL; q = q->next)
     {
+      if (q->payload == NULL_PTR)
+      {
+        lwip_geth_DebugRxNullPayloadCnt++;
+        pbuf_free(p);
+        IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+        return (pbuf_t *)0;
+      }
+
       /* Read enough bytes to fill this pbuf in the chain. The
        * available data in the pbuf is given by the q->len
        * variable.

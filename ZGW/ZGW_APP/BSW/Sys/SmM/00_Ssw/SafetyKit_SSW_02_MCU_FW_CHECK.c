@@ -409,7 +409,7 @@ IfxMtu_MbistSel safetyKitFwCheckCheckSshRegisters (const MemoryTestedStruct* ssh
         if (mc->ECCD.U != expectedValueECCD || mc->FAULTSTS.U != expectedValueFAULTSTS
                 || mc->ERRINFO[0].U != expectedValueERRINFO)
         {
-            return (IfxMtu_MbistSel_none);//(mbistSel);
+            return (mbistSel);
         }
         else
         {

@@ -31,6 +31,7 @@ void Com_MainFunctionRx(void);
 
 Std_ReturnType Com_IpduGroupStart(Com_IpduGroupIdType groupId);
 Std_ReturnType Com_IpduGroupStop(Com_IpduGroupIdType groupId);
+void Com_TriggerFullComRestartBurst(uint8 channel);
 
 Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataPtr);
 Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr);
@@ -146,6 +147,10 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_TX_SDAT_CSB_SDAT_MILLISECOND                               23u
 #define COM_SIG_TX_SDAT_CSB_SDAT_HOUR                                      24u
 #define COM_SIG_TX_SDAT_CSB_SDAT_DAY                                       25u
+#define COM_SIG_TX_SDAT_CSB_SDAT_TIMESOURCE                                2300u
+#define COM_SIG_TX_SDAT_CSB_SDAT_UTCVALID                                  2301u
+#define COM_SIG_TX_SDAT_CSB_SDAT_DEFAULTTIME                               2302u
+#define COM_SIG_TX_SDAT_CSB_SDAT_NVMRESTORED                               2306u
 #define COM_SIG_TX_NM3_NM3_PN1                                            26u
 #define COM_SIG_TX_LOADREQUEST_LOADREQUESTSTATUS                                  27u
 #define COM_SIG_TX_LOADREQUEST_LOADREQUESTDATAID                                  28u
@@ -385,6 +390,10 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_MILLISECOND                                            1038u
 #define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_HOUR                                                   1039u
 #define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DAY                                                    1040u
+#define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_TIMESOURCE                                             2303u
+#define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_UTCVALID                                               2304u
+#define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_DEFAULTTIME                                            2305u
+#define COM_SIG_TX_CANFD_SDAT_CANFD_SDAT_NVMRESTORED                                            2307u
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_TURNSIGNALSSTATUS                                             1041u
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_TURNSIGNALCOMMAND                                             1042u
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_REVERSELIGTHSTATUS                                            1043u

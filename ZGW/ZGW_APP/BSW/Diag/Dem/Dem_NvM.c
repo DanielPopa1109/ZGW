@@ -33,6 +33,11 @@ static Std_ReturnType Dem_NvM_CopyToRamBlock(uint16 blockId, const void *srcPtr)
         return E_NOT_OK;
     }
 
+    if (block->ramBlockDataAddress == srcPtr)
+    {
+        return E_OK;
+    }
+
     memcpy(block->ramBlockDataAddress, srcPtr, block->nvBlockLength);
     return E_OK;
 }
@@ -97,6 +102,11 @@ Std_ReturnType Dem_NvM_UpdateRamBlock(uint16 blockId, const void *srcPtr)
     if ((block == NULL_PTR) || (block->ramBlockDataAddress == NULL_PTR))
     {
         return E_NOT_OK;
+    }
+
+    if (block->ramBlockDataAddress == srcPtr)
+    {
+        return NvM_SetRamBlockStatus(blockId, TRUE);
     }
 
     if (memcmp(block->ramBlockDataAddress, srcPtr, block->nvBlockLength) == 0)

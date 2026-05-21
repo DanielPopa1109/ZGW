@@ -64,30 +64,33 @@ const TIMER_STM_CONF_t TIMER_STM_0_config =
 TIMER_STM_t TIMER_STM_0 =
 {
   .app_config              = &TIMER_STM_0_config,
-  .ch[TIMER_STM_COMP_CHANNEL_0] =
+  .ch =
   {
-    .user_interval         = 10000,
-    .auto_start            = TRUE,
-    .config =
+    [TIMER_STM_COMP_CHANNEL_0] =
     {
-      .comparator          = IfxStm_Comparator_0,
-      .comparatorInterrupt = IfxStm_ComparatorInterrupt_ir0,
-      .compareSize         = IfxStm_ComparatorSize_32Bits,
-      .ticks               = 0,
-      .triggerPriority     = 0
-    }
-  },
-  .ch[TIMER_STM_COMP_CHANNEL_1] =
-  {
-    .user_interval         = 10000,
-    .auto_start            = TRUE,
-    .config =
+      .user_interval         = 10000,
+      .auto_start            = TRUE,
+      .config =
+      {
+        .comparator          = IfxStm_Comparator_0,
+        .comparatorInterrupt = IfxStm_ComparatorInterrupt_ir0,
+        .compareSize         = IfxStm_ComparatorSize_32Bits,
+        .ticks               = 0,
+        .triggerPriority     = 0
+      }
+    },
+    [TIMER_STM_COMP_CHANNEL_1] =
     {
-      .comparator          = IfxStm_Comparator_1,
-      .comparatorInterrupt = IfxStm_ComparatorInterrupt_ir1,
-      .compareSize         = IfxStm_ComparatorSize_32Bits,
-      .ticks               = 0,
-      .triggerPriority     = 0
+      .user_interval         = 10000,
+      .auto_start            = TRUE,
+      .config =
+      {
+        .comparator          = IfxStm_Comparator_1,
+        .comparatorInterrupt = IfxStm_ComparatorInterrupt_ir1,
+        .compareSize         = IfxStm_ComparatorSize_32Bits,
+        .ticks               = 0,
+        .triggerPriority     = 0
+      }
     }
   },
   .app_is_initialized      = FALSE

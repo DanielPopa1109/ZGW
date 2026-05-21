@@ -626,7 +626,7 @@ pcb_new(struct api_msg *msg)
   switch (NETCONNTYPE_GROUP(msg->conn->type)) {
 #if LWIP_RAW
     case NETCONN_RAW:
-      msg->conn->pcb.raw = raw_new_ip_type(iptype, msg->msg.n.proto);
+      msg->conn->pcb.raw = raw_new_ip_type((u8_t)iptype, msg->msg.n.proto);
       if (msg->conn->pcb.raw != NULL) {
 #if LWIP_IPV6
         /* ICMPv6 packets should always have checksum calculated by the stack as per RFC 3542 chapter 3.1 */
@@ -641,7 +641,7 @@ pcb_new(struct api_msg *msg)
 #endif /* LWIP_RAW */
 #if LWIP_UDP
     case NETCONN_UDP:
-      msg->conn->pcb.udp = udp_new_ip_type(iptype);
+      msg->conn->pcb.udp = udp_new_ip_type((u8_t)iptype);
       if (msg->conn->pcb.udp != NULL) {
 #if LWIP_UDPLITE
         if (NETCONNTYPE_ISUDPLITE(msg->conn->type)) {
@@ -657,7 +657,7 @@ pcb_new(struct api_msg *msg)
 #endif /* LWIP_UDP */
 #if LWIP_TCP
     case NETCONN_TCP:
-      msg->conn->pcb.tcp = tcp_new_ip_type(iptype);
+      msg->conn->pcb.tcp = tcp_new_ip_type((u8_t)iptype);
       if (msg->conn->pcb.tcp != NULL) {
         setup_tcp(msg->conn);
       }
