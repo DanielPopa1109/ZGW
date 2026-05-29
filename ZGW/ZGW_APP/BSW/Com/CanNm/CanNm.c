@@ -1,5 +1,6 @@
 #include "CanNm.h"
 
+#include "GatewaySwc.h"
 #include "../Com.h"
 #include "../ComM/ComM.h"
 
@@ -124,7 +125,7 @@ static void CanNm_WriteNm3Signal(uint8 index, uint8 nm3Pn1)
 {
     const CanNm_ChannelConfigType* cfg = &CanNm_ChannelConfig[index];
 
-    (void)Com_SendSignal(cfg->nm3SignalId, &nm3Pn1);
+    (void)GatewaySwc_RequestComSendSignal(cfg->nm3SignalId, &nm3Pn1);
 }
 
 static void CanNm_TransmitNmPdu(uint8 index)
@@ -294,6 +295,7 @@ Std_ReturnType CanNm_NetworkRequest(uint8 channel)
     CanNm_ChannelState[index].txTimer = 0u;
     CanNm_EnterNetwork(index, TRUE);
     CanNm_TransmitNmPdu(index);
+    CanNm_ChannelState[index].txTimer = CANNM_TX_RELOAD_TICKS;
     return E_OK;
 }
 
@@ -374,6 +376,7 @@ Std_ReturnType CanNm_SetUserData(uint8 channel, const uint8* data, uint8 len)
     if (CanNm_ChannelState[index].localRequested != FALSE)
     {
         CanNm_TransmitNmPdu(index);
+        CanNm_ChannelState[index].txTimer = CANNM_TX_RELOAD_TICKS;
     }
     return E_OK;
 }

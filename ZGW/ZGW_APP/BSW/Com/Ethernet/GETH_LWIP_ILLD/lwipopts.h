@@ -61,14 +61,14 @@ extern "C" {
 
 #define LWIP_HAVE_SLIPIF 0
 
-#define DEFAULT_TCP_RECVMBOX_SIZE           8
-#define DEFAULT_UDP_RECVMBOX_SIZE           16
+#define DEFAULT_TCP_RECVMBOX_SIZE           32
+#define DEFAULT_UDP_RECVMBOX_SIZE           32
 #define DEFAULT_ACCEPTMBOX_SIZE             8
 #define DEFAULT_RAW_RECVMBOX_SIZE           8
-#define TCPIP_MBOX_SIZE                     16
-#define MEMP_NUM_NETCONN                    8
-#define MEMP_NUM_TCPIP_MSG_API              16
-#define MEMP_NUM_TCPIP_MSG_INPKT            16
+#define TCPIP_MBOX_SIZE                     64
+#define MEMP_NUM_NETCONN                    12
+#define MEMP_NUM_TCPIP_MSG_API              24
+#define MEMP_NUM_TCPIP_MSG_INPKT            64
 #define MEMP_NUM_SYS_TIMEOUT                (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 8)
 
 /* FreeRTOS/lwIP thread sizing. Required when NO_SYS == 0.
@@ -87,24 +87,28 @@ extern "C" {
 #define LWIP_NETIF_TX_SINGLE_PBUF           1
 #define TCP_LISTEN_BACKLOG                  1
 #define LWIP_SO_RCVTIMEO                    1
-#define MEM_SIZE                            4096
-#define PBUF_POOL_SIZE                      24
+#define MEM_SIZE                            16384
+#define PBUF_POOL_SIZE                      96
 #define PBUF_POOL_BUFSIZE                   512
-#define MEMP_NUM_PBUF                       24
+#define MEMP_NUM_PBUF                       48
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
 #define LWIP_UDP                            1
-#define MEMP_NUM_UDP_PCB                    4
+#define MEMP_NUM_UDP_PCB                    8
+
+#define IP_SOF_BROADCAST                    1
+#define IP_SOF_BROADCAST_RECV               1
+#define SO_REUSE_RXTOALL                    1
 
 #define LWIP_TCP                            1
 #define MEMP_NUM_TCP_PCB                    3
 #define MEMP_NUM_TCP_PCB_LISTEN             3
-#define MEMP_NUM_TCP_SEG                    8
+#define MEMP_NUM_TCP_SEG                    24
 #define TCP_MSS                             536
 #define TCP_WND                             2144
-#define TCP_SND_BUF                         1072
-#define TCP_SND_QUEUELEN                    8
+#define TCP_SND_BUF                         2144
+#define TCP_SND_QUEUELEN                    16
 
 #define LWIP_DHCP                           0
 

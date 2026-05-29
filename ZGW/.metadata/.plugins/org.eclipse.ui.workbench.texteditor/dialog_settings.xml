@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="NCR"/>
+		<item key="selection" value="SCR_RtcCompareIsr"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="NCR"/>
-			<item value="ncr"/>
-			<item value="Core0_ServiceMemoryStack"/>
-			<item value="LoadReq"/>
-			<item value="loadreq"/>
-			<item value="GATEWAYSWC_DIAG_PERIOD_MS"/>
-			<item value="IFXCFG_P21_3_IO_CONFIG_IN"/>
-			<item value="GATEWAYSWC_ETH_PERIOD_MS"/>
-			<item value="vTaskDelay"/>
-			<item value="ASIL_APPL_Task_C2"/>
-			<item value="QM_BSW_Task_C2"/>
-			<item value=" volatile uint8 g_LwipNetifFlagsAfterSet;"/>
-			<item value="lwip_geth_Lwip_init"/>
-			<item value="tcpip_create"/>
-			<item value="tcpcreate"/>
+			<item value="SCR_RtcCompareIsr"/>
+			<item value="SCR_RTC_CON"/>
+			<item value="SCR_TIME_RTC_USE_PCLK_20MHZ"/>
+			<item value="SCR_TIME_RTC_TICK_HZ_NUM"/>
+			<item value="TimeBase_TryGetStandbyRtcElapsedNs"/>
+			<item value="SCR_TIME_OFFSET_DEBUG_RTC_CON"/>
+			<item value="SCR_TIME_OFFSET_DEBUG_RTC_CNT0"/>
+			<item value="SCR_TimeBaseActive "/>
+			<item value="SCR_TimeUpdate"/>
+			<item value="SCR_TIME_XRAM_BASE "/>
+			<item value="TimeBase_RearmStandbyRtc"/>
+			<item value="GoSleep"/>
+			<item value="gosleep"/>
+			<item value="timeinit"/>
+			<item value="SCR_TIME_OFFSET_ELAPSED_TICKS"/>
 		</list>
 		<list key="replacehistory">
 		</list>

@@ -154,14 +154,13 @@ void EthSM_MainFunction(void)
         }
 
         EthSM_EnsureStackInitialized(channel);
+        EthSM_OpenConfiguredSockets();
 
         if (TcpIp_IsLinkAvailable() == FALSE)
         {
             EthSM_SetCurrentMode(channel, ETHSM_WAIT_LINK);
             continue;
         }
-
-        EthSM_OpenConfiguredSockets();
 
         if (EthSM_Channel[channel].requestedMode == ETHSM_FULL_COMMUNICATION)
         {

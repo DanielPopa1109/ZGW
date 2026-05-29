@@ -50,10 +50,13 @@ static TimeBase_UtcMappingType TimeBase_UtcMapping;
 static boolean TimeBase_Initialized = FALSE;
 static uint64 TimeBase_LastNvMImageVehicleNs = 0ull;
 static uint32 TimeBase_NvMStoreCounter = 0u;
+static boolean TimeBase_DiagnosticUtcSet = FALSE;
 
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
 static uint8 TimeBase_ScrRtcBootImage[SCR_TIME_RECORD_LENGTH];
 static boolean TimeBase_ScrRtcBootImageValid = FALSE;
+static uint8 TimeBase_ScrRtcStandbyImage[SCR_TIME_RECORD_LENGTH];
+static boolean TimeBase_ScrRtcStandbyImageValid = FALSE;
 #endif
 
 static IfxCpu_spinLock TimeBase_CriticalSpinLock;
@@ -61,6 +64,19 @@ static boolean TimeBase_CriticalIrqState[TIMEBASE_CRITICAL_CORE_COUNT];
 static volatile uint8 TimeBase_CriticalOwnedByCore[TIMEBASE_CRITICAL_CORE_COUNT];
 
 volatile uint32 TimeBase_CriticalTimeoutCounter = 0u;
+
+/* Debug probes — read via debugger after wake to diagnose SCR restore path. */
+volatile uint8  TimeBase_Dbg_BootImageValid    = 0u;  /* TimeBase_ScrRtcBootImageValid */
+volatile uint8  TimeBase_Dbg_ImageSafe         = 0u;  /* TimeBase_IsScrRtcImageSafe() */
+volatile uint8  TimeBase_Dbg_MagicOk           = 0u;  /* MAGIC matches SCR_TIME_MAGIC */
+volatile uint8  TimeBase_Dbg_Flags             = 0u;  /* FLAGS byte from boot image */
+volatile uint32 TimeBase_Dbg_ScrVehicleHigh    = 0u;  /* scrVehicleTimeNs >> 32 */
+volatile uint32 TimeBase_Dbg_ScrVehicleLow     = 0u;  /* scrVehicleTimeNs & 0xFFFFFFFF */
+volatile uint32 TimeBase_Dbg_NvmVehicleHigh    = 0u;  /* restoredVehicleTimeNs >> 32 */
+volatile uint32 TimeBase_Dbg_NvmVehicleLow     = 0u;  /* restoredVehicleTimeNs & 0xFFFFFFFF */
+volatile uint8  TimeBase_Dbg_VehicleGtResult   = 0u;  /* 1 if scrVehicle > nvmVehicle */
+volatile uint8  TimeBase_Dbg_ElapsedPathOk     = 0u;  /* 1 if TryGetStandbyRtcElapsedNs E_OK */
+volatile uint32 TimeBase_Dbg_ElapsedTicks      = 0u;  /* ELAPSED_TICKS from boot image */
 
 static void TimeBase_EnterCritical(void);
 static void TimeBase_ExitCritical(void);
@@ -78,17 +94,18 @@ static void TimeBase_StoreU64(uint8 *buffer, uint16 offset, uint64 value);
 static uint32 TimeBase_LoadU32(const uint8 *buffer, uint16 offset);
 static uint64 TimeBase_LoadU64(const uint8 *buffer, uint16 offset);
 static boolean TimeBase_IsPersistentSource(TimeBase_TimeSourceType source);
+static boolean TimeBase_IsNvMImageValid(const uint8 *image);
 static Std_ReturnType TimeBase_UpdateNvMImage(uint64 utcTimeNs, uint64 vehicleTimeNs, TimeBase_TimeSourceType source, uint32 syncStatus);
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
 static volatile uint8 *TimeBase_GetScrRtcXram(void);
 static void TimeBase_ScrStoreU8(uint16 offset, uint8 value);
 static uint8 TimeBase_ScrLoadU8(uint16 offset);
-static void TimeBase_ScrStoreU32(uint16 offset, uint32 value);
-static uint32 TimeBase_ScrLoadU32(uint16 offset);
-static void TimeBase_ScrStoreU64(uint16 offset, uint64 value);
 static uint32 TimeBase_ScrLoadU32FromImage(const uint8 *image, uint16 offset);
+static uint64 TimeBase_ScrLoadU64FromImage(const uint8 *image, uint16 offset);
+static void TimeBase_ScrWriteImage(const uint8 *image);
 static uint64 TimeBase_ScrRtcTicksToNs(uint32 elapsedTicks);
 static uint64 TimeBase_ApplyScrRtcCalibration(uint64 elapsedNs);
+static boolean TimeBase_IsScrRtcImageSafe(const uint8 *image);
 static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(TimeBase_TimeSourceType source, uint64 *elapsedNs, uint32 *syncStatusMask);
 #endif
 
@@ -461,6 +478,38 @@ static uint64 TimeBase_LoadU64(const uint8 *buffer, uint16 offset)
            (uint64)TimeBase_LoadU32(buffer, (uint16)(offset + 4u));
 }
 
+static boolean TimeBase_IsNvMImageValid(const uint8 *image)
+{
+    TimeBase_TimeSourceType source;
+    uint64 utcTimeNs;
+
+    if (image == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    if ((TimeBase_LoadU32(image, TIMEBASE_NVM_OFFSET_MAGIC) != TIMEBASE_NVM_MAGIC) ||
+        (image[TIMEBASE_NVM_OFFSET_VERSION] != TIMEBASE_NVM_VERSION) ||
+        (image[TIMEBASE_NVM_OFFSET_VALID] != TIMEBASE_NVM_VALID))
+    {
+        return FALSE;
+    }
+
+    source = (TimeBase_TimeSourceType)image[TIMEBASE_NVM_OFFSET_SOURCE];
+    if (TimeBase_IsPersistentSource(source) == FALSE)
+    {
+        return FALSE;
+    }
+
+    utcTimeNs = TimeBase_LoadU64(image, TIMEBASE_NVM_OFFSET_UTC_NS);
+    if (TimeBase_ValidateUtcTimeNs(utcTimeNs) != E_OK)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
 static volatile uint8 *TimeBase_GetScrRtcXram(void)
 {
@@ -481,34 +530,28 @@ static uint8 TimeBase_ScrLoadU8(uint16 offset)
     return record[offset];
 }
 
-static void TimeBase_ScrStoreU32(uint16 offset, uint32 value)
-{
-    TimeBase_ScrStoreU8(offset, (uint8)((value >> 24u) & 0xFFu));
-    TimeBase_ScrStoreU8((uint16)(offset + 1u), (uint8)((value >> 16u) & 0xFFu));
-    TimeBase_ScrStoreU8((uint16)(offset + 2u), (uint8)((value >> 8u) & 0xFFu));
-    TimeBase_ScrStoreU8((uint16)(offset + 3u), (uint8)(value & 0xFFu));
-}
-
-static uint32 TimeBase_ScrLoadU32(uint16 offset)
-{
-    return ((uint32)TimeBase_ScrLoadU8(offset) << 24u) |
-           ((uint32)TimeBase_ScrLoadU8((uint16)(offset + 1u)) << 16u) |
-           ((uint32)TimeBase_ScrLoadU8((uint16)(offset + 2u)) << 8u) |
-           (uint32)TimeBase_ScrLoadU8((uint16)(offset + 3u));
-}
-
-static void TimeBase_ScrStoreU64(uint16 offset, uint64 value)
-{
-    TimeBase_ScrStoreU32(offset, (uint32)((value >> 32u) & 0xFFFFFFFFull));
-    TimeBase_ScrStoreU32((uint16)(offset + 4u), (uint32)(value & 0xFFFFFFFFull));
-}
-
 static uint32 TimeBase_ScrLoadU32FromImage(const uint8 *image, uint16 offset)
 {
     return ((uint32)image[offset] << 24u) |
            ((uint32)image[(uint16)(offset + 1u)] << 16u) |
            ((uint32)image[(uint16)(offset + 2u)] << 8u) |
            (uint32)image[(uint16)(offset + 3u)];
+}
+
+static uint64 TimeBase_ScrLoadU64FromImage(const uint8 *image, uint16 offset)
+{
+    return ((uint64)TimeBase_ScrLoadU32FromImage(image, offset) << 32u) |
+            (uint64)TimeBase_ScrLoadU32FromImage(image, (uint16)(offset + 4u));
+}
+
+static void TimeBase_ScrWriteImage(const uint8 *image)
+{
+    uint16 index;
+
+    for (index = 0u; index < SCR_TIME_RECORD_LENGTH; index++)
+    {
+        TimeBase_ScrStoreU8(index, image[index]);
+    }
 }
 
 static uint64 TimeBase_ApplyScrRtcCalibration(uint64 elapsedNs)
@@ -540,6 +583,26 @@ static uint64 TimeBase_ApplyScrRtcCalibration(uint64 elapsedNs)
 #endif
 
     return elapsedNs;
+}
+
+static boolean TimeBase_IsScrRtcImageSafe(const uint8 *image)
+{
+    if (image == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    if (((image[SCR_TIME_OFFSET_WAKE_REASON] & SCR_TIME_WAKE_REASON_ECC_DBE) != 0u) ||
+        ((image[SCR_TIME_OFFSET_SCR_FAULT_STATUS] & SCR_TIME_FAULT_STATUS_ECC_DBE) != 0u))
+    {
+        return FALSE;
+    }
+
+    /* PMS_PMSWCR2.B.SCRECC is intentionally not checked here — see
+     * TimeBase_CaptureStandbyRtcBeforeScrReset() for the rationale.
+     * Genuine ECC faults are covered by the SCR-reported fields above. */
+
+    return TRUE;
 }
 
 static uint64 TimeBase_ScrRtcTicksToNs(uint32 elapsedTicks)
@@ -585,6 +648,11 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
         return E_NOT_OK;
     }
 
+    if (TimeBase_IsScrRtcImageSafe(image) == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
     if ((TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_MAGIC) != SCR_TIME_MAGIC) ||
         (image[SCR_TIME_OFFSET_VERSION] != SCR_TIME_VERSION) ||
         (image[SCR_TIME_OFFSET_VALID] != SCR_TIME_VALID) ||
@@ -607,6 +675,11 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
                 TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_START_TICKS);
     }
 
+    if (elapsedTicks == 0u)
+    {
+        return E_NOT_OK;
+    }
+
     *elapsedNs = TimeBase_ScrRtcTicksToNs(elapsedTicks);
     *syncStatusMask = TIMEBASE_SYNC_STATUS_SCR_RTC_ELAPSED;
 
@@ -623,7 +696,8 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
 
 static boolean TimeBase_IsPersistentSource(TimeBase_TimeSourceType source)
 {
-    if ((source == TIMEBASE_SOURCE_UDS_ROUTINE) ||
+    if ((source == TIMEBASE_SOURCE_DEFAULT_COMPILETIME) ||
+        (source == TIMEBASE_SOURCE_UDS_ROUTINE) ||
         (source == TIMEBASE_SOURCE_GPTP_MASTER))
     {
         return TRUE;
@@ -675,12 +749,46 @@ void TimeBase_CaptureStandbyRtcBeforeScrReset(void)
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
     uint16 index;
 
+    /*
+     * PMS_PMSWCR2.B.SCRECC is NOT checked here.  The SCR writes to PMS_XRAM
+     * through its 8-bit bus which does not update the TriCore-side word ECC.
+     * Every standby period where the SCR ISR updated the time record therefore
+     * leaves ECC mismatches that set SCRECC — making the flag structurally
+     * unreliable for this use case.  Genuine SCR ECC faults are reported by the
+     * SCR firmware itself via SCR_TIME_OFFSET_WAKE_REASON and
+     * SCR_TIME_OFFSET_SCR_FAULT_STATUS in the XRAM record, which
+     * TimeBase_IsScrRtcImageSafe() already checks independently.
+     */
     for (index = 0u; index < SCR_TIME_RECORD_LENGTH; index++)
     {
         TimeBase_ScrRtcBootImage[index] = TimeBase_ScrLoadU8(index);
     }
 
     TimeBase_ScrRtcBootImageValid = TRUE;
+#endif
+}
+
+Std_ReturnType TimeBase_RestoreStandbyRtcCapture(const uint8 *image, uint16 length)
+{
+#if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
+    uint16 index;
+
+    if ((image == NULL_PTR) || (length < SCR_TIME_RECORD_LENGTH))
+    {
+        return E_NOT_OK;
+    }
+
+    for (index = 0u; index < SCR_TIME_RECORD_LENGTH; index++)
+    {
+        TimeBase_ScrRtcBootImage[index] = image[index];
+    }
+
+    TimeBase_ScrRtcBootImageValid = TRUE;
+    return E_OK;
+#else
+    (void)image;
+    (void)length;
+    return E_NOT_OK;
 #endif
 }
 
@@ -692,6 +800,10 @@ Std_ReturnType TimeBase_PrepareStandbyRtc(void)
     uint32 syncStatus;
     boolean utcValid;
     Std_ReturnType result;
+
+#if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
+    TimeBase_ScrRtcStandbyImageValid = FALSE;
+#endif
 
     if (TimeBase_Initialized == FALSE)
     {
@@ -722,47 +834,78 @@ Std_ReturnType TimeBase_PrepareStandbyRtc(void)
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
     {
         uint8 flags = SCR_TIME_FLAG_ARMED;
-        uint32 currentRtcTicks = TimeBase_ScrLoadU32(SCR_TIME_OFFSET_RTC_LAST_TICKS);
+        uint16 index;
 
 #if (TIMESYNC_SCR_RTC_CALIBRATION_PPM != 0)
         flags |= SCR_TIME_FLAG_CALIBRATION_APPLIED;
 #endif
 
-        TimeBase_ScrStoreU32(SCR_TIME_OFFSET_MAGIC, SCR_TIME_MAGIC);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_VERSION, SCR_TIME_VERSION);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_VALID, SCR_TIME_VALID);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_SOURCE, (uint8)source);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_FLAGS, flags);
-        TimeBase_ScrStoreU64(SCR_TIME_OFFSET_UTC_NS, utcTimeNs);
-        TimeBase_ScrStoreU32(SCR_TIME_OFFSET_RTC_START_TICKS, currentRtcTicks);
-        TimeBase_ScrStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, currentRtcTicks);
-        TimeBase_ScrStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, 0u);
-        TimeBase_ScrStoreU32(SCR_TIME_OFFSET_SYNC_STATUS, syncStatus);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_WAKE_REASON, 0u);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_SCR_FAULT_STATUS, 0u);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_SCR_NMI_STATUS, 0u);
-        TimeBase_ScrStoreU8(SCR_TIME_OFFSET_SCR_RST_STATUS, 0u);
+        for (index = 0u; index < SCR_TIME_RECORD_LENGTH; index++)
+        {
+            TimeBase_ScrRtcStandbyImage[index] = 0u;
+        }
+
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_MAGIC, SCR_TIME_MAGIC);
+        TimeBase_ScrRtcStandbyImage[SCR_TIME_OFFSET_VERSION] = SCR_TIME_VERSION;
+        TimeBase_ScrRtcStandbyImage[SCR_TIME_OFFSET_VALID] = SCR_TIME_VALID;
+        TimeBase_ScrRtcStandbyImage[SCR_TIME_OFFSET_SOURCE] = (uint8)source;
+        TimeBase_ScrRtcStandbyImage[SCR_TIME_OFFSET_FLAGS] = flags;
+        TimeBase_StoreU64(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_UTC_NS, utcTimeNs);
+        TimeBase_StoreU64(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_VEHICLE_NS, vehicleTimeNs);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_RTC_START_TICKS, 0u);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_RTC_LAST_TICKS, 0u);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_ELAPSED_TICKS, 0u);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_SYNC_STATUS, syncStatus);
+        TimeBase_ScrRtcStandbyImageValid = TRUE;
+        TimeBase_ScrWriteImage(TimeBase_ScrRtcStandbyImage);
     }
 #endif
 
     return result;
 }
 
+Std_ReturnType TimeBase_RearmStandbyRtc(void)
+{
+#if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
+    if (TimeBase_ScrRtcStandbyImageValid == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    TimeBase_ScrWriteImage(TimeBase_ScrRtcStandbyImage);
+    return E_OK;
+#else
+    return E_NOT_OK;
+#endif
+}
+
 void TimeBase_Init(void)
 {
     uint64 defaultUtcNs = 0ull;
+    uint32 defaultSyncStatus;
 
     TimeBase_InitFrequency();
-    (void)TimeBase_ConvertDateTimeToUtcNs(
-            (uint16)TIMESYNC_DEFAULT_UTC_YEAR,
-            (uint8)TIMESYNC_DEFAULT_UTC_MONTH,
-            (uint8)TIMESYNC_DEFAULT_UTC_DAY,
-            (uint8)TIMESYNC_DEFAULT_UTC_HOUR,
-            (uint8)TIMESYNC_DEFAULT_UTC_MINUTE,
-            (uint8)TIMESYNC_DEFAULT_UTC_SECOND,
-            0u,
-            0,
-            &defaultUtcNs);
+#if (TIMESYNC_NVM_ENABLE == STD_ON)
+    if (TimeBase_IsNvMImageValid(NvM_TimeBase_Rom) != FALSE)
+    {
+        defaultUtcNs = TimeBase_LoadU64(NvM_TimeBase_Rom, TIMEBASE_NVM_OFFSET_UTC_NS);
+        defaultSyncStatus = TimeBase_LoadU32(NvM_TimeBase_Rom, TIMEBASE_NVM_OFFSET_SYNC_STATUS);
+    }
+    else
+#endif
+    {
+        (void)TimeBase_ConvertDateTimeToUtcNs(
+                (uint16)TIMESYNC_DEFAULT_UTC_YEAR,
+                (uint8)TIMESYNC_DEFAULT_UTC_MONTH,
+                (uint8)TIMESYNC_DEFAULT_UTC_DAY,
+                (uint8)TIMESYNC_DEFAULT_UTC_HOUR,
+                (uint8)TIMESYNC_DEFAULT_UTC_MINUTE,
+                (uint8)TIMESYNC_DEFAULT_UTC_SECOND,
+                0u,
+                0,
+                &defaultUtcNs);
+        defaultSyncStatus = TimeBase_GetSyncStatusForSource(TIMEBASE_SOURCE_DEFAULT_COMPILETIME);
+    }
 
     TimeBase_EnterCritical();
     TimeBase_LastCounterTicks = TimeBase_PlatformGetCounterTicks();
@@ -771,18 +914,16 @@ void TimeBase_Init(void)
     TimeBase_UtcMapping.utc_time_at_set_ns = defaultUtcNs;
     TimeBase_UtcMapping.utc_valid = TRUE;
     TimeBase_UtcMapping.time_source = TIMEBASE_SOURCE_DEFAULT_COMPILETIME;
-    TimeBase_UtcMapping.sync_status = TimeBase_GetSyncStatusForSource(TIMEBASE_SOURCE_DEFAULT_COMPILETIME);
+    TimeBase_UtcMapping.sync_status = defaultSyncStatus;
     TimeBase_Initialized = TRUE;
     TimeBase_LastNvMImageVehicleNs = 0ull;
+    TimeBase_NvMStoreCounter = 0u;
+    TimeBase_DiagnosticUtcSet = FALSE;
     TimeBase_ExitCritical();
 }
 
 void TimeBase_MainFunction(void)
 {
-    uint64 vehicleTimeNs = 0ull;
-    uint64 utcTimeNs = 0ull;
-    TimeBase_TimeSourceType source = TIMEBASE_SOURCE_INVALID;
-    uint32 syncStatus = 0u;
     boolean updateNvM = FALSE;
 
     if (TimeBase_Initialized == FALSE)
@@ -796,18 +937,16 @@ void TimeBase_MainFunction(void)
         (TimeBase_IsPersistentSource(TimeBase_UtcMapping.time_source) != FALSE) &&
         ((TimeBase_VehicleTimeNs - TimeBase_LastNvMImageVehicleNs) >= TIMEBASE_NVM_UPDATE_PERIOD_NS))
     {
-        vehicleTimeNs = TimeBase_VehicleTimeNs;
-        utcTimeNs = TimeBase_GetMappedUtcLocked(vehicleTimeNs);
-        source = TimeBase_UtcMapping.time_source;
-        syncStatus = TimeBase_UtcMapping.sync_status;
-        TimeBase_LastNvMImageVehicleNs = vehicleTimeNs;
         updateNvM = TRUE;
     }
     TimeBase_ExitCritical();
 
     if (updateNvM != FALSE)
     {
-        (void)TimeBase_UpdateNvMImage(utcTimeNs, vehicleTimeNs, source, syncStatus);
+        /* PrepareStandbyRtc internally calls UpdateNvMImage (one NvM write per cycle)
+         * and also refreshes the SCR XRAM standby record so the SCR ISR has a
+         * recent UTC/vehicle base when the TC next enters PMS standby. */
+        (void)TimeBase_PrepareStandbyRtc();
     }
 }
 
@@ -898,6 +1037,10 @@ Std_ReturnType TimeBase_SetUtcTimeNsFromSource(uint64 utcNowNs, TimeBase_TimeSou
     TimeBase_UtcMapping.utc_valid = TRUE;
     TimeBase_UtcMapping.time_source = source;
     TimeBase_UtcMapping.sync_status = TimeBase_GetSyncStatusForSource(source);
+    if (source == TIMEBASE_SOURCE_UDS_ROUTINE)
+    {
+        TimeBase_DiagnosticUtcSet = TRUE;
+    }
     vehicleTimeNs = TimeBase_VehicleTimeNs;
     syncStatus = TimeBase_UtcMapping.sync_status;
     TimeBase_LastNvMImageVehicleNs = vehicleTimeNs;
@@ -940,65 +1083,157 @@ void TimeBase_SetUtcTimeFromDateTime(
 Std_ReturnType TimeBase_LoadUtcFromNvM(void)
 {
 #if ((TIMESYNC_NVM_ENABLE == STD_ON) && (TIMESYNC_NVM_RESTORE_ENABLE == STD_ON))
+    const uint8 *restoreImage;
     NvM_RequestResultType nvmResult;
     uint64 utcTimeNs;
     uint64 vehicleTimeNs;
+    uint64 storedVehicleTimeNs;
+    uint64 restoredVehicleTimeNs;
     TimeBase_TimeSourceType source;
     uint32 syncStatus;
+    uint32 storeCounter;
+    boolean restoredFromDataFlash;
+    boolean refreshNvM;
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
     uint64 standbyElapsedNs = 0ull;
     uint32 standbySyncStatus = 0u;
-    uint64 adjustedUtcTimeNs;
+    uint64 scrUtcTimeNs;
+    uint64 scrVehicleTimeNs;
+    uint64 candidateUtcTimeNs;
+    uint64 candidateVehicleTimeNs;
+    boolean standbyElapsedAccepted = FALSE;
 #endif
+
+    if (TimeBase_DiagnosticUtcSet != FALSE)
+    {
+        return E_OK;
+    }
 
     if (NvM_GetErrorStatus(NVM_BLOCK_ID_TIMEBASE, &nvmResult) != E_OK)
     {
         return E_NOT_OK;
     }
 
-    if (nvmResult != NVM_REQ_OK)
+    restoreImage = NULL_PTR;
+    restoredFromDataFlash = FALSE;
+    refreshNvM = FALSE;
+
+    if (TimeBase_IsNvMImageValid(NvM_TimeBase_Ram) != FALSE)
+    {
+        restoreImage = NvM_TimeBase_Ram;
+        restoredFromDataFlash = (nvmResult == NVM_REQ_OK) ? TRUE : FALSE;
+        refreshNvM = (restoredFromDataFlash == FALSE) ? TRUE : FALSE;
+    }
+    else if (TimeBase_IsNvMImageValid(NvM_TimeBase_Rom) != FALSE)
+    {
+        restoreImage = NvM_TimeBase_Rom;
+        refreshNvM = TRUE;
+    }
+
+    if (restoreImage == NULL_PTR)
     {
         return E_NOT_OK;
     }
 
-    if ((TimeBase_LoadU32(NvM_TimeBase_Ram, TIMEBASE_NVM_OFFSET_MAGIC) != TIMEBASE_NVM_MAGIC) ||
-        (NvM_TimeBase_Ram[TIMEBASE_NVM_OFFSET_VERSION] != TIMEBASE_NVM_VERSION) ||
-        (NvM_TimeBase_Ram[TIMEBASE_NVM_OFFSET_VALID] != TIMEBASE_NVM_VALID))
-    {
-        return E_NOT_OK;
-    }
-
-    source = (TimeBase_TimeSourceType)NvM_TimeBase_Ram[TIMEBASE_NVM_OFFSET_SOURCE];
+    source = (TimeBase_TimeSourceType)restoreImage[TIMEBASE_NVM_OFFSET_SOURCE];
     if (TimeBase_IsPersistentSource(source) == FALSE)
     {
         return E_NOT_OK;
     }
 
-    utcTimeNs = TimeBase_LoadU64(NvM_TimeBase_Ram, TIMEBASE_NVM_OFFSET_UTC_NS);
+    utcTimeNs = TimeBase_LoadU64(restoreImage, TIMEBASE_NVM_OFFSET_UTC_NS);
     if (TimeBase_ValidateUtcTimeNs(utcTimeNs) != E_OK)
     {
         return E_NOT_OK;
     }
 
+    storedVehicleTimeNs = TimeBase_LoadU64(restoreImage, TIMEBASE_NVM_OFFSET_VEHICLE_NS);
+    restoredVehicleTimeNs = storedVehicleTimeNs;
+    storeCounter = TimeBase_LoadU32(restoreImage, TIMEBASE_NVM_OFFSET_STORE_COUNTER);
+    syncStatus = TimeBase_GetSyncStatusForSource(source);
+    if (restoredFromDataFlash != FALSE)
+    {
+        syncStatus |= TIMEBASE_SYNC_STATUS_NVM_RESTORED;
+    }
+
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
+    TimeBase_Dbg_ElapsedTicks = TimeBase_ScrLoadU32FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_ELAPSED_TICKS);
     if (TimeBase_TryGetStandbyRtcElapsedNs(source, &standbyElapsedNs, &standbySyncStatus) == E_OK)
     {
-        adjustedUtcTimeNs = utcTimeNs + standbyElapsedNs;
-        if ((adjustedUtcTimeNs >= utcTimeNs) &&
-            (TimeBase_ValidateUtcTimeNs(adjustedUtcTimeNs) == E_OK))
+        TimeBase_Dbg_ElapsedPathOk = 1u;
+        candidateUtcTimeNs = utcTimeNs + standbyElapsedNs;
+        if (candidateUtcTimeNs < utcTimeNs)
         {
-            utcTimeNs = adjustedUtcTimeNs;
+            candidateUtcTimeNs = utcTimeNs;
         }
-        else
+
+        scrUtcTimeNs = TimeBase_ScrLoadU64FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_UTC_NS);
+        if ((scrUtcTimeNs > candidateUtcTimeNs) &&
+            (TimeBase_ValidateUtcTimeNs(scrUtcTimeNs) == E_OK))
         {
-            standbySyncStatus = 0u;
+            candidateUtcTimeNs = scrUtcTimeNs;
+        }
+
+        if ((candidateUtcTimeNs > utcTimeNs) &&
+            (TimeBase_ValidateUtcTimeNs(candidateUtcTimeNs) == E_OK))
+        {
+            utcTimeNs = candidateUtcTimeNs;
+            standbyElapsedAccepted = TRUE;
+            refreshNvM = TRUE;
+
+            candidateVehicleTimeNs = storedVehicleTimeNs + standbyElapsedNs;
+            if (candidateVehicleTimeNs >= storedVehicleTimeNs)
+            {
+                restoredVehicleTimeNs = candidateVehicleTimeNs;
+            }
         }
     }
-#endif
 
-    syncStatus = TimeBase_GetSyncStatusForSource(source) | TIMEBASE_SYNC_STATUS_NVM_RESTORED;
-#if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
-    syncStatus |= standbySyncStatus;
+    /*
+     * Always read the SCR's directly-computed VEHICLE_NS from the boot image,
+     * regardless of whether the elapsed-ticks path succeeded.  The ISR writes
+     * this field every ~100 ms throughout standby (base + accumulated ticks),
+     * so it is valid even when ELAPSED_TICKS happened to be zero at capture
+     * time (e.g. captured within the first 100 ms window after SCR_TimeInit).
+     * Only apply it if the boot image has a valid magic and the ARMED flag,
+     * ensuring we never use a stale image from a previous standby cycle.
+     */
+    TimeBase_Dbg_BootImageValid = (uint8)TimeBase_ScrRtcBootImageValid;
+    TimeBase_Dbg_ImageSafe      = (uint8)TimeBase_IsScrRtcImageSafe(TimeBase_ScrRtcBootImage);
+    TimeBase_Dbg_MagicOk        = (uint8)(TimeBase_ScrLoadU32FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_MAGIC) == SCR_TIME_MAGIC);
+    TimeBase_Dbg_Flags          = TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS];
+
+    if ((TimeBase_ScrRtcBootImageValid != FALSE) &&
+        (TimeBase_IsScrRtcImageSafe(TimeBase_ScrRtcBootImage) != FALSE) &&
+        (TimeBase_ScrLoadU32FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_MAGIC) == SCR_TIME_MAGIC) &&
+        ((TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS] & SCR_TIME_FLAG_ARMED) != 0u) &&
+        ((TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS] & SCR_TIME_FLAG_CONSUMED) == 0u))
+    {
+        scrVehicleTimeNs = TimeBase_ScrLoadU64FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_VEHICLE_NS);
+        TimeBase_Dbg_ScrVehicleHigh  = (uint32)((uint64)scrVehicleTimeNs >> 32u);
+        TimeBase_Dbg_ScrVehicleLow   = (uint32)(scrVehicleTimeNs & 0xFFFFFFFFull);
+        TimeBase_Dbg_NvmVehicleHigh  = (uint32)((uint64)restoredVehicleTimeNs >> 32u);
+        TimeBase_Dbg_NvmVehicleLow   = (uint32)(restoredVehicleTimeNs & 0xFFFFFFFFull);
+        TimeBase_Dbg_VehicleGtResult = (uint8)((scrVehicleTimeNs != 0ull) && (scrVehicleTimeNs > restoredVehicleTimeNs));
+        if ((scrVehicleTimeNs != 0ull) && (scrVehicleTimeNs > restoredVehicleTimeNs))
+        {
+            restoredVehicleTimeNs = scrVehicleTimeNs;
+            refreshNvM = TRUE;
+        }
+
+        scrUtcTimeNs = TimeBase_ScrLoadU64FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_UTC_NS);
+        if ((scrUtcTimeNs > utcTimeNs) && (TimeBase_ValidateUtcTimeNs(scrUtcTimeNs) == E_OK))
+        {
+            utcTimeNs = scrUtcTimeNs;
+            standbyElapsedAccepted = TRUE;
+            refreshNvM = TRUE;
+        }
+    }
+
+    if (standbyElapsedAccepted != FALSE)
+    {
+        syncStatus |= standbySyncStatus;
+    }
 #endif
 
     TimeBase_EnterCritical();
@@ -1007,14 +1242,31 @@ Std_ReturnType TimeBase_LoadUtcFromNvM(void)
         TimeBase_UpdateVehicleTimeLocked();
     }
     vehicleTimeNs = TimeBase_VehicleTimeNs;
+    if (restoredVehicleTimeNs > vehicleTimeNs)
+    {
+        TimeBase_VehicleTimeNs = restoredVehicleTimeNs;
+        vehicleTimeNs = restoredVehicleTimeNs;
+    }
     TimeBase_UtcMapping.vehicle_time_at_utc_set_ns = vehicleTimeNs;
     TimeBase_UtcMapping.utc_time_at_set_ns = utcTimeNs;
     TimeBase_UtcMapping.utc_valid = TRUE;
     TimeBase_UtcMapping.time_source = source;
     TimeBase_UtcMapping.sync_status = syncStatus;
     TimeBase_LastNvMImageVehicleNs = vehicleTimeNs;
-    TimeBase_NvMStoreCounter = TimeBase_LoadU32(NvM_TimeBase_Ram, TIMEBASE_NVM_OFFSET_STORE_COUNTER);
+    TimeBase_NvMStoreCounter = storeCounter;
+    TimeBase_DiagnosticUtcSet = FALSE;
     TimeBase_ExitCritical();
+
+    if (refreshNvM != FALSE)
+    {
+        if (TimeBase_UpdateNvMImage(utcTimeNs, vehicleTimeNs, source, syncStatus) == E_OK)
+        {
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                (void)NvM_WriteBlock(NVM_BLOCK_ID_TIMEBASE, NULL_PTR);
+            }
+        }
+    }
 
     return E_OK;
 #else

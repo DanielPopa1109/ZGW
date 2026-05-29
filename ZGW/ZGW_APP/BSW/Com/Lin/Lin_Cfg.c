@@ -6,5 +6,5 @@ const IfxAsclin_Lin_Pins Lin_Pins =
     IfxPort_InputMode_pullUp,
     &IfxAsclin1_TX_P15_0_OUT,
     IfxPort_OutputMode_pushPull,
-    IfxPort_PadDriver_cmosAutomotiveSpeed1
+    IfxPort_PadDriver_cmosAutomotiveSpeed4
 };

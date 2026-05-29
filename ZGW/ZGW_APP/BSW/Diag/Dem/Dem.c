@@ -942,17 +942,74 @@ static void Dem_ProcessPrePassed(uint16 eventIndex)
     }
 }
 
+static boolean Dem_DtcInGeneratedRange(Dem_DTCType dtc, Dem_DTCType firstDtc, uint16 count)
+{
+    Dem_DTCType normalizedDtc;
+    Dem_DTCType normalizedFirst;
+    Dem_DTCType normalizedLast;
+
+    if (count == 0u)
+    {
+        return FALSE;
+    }
+
+    normalizedDtc = dtc & 0x00FFFFFFu;
+    normalizedFirst = firstDtc & 0x00FFFFFFu;
+    normalizedLast = (Dem_DTCType)(normalizedFirst + (Dem_DTCType)count - 1u);
+
+    if ((normalizedDtc >= normalizedFirst) && (normalizedDtc <= normalizedLast))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static boolean Dem_IsGeneratedUniqueDtc(Dem_DTCType dtc)
+{
+    if (Dem_DtcInGeneratedRange(
+            dtc,
+            DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT,
+            (uint16)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT) != FALSE)
+    {
+        return TRUE;
+    }
+
+    if (Dem_DtcInGeneratedRange(
+            dtc,
+            DEM_DTC_GATEWAY_RX_SIGNAL_INVALID,
+            (uint16)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT) != FALSE)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static boolean Dem_DtcAlreadySeen(uint16 currentIndex, Dem_DTCType dtc)
 {
     uint16 i;
     Dem_EventConfigType eventConfig;
+
+    /* Gateway message/signal DTCs are generated from monotonically increasing bases. */
+    if (Dem_IsGeneratedUniqueDtc(dtc) != FALSE)
+    {
+        return FALSE;
+    }
 
     for (i = 0u; i < currentIndex; i++)
     {
         if ((Dem_GetEventConfig(i, &eventConfig) == E_OK) &&
             ((eventConfig.DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu)))
         {
-            if ((Dem_RuntimeEvents[i].udsStatus & Dem_Filter.statusMask) != 0u)
+            if (Dem_Filter.statusMask != 0u)
+            {
+                if ((Dem_RuntimeEvents[i].udsStatus & Dem_Filter.statusMask) != 0u)
+                {
+                    return TRUE;
+                }
+            }
+            else if (Dem_RuntimeEvents[i].udsStatus != 0u)
             {
                 return TRUE;
             }

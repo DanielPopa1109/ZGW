@@ -864,7 +864,7 @@ void QM_BSW_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_QM_BSW_Task_C0)
         {
             Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
-            Com_MainFunctionTx();
+            GatewaySwc_RequestComMainFunctionTx();
             Com_MainFunctionRx();
             ComM_MainFunction();
             Nm_MainFunction();
@@ -888,7 +888,7 @@ void QM_LIN_Task_C0(void *pvParameters)
         {
             Alarm5ms_Flag_QM_LIN_Task_C0 = 0u;
             LinSM_MainFunction();
-            LinIf_MainFunction();
+            GatewaySwc_RequestLinIfMainFunction();
             LinTp_MainFunction();
             QM_LIN_Task_C0_Counter ++;
         }
@@ -1076,14 +1076,10 @@ void QM_BSW_Task_C2(void *pvParameters)
                 Gptp_Lab_MainFunction(5u);
                 SomeIpSd_MainFunction(5);
 
+                lwip_geth_Lwip_pollTimerFlags();
                 TcpIp_MainFunction();
                 SoAd_MainFunction();
-                /* The dedicated RX task owns the DMA descriptor ring in RTOS
-                 * builds. Keep the polling fallback only for non-RTOS ports.
-                 */
-#if !LWIP_GETH_RTOS_ENABLED
                 lwip_geth_Lwip_pollReceiveFlags();
-#endif
                 DoIP_MainFunction(5);
                 PduR_DoIPCore2MainFunction();
                 SomeIp_MainFunction(5);

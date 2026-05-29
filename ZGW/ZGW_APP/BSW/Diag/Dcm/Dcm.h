@@ -14,7 +14,7 @@ typedef NotifResultType Dcm_NotifResultType;
 
 #define DCM_E_OK      0x00u
 #define DCM_E_NOT_OK  0x01u
-#define DCM_E_PENDING 0x10u
+#define DCM_E_PENDING 0xFFu
 
 #define DCM_INITIAL   0x00u
 #define DCM_PENDING   0x01u
@@ -30,6 +30,7 @@ typedef NotifResultType Dcm_NotifResultType;
 #define DCM_SESSION_MASK_DEFAULT     (1u << DCM_SESSION_DEFAULT)
 #define DCM_SESSION_MASK_PROGRAMMING (1u << DCM_SESSION_PROGRAMMING)
 #define DCM_SESSION_MASK_EXTENDED    (1u << DCM_SESSION_EXTENDED)
+#define DCM_SESSION_MASK_CODING      (1u << 4u)
 
 #define DCM_SEC_MASK_LOCKED          (1u << DCM_SECURITY_LOCKED)
 #define DCM_SEC_MASK_L1              (1u << DCM_SECURITY_L1)
@@ -41,21 +42,23 @@ typedef uint8 Dcm_OpStatusType;
 /* ===================== Limits ===================== */
 
 #define DCM_MAX_CONNECTIONS          10u
-#define DCM_MAX_PDU_LEN              4095u
-#define DCM_MAX_RESPONSE_LEN         4095u
+#define DCM_CLASSIC_ISOTP_MAX_LEN    4095u
+#define DCM_MAX_PDU_LEN              8192u
+#define DCM_MAX_RESPONSE_LEN         8192u
 #define DCM_RX_QUEUE_DEPTH           2u
 #define DCM_MAX_SERVICES             32u
 #define DCM_MAX_SECURITY_LEVELS      4u
 #define DCM_MAX_DID_RESPONSE_LEN     512u
 #define DCM_MAX_ROUTINE_RESPONSE_LEN 512u
-#define DCM_MAX_DTC_RESPONSE_LEN     512u
+#define DCM_MAX_SERVICE_RESPONSE_LEN (DCM_MAX_RESPONSE_LEN - 1u)
+#define DCM_MAX_DTC_RESPONSE_LEN     (DCM_MAX_SERVICE_RESPONSE_LEN - 1u)
 #define DCM_TRANSFER_BLOCK_LEN       1024u
 
 /* ===================== Timing ===================== */
 
 #define DCM_P2_SERVER_TICKS          50u
-#define DCM_P2STAR_SERVER_TICKS      500u
-#define DCM_RESPONSE_PENDING_PERIOD  50u
+#define DCM_P2STAR_SERVER_TICKS      5000u
+#define DCM_RESPONSE_PENDING_MAX     2u
 
 /* ===================== AUTOSAR-like TP ===================== */
 
@@ -123,11 +126,28 @@ typedef struct
 
 #define DCM_SUPPRESS_POS_RSP_MSG_INDICATION_BIT         0x80u
 
+/* ===================== Standard DIDs ===================== */
+
+#define DCM_DID_ACTIVE_SOFTWARE_BLOCK                 0xF100u
+#define DCM_DID_APPLICATION_SOFTWARE_VERSION          0xF101u
+#define DCM_DID_ACTIVE_DIAGNOSTIC_SESSION               0xF186u
+#define DCM_DID_SOFTWARE_VERSION                        0xF187u
+
+#define DCM_ACTIVE_SOFTWARE_BLOCK_APP                   0x00u
+
+#define DCM_APP_SW_VERSION_MAJOR                        1u
+#define DCM_APP_SW_VERSION_MINOR                        0u
+#define DCM_APP_SW_VERSION_PATCH                        0u
+#define DCM_FBL_SW_VERSION_MAJOR                        1u
+#define DCM_FBL_SW_VERSION_MINOR                        0u
+#define DCM_FBL_SW_VERSION_PATCH                        0u
+
 /* ===================== Sessions ===================== */
 
 #define DCM_SESSION_DEFAULT                             0x01u
 #define DCM_SESSION_PROGRAMMING                         0x02u
 #define DCM_SESSION_EXTENDED                            0x03u
+#define DCM_SESSION_CODING                              0x41u
 
 /* ===================== Connection ===================== */
 
@@ -186,6 +206,7 @@ void Dcm_Init(const Dcm_ConfigType* ConfigPtr);
 void Dcm_MainFunction(void);
 void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result);
+uint8 Dcm_GetActiveSession(uint8 connIdx);
 uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len);
 
 BufReq_ReturnType Dcm_StartOfReception(
@@ -227,26 +248,9 @@ Std_ReturnType Dcm_LoTransmit(
 
 /* ===================== Weak application hooks ===================== */
 
-Dcm_ReturnType DcmAppl_DiagnosticSessionControl(
+void DcmAppl_DiagnosticSessionChanged(
     uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    uint8 session,
-    uint8* respData,
-    Dcm_PduLengthType* respLen
-);
-
-Dcm_ReturnType DcmAppl_EcuReset(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    uint8 resetType,
-    uint8* respData,
-    Dcm_PduLengthType* respLen
-);
-
-Dcm_ReturnType DcmAppl_ClearDiagnosticInformation(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
-    uint32 dtcGroup
+    uint8 session
 );
 
 Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
@@ -270,15 +274,6 @@ Dcm_ReturnType DcmAppl_RoutineControl(
     Dcm_OpStatusType opStatus,
     uint8 routineControlType,
     uint16 routineId,
-    const uint8* reqData,
-    Dcm_PduLengthType reqLen,
-    uint8* respData,
-    Dcm_PduLengthType* respLen
-);
-
-Dcm_ReturnType DcmAppl_ReadDtcInformation(
-    uint8 connIdx,
-    Dcm_OpStatusType opStatus,
     const uint8* reqData,
     Dcm_PduLengthType reqLen,
     uint8* respData,

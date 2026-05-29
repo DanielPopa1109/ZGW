@@ -73,7 +73,7 @@ void SoAd_MainFunction(void);
 
 uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
 void SoAd_CloseSoCon(SoAd_SoConIdType id);
-
+void SoAd_AbortTcpConnection(SoAd_SoConIdType id);
 sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
 
 extern volatile uint32 SoAd_OpenFailNoLinkCounter;
@@ -99,6 +99,8 @@ extern volatile uint32 SoAd_DebugPcHeartbeatRxCounter;
 extern volatile uint32 SoAd_DebugPcHeartbeatAckCounter;
 extern volatile uint32 SoAd_DebugPcHeartbeatLastRemoteAddr;
 extern volatile uint16 SoAd_DebugPcHeartbeatLastRemotePort;
+extern volatile uint32 SoAd_DebugTcpStaleReplaceCounter;
+extern volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
                                 const TcpIp_SockAddrType *remoteAddr,

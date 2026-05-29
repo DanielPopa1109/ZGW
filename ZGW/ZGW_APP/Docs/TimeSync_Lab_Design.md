@@ -71,12 +71,17 @@ SysMgr_GoSleep()
   wait NvM idle
   TimeBase_PrepareStandbyRtc()
     refresh TimeBase NvM RAM image with current mapped UTC
-    arm SCR XRAM record with UTC, source, sync_status, and current RTC tick
+    prepare and initially write the SCR XRAM record with UTC, source, and sync_status
   NvM_WriteAll()
+  clear/reload SCR XRAM
+  TimeBase_RearmStandbyRtc()
+    restore the prepared SCR XRAM record after the destructive SCR clear/copy path
   start/restart SCR and enter standby
 ```
 
 When the SCR starts for standby and sees the armed record, it resets the SCR RTC counter to zero and records `rtc_start_ticks = 0`. While the TC375 is in standby, the SCR main loop keeps writing `rtc_last_ticks` and `elapsed_ticks`. On the next core0 startup, `TimeBase_CaptureStandbyRtcBeforeScrReset()` copies the SCR XRAM record before the existing SCR RAM cleanup (`IfxMtu_MbistSel_scrXram = 77`) can erase it. `TimeBase_LoadUtcFromNvM()` then adds the captured elapsed time to the NvM UTC.
+
+If McuSm TRAP4 reacts to a bus error whose failing address is inside SCR XRAM, the handler copies the SCR RTC record into an application-side TimeBase capture and an NCR-backed McuSm backup before zero-filling XRAM. If the failing address is inside the NCR linker group, the handler zero-fills NCR and then re-captures the SCR RTC record into the restored NCR backup. `Core0_HandleScrStartup()` imports that backup before SCR reset/copy/disable, so the RTC handoff is not lost by the zero-fill reaction.
 
 Configured default tick conversion:
 
@@ -256,9 +261,11 @@ When raw Ethernet and hardware timestamps are available, enable `TIMESYNC_GPTP_E
 
 - `TimeBase_Init()` during core0 BSW/system init.
 - `TimeBase_CaptureStandbyRtcBeforeScrReset()` at the start of `Core0_HandleScrStartup()`, before SCR reset/copy/clear.
+- `TimeBase_RestoreStandbyRtcCapture()` at the start of `Core0_HandleScrStartup()` if McuSm TRAP4 preserved an SCR RTC record after an XRAM/NCR zero-fill reaction.
 - `TimeBase_LoadUtcFromNvM()` after `NvM_ReadAll()` and before `Dem_Init()`.
 - `TimeBase_MainFunction()` in the core0 5 ms diagnostic cyclic task.
 - `TimeBase_PrepareStandbyRtc()` in `SysMgr_GoSleep()` after NvM is idle and immediately before `NvM_WriteAll()`.
+- `TimeBase_RearmStandbyRtc()` in `SysMgr_GoSleep()` after SCR XRAM clear/program copy and before `IfxScr_init(1)`.
 - `EthTimeSync_Init()` after Ethernet/lwIP stack initialization on core2.
 - `Gptp_Lab_Init()` after Ethernet driver initialization on core2.
 - `EthTimeSync_MainFunction(5u)` and `Gptp_Lab_MainFunction(5u)` in the core2 Ethernet cyclic task.

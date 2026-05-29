@@ -3,7 +3,7 @@
 
 #include "Std_Types.h"
 
-/* Lab default UTC. This is a boot-time mapping only, not trusted real-world time. */
+/* Fallback only. The primary TimeBase boot default is the NvM_TimeBase_Rom image in PFLASH. */
 #define TIMESYNC_DEFAULT_UTC_YEAR              2026u
 #define TIMESYNC_DEFAULT_UTC_MONTH             5u
 #define TIMESYNC_DEFAULT_UTC_DAY               21u
@@ -29,13 +29,8 @@
 #define TIMESYNC_NVM_RAM_UPDATE_PERIOD_MS      1000u
 
 #define TIMESYNC_SCR_RTC_ENABLE                STD_ON
-/*
- * SCR uses DIV5 from the 100 MHz backup clock and the RTC 9-bit prescaler is
- * left enabled in the SCR firmware. RTCCLKSEL is set for the 20 MHz PCLK path:
- * 100 MHz / 5 / 512 = 39062.5 Hz.
- */
-#define TIMESYNC_SCR_RTC_TICK_HZ_NUM           390625u
-#define TIMESYNC_SCR_RTC_TICK_HZ_DEN           10u
+#define TIMESYNC_SCR_RTC_TICK_HZ_NUM           20000000u
+#define TIMESYNC_SCR_RTC_TICK_HZ_DEN           1u
 #define TIMESYNC_SCR_RTC_CALIBRATION_PPM       0
 #define TIMESYNC_SCR_RTC_USE_CCU6_CALIBRATION  STD_OFF
 #define TIMESYNC_SCR_RTC_LOW_POWER_70KHZ       STD_OFF

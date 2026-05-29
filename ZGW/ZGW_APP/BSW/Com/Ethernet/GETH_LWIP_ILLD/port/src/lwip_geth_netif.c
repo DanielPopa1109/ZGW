@@ -90,6 +90,7 @@
 #include <lwip/snmp.h>
 #include "netif/etharp.h"
 #include "netif/ppp/pppoe.h"
+#include "Cpu/Std/IfxCpu_Intrinsics.h"
 #include "IfxGeth_Eth.h"
 #include "lwip_geth_lwip.h"
 #include "lwip_geth_netif.h"
@@ -100,6 +101,14 @@
 #endif
 #if (PHY_DEVICE_NAME == PHY_RTL8211F)
 #include "lwip_geth_private_phy_rtl8211f.h"
+#endif
+
+#ifndef __cacheai
+#define __cacheai(p)  __asm__ volatile("cachea.i [%0]0"::"a"(p))
+#endif
+
+#ifndef __cacheawi
+#define __cacheawi(p) __asm__ volatile("cachea.wi [%0]0"::"a"(p))
 #endif
 
 /***********************************************************************************************************************
@@ -113,6 +122,7 @@
 #define LWIP_GETH_TX_WAIT_POLLS        100000u
 #define LWIP_GETH_RX_TASK_BUDGET       64u
 #define LWIP_GETH_RX_FRAME_INVALID     0xFFFFu
+#define LWIP_GETH_CACHE_LINE_SIZE      32u
 
 volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
@@ -141,6 +151,8 @@ volatile uint32 lwip_geth_DebugLastTxDescrAddr;
 volatile uint32 lwip_geth_DebugLastTxBufferAddr;
 volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 volatile uint32 lwip_geth_DebugLastRxBufferAddr;
+volatile uint32 lwip_geth_DebugRxCacheInvalidateCnt;
+volatile uint32 lwip_geth_DebugTxCacheWritebackCnt;
 
 /***********************************************************************************************************************
  * DATA STRUCTURES
@@ -156,6 +168,147 @@ struct ethernetif
   eth_addr_t *ethaddr;
   /* Add whatever per-interface state that is needed here. */
 };
+
+static void lwip_geth_CacheInvalidateRange(const void *address, uint32 length)
+{
+  uint32 line;
+  uint32 end;
+
+  if ((address == NULL_PTR) || (length == 0u))
+  {
+    return;
+  }
+
+  line = ((uint32)address) & ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+  end = (((uint32)address) + length + (LWIP_GETH_CACHE_LINE_SIZE - 1u)) &
+      ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+
+  while (line < end)
+  {
+    __cacheai((uint8 *)line);
+    line += LWIP_GETH_CACHE_LINE_SIZE;
+  }
+
+  __dsync();
+  lwip_geth_DebugRxCacheInvalidateCnt++;
+}
+
+static void lwip_geth_CacheWritebackInvalidateRange(const void *address, uint32 length)
+{
+  uint32 line;
+  uint32 end;
+
+  if ((address == NULL_PTR) || (length == 0u))
+  {
+    return;
+  }
+
+  line = ((uint32)address) & ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+  end = (((uint32)address) + length + (LWIP_GETH_CACHE_LINE_SIZE - 1u)) &
+      ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+
+  while (line < end)
+  {
+    __cacheawi((uint8 *)line);
+    line += LWIP_GETH_CACHE_LINE_SIZE;
+  }
+
+  __dsync();
+  lwip_geth_DebugTxCacheWritebackCnt++;
+}
+
+static void lwip_geth_FreeReceiveDescriptor(IfxGeth_Eth *ethernetif, IfxGeth_RxDescr *rxDescr)
+{
+  IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+  lwip_geth_CacheWritebackInvalidateRange(rxDescr, sizeof(*rxDescr));
+  IfxGeth_Eth_wakeupReceiver(ethernetif, IfxGeth_RxDmaChannel_0);
+}
+
+static void lwip_geth_PrepareDmaMemory(const IfxGeth_Eth_Config *config)
+{
+  const IfxGeth_Eth_TxChannelConfig *txConfig;
+  const IfxGeth_Eth_RxChannelConfig *rxConfig;
+  uint32 i;
+
+  if ((config == NULL_PTR) || (config->dma.numOfTxChannels == 0u) || (config->dma.numOfRxChannels == 0u))
+  {
+    return;
+  }
+
+  for (i = 0u; i < config->dma.numOfTxChannels; i++)
+  {
+    txConfig = &config->dma.txChannel[i];
+
+    if ((txConfig->channelEnable != FALSE) && (txConfig->txDescrList != NULL_PTR))
+    {
+      lwip_geth_CacheWritebackInvalidateRange(txConfig->txDescrList->descr,
+          (uint32)(IFXGETH_MAX_TX_DESCRIPTORS * sizeof(IfxGeth_TxDescr)));
+    }
+
+    if ((txConfig->channelEnable != FALSE) &&
+        (txConfig->txBuffer1StartAddress != NULL_PTR) &&
+        (txConfig->txBuffer1Size > 0u))
+    {
+      lwip_geth_CacheWritebackInvalidateRange(txConfig->txBuffer1StartAddress,
+          (uint32)(IFXGETH_MAX_TX_DESCRIPTORS * txConfig->txBuffer1Size));
+    }
+  }
+
+  for (i = 0u; i < config->dma.numOfRxChannels; i++)
+  {
+    rxConfig = &config->dma.rxChannel[i];
+
+    if ((rxConfig->channelEnable != FALSE) && (rxConfig->rxDescrList != NULL_PTR))
+    {
+      lwip_geth_CacheWritebackInvalidateRange(rxConfig->rxDescrList->descr,
+          (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr)));
+    }
+
+    if ((rxConfig->channelEnable != FALSE) &&
+        (rxConfig->rxBuffer1StartAddress != NULL_PTR) &&
+        (rxConfig->rxBuffer1Size > 0u))
+    {
+      lwip_geth_CacheWritebackInvalidateRange(rxConfig->rxBuffer1StartAddress,
+          (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * rxConfig->rxBuffer1Size));
+    }
+  }
+}
+
+static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 packetLength)
+{
+  volatile IfxGeth_TxDescr *firstDescr =
+      IfxGeth_Eth_getActualTxDescriptor(ethernetif, IfxGeth_TxDmaChannel_0);
+  volatile IfxGeth_TxDescr *lastDescr =
+      &ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrList->descr[IFXGETH_MAX_TX_DESCRIPTORS - 1u];
+  volatile IfxGeth_TxDescr *nextDescr;
+
+  if (firstDescr == lastDescr)
+  {
+    nextDescr = IfxGeth_Eth_getBaseTxDescriptor(ethernetif, IfxGeth_TxDmaChannel_0);
+  }
+  else
+  {
+    nextDescr = &firstDescr[1];
+  }
+
+  firstDescr->TDES3.R.FL_TPL = packetLength;
+  firstDescr->TDES3.R.TSE = 0u;
+  firstDescr->TDES3.R.CIC_TPL = 3u;
+  firstDescr->TDES3.R.SAIC = 0u;
+  firstDescr->TDES3.R.CPC = 0u;
+  firstDescr->TDES3.R.FD = 1u;
+  firstDescr->TDES3.R.LD = 1u;
+  firstDescr->TDES2.R.IOC = 1u;
+  firstDescr->TDES2.R.B1L = packetLength;
+  firstDescr->TDES3.R.OWN = 1u;
+
+  lwip_geth_CacheWritebackInvalidateRange((const void *)firstDescr, sizeof(*firstDescr));
+  ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
+  IfxGeth_dma_setTxDescriptorTailPointer(ethernetif->gethSFR, IfxGeth_TxDmaChannel_0, (uint32)nextDescr);
+  IfxGeth_Eth_wakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);
+  ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = nextDescr;
+  ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txCount++;
+}
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -357,6 +510,12 @@ static void lwip_geth_low_level_init(netif_t *netif)
     /* initialize the module */
     lwip_geth_DebugLowLevelInitState = 2u;
     IfxGeth_Eth_initModule(ethernetif, &GethConfig);
+    lwip_geth_PrepareDmaMemory(&GethConfig);
+
+    /* Normal operation: keep MAC destination filtering enabled. */
+    IfxGeth_mac_setPromiscuousMode(ethernetif->gethSFR, FALSE);
+    IfxGeth_mac_setAllMulticastPassing(ethernetif->gethSFR, FALSE);
+
     Dp83825i_DebugScanMdio();
     /* initialize the PHY */
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
@@ -430,10 +589,11 @@ static void lwip_geth_low_level_init(netif_t *netif)
 static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
 {
   IfxGeth_Eth *ethernetif = netif->state;
-  lwip_geth_DebugLowLevelOutputCount++;
   struct pbuf *q;
   u8_t *tbuf;
   u16_t l;
+
+  lwip_geth_DebugLowLevelOutputCount++;
 
 #ifdef LWIP_DEBUG
   u16_t       length = p->tot_len;
@@ -498,8 +658,9 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
     pactTxDescriptor->TDES2.R.B1L = l;
   }
 
+  lwip_geth_CacheWritebackInvalidateRange(tbuf, (uint32)l);
   lwip_geth_DebugLastTxLen = (uint32)l;
-  IfxGeth_Eth_sendTransmitBuffer(ethernetif, l, IfxGeth_TxDmaChannel_0);
+  lwip_geth_SendSingleTransmitBuffer(ethernetif, l);
   lwip_geth_DebugLowLevelOutputOkCount++;
 
   LWIP_DEBUGF(NETIF_DEBUG | LWIP_DBG_TRACE, ("low_level_output: signal length: %d\n", length));
@@ -558,15 +719,20 @@ static uint16 lwip_geth_GetRxFrameSize(IfxGeth_RxDescr *descr)
 static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 {
   IfxGeth_Eth *ethernetif = netif->state;
-  lwip_geth_DebugLowLevelInputCallCount++;
+  IfxGeth_RxDescr *rxDescr = NULL_PTR;
   pbuf_t      *p, *q;
+  u8_t        *src;
   u16_t       len;
 
+  lwip_geth_DebugLowLevelInputCallCount++;
+
   len = 0;
-  if (IfxGeth_Eth_isRxDataAvailable(ethernetif, IfxGeth_RxDmaChannel_0) != FALSE)
+  rxDescr = (IfxGeth_RxDescr *)IfxGeth_Eth_getActualRxDescriptor(ethernetif, IfxGeth_RxDmaChannel_0);
+  lwip_geth_DebugLastRxDescrAddr = (uint32)rxDescr;
+  lwip_geth_CacheInvalidateRange(rxDescr, sizeof(*rxDescr));
+
+  if ((rxDescr != NULL_PTR) && (rxDescr->RDES3.R.OWN == 0u))
   {
-    IfxGeth_RxDescr *rxDescr = (IfxGeth_RxDescr *)IfxGeth_Eth_getActualRxDescriptor(ethernetif, IfxGeth_RxDmaChannel_0);
-    lwip_geth_DebugLastRxDescrAddr = (uint32)rxDescr;
     len = lwip_geth_GetRxFrameSize(rxDescr);
   }
 
@@ -578,7 +744,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
   if (len == LWIP_GETH_RX_FRAME_INVALID)
   {
     lwip_geth_DebugRxInvalidFrameCnt++;
-    IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+    lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
     return (pbuf_t *)0;
   }
 
@@ -595,7 +761,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     pbuf_header(p, -ETH_PAD_SIZE); /* drop the padding word */
 #endif
 
-    u8_t *src = IfxGeth_Eth_getReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+    src = (rxDescr != NULL_PTR) ? (u8_t *)rxDescr->RDES0.U : NULL_PTR;
     lwip_geth_DebugLastRxBufferAddr = (uint32)src;
     lwip_geth_DebugLastRxLen = (uint32)len;
 
@@ -603,9 +769,11 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     {
       lwip_geth_DebugRxNullBufferCnt++;
       pbuf_free(p);
+      lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
       return (pbuf_t *)0;
     }
 
+    lwip_geth_CacheInvalidateRange(src, (uint32)len);
     lwip_geth_DebugLowLevelInputPacketCount++;
 
     /* We iterate over the pbuf chain until we have read the entire
@@ -616,7 +784,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
       {
         lwip_geth_DebugRxNullPayloadCnt++;
         pbuf_free(p);
-        IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+        lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
         return (pbuf_t *)0;
       }
 
@@ -636,7 +804,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     }
 
     /* acknowledge that packet has been read */
-    IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+    lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
 
 #if ETH_PAD_SIZE
     pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
@@ -649,7 +817,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     lwip_geth_DebugRxAllocFailCnt++;
     LINK_STATS_INC(link.memerr);
     LINK_STATS_INC(link.drop);
-    IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+    lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
   }
 
   return p;

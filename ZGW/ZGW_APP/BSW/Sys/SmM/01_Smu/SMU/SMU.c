@@ -134,6 +134,7 @@ RuntimeAlarmHandle runtimeAlarmHandleNotConfiguredAlarm;
 void initFunctionExecutionStatusSMU(SmuExecutionStatusType *SmuExecutionStatusType);
 SmuStatusType initSMUAlarmsSMU(void);
 SmuStatusType activateSMU(void);
+static void safetyKitClearExpectedStartupAlarmsSMU(void);
 /*********************************************************************************************************************/
 /*-------------------------Function Implementations------------------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -350,6 +351,14 @@ void initSMUModule(void)
 
     g_SafetyKitStatus.smuStatus.smuCoreInitSts = result;
 }
+
+static void safetyKitClearExpectedStartupAlarmsSMU(void)
+{
+    (void)IfxSmu_clearAlarmStatus((IfxSmu_Alarm)((9u * 32u) + 5u));
+    (void)IfxSmu_clearAlarmStatus((IfxSmu_Alarm)((9u * 32u) + 17u));
+    (void)IfxSmu_clearAlarmStatus((IfxSmu_Alarm)((6u * 32u) + 20u));
+    (void)IfxSmu_clearAlarmStatus((IfxSmu_Alarm)((7u * 32u) + 1u));
+}
 /*
  * This function configures the alarm action for every alarm which has no default alarm configuration set
  * Note: This function is only configuring every alarm with with default alarm group configuration but
@@ -363,6 +372,8 @@ void safetyKitEnableAllSMUAlarms(void)
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     MODULE_SMU.CLC.B.DISS = 0;
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+
+    safetyKitClearExpectedStartupAlarmsSMU();
 
     /* First determine the target configuration */
     uint32 alarmGroupCF0[IFXSMU_NUM_ALARM_GROUPS] = {0};
@@ -428,6 +439,7 @@ void safetyKitEnableAllSMUAlarms(void)
         }
     }
     /* Unlocks the SMU configuration registers for modification */
+    g_SafetyKitStatus.unlockConfig = TRUE;
     g_SafetyKitStatus.unlockConfig &= IfxSmu_unlockConfigRegisters();
     if (g_SafetyKitStatus.unlockConfig == TRUE)
     {

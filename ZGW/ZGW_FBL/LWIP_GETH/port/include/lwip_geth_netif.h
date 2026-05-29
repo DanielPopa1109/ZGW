@@ -43,6 +43,7 @@
 #define LWIP_GETH_NETIF_H
 
 err_t lwip_geth_netif_init(struct netif *netif);
+uint8 lwip_geth_netif_input_once(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
 
 #endif

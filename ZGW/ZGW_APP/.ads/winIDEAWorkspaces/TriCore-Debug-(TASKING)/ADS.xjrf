@@ -705,26 +705,26 @@
         <BinaryDisplay>0bPrefix</BinaryDisplay>
         <CharArraysAsString>true</CharArraysAsString>
         <CharDisplay>Both</CharDisplay>
-        <DereferenceStringPointers>false</DereferenceStringPointers>
+        <DereferenceStringPointers>true</DereferenceStringPointers>
         <DisplayCollapsedArrayStruct>true</DisplayCollapsedArrayStruct>
-        <DisplayPointerMemArea>false</DisplayPointerMemArea>
+        <DisplayPointerMemArea>true</DisplayPointerMemArea>
         <EnumDisplay>Enum</EnumDisplay>
         <Hex>false</Hex>
         <MaxParseUpload>256</MaxParseUpload>
         <QualifiedNames>Unique</QualifiedNames>
-        <UseSpacers>false</UseSpacers>
+        <UseSpacers>true</UseSpacers>
         <VagueFloatPrecision>1e-05</VagueFloatPrecision>
        </Format>
       </Symbols>
       <Update1>
-       <RTUpdatePeriod>100</RTUpdatePeriod>
+       <RTUpdatePeriod>50</RTUpdatePeriod>
        <RTUpdateWhenRunning>true</RTUpdateWhenRunning>
-       <RTUpdateWhenStopped>false</RTUpdateWhenStopped>
+       <RTUpdateWhenStopped>true</RTUpdateWhenStopped>
        <UpdateOnBP>false</UpdateOnBP>
        <Access>
         <AllowRealTimeAccess>true</AllowRealTimeAccess>
-        <CacheAccesses>true</CacheAccesses>
-        <DisableSFRCaching>true</DisableSFRCaching>
+        <CacheAccesses>false</CacheAccesses>
+        <DisableSFRCaching>false</DisableSFRCaching>
        </Access>
       </Update1>
       <WatchExport>
@@ -840,35 +840,11 @@
         <ActionShow>false</ActionShow>
         <Condition>false</Condition>
         <Count>0</Count>
-        <Enabled>true</Enabled>
-        <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::157</Location>
-        <ProcessFilter></ProcessFilter>
-       </__.0>
-       <__.1>
-        <ActionEnabled>false</ActionEnabled>
-        <ActionParams></ActionParams>
-        <ActionScript></ActionScript>
-        <ActionShow>false</ActionShow>
-        <Condition>false</Condition>
-        <Count>0</Count>
-        <Enabled>true</Enabled>
-        <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::58</Location>
-        <ProcessFilter></ProcessFilter>
-       </__.1>
-       <__.2>
-        <ActionEnabled>false</ActionEnabled>
-        <ActionParams></ActionParams>
-        <ActionScript></ActionScript>
-        <ActionShow>false</ActionShow>
-        <Condition>false</Condition>
-        <Count>0</Count>
         <Enabled>false</Enabled>
         <Expression></Expression>
-        <Location>&quot;..\..\..\Libraries\Infra\Ssw\TC3xx\Tricore\Ifx_Ssw_Tc0.c&quot;::264</Location>
+        <Location>&quot;..\..\..\BSW\Time\TimeBase.c&quot;::672</Location>
         <ProcessFilter></ProcessFilter>
-       </__.2>
+       </__.0>
       </BPs>
       <Processes.0>
        <URL></URL>
@@ -1059,7 +1035,7 @@
           <Enabled>0</Enabled>
           <BP.0>
            <Access>1</Access>
-           <Address>lwip_geth_handle</Address>
+           <Address>TimeBase_NvMStoreCounter</Address>
            <Enabled>1</Enabled>
            <EntireObject>1</EntireObject>
            <Range>1</Range>

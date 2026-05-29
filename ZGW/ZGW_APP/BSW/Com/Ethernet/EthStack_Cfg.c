@@ -136,7 +136,7 @@ const SoAd_ConfigType SoAd_Config =
 
 const DoIP_ConfigType DoIP_Config =
 {
-    .vin = "LABTC375DOIP0001",
+    .vin = "WBAJA9C51KG240310",
     .eid = {0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u},
     .gid = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u},
     .logicalAddress = 0x1001u,

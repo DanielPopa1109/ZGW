@@ -3,6 +3,7 @@
 #include "MemIf.h"
 #include "Fee.h"
 #include "Fls.h"
+#include "Crc.h"
 
 #define NVM_API_INIT                    (0x00u)
 #define NVM_API_READ_BLOCK              (0x06u)
@@ -71,6 +72,10 @@ typedef struct
     boolean ramValid;
     boolean ramChanged;
     boolean writeProtected;
+    boolean ramMirrorCrcValid;
+    boolean writeRamMirrorCrcValid;
+    uint32 ramMirrorCrc;
+    uint32 writeRamMirrorCrc;
 } NvM_BlockAdminType;
 
 static NvM_StateType NvM_State =
@@ -103,6 +108,14 @@ volatile uint8 NvM_WriteAllBlockPlanned[NVM_TOTAL_BLOCKS];
 volatile uint8 NvM_WriteAllBlockWritten[NVM_TOTAL_BLOCKS];
 volatile uint8 NvM_WriteAllBlockResult[NVM_TOTAL_BLOCKS];
 
+static uint8 *NvM_GetRamPtr(uint16 idx);
+static uint32 NvM_CalculateRamMirrorCrc(uint16 idx);
+static void NvM_UpdateRamMirrorCrc(uint16 idx);
+static void NvM_InvalidateRamMirrorCrc(uint16 idx);
+static void NvM_CaptureWriteRamMirrorCrc(uint16 idx);
+static void NvM_CommitWriteRamMirrorCrc(uint16 idx);
+static boolean NvM_ShouldWriteBlock(uint16 idx);
+
 static void NvM_ResetWriteAllDebug(void)
 {
     uint16 i;
@@ -127,8 +140,7 @@ static void NvM_ResetWriteAllDebug(void)
         NvM_WriteAllBlockWritten[i] = 0u;
         NvM_WriteAllBlockResult[i] = 0u;
 
-        if ((NvM_Admin[i].ramValid == TRUE) &&
-            (NvM_Admin[i].ramChanged == TRUE))
+        if (NvM_ShouldWriteBlock(i) != FALSE)
         {
             NvM_WriteAllBlockPlanned[i] = 1u;
             NvM_WriteAllPlannedBytes += NvM_BlockDescriptor[i].nvBlockLength;
@@ -158,6 +170,101 @@ static sint16 NvM_FindBlockIndex(NvM_BlockIdType BlockId)
 static uint8 *NvM_GetRamPtr(uint16 idx)
 {
     return NvM_BlockDescriptor[idx].ramBlockDataAddress;
+}
+
+static uint32 NvM_CalculateRamMirrorCrc(uint16 idx)
+{
+    uint8 *ramPtr;
+
+    ramPtr = NvM_GetRamPtr(idx);
+    if (ramPtr == NULL_PTR)
+    {
+        return 0u;
+    }
+
+    return Crc_CalculateCRC32(
+            ramPtr,
+            (uint32)NvM_BlockDescriptor[idx].nvBlockLength,
+            0u,
+            TRUE);
+}
+
+static void NvM_UpdateRamMirrorCrc(uint16 idx)
+{
+    if (NvM_GetRamPtr(idx) == NULL_PTR)
+    {
+        NvM_InvalidateRamMirrorCrc(idx);
+        return;
+    }
+
+    NvM_Admin[idx].ramMirrorCrc = NvM_CalculateRamMirrorCrc(idx);
+    NvM_Admin[idx].ramMirrorCrcValid = TRUE;
+    NvM_Admin[idx].writeRamMirrorCrc = 0u;
+    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+}
+
+static void NvM_InvalidateRamMirrorCrc(uint16 idx)
+{
+    NvM_Admin[idx].ramMirrorCrc = 0u;
+    NvM_Admin[idx].ramMirrorCrcValid = FALSE;
+    NvM_Admin[idx].writeRamMirrorCrc = 0u;
+    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+}
+
+static void NvM_CaptureWriteRamMirrorCrc(uint16 idx)
+{
+    if (NvM_GetRamPtr(idx) == NULL_PTR)
+    {
+        NvM_Admin[idx].writeRamMirrorCrc = 0u;
+        NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+        return;
+    }
+
+    NvM_Admin[idx].writeRamMirrorCrc = NvM_CalculateRamMirrorCrc(idx);
+    NvM_Admin[idx].writeRamMirrorCrcValid = TRUE;
+}
+
+static void NvM_CommitWriteRamMirrorCrc(uint16 idx)
+{
+    if (NvM_Admin[idx].writeRamMirrorCrcValid != FALSE)
+    {
+        NvM_Admin[idx].ramMirrorCrc = NvM_Admin[idx].writeRamMirrorCrc;
+        NvM_Admin[idx].ramMirrorCrcValid = TRUE;
+    }
+    else
+    {
+        NvM_InvalidateRamMirrorCrc(idx);
+    }
+
+    NvM_Admin[idx].writeRamMirrorCrc = 0u;
+    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+}
+
+static boolean NvM_ShouldWriteBlock(uint16 idx)
+{
+    if (NvM_Admin[idx].ramValid == FALSE)
+    {
+        return FALSE;
+    }
+
+    if (NvM_Admin[idx].ramChanged != FALSE)
+    {
+        return TRUE;
+    }
+
+    if (NvM_Admin[idx].ramMirrorCrcValid == FALSE)
+    {
+        NvM_Admin[idx].ramChanged = TRUE;
+        return TRUE;
+    }
+
+    if (NvM_CalculateRamMirrorCrc(idx) != NvM_Admin[idx].ramMirrorCrc)
+    {
+        NvM_Admin[idx].ramChanged = TRUE;
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 static const uint8 *NvM_GetRomPtr(uint16 idx)
@@ -231,6 +338,7 @@ void NvM_Init(const NvM_ConfigType *ConfigPtr)
         NvM_Admin[i].ramValid = FALSE;
         NvM_Admin[i].ramChanged = FALSE;
         NvM_Admin[i].writeProtected = FALSE;
+        NvM_InvalidateRamMirrorCrc(i);
         NvM_RestoreDefaultsByIndex(i, NULL_PTR);
     }
 
@@ -453,6 +561,10 @@ Std_ReturnType NvM_SetRamBlockStatus(NvM_BlockIdType BlockId, boolean BlockChang
     {
         NvM_Admin[(uint16)idx].ramValid = TRUE;
     }
+    else
+    {
+        NvM_UpdateRamMirrorCrc((uint16)idx);
+    }
 
     if ((BlockChanged == TRUE) && (NvM_BlockDescriptor[(uint16)idx].immediateData == TRUE))
     {
@@ -500,6 +612,7 @@ static void NvM_HandleReadCompletion(uint16 idx)
         NvM_Admin[idx].result = NVM_REQ_OK;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = FALSE;
+        NvM_UpdateRamMirrorCrc(idx);
     }
     else if (result == MEMIF_BLOCK_INVALID)
     {
@@ -507,6 +620,7 @@ static void NvM_HandleReadCompletion(uint16 idx)
         NvM_Admin[idx].result = NVM_REQ_NV_INVALIDATED;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
+        NvM_InvalidateRamMirrorCrc(idx);
     }
     else if (result == MEMIF_BLOCK_INCONSISTENT)
     {
@@ -514,6 +628,7 @@ static void NvM_HandleReadCompletion(uint16 idx)
         NvM_Admin[idx].result = NVM_REQ_INTEGRITY_FAILED;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
+        NvM_InvalidateRamMirrorCrc(idx);
     }
     else
     {
@@ -521,6 +636,7 @@ static void NvM_HandleReadCompletion(uint16 idx)
         NvM_Admin[idx].result = NVM_REQ_NOT_OK;
         NvM_Admin[idx].ramValid = TRUE;
         NvM_Admin[idx].ramChanged = TRUE;
+        NvM_InvalidateRamMirrorCrc(idx);
     }
 }
 
@@ -564,6 +680,7 @@ void NvM_MainFunction(void)
                 NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                 NvM_Admin[idx].ramValid = TRUE;
                 NvM_Admin[idx].ramChanged = TRUE;
+                NvM_InvalidateRamMirrorCrc(idx);
                 NvM_Report(NVM_API_MAIN, NVM_E_LOWER_LAYER, NvM_BlockDescriptor[idx].blockId);
                 NvM_SetIdle();
             }
@@ -585,10 +702,12 @@ void NvM_MainFunction(void)
         case NVM_STATE_WRITE_START:
             idx = NvM_State.activeIndex;
             NvM_Admin[idx].ramChanged = FALSE;
+            NvM_CaptureWriteRamMirrorCrc(idx);
             if (MemIf_Write(MEMIF_FEE_DEVICE_INDEX, NvM_BlockDescriptor[idx].blockId, NvM_GetRamPtr(idx)) != E_OK)
             {
                 NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                 NvM_Admin[idx].ramChanged = TRUE;
+                NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
                 NvM_Report(NVM_API_MAIN, NVM_E_LOWER_LAYER, NvM_BlockDescriptor[idx].blockId);
                 NvM_SetIdle();
             }
@@ -606,6 +725,7 @@ void NvM_MainFunction(void)
                 {
                     NvM_Admin[idx].result = NVM_REQ_OK;
                     NvM_Admin[idx].ramValid = TRUE;
+                    NvM_CommitWriteRamMirrorCrc(idx);
                     if (NvM_BlockDescriptor[idx].writeOnce == TRUE)
                     {
                         NvM_Admin[idx].writeProtected = TRUE;
@@ -615,6 +735,7 @@ void NvM_MainFunction(void)
                 {
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                     NvM_Admin[idx].ramChanged = TRUE;
+                    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
                 }
                 NvM_SetIdle();
             }
@@ -626,6 +747,7 @@ void NvM_MainFunction(void)
             NvM_Admin[idx].result = NVM_REQ_RESTORED_FROM_ROM;
             NvM_Admin[idx].ramValid = TRUE;
             NvM_Admin[idx].ramChanged = TRUE;
+            NvM_InvalidateRamMirrorCrc(idx);
             NvM_SetIdle();
             break;
 
@@ -652,6 +774,7 @@ void NvM_MainFunction(void)
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                     NvM_Admin[idx].ramValid = TRUE;
                     NvM_Admin[idx].ramChanged = TRUE;
+                    NvM_InvalidateRamMirrorCrc(idx);
                     NvM_State.currentIndex++;
                 }
                 else
@@ -680,18 +803,19 @@ void NvM_MainFunction(void)
             else
             {
                 idx = NvM_State.currentIndex;
-                if ((NvM_Admin[idx].ramValid == TRUE) &&
-                    (NvM_Admin[idx].ramChanged == TRUE))
+                if (NvM_ShouldWriteBlock(idx) != FALSE)
                 {
                     NvM_State.activeIndex = idx;
                     NvM_WriteAllActiveIndex = idx;
                     NvM_WriteAllActiveBlockId = NvM_BlockDescriptor[idx].blockId;
                     NvM_Admin[idx].result = NVM_REQ_PENDING;
                     NvM_Admin[idx].ramChanged = FALSE;
+                    NvM_CaptureWriteRamMirrorCrc(idx);
                     if (MemIf_Write(MEMIF_FEE_DEVICE_INDEX, NvM_BlockDescriptor[idx].blockId, NvM_GetRamPtr(idx)) != E_OK)
                     {
                         NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                         NvM_Admin[idx].ramChanged = TRUE;
+                        NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
                         NvM_WriteAllFailedBytes += NvM_BlockDescriptor[idx].nvBlockLength;
                         NvM_WriteAllBlocksFailed++;
                         NvM_WriteAllBlockResult[idx] = 3u;
@@ -722,6 +846,7 @@ void NvM_MainFunction(void)
                 {
                     NvM_Admin[idx].result = NVM_REQ_OK;
                     NvM_Admin[idx].ramValid = TRUE;
+                    NvM_CommitWriteRamMirrorCrc(idx);
                     NvM_WriteAllWrittenBytes += NvM_BlockDescriptor[idx].nvBlockLength;
                     NvM_WriteAllBlocksWritten++;
                     NvM_WriteAllBlockWritten[idx] = 1u;
@@ -731,6 +856,7 @@ void NvM_MainFunction(void)
                 {
                     NvM_Admin[idx].result = NVM_REQ_NOT_OK;
                     NvM_Admin[idx].ramChanged = TRUE;
+                    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
                     NvM_WriteAllFailedBytes += NvM_BlockDescriptor[idx].nvBlockLength;
                     NvM_WriteAllBlocksFailed++;
                     NvM_WriteAllBlockResult[idx] = 3u;
@@ -762,6 +888,7 @@ void NvM_MainFunction(void)
                     NvM_Admin[idx].result = NVM_REQ_NV_INVALIDATED;
                     NvM_Admin[idx].ramValid = FALSE;
                     NvM_Admin[idx].ramChanged = FALSE;
+                    NvM_InvalidateRamMirrorCrc(idx);
                 }
                 else
                 {

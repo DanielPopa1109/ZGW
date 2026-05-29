@@ -3,8 +3,9 @@
  * RAM updater for AURIX TC375 FBL self-update.
  *
  * Supported receive transports while old FBL is still intact:
- *   1) CAN-FD + ISO-TP, request ID 0x710, response ID 0x711
- *   2) Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
+ *   1) Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
+ *   2) CAN-FD + ISO-TP, request ID 0x710, response ID 0x711
+ *   3) CAN classic + ISO-TP, request ID 0x710, response ID 0x711
  *
  * Ethernet payload is direct UDS payload over UDP, not DoIP/TCP.
  * This is intentional for RAM-updater safety: no lwIP dependency is used here.
@@ -35,8 +36,9 @@
 #define RAM_CODE __attribute__((section(".ram_code")))
 #define RAM_DATA __attribute__((section(".ram_data")))
 
-#define FBL_TRANSPORT_CANFD              1u
-#define FBL_TRANSPORT_ETH_RAW_UDP        2u
+#define FBL_TRANSPORT_ETH_RAW_UDP        1u
+#define FBL_TRANSPORT_CANFD              2u
+#define FBL_TRANSPORT_CAN_CLASSIC        3u
 
 #define FBL_START_NCACHED                0xA0000000u
 #define FBL_END_NCACHED                  0xA002FFFFu
@@ -61,6 +63,11 @@
 #define FBL_CAN_RES_ID                   0x711u
 #define FBL_CAN_RX_PRIO                  2u
 #define FBL_CAN_MAX_DL                   64u
+#define FBL_CAN_CLASSIC_MAX_DL           8u
+#define FBL_CAN_EXT_ADDR_ZGW             0x41u
+#define FBL_CAN_EXT_ADDR_TESTER          0x41u
+#define FBL_CAN_CLASSIC_TRCV_STB_PORT    (&MODULE_P20)
+#define FBL_CAN_CLASSIC_TRCV_STB_PIN     6u
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
 
 #define FBL_ETH_MTU                      1518u
@@ -139,6 +146,8 @@ typedef struct
     uint16 rxIdx;
     uint8 nextSn;
     uint8 rxReady;
+    uint8 addrOffset;
+    uint8 txAddrOffset;
 } RamIso_Type;
 
 typedef struct
@@ -193,13 +202,16 @@ static uint8 g_udsReqReady;
 IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
 static void Ram_CanReleaseFdRxPinFromScr(void);
-static void Ram_CanInit(void);
+static void Ram_CanClassicTrcvSetNormalMode(void);
+static void Ram_CanInit(uint8 transport);
 static void Ram_CanSend(const uint8 *data, uint8 len);
+static uint8 Ram_CanPayloadLen(void);
 static uint8 Ram_DlcFromLen(uint8 len);
 static uint8 Ram_LenFromDlc(uint8 dlc);
 static void Ram_IsoRx(const uint8 *data, uint8 len);
 static void Ram_IsoSend(const uint8 *data, uint16 len);
 static void Ram_IsoSendFc(void);
+static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len);
 
 static void Ram_EthInit(void);
 static void Ram_EthPoll(void);
@@ -252,8 +264,11 @@ void FblRamUpdater_Entry(void)
     }
     else
     {
-        g_FblTransportSelect = FBL_TRANSPORT_CANFD;
-        Ram_CanInit();
+        if(g_FblTransportSelect != FBL_TRANSPORT_CAN_CLASSIC)
+        {
+            g_FblTransportSelect = FBL_TRANSPORT_CANFD;
+        }
+        Ram_CanInit((uint8)g_FblTransportSelect);
     }
 
     IfxCpu_enableInterrupts();
@@ -275,7 +290,7 @@ void FblRamUpdater_Entry(void)
             if(g_iso.rxReady != 0u)
             {
                 g_iso.rxReady = 0u;
-                Ram_UdsHandle(g_iso.rxBuf, g_iso.rxLen, FBL_TRANSPORT_CANFD);
+                Ram_UdsHandle(g_iso.rxBuf, g_iso.rxLen, (uint8)g_FblTransportSelect);
             }
         }
     }
@@ -294,43 +309,71 @@ static void Ram_CanReleaseFdRxPinFromScr(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
-static void Ram_CanInit(void)
+static void Ram_CanClassicTrcvSetNormalMode(void)
 {
-    Ram_CanReleaseFdRxPinFromScr();
-    can1_node3_init_pins();
+    IfxPort_setPinModeOutput(FBL_CAN_CLASSIC_TRCV_STB_PORT,
+            FBL_CAN_CLASSIC_TRCV_STB_PIN,
+            IfxPort_OutputMode_pushPull,
+            IfxPort_OutputIdx_general);
+    IfxPort_setPinLow(FBL_CAN_CLASSIC_TRCV_STB_PORT, FBL_CAN_CLASSIC_TRCV_STB_PIN);
+}
+
+static void Ram_CanInit(uint8 transport)
+{
+    uint8 isClassic = (transport == FBL_TRANSPORT_CAN_CLASSIC) ? 1u : 0u;
+
+    if(isClassic != 0u)
+    {
+        can0_node0_init_pins();
+    }
+    else
+    {
+        Ram_CanReleaseFdRxPinFromScr();
+        can1_node3_init_pins();
+    }
 
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN1);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN0 : &MODULE_CAN1);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
-    g_can.nodeConfig.nodeId = IfxCan_NodeId_3;
-    g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_0 : IfxCan_NodeId_3;
+    g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
-    g_can.nodeConfig.baudRate.prescaler = 3u;
-    g_can.nodeConfig.baudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.baudRate.timeSegment2 = 3u;
-    g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
-    g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-    g_can.nodeConfig.fastBaudRate.prescaler = 0u;
-    g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
-    g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+
+    if(isClassic == 0u)
+    {
+        g_can.nodeConfig.baudRate.prescaler = 3u;
+        g_can.nodeConfig.baudRate.timeSegment1 = 14u;
+        g_can.nodeConfig.baudRate.timeSegment2 = 3u;
+        g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
+        g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
+        g_can.nodeConfig.fastBaudRate.prescaler = 0u;
+        g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
+        g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
+        g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+    }
+
     g_can.nodeConfig.calculateBitTimingValues = TRUE;
 
     g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
     g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
-    g_can.nodeConfig.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.txConfig.txBufferDataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
 
-    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_dedicatedBuffers;
-    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_fifo0;
+    g_can.nodeConfig.rxConfig.rxFifo0DataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxFifo0Size = (isClassic != 0u) ? 32u : 12u;
 
-    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
     g_can.nodeConfig.filterConfig.standardListSize = 1u;
     g_can.nodeConfig.filterConfig.extendedListSize = 0u;
     g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
@@ -338,27 +381,36 @@ static void Ram_CanInit(void)
     g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
     g_can.nodeConfig.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
 
-    g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
-    g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_PRIO;
-    g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
-    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0; // @suppress("Symbol is not resolved")
+    g_can.nodeConfig.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
+    g_can.nodeConfig.interruptConfig.rxf0n.priority = FBL_CAN_RX_PRIO;
+    g_can.nodeConfig.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_0;
 
     g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x800u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x880u;
-    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x980u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0xD00u;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = (isClassic != 0u) ? 0x000u : 0x800u;
+    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = (isClassic != 0u) ? 0x080u : 0x880u;
+    g_can.nodeConfig.messageRAM.rxFifo0StartAddress = (isClassic != 0u) ? 0x180u : 0x980u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = (isClassic != 0u) ? 0x400u : 0xD00u;
 
     IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
 
     g_can.filter.number = 0u;
-    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    g_can.filter.type = IfxCan_FilterType_classic;
     g_can.filter.id1 = FBL_CAN_REQ_ID;
-    g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
+    g_can.filter.id2 = FBL_CAN_REQ_ID;
     IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
 
-    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    if(isClassic != 0u)
+    {
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        Ram_CanClassicTrcvSetNormalMode();
+    }
+    else
+    {
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    }
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
@@ -368,31 +420,43 @@ void FblRam_CanRxIsr(void)
 {
     uint8 len;
 
-    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_messageStoredToDedicatedRxBuffer);
-    g_can.rxMsg.bufferNumber = 0u;
+    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_rxFifo0NewMessage);
 
-    if(IfxCan_Can_isNewDataReceived(&g_can.canNode, 0u) != 0u)
+    while(IfxCan_Can_getRxFifo0FillLevel(&g_can.canNode) > 0u)
     {
+        IfxCan_Can_initMessage(&g_can.rxMsg);
+        g_can.rxMsg.readFromRxFifo0 = TRUE;
+        memset(g_can.rxData, 0u, sizeof(g_can.rxData));
         IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32 *)g_can.rxData);
 
         if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
         {
             len = Ram_LenFromDlc((uint8)g_can.rxMsg.dataLengthCode);
+            if(len > Ram_CanPayloadLen())
+            {
+                len = Ram_CanPayloadLen();
+            }
             Ram_IsoRx(g_can.rxData, len);
         }
-
-        IfxCan_Node_clearRxBufferNewDataFlag(g_can.canNode.node, 0u);
     }
 }
 
 static void Ram_CanSend(const uint8 *data, uint8 len)
 {
+    uint8 maxLen = Ram_CanPayloadLen();
+
+    if(len > maxLen)
+    {
+        len = maxLen;
+    }
+
     memset(g_can.txData, 0u, sizeof(g_can.txData));
     memcpy(g_can.txData, data, len);
 
     IfxCan_Can_initMessage(&g_can.txMsg);
     g_can.txMsg.messageId = FBL_CAN_RES_ID;
-    g_can.txMsg.frameMode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.txMsg.frameMode = (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
+            IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
     g_can.txMsg.dataLengthCode = Ram_DlcFromLen(len);
     g_can.txMsg.bufferNumber = 0u;
@@ -420,75 +484,115 @@ static uint8 Ram_LenFromDlc(uint8 dlc)
     return map[dlc & 0x0Fu];
 }
 
+static uint8 Ram_CanPayloadLen(void)
+{
+    return (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
+            FBL_CAN_CLASSIC_MAX_DL : FBL_CAN_MAX_DL;
+}
+
 static void Ram_IsoSendFc(void)
 {
-    uint8 fc[3] = {0x30u, 0x00u, 0x00u};
-    Ram_CanSend(fc, 3u);
+    uint8 fc[64];
+    uint8 addrOffset = g_iso.txAddrOffset;
+
+    memset(fc, 0u, sizeof(fc));
+    if(addrOffset != 0u)
+    {
+        fc[0u] = FBL_CAN_EXT_ADDR_TESTER;
+    }
+
+    fc[addrOffset] = 0x30u;
+    fc[addrOffset + 1u] = 0x00u;
+    fc[addrOffset + 2u] = 0x00u;
+    Ram_CanSend(fc, Ram_CanPayloadLen());
+}
+
+static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len)
+{
+    if((len > 1u) && (data[0u] == FBL_CAN_EXT_ADDR_ZGW))
+    {
+        return 1u;
+    }
+
+    return 0u;
 }
 
 static void Ram_IsoRx(const uint8 *data, uint8 len)
 {
     uint8 pci;
+    uint8 pciIdx;
     uint16 ffLen;
     uint8 copy;
     uint8 sn;
 
     if(len == 0u) { return; }
 
-    pci = data[0u] & 0xF0u;
+    g_iso.addrOffset = Ram_IsoDetectAddrOffset(data, len);
+    if(len <= g_iso.addrOffset) { return; }
+
+    pciIdx = g_iso.addrOffset;
+    pci = data[pciIdx] & 0xF0u;
 
     if(pci == 0x00u)
     {
-        uint8 sfLen = data[0u] & 0x0Fu;
-        uint8 off = 1u;
+        uint8 sfLen = data[pciIdx] & 0x0Fu;
+        uint8 off = (uint8)(pciIdx + 1u);
 
         if(sfLen == 0u)
         {
-            if(len < 2u) { return; }
-            sfLen = data[1u];
-            off = 2u;
+            if(len < (uint8)(pciIdx + 2u)) { return; }
+            sfLen = data[pciIdx + 1u];
+            off = (uint8)(pciIdx + 2u);
         }
 
         if((sfLen <= (len - off)) && (sfLen <= FBL_ISOTP_MAX_PAYLOAD))
         {
             memcpy(g_iso.rxBuf, &data[off], sfLen);
             g_iso.rxLen = sfLen;
+            g_iso.rxIdx = 0u;
+            g_iso.txAddrOffset = g_iso.addrOffset;
             g_iso.rxReady = 1u;
         }
     }
     else if(pci == 0x10u)
     {
-        ffLen = (((uint16)(data[0u] & 0x0Fu)) << 8u) | data[1u];
+        if(len < (uint8)(pciIdx + 3u)) { return; }
+
+        ffLen = (((uint16)(data[pciIdx] & 0x0Fu)) << 8u) | data[pciIdx + 1u];
 
         if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
 
-        copy = (uint8)(len - 2u);
+        copy = (uint8)(len - (uint8)(pciIdx + 2u));
         if(copy > ffLen) { copy = (uint8)ffLen; }
 
-        memcpy(g_iso.rxBuf, &data[2u], copy);
+        memcpy(g_iso.rxBuf, &data[pciIdx + 2u], copy);
         g_iso.rxLen = ffLen;
         g_iso.rxIdx = copy;
         g_iso.nextSn = 1u;
+        g_iso.txAddrOffset = g_iso.addrOffset;
         Ram_IsoSendFc();
     }
     else if(pci == 0x20u)
     {
-        sn = data[0u] & 0x0Fu;
+        if((len < (uint8)(pciIdx + 2u)) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
+
+        sn = data[pciIdx] & 0x0Fu;
 
         if(sn != g_iso.nextSn) { return; }
 
-        copy = (uint8)(len - 1u);
+        copy = (uint8)(len - (uint8)(pciIdx + 1u));
         if((g_iso.rxIdx + copy) > g_iso.rxLen)
         {
             copy = (uint8)(g_iso.rxLen - g_iso.rxIdx);
         }
 
-        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[1u], copy);
+        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[pciIdx + 1u], copy);
         g_iso.rxIdx += copy;
         g_iso.nextSn = (uint8)((g_iso.nextSn + 1u) & 0x0Fu);
 
         if(g_iso.rxIdx >= g_iso.rxLen)
         {
+            g_iso.txAddrOffset = g_iso.addrOffset;
             g_iso.rxReady = 1u;
         }
     }
@@ -500,22 +604,71 @@ static void Ram_IsoSend(const uint8 *data, uint16 len)
     uint8 chunk;
     uint16 idx;
     uint8 sn;
+    uint8 payloadLen;
+    uint8 addrOffset;
+    uint8 pciIdx;
+    uint8 sfMax;
+    uint8 ffPayload;
+    uint8 cfPayload;
 
-    if(len <= 7u)
+    if(len > FBL_ISOTP_MAX_PAYLOAD)
+    {
+        return;
+    }
+
+    payloadLen = Ram_CanPayloadLen();
+    addrOffset = g_iso.txAddrOffset;
+    pciIdx = addrOffset;
+
+    if(addrOffset != 0u)
+    {
+        if(payloadLen <= 2u)
+        {
+            return;
+        }
+    }
+
+    sfMax = (uint8)(payloadLen - addrOffset - 1u);
+    if((payloadLen > 8u) && (sfMax > 7u))
+    {
+        sfMax = (uint8)(payloadLen - addrOffset - 2u);
+    }
+
+    if(len <= sfMax)
     {
         memset(frame, 0u, sizeof(frame));
-        frame[0u] = (uint8)len;
-        memcpy(&frame[1u], data, len);
-        Ram_CanSend(frame, (uint8)(len + 1u));
+        if(addrOffset != 0u)
+        {
+            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+        }
+
+        if((payloadLen > 8u) && (len > 7u))
+        {
+            frame[pciIdx] = 0x00u;
+            frame[pciIdx + 1u] = (uint8)len;
+            memcpy(&frame[pciIdx + 2u], data, len);
+        }
+        else
+        {
+            frame[pciIdx] = (uint8)len;
+            memcpy(&frame[pciIdx + 1u], data, len);
+        }
+        Ram_CanSend(frame, payloadLen);
         return;
     }
 
     memset(frame, 0u, sizeof(frame));
-    frame[0u] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
-    frame[1u] = (uint8)(len & 0xFFu);
-    chunk = 62u;
-    memcpy(&frame[2u], data, chunk);
-    Ram_CanSend(frame, 64u);
+    if(addrOffset != 0u)
+    {
+        frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+    }
+
+    frame[pciIdx] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
+    frame[pciIdx + 1u] = (uint8)(len & 0xFFu);
+    ffPayload = (uint8)(payloadLen - addrOffset - 2u);
+    chunk = ffPayload;
+    memcpy(&frame[pciIdx + 2u], data, chunk);
+    Ram_CanSend(frame, payloadLen);
 
     idx = chunk;
     sn = 1u;
@@ -523,16 +676,22 @@ static void Ram_IsoSend(const uint8 *data, uint16 len)
     while(idx < len)
     {
         memset(frame, 0u, sizeof(frame));
-        frame[0u] = (uint8)(0x20u | (sn & 0x0Fu));
+        if(addrOffset != 0u)
+        {
+            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+        }
 
-        chunk = 63u;
+        frame[pciIdx] = (uint8)(0x20u | (sn & 0x0Fu));
+
+        cfPayload = (uint8)(payloadLen - addrOffset - 1u);
+        chunk = cfPayload;
         if((idx + chunk) > len)
         {
             chunk = (uint8)(len - idx);
         }
 
-        memcpy(&frame[1u], &data[idx], chunk);
-        Ram_CanSend(frame, (uint8)(chunk + 1u));
+        memcpy(&frame[pciIdx + 1u], &data[idx], chunk);
+        Ram_CanSend(frame, payloadLen);
         idx += chunk;
         sn = (uint8)((sn + 1u) & 0x0Fu);
     }

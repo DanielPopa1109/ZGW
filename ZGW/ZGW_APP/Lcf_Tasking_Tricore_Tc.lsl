@@ -764,7 +764,7 @@ derivative tc37
             select ".bss.lwip_geth_private_phy_rtl8211f.*";
         }
 
-        group bsw_eth_glue_dlmu2 (ordered, align = 4, attributes=rw, run_addr = mem:cpu2_dlmu)
+        group bsw_eth_glue_dlmu2 (ordered, align = 4, attributes=rw, run_addr = mem:cpu1_dlmu)
         {
             select ".data.EthStack.*";
             select ".bss.EthStack.*";
@@ -909,7 +909,43 @@ derivative tc37
             select ".data.McuSm.Iven_IcmLookupTable";
             select ".bss.McuSm.Iven_IcmLookupTable";  
             select ".data.McuSm.McuSm_FBL_ResetCounter";
-            select ".bss.McuSm.McuSm_FBL_ResetCounter";                     
+            select ".bss.McuSm.McuSm_FBL_ResetCounter";
+            select ".data.McuSm.McuSm_FBL_ProgrammingRequest";
+            select ".bss.McuSm.McuSm_FBL_ProgrammingRequest";
+            select ".data.McuSm.McuSm_FBL_CommInterface";
+            select ".bss.McuSm.McuSm_FBL_CommInterface";
+            select ".data.McuSm.McuSm_SswStartupCounter";
+            select ".bss.McuSm.McuSm_SswStartupCounter";
+            select ".data.McuSm.McuSm_SafetyKitFailureMask";
+            select ".bss.McuSm.McuSm_SafetyKitFailureMask";
+            select ".data.McuSm.McuSm_SafetyKitResetReactionCounter";
+            select ".bss.McuSm.McuSm_SafetyKitResetReactionCounter";
+            select ".data.McuSm.McuSm_SafetyKitResetInhibit";
+            select ".bss.McuSm.McuSm_SafetyKitResetInhibit";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckLastSshFail";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckLastSshFail";
+            select ".data.McuSm.McuSm_SswStatusData";
+            select ".bss.McuSm.McuSm_SswStatusData";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckResultMask";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckResultMask";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualEccd";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualEccd";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualFaultsts";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualFaultsts";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualErrinfo";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualErrinfo";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedEccd";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedEccd";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedFaultsts";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedFaultsts";
+            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedErrinfo";
+            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedErrinfo";
+            select ".data.McuSm.McuSm_Trap4ScrRtcRecord";
+            select ".bss.McuSm.McuSm_Trap4ScrRtcRecord";
+            select ".data.McuSm.McuSm_Trap4ScrRtcRecordValid";
+            select ".bss.McuSm.McuSm_Trap4ScrRtcRecordValid";
+            select ".data.McuSm.McuSm_Trap4ScrRtcRecordCounter";
+            select ".bss.McuSm.McuSm_Trap4ScrRtcRecordCounter";
         }
         "__NCR_START" := "_lc_gb_NCR";
         "__NCR_END"   := "_lc_ge_NCR";

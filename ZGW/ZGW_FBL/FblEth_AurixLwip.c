@@ -286,15 +286,7 @@ void FblEth_MainFunction(void)
     }
 
     lwip_geth_Lwip_pollTimerFlags();
-
-#if (LWIP_GETH_IS_ISR == 0)
-    /*
-     * Warning:
-     * Your generated lwip_geth_netif_input() contains an infinite loop.
-     * Keep LWIP_GETH_IS_ISR = 1 unless you rewrite lwip_geth_netif_input()
-     * into a non-blocking polling function.
-     */
-#endif
+    lwip_geth_Lwip_pollReceiveFlags();
 }
 
 uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len)

@@ -1,5 +1,6 @@
 #include "UdpNm.h"
 
+#include "GatewaySwc.h"
 #include "../ComM/ComM.h"
 #include "../../Time/TimeBase.h"
 
@@ -109,7 +110,7 @@ static void UdpNm_TransmitNmPdu(void)
     }
 
     len = (uint16)(UDPNM_HEADER_LEN + UdpNm_ChannelState.userDataLen);
-    (void)SoAd_IfTransmit(UDPNM_SOCON_ID, NULL_PTR, data, len);
+    (void)GatewaySwc_RequestSoAdIfTransmit(UDPNM_SOCON_ID, NULL_PTR, data, len);
 }
 
 static void UdpNm_HandleReleasedNetwork(void)

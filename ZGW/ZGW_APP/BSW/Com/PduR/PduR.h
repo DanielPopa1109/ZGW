@@ -4,7 +4,7 @@
 #include "ComStack_Types.h"
 #include "TcpIpH.h"
 
-#define PDUR_MAX_TP_BUFFER             4095u
+#define PDUR_MAX_TP_BUFFER             8192u
 #define PDUR_MAX_TP_RX_ROUTES          10u
 #define PDUR_MAX_TP_RX_BUFFERS         4u
 #define PDUR_MAX_IF_ROUTE_DATA_LEN     64u
@@ -22,6 +22,7 @@ Std_ReturnType PduR_ComTransmit(PduIdType TxPduId,
 Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
                                 const uint8* data,
                                 PduLengthType len);
+void PduR_DcmReleaseNoResponse(PduIdType DcmTxPduId);
 
 /* Lower IF callbacks: CanIf/LinIf/SoAd -> PduR -> COM and/or raw IF gateway */
 void PduR_CanIfRxIndication(PduIdType CanIfRxPduId,

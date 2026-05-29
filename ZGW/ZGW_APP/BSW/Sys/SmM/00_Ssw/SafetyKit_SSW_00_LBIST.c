@@ -31,6 +31,7 @@
 #include "SafetyKit_SSW_00_LBIST.h"
 #include "SafetyKit_Cfg.h"
 #include "SafetyKit_Main.h"
+#include "McuSm.h"
 #include "IfxScuLbist.h"
 #include "Ifx_Ssw_Infra.h"
 /*********************************************************************************************************************/
@@ -64,12 +65,14 @@ boolean IfxScuLbist_isTerminatedPORST(void);
 void safetyKitSswLbist(void)
 {
     boolean lbistHasPassed;
-    volatile SswStatusXramType *sswStatusXram = &SSW_STATUS_DATA_ADDRESS;
 
-    if (Ifx_Ssw_isColdPoweronReset())
+    if ((Ifx_Ssw_isColdPoweronReset()) &&
+            (FALSE == IfxScuLbist_isTerminatedPORST()) &&
+            (FALSE == IfxScuLbist_isTerminatedProperly()))
     {
-        sswStatusXram->lbistRuns = 0u;
-        sswStatusXram->lbistAppSwReq = 0u;
+        McuSm_SswStatusData.lbistRuns = 0u;
+        McuSm_SswStatusData.lbistAppSwReq = 0u;
+        McuSm_SswStatusData.mcuFwcheckRuns = 0u;
     }
 
     /* check if LBIST was terminated by a PORST */
@@ -78,7 +81,14 @@ void safetyKitSswLbist(void)
         /* Check if LBIST was already executed, either within firmware of within application SSW */
         if (IfxScuLbist_isDone())
         {
-            sswStatusXram->lbistRuns++;
+            if (McuSm_SswStatusData.lbistRuns < 0xFFu)
+            {
+                McuSm_SswStatusData.lbistRuns++;
+            }
+            else
+            {
+                /* Saturated retained counter. */
+            }
 
             if (TRUE == IfxScuLbist_isTerminatedProperly())
             {
@@ -109,12 +119,13 @@ void safetyKitSswLbist(void)
             if (lbistHasPassed)
             {
                 g_SafetyKitStatus.sswStatus.lbistStatus = passed;
+                McuSm_SswStatusData.lbistAppSwReq = 0u;
             }
             else
             {
                 g_SafetyKitStatus.sswStatus.lbistStatus = failed;
 
-                if (sswStatusXram->lbistRuns < SAFETKIT_LBIST_MAX_RUNS)
+                if (McuSm_SswStatusData.lbistAppSwReq < SAFETKIT_LBIST_MAX_RUNS)
                 {
                     /* SM:LBIST_CFG */
                     safetyKitTriggerLbist();
@@ -127,26 +138,42 @@ void safetyKitSswLbist(void)
                     }
                 }
             }
+
+            McuSm_SswStatusData.lbistStatus = (uint8)g_SafetyKitStatus.sswStatus.lbistStatus;
         }
         else
         {
-            /* If LBIST was not yet executed and coming from a cold PORST execute LBIST here, within application start up software. */
 #if SAFETYKIT_CFG_SSW_ENABLE_LBIST_APPSW
-            if (Ifx_Ssw_isColdPoweronReset())
+            if (McuSm_SswStatusData.lbistAppSwReq < SAFETKIT_LBIST_MAX_RUNS)
             {
                 /* SM:LBIST_CFG */
                 safetyKitTriggerLbist();
             }
             else
             {
-                /* Do nothing. */
+                g_SafetyKitStatus.sswStatus.lbistStatus = failed;
+                McuSm_SswStatusData.lbistStatus = (uint8)failed;
             }
 #endif
         }
     }
     else
     {
+#if SAFETYKIT_CFG_SSW_ENABLE_LBIST_APPSW
+        if (McuSm_SswStatusData.lbistAppSwReq < SAFETKIT_LBIST_MAX_RUNS)
+        {
+            /* Retry LBIST when the previous LBIST reset was interrupted by PORST. */
+            safetyKitTriggerLbist();
+        }
+        else
+        {
+            g_SafetyKitStatus.sswStatus.lbistStatus = failed;
+            McuSm_SswStatusData.lbistStatus = (uint8)failed;
+        }
+#else
         g_SafetyKitStatus.sswStatus.lbistStatus = failed;
+        McuSm_SswStatusData.lbistStatus = (uint8)failed;
+#endif
     }
 }
 
@@ -170,10 +197,8 @@ boolean IfxScuLbist_isTerminatedProperly(void)
  * */
 void safetyKitTriggerLbist(void)
 {
-    volatile SswStatusXramType *sswStatusXram = &SSW_STATUS_DATA_ADDRESS;
-
-    sswStatusXram->lbistAppSwReq++;
-    sswStatusXram->RSTSTAT.U = MODULE_SCU.RSTSTAT.U;
+    McuSm_SswStatusData.lbistAppSwReq++;
+    McuSm_SswStatusData.rstStat = MODULE_SCU.RSTSTAT.U;
 
     /* Clear COLD PORST reason to preserve the data on the SCR XRAM */
     IfxScuRcu_clearColdResetStatus();

@@ -1,18 +1,20 @@
 #include "SoAd.h"
+#include "GatewaySwc.h"
 #include "../ComM/ComM.h"
 #include "SysMgr.h"
 #include "FreeRTOS_core2.h"
 #include "semphr_core2.h"
 #include <string.h>
+#include <errno.h>
 
 typedef struct
 {
-    SoAd_StateType state;
-    TcpIp_SocketIdType listenSock;
-    TcpIp_SocketIdType activeSock;
-    TcpIp_SockAddrType remoteAddr;
-    const SoAd_SocketConnectionConfigType *cfg;
-    uint8 requestedOpen;
+        SoAd_StateType state;
+        TcpIp_SocketIdType listenSock;
+        TcpIp_SocketIdType activeSock;
+        TcpIp_SockAddrType remoteAddr;
+        const SoAd_SocketConnectionConfigType *cfg;
+        uint8 requestedOpen;
 } SoAd_SoConRuntimeType;
 
 static SoAd_SoConRuntimeType SoAd_Runtime[SOAD_MAX_CONNECTIONS];
@@ -47,8 +49,11 @@ volatile uint16 SoAd_DebugLastRxRemotePort[SOAD_MAX_CONNECTIONS];
 volatile uint32 SoAd_DebugLastRxRemoteAddr[SOAD_MAX_CONNECTIONS];
 volatile uint32 SoAd_DebugPcHeartbeatRxCounter = 0u;
 volatile uint32 SoAd_DebugPcHeartbeatAckCounter = 0u;
+volatile uint32 SoAd_DebugPcHeartbeatBroadcastAckCounter = 0u;
 volatile uint32 SoAd_DebugPcHeartbeatLastRemoteAddr = 0u;
 volatile uint16 SoAd_DebugPcHeartbeatLastRemotePort = 0u;
+volatile uint32 SoAd_DebugTcpStaleReplaceCounter = 0u;
+volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
 
 static void SoAd_InitLock(void)
 {
@@ -99,9 +104,9 @@ static void SoAd_Unlock(void)
 static uint32 SoAd_Ip4ToU32(const uint8 ip[4])
 {
     return ((uint32)ip[0] << 24u) |
-           ((uint32)ip[1] << 16u) |
-           ((uint32)ip[2] << 8u) |
-           ((uint32)ip[3]);
+            ((uint32)ip[1] << 16u) |
+            ((uint32)ip[2] << 8u) |
+            ((uint32)ip[3]);
 }
 
 static uint8 SoAd_IsPcHeartbeat(const uint8 *data, uint16 len)
@@ -116,53 +121,181 @@ static uint8 SoAd_IsPcHeartbeat(const uint8 *data, uint16 len)
     return (memcmp(data, SOAD_PC_HEARTBEAT_PAYLOAD, hbLen) == 0) ? 1u : 0u;
 }
 
-static void SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
-                                   SoAd_SoConIdType id,
-                                   const TcpIp_SockAddrType *remoteAddr,
-                                   const uint8 *data,
-                                   uint16 len)
+void SoAd_AbortTcpConnection(SoAd_SoConIdType id)
+{
+    SoAd_SoConRuntimeType *rt;
+
+    if (SoAd_Lock() == 0u)
+    {
+        return;
+    }
+
+    if (id >= SOAD_MAX_CONNECTIONS)
+    {
+        SoAd_Unlock();
+        return;
+    }
+
+    rt = &SoAd_Runtime[id];
+
+    if ((rt->cfg == 0) || (rt->cfg->protocol != TCPIP_PROTOCOL_TCP))
+    {
+        SoAd_Unlock();
+        return;
+    }
+
+    if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
+            (rt->activeSock != rt->listenSock))
+    {
+        TcpIp_Close(rt->activeSock);
+    }
+
+    if (rt->cfg->tcpDisconnected != 0)
+    {
+        rt->cfg->tcpDisconnected(id);
+    }
+
+    rt->activeSock = TCPIP_INVALID_SOCKET;
+    rt->remoteAddr.addr = 0u;
+    rt->remoteAddr.port = 0u;
+
+    if ((rt->listenSock != TCPIP_INVALID_SOCKET) &&
+            (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
+    {
+        rt->state = SOAD_SOCON_OPEN;
+        SoAd_DebugSocket[id] = rt->listenSock;
+    }
+    else
+    {
+        rt->state = SOAD_SOCON_CLOSED;
+        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+    }
+
+    SoAd_DebugState[id] = (uint8)rt->state;
+    SoAd_Unlock();
+}
+
+static uint8 SoAd_IsTcpWouldBlock(sint32 err)
+{
+#if defined(EWOULDBLOCK) && defined(EAGAIN)
+    return ((err == EWOULDBLOCK) || (err == EAGAIN)) ? 1u : 0u;
+#elif defined(EWOULDBLOCK)
+    return (err == EWOULDBLOCK) ? 1u : 0u;
+#elif defined(EAGAIN)
+    return (err == EAGAIN) ? 1u : 0u;
+#else
+    return 0u;
+#endif
+}
+
+static void SoAd_TcpDisconnectToOpen(SoAd_SoConRuntimeType *rt, SoAd_SoConIdType id)
+{
+    if ((rt == 0) || (rt->cfg == 0))
+    {
+        return;
+    }
+
+    if (rt->cfg->tcpDisconnected != 0)
+    {
+        rt->cfg->tcpDisconnected(id);
+    }
+
+    if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
+            (rt->activeSock != rt->listenSock))
+    {
+        TcpIp_Close(rt->activeSock);
+    }
+
+    rt->activeSock = TCPIP_INVALID_SOCKET;
+    rt->remoteAddr.addr = 0u;
+    rt->remoteAddr.port = 0u;
+
+    if ((rt->listenSock != TCPIP_INVALID_SOCKET) &&
+            (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
+    {
+        rt->state = SOAD_SOCON_OPEN;
+        SoAd_DebugSocket[id] = rt->listenSock;
+    }
+    else
+    {
+        rt->state = SOAD_SOCON_CLOSED;
+        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+    }
+
+    SoAd_DebugState[id] = (uint8)rt->state;
+}
+
+static uint8 SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
+        SoAd_SoConIdType id,
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8 *data,
+        uint16 len)
 {
     TcpIp_SockAddrType ackDst;
     const uint8 ackPayload[] = SOAD_PC_HEARTBEAT_ACK_PAYLOAD;
 
     if ((rt == 0) || (rt->cfg == 0) || (remoteAddr == 0))
     {
-        return;
+        return 0u;
     }
 
     if ((rt->cfg->protocol != TCPIP_PROTOCOL_UDP) ||
-        (rt->cfg->localAddr.port != SOAD_PC_HEARTBEAT_PORT) ||
-        (SoAd_IsPcHeartbeat(data, len) == 0u))
+            (SoAd_IsPcHeartbeat(data, len) == 0u))
     {
-        return;
+        return 0u;
     }
 
     SoAd_DebugPcHeartbeatRxCounter++;
     SoAd_DebugPcHeartbeatLastRemoteAddr = remoteAddr->addr;
     SoAd_DebugPcHeartbeatLastRemotePort = remoteAddr->port;
 
-    /* Acknowledge on the configured gateway/logger UDP port.  For the lab
-     * PDUR IF socket this is normally 192.168.1.255:30600, so no ARP entry
-     * is required and the Python logger/Wireshark can see the ACK.
-     */
-    ackDst.addr = SoAd_Ip4ToU32(rt->cfg->remoteAddr.addr);
-    ackDst.port = rt->cfg->remoteAddr.port;
+    ackDst = *remoteAddr;
 
     if ((ackDst.addr == 0u) || (ackDst.port == 0u))
     {
-        ackDst = *remoteAddr;
+        ackDst.addr = SoAd_Ip4ToU32(rt->cfg->remoteAddr.addr);
+        ackDst.port = rt->cfg->remoteAddr.port;
     }
 
-    if ((ComM_IsTxAllowed(COMM_CH_ETH) != FALSE) &&
-        (TcpIp_SendTo(rt->listenSock,
-                     &ackDst,
-                     ackPayload,
-                     (uint16)(sizeof(ackPayload) - 1u)) > 0))
+    if (GatewaySwc_RequestTcpIpSendTo(rt->listenSock,
+            &ackDst,
+            ackPayload,
+            (uint16)(sizeof(ackPayload) - 1u)) > 0)
     {
         SoAd_DebugPcHeartbeatAckCounter++;
     }
+    else
+    {
+        ackDst.addr = SoAd_Ip4ToU32(rt->cfg->remoteAddr.addr);
+        if (ackDst.addr == 0u)
+        {
+            ackDst.addr = 0xFFFFFFFFu;
+        }
+
+        if (GatewaySwc_RequestTcpIpSendTo(rt->listenSock,
+                &ackDst,
+                ackPayload,
+                (uint16)(sizeof(ackPayload) - 1u)) > 0)
+        {
+            SoAd_DebugPcHeartbeatBroadcastAckCounter++;
+        }
+
+        if (ackDst.port != SOAD_PC_HEARTBEAT_PORT)
+        {
+            ackDst.port = SOAD_PC_HEARTBEAT_PORT;
+
+            if (GatewaySwc_RequestTcpIpSendTo(rt->listenSock,
+                    &ackDst,
+                    ackPayload,
+                    (uint16)(sizeof(ackPayload) - 1u)) > 0)
+            {
+                SoAd_DebugPcHeartbeatBroadcastAckCounter++;
+            }
+        }
+    }
 
     (void)id;
+    return 1u;
 }
 
 static const SoAd_SocketConnectionConfigType *SoAd_FindConfig(SoAd_SoConIdType id)
@@ -187,24 +320,7 @@ static const SoAd_SocketConnectionConfigType *SoAd_FindConfig(SoAd_SoConIdType i
 
 static uint8 SoAd_RuntimeSocketLost(const SoAd_SoConRuntimeType *rt)
 {
-    if ((rt == 0) || (rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
-    {
-        return 0u;
-    }
-
-    if ((rt->listenSock == TCPIP_INVALID_SOCKET) ||
-        (TcpIp_IsSocketOpen(rt->listenSock) == 0u))
-    {
-        return 1u;
-    }
-
-    if ((rt->state == SOAD_SOCON_CONNECTED) &&
-        ((rt->activeSock == TCPIP_INVALID_SOCKET) ||
-         (TcpIp_IsSocketOpen(rt->activeSock) == 0u)))
-    {
-        return 1u;
-    }
-
+    (void)rt;
     return 0u;
 }
 
@@ -224,21 +340,21 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     reopen = rt->requestedOpen;
 
     if ((cfg != 0) &&
-        (cfg->tcpDisconnected != 0) &&
-        (rt->state == SOAD_SOCON_CONNECTED))
+            (cfg->tcpDisconnected != 0) &&
+            (rt->state == SOAD_SOCON_CONNECTED))
     {
         cfg->tcpDisconnected(id);
     }
 
     if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
-        (rt->activeSock != rt->listenSock) &&
-        (TcpIp_IsSocketOpen(rt->activeSock) != 0u))
+            (rt->activeSock != rt->listenSock) &&
+            (TcpIp_IsSocketOpen(rt->activeSock) != 0u))
     {
         TcpIp_Close(rt->activeSock);
     }
 
     if ((rt->listenSock != TCPIP_INVALID_SOCKET) &&
-        (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
+            (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
     {
         TcpIp_Close(rt->listenSock);
     }
@@ -254,7 +370,9 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     rt->requestedOpen = reopen;
     SoAd_DebugRequestedOpen[id] = reopen;
 
-    if ((reopen != 0u) && (TcpIp_IsLinkAvailable() != 0u))
+    if ((reopen != 0u) &&
+            (((cfg != 0) && (cfg->isServer != 0u)) ||
+                    (TcpIp_IsLinkAvailable() != 0u)))
     {
         (void)SoAd_OpenSoCon(id);
     }
@@ -279,6 +397,7 @@ void SoAd_Init(const SoAd_ConfigType *cfg)
         SoAd_DebugState[i] = SOAD_SOCON_CLOSED;
         SoAd_DebugRequestedOpen[i] = 0u;
         SoAd_DebugSocket[i] = TCPIP_INVALID_SOCKET;
+        SoAd_DebugTcpLastAcceptedSocket[i] = TCPIP_INVALID_SOCKET;
         SoAd_DebugLastOpenResult[i] = 0u;
         SoAd_DebugRxCounter[i] = 0u;
         SoAd_DebugRxDropCounter[i] = 0u;
@@ -333,7 +452,7 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
         return 1u;
     }
 
-    if (TcpIp_IsLinkAvailable() == 0u)
+    if ((cfg->isServer == 0u) && (TcpIp_IsLinkAvailable() == 0u))
     {
         SoAd_OpenFailNoLinkCounter++;
         SoAd_DebugLastOpenResult[id] = 0u;
@@ -363,8 +482,8 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
      * as the ECU identity; only the socket bind address is widened.
      */
     if (TcpIp_BindAddr(rt->listenSock,
-                       (cfg->isServer != 0u) ? 0u : SoAd_Ip4ToU32(cfg->localAddr.addr),
-                       cfg->localAddr.port) != 0)
+            (cfg->isServer != 0u) ? 0u : SoAd_Ip4ToU32(cfg->localAddr.addr),
+                    cfg->localAddr.port) != 0)
     {
         SoAd_OpenFailBindCounter++;
         TcpIp_Close(rt->listenSock);
@@ -377,6 +496,8 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
 
     if (isTcp != 0u)
     {
+        rt->activeSock = TCPIP_INVALID_SOCKET;
+
         if (TcpIp_Listen(rt->listenSock) != 0)
         {
             TcpIp_Close(rt->listenSock);
@@ -420,7 +541,7 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     rt = &SoAd_Runtime[id];
 
     if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
-        (rt->activeSock != rt->listenSock))
+            (rt->activeSock != rt->listenSock))
     {
         TcpIp_Close(rt->activeSock);
     }
@@ -446,6 +567,80 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     SoAd_Unlock();
 }
 
+static uint8 SoAd_TryReplaceStaleTcpClient(SoAd_SoConRuntimeType *rt, SoAd_SoConIdType id)
+{
+    TcpIp_SockAddrType newRemote;
+    TcpIp_SocketIdType newSock;
+
+    if ((rt == 0) || (rt->cfg == 0) || (rt->cfg->protocol != TCPIP_PROTOCOL_TCP))
+    {
+        return 0u;
+    }
+
+    if (rt->listenSock == TCPIP_INVALID_SOCKET)
+    {
+        return 0u;
+    }
+
+    newSock = TcpIp_Accept(rt->listenSock, &newRemote);
+
+    if (newSock < 0)
+    {
+        return 0u;
+    }
+
+    if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
+            (rt->activeSock != rt->listenSock))
+    {
+        TcpIp_Close(rt->activeSock);
+    }
+
+    if (rt->cfg->tcpDisconnected != 0)
+    {
+        rt->cfg->tcpDisconnected(id);
+    }
+
+    rt->activeSock = newSock;
+    rt->remoteAddr = newRemote;
+    rt->state = SOAD_SOCON_CONNECTED;
+
+    SoAd_DebugState[id] = (uint8)rt->state;
+    SoAd_DebugSocket[id] = rt->listenSock;
+    SoAd_DebugTcpLastAcceptedSocket[id] = newSock;
+    SoAd_DebugTcpStaleReplaceCounter++;
+
+    if (rt->cfg->tcpConnected != 0)
+    {
+        rt->cfg->tcpConnected(id);
+    }
+
+    return 1u;
+}
+
+static void SoAd_DispatchTcpRx(SoAd_SoConRuntimeType *rt,
+        SoAd_SoConIdType id,
+        const uint8 *buffer,
+        uint16 len)
+{
+    if ((rt == 0) || (rt->cfg == 0) || (buffer == 0) || (len == 0u))
+    {
+        return;
+    }
+
+    SoAd_DebugRxCounter[id]++;
+    SoAd_DebugLastRxLength[id] = len;
+    SoAd_DebugLastRxRemoteAddr[id] = rt->remoteAddr.addr;
+    SoAd_DebugLastRxRemotePort[id] = rt->remoteAddr.port;
+
+    if ((rt->cfg->rxIndication != 0) &&
+            ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||
+                    (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE)))
+    {
+        rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, len);
+        SysMgr_NotifyBusActivity();
+    }
+}
+
 void SoAd_MainFunction(void)
 {
     uint8 id;
@@ -453,6 +648,7 @@ void SoAd_MainFunction(void)
     sint32 len;
     TcpIp_SockAddrType remote;
     SoAd_SoConRuntimeType *rt;
+    const SoAd_SocketConnectionConfigType *cfg;
 
     if (SoAd_Lock() == 0u)
     {
@@ -465,7 +661,11 @@ void SoAd_MainFunction(void)
 
         if (rt->state == SOAD_SOCON_CLOSED)
         {
-            if ((rt->requestedOpen != 0u) && (TcpIp_IsLinkAvailable() != 0u))
+            cfg = (rt->cfg != 0) ? rt->cfg : SoAd_FindConfig(id);
+
+            if ((rt->requestedOpen != 0u) &&
+                    (((cfg != 0) && (cfg->isServer != 0u)) ||
+                            (TcpIp_IsLinkAvailable() != 0u)))
             {
                 (void)SoAd_OpenSoCon(id);
             }
@@ -493,10 +693,25 @@ void SoAd_MainFunction(void)
                 {
                     rt->state = SOAD_SOCON_CONNECTED;
                     SoAd_DebugState[id] = (uint8)rt->state;
+                    SoAd_DebugSocket[id] = rt->listenSock;
+                    SoAd_DebugTcpLastAcceptedSocket[id] = rt->activeSock;
+                    SoAd_DebugLastRxRemoteAddr[id] = rt->remoteAddr.addr;
+                    SoAd_DebugLastRxRemotePort[id] = rt->remoteAddr.port;
 
                     if (rt->cfg->tcpConnected != 0)
                     {
                         rt->cfg->tcpConnected(id);
+                    }
+
+                    len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
+
+                    if (len > 0)
+                    {
+                        SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
+                    }
+                    else if (len == 0)
+                    {
+                        SoAd_TcpDisconnectToOpen(rt, id);
                     }
                 }
             }
@@ -506,23 +721,22 @@ void SoAd_MainFunction(void)
 
                 if (len == 0)
                 {
-                    if (rt->cfg->tcpDisconnected != 0)
-                    {
-                        rt->cfg->tcpDisconnected(id);
-                    }
-
-                    TcpIp_Close(rt->activeSock);
-                    rt->activeSock = TCPIP_INVALID_SOCKET;
-                    rt->state = SOAD_SOCON_OPEN;
+                    SoAd_TcpDisconnectToOpen(rt, id);
                 }
-                else if (len > 0)
+                else if (len < 0)
                 {
-                    if ((rt->cfg->rxIndication != 0) &&
-                        (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE))
+                    if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
                     {
-                        rt->cfg->rxIndication(id, &rt->remoteAddr, buffer, (uint16)len);
-                        SysMgr_NotifyBusActivity();
+                        SoAd_TcpDisconnectToOpen(rt, id);
                     }
+                    else
+                    {
+                        /* nonblocking no-data condition */
+                    }
+                }
+                else
+                {
+                    SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
                 }
             }
         }
@@ -546,10 +760,13 @@ void SoAd_MainFunction(void)
                         rt->remoteAddr = remote;
                     }
 
-                    SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len);
-
-                    if ((rt->cfg->rxIndication != 0) &&
-                        (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE))
+                    if (SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len) != 0u)
+                    {
+                        /* Heartbeat is a link probe, not upper-layer payload. */
+                    }
+                    else if ((rt->cfg->rxIndication != 0) &&
+                            ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||
+                                    (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE)))
                     {
                         rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
                         SysMgr_NotifyBusActivity();
@@ -570,13 +787,13 @@ void SoAd_MainFunction(void)
 
 sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len)
 {
-    return (SoAd_IfTransmit(id, 0, data, len) == SOAD_OK) ? (sint32)len : -1;
+    return (GatewaySwc_RequestSoAdIfTransmit(id, 0, data, len) == SOAD_OK) ? (sint32)len : -1;
 }
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
-                                const TcpIp_SockAddrType *remoteAddr,
-                                const uint8 *data,
-                                uint16 len)
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8 *data,
+        uint16 len)
 {
     SoAd_SoConRuntimeType *rt;
     const TcpIp_SockAddrType *dst;
@@ -587,11 +804,6 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
     SoAd_DebugLastTxLength = len;
     SoAd_DebugLastTxTcpIpResult = -1;
     SoAd_DebugLastTxResult = SOAD_NOT_OK;
-
-    if (ComM_IsTxAllowed(COMM_CH_ETH) == FALSE)
-    {
-        return SOAD_NOT_OK;
-    }
 
     if (SoAd_Lock() == 0u)
     {
@@ -607,6 +819,13 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
     rt = &SoAd_Runtime[id];
 
     if ((rt->cfg == 0) || (rt->state == SOAD_SOCON_CLOSED))
+    {
+        SoAd_Unlock();
+        return SOAD_NOT_OK;
+    }
+
+    if ((rt->cfg->upperLayer != SOAD_UPPER_DOIP) &&
+            (ComM_IsTxAllowed(COMM_CH_ETH) == FALSE))
     {
         SoAd_Unlock();
         return SOAD_NOT_OK;

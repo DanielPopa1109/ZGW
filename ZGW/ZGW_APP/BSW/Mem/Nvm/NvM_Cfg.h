@@ -41,7 +41,6 @@ typedef struct
 extern uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];
 extern uint8 NvM_TimeBase_Ram[NVM_BLOCK_TIMEBASE_LENGTH];
 
-extern const uint8 NvM_DemPrimary_Rom[NVM_BLOCK_DEM_PRIMARY_LENGTH];
 extern const uint8 NvM_AppData_Rom[NVM_BLOCK_APP_DATA_LENGTH];
 extern const uint8 NvM_TimeBase_Rom[NVM_BLOCK_TIMEBASE_LENGTH];
 

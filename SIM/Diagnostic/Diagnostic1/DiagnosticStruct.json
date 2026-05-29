@@ -1,3 +1,33 @@
 {
-
+  "Items":  
+  [
+    {
+      "Name":"DSC Change",
+      "Type":      1,
+      "GUID":"s20260526020000000000000000",
+      "SEL":"Checked",
+      "REG":"False"    
+    },
+    {
+      "Name":"UDS 0x22 Read DIDs",
+      "Type":      1,
+      "GUID":"s20260526020000000000000003",
+      "SEL":"Checked",
+      "REG":"False"    
+    },
+    {
+      "Name":"UDS 0x31 Coding Routines Safe",
+      "Type":      1,
+      "GUID":"s20260526020000000000000005",
+      "SEL":"Checked",
+      "REG":"False"    
+    },
+    {
+      "Name":"UDS 0x14 0x19 DTC",
+      "Type":      1,
+      "GUID":"s20260526020000000000000007",
+      "SEL":"Checked",
+      "REG":"False"    
+    }  
+  ]
 }

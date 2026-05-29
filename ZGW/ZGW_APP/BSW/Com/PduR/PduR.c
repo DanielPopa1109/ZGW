@@ -119,6 +119,7 @@ typedef struct
 {
     volatile uint8 state;
     uint8 keepContext;
+    uint8 confirmDcm;
     PduIdType txPduId;
     uint16 sourceAddress;
     uint16 targetAddress;
@@ -359,6 +360,7 @@ volatile uint32 PduR_DoIPTxMailboxFullCounter;
 volatile uint32 PduR_DoIPTxConfirmFullCounter;
 volatile uint32 PduR_DoIPTxSentCounter;
 volatile uint32 PduR_DoIPTxFailCounter;
+volatile uint32 PduR_DoIPFastConfirmCounter;
 
 /* ===================== Internal helpers ===================== */
 
@@ -594,17 +596,17 @@ static Std_ReturnType PduR_TransmitIf(PduR_IfLowerType lower,
     switch (lower)
     {
         case PDUR_IF_LOWER_CANIF:
-            return CanIf_Transmit(lowerPduId, data, len);
+            return GatewaySwc_RequestCanIfTransmit(lowerPduId, data, len);
 
         case PDUR_IF_LOWER_LINIF:
-            return LinIf_Transmit(lowerPduId, data, len);
+            return GatewaySwc_RequestLinIfTransmit(lowerPduId, data, len);
 
         case PDUR_IF_LOWER_SOAD:
             if ((soConId == PDUR_SOAD_INVALID_SOCON) || (len > 0xFFFFu))
             {
                 return E_NOT_OK;
             }
-            return (SoAd_IfTransmit(soConId, NULL_PTR, data, (uint16)len) == SOAD_OK) ? E_OK : E_NOT_OK;
+            return (GatewaySwc_RequestSoAdIfTransmit(soConId, NULL_PTR, data, (uint16)len) == SOAD_OK) ? E_OK : E_NOT_OK;
 
         default:
             return E_NOT_OK;
@@ -637,17 +639,17 @@ static Std_ReturnType PduR_DispatchIfDest(PduR_IfDestType dest,
             return E_OK;
 
         case PDUR_IF_DEST_CANIF:
-            return CanIf_Transmit(destPduId, data, len);
+            return GatewaySwc_RequestCanIfTransmit(destPduId, data, len);
 
         case PDUR_IF_DEST_LINIF:
-            return LinIf_Transmit(destPduId, data, len);
+            return GatewaySwc_RequestLinIfTransmit(destPduId, data, len);
 
         case PDUR_IF_DEST_SOAD:
             if ((destSoConId == PDUR_SOAD_INVALID_SOCON) || (len > 0xFFFFu))
             {
                 return E_NOT_OK;
             }
-            return (SoAd_IfTransmit(destSoConId, NULL_PTR, data, (uint16)len) == SOAD_OK) ? E_OK : E_NOT_OK;
+            return (GatewaySwc_RequestSoAdIfTransmit(destSoConId, NULL_PTR, data, (uint16)len) == SOAD_OK) ? E_OK : E_NOT_OK;
 
         case PDUR_IF_DEST_GATEWAY:
             if ((destSoConId == PDUR_SOAD_INVALID_SOCON) || (len > 0xFFFFu))
@@ -770,6 +772,7 @@ void PduR_Init(void)
     PduR_DoIPRxMailbox.udsLen = 0u;
     PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
     PduR_DoIPTxMailbox.keepContext = FALSE;
+    PduR_DoIPTxMailbox.confirmDcm = FALSE;
     PduR_DoIPTxMailbox.txPduId = 0u;
     PduR_DoIPTxMailbox.sourceAddress = 0u;
     PduR_DoIPTxMailbox.targetAddress = 0u;
@@ -837,6 +840,7 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
 {
     const PduR_DcmTxRouteType* route;
     uint8 keepContext;
+    uint8 fastConfirm;
     ComM_ChannelType channel;
 
     if ((PduR_Initialized == FALSE) ||
@@ -884,20 +888,49 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
             keepContext = ((len == 3u) &&
                            (data[0u] == 0x7Fu) &&
                            (data[2u] == DCM_NRC_RESPONSE_PENDING)) ? TRUE : FALSE;
+            fastConfirm = ((len == 2u) && (data[0u] == 0x7Eu)) ? TRUE : FALSE;
 
             PduR_DoIPTxMailbox.txPduId = DcmTxPduId;
             PduR_DoIPTxMailbox.sourceAddress = PduR_DoIPCtx.targetAddress;
             PduR_DoIPTxMailbox.targetAddress = PduR_DoIPCtx.sourceAddress;
             PduR_DoIPTxMailbox.udsLen = (uint16)len;
             PduR_DoIPTxMailbox.keepContext = keepContext;
+            PduR_DoIPTxMailbox.confirmDcm = (fastConfirm == FALSE) ? TRUE : FALSE;
             memcpy(PduR_DoIPTxMailbox.data, data, len);
             __dsync();
             PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_PENDING;
             __dsync();
+
+            if (fastConfirm != FALSE)
+            {
+                PduR_DoIPCtx.valid = FALSE;
+                PduR_DoIPFastConfirmCounter++;
+                __dsync();
+                Dcm_TxConfirmation(DcmTxPduId, E_OK);
+            }
+
             return E_OK;
 
         default:
             return E_NOT_OK;
+    }
+}
+
+void PduR_DcmReleaseNoResponse(PduIdType DcmTxPduId)
+{
+    const PduR_DcmTxRouteType* route;
+
+    if (PduR_Initialized == FALSE)
+    {
+        return;
+    }
+
+    route = PduR_FindDcmTxRoute(DcmTxPduId);
+
+    if ((route != NULL_PTR) && (route->lower == PDUR_TP_LOWER_DOIP))
+    {
+        PduR_DoIPCtx.valid = FALSE;
+        __dsync();
     }
 }
 
@@ -1274,6 +1307,13 @@ void PduR_DoIPCore2MainFunction(void)
         else
         {
             PduR_DoIPTxFailCounter++;
+        }
+
+        if (PduR_DoIPTxMailbox.confirmDcm == FALSE)
+        {
+            PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
+            __dsync();
+            return;
         }
 
         __dsync();

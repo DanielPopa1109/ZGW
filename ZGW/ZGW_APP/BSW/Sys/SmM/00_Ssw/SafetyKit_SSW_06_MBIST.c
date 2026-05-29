@@ -151,20 +151,7 @@ void safetyKitSswMbist(void)
     /* Enable CPU caches */
     IfxCpu_setDataCache    (1u);
     IfxCpu_setProgramCache (1u);
-    /* Enable all other CPUs, but not the one which is executing the function (of course it is also not disabled) */
-    if(coreIndex != IfxCpu_ResourceCpu_0){
-        IfxCpu_setCoreMode(&MODULE_CPU0, IfxCpu_CoreMode_run);
-    }
-#if (IFXCPU_NUM_MODULES > 1u)
-    if(coreIndex != IfxCpu_ResourceCpu_1){
-        IfxCpu_setCoreMode(&MODULE_CPU1, IfxCpu_CoreMode_run);
-    }
-#endif
-#if (IFXCPU_NUM_MODULES > 2u)
-    if(coreIndex != IfxCpu_ResourceCpu_2){
-        IfxCpu_setCoreMode(&MODULE_CPU2, IfxCpu_CoreMode_run);
-    }
-#endif
+    /* Slave cores are started later by Ssw_StartCores(). */
 }
 #endif /* SAFETYKIT_CFG_SSW_ENABLE_MBIST */
 /*

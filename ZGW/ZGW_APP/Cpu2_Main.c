@@ -16,6 +16,7 @@
 
 extern volatile uint8 OsInit_C1;
 volatile uint8 OsInit_C2 = 0u;
+volatile uint32 Core2_MainEnteredCounter = 0u;
 volatile uint32 Core2_WaitForCore1LoopCounter = 0u;
 volatile uint32 Core2_WaitForCore1Timeout = 0u;
 
@@ -23,9 +24,15 @@ volatile uint32 Core2_WaitForCore1Timeout = 0u;
 
 void core2_main(void)
 {
+    Core2_MainEnteredCounter++;
+
     initCpuWatchdog(2u);
 
-    while(OsInit_C1 == 0u) serviceCpuWatchdog();
+    while(OsInit_C1 == 0u)
+    {
+        Core2_WaitForCore1LoopCounter++;
+        serviceCpuWatchdog();
+    }
     __dsync();
     rmii0_init_pins();
     Os_Init_C2();

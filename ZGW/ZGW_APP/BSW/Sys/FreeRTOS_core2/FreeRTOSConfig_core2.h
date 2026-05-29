@@ -40,7 +40,7 @@
 /* Interrupt above priority 31 are not effected by critical sections, but cannot call interrupt safe FreeRTOS_core2 functions. */
 #define configMAX_API_CALL_INTERRUPT_PRIORITY_core2      31
 #ifdef __TASKING__
-#define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { __disable(); __debug(); }
+#define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { }
 #elif defined(__clang__)
 #define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { __builtin_tricore_disable(); __builtin_tricore_debug(); }
 #endif

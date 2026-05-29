@@ -87,7 +87,9 @@ Std_ReturnType TimeBase_ConvertDateTimeToUtcNs(
 Std_ReturnType TimeBase_ConvertUtcNsToDateTime(uint64 utcTimeNs, TimeBase_DateTimeType *dateTime);
 Std_ReturnType TimeBase_ValidateUtcTimeNs(uint64 utcTimeNs);
 void TimeBase_CaptureStandbyRtcBeforeScrReset(void);
+Std_ReturnType TimeBase_RestoreStandbyRtcCapture(const uint8 *image, uint16 length);
 Std_ReturnType TimeBase_PrepareStandbyRtc(void);
+Std_ReturnType TimeBase_RearmStandbyRtc(void);
 Std_ReturnType TimeBase_LoadUtcFromNvM(void);
 
 void TimeBase_GetTimestampSnapshot(TimeBase_TimestampSnapshotType *snapshot);

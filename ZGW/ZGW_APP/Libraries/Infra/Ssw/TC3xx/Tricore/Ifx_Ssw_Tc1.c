@@ -151,11 +151,6 @@ void __Core1_start(void)
          *     diff= stmCountNow - stmCountBegin = 4 as expected.*/
     }
 
-    /*Start remaining cores down the line in a daisy-chain fashion*/
-#if (IFX_CFG_SSW_ENABLE_TRICORE2 != 0)
-    (void)Ifx_Ssw_startCore(&MODULE_CPU2, (unsigned int)__START(2));       /*The status returned by function call is ignored */
-#endif
-
     /*Initialize CPU Private Global Variables*/
     //TODO : This implementation is done once all compilers support this
 #if (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0)
@@ -179,7 +174,7 @@ void __Core1_start(void)
 #ifdef IFX_CFG_SSW_RETURN_FROM_MAIN
     {
         extern int core1_main(void);
-        int status= core1_main();        /* Call main function of CPU2 */
+        int status= core1_main();        /* Call main function of CPU1 */
 #if (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0)
         Ifx_Ssw_doCppExit(status);
 #else /* (IFX_CFG_SSW_ENABLE_INDIVIDUAL_C_INIT != 0) */
@@ -188,7 +183,7 @@ void __Core1_start(void)
     }
 #else /* IFX_CFG_SSW_RETURN_FROM_MAIN */
     extern void core1_main(void);
-    Ifx_Ssw_jumpToFunction(core1_main);  /* Jump to main function of CPU2 */
+    Ifx_Ssw_jumpToFunction(core1_main);  /* Jump to main function of CPU1 */
 #endif /* IFX_CFG_SSW_RETURN_FROM_MAIN */
 
     /* Go into infinite loop, normally the code shall not reach here */

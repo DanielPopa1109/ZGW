@@ -5,11 +5,25 @@
 #include "IfxScuRcu.h"
 #include "IfxFlash.h"
 #include "IfxCan_Can.h"
+#include "IfxPort.h"
 #include "IfxPort_reg.h"
 #include "aurix_pin_mappings.h"
 
-#define FBL_TRANSPORT_CANFD              1u
-#define FBL_TRANSPORT_ETH                2u
+#define FBL_TRANSPORT_ETH                1u
+#define FBL_TRANSPORT_CANFD              2u
+#define FBL_TRANSPORT_CAN_CLASSIC        3u
+
+#define FBL_RESET_INFO_ENTER_DOIP        0xFCD0u
+
+/* Mirrors the APP NCR group ordering in Lcf_Tasking_Tricore_Tc.lsl. */
+#define FBL_NCR_DIAG_SESSION_ADDR        0x900000DCu
+#define FBL_NCR_RESET_COUNTER_ADDR       0x900000E4u
+#define FBL_NCR_PROGRAMMING_REQ_ADDR     0x900000E5u
+#define FBL_NCR_COMM_INTERFACE_ADDR      0x900000E6u
+#define FBL_PROGRAMMING_REQUEST_ACTIVE   1u
+#define FBL_DIAG_SESSION_PROGRAMMING     0x02u
+#define FBL_RESET_COUNTER_FORCE_MIN      49u
+#define FBL_RESET_COUNTER_FORCE_MAX      52u
 
 #define FBL_START_NCACHED                0xA0000000u
 #define FBL_END_NCACHED                  0xA002FFFFu
@@ -34,6 +48,11 @@
 #define FBL_CAN_RES_ID                   0x711u
 #define FBL_CAN_RX_PRIO                  1u
 #define FBL_CAN_MAX_DL                   64u
+#define FBL_CAN_CLASSIC_MAX_DL           8u
+#define FBL_CAN_EXT_ADDR_ZGW             0x41u
+#define FBL_CAN_EXT_ADDR_TESTER          0x41u
+#define FBL_CAN_CLASSIC_TRCV_STB_PORT    (&MODULE_P20)
+#define FBL_CAN_CLASSIC_TRCV_STB_PIN     6u
 
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
 #define FBL_ISOTP_FC_TIMEOUT_LOOPS       1000000u
@@ -65,6 +84,15 @@
 #define UDS_RID_ERASE_APP                0x0001u
 #define UDS_RID_CRC_CHECK                0x0002u
 #define UDS_RID_START_FBL_RAM_UPDATER    0x0155u
+#define UDS_DID_ACTIVE_SESSION           0xF186u
+#define UDS_DID_SOFTWARE_VERSION         0xF187u
+#define UDS_DID_FBL_SW_VERSION           UDS_DID_SOFTWARE_VERSION
+#define APP_SW_VERSION_MAJOR             1u
+#define APP_SW_VERSION_MINOR             0u
+#define APP_SW_VERSION_PATCH             0u
+#define FBL_SW_VERSION_MAJOR             1u
+#define FBL_SW_VERSION_MINOR             0u
+#define FBL_SW_VERSION_PATCH             0u
 
 #define DOIP_TCP_PORT                    13400u
 #define DOIP_UDP_PORT                    13400u
@@ -112,9 +140,11 @@ extern uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len);
 extern void FblEth_TcpSend(const uint8 *buf, uint16 len);
 extern void FblEth_UdpSend(const uint8 *buf, uint16 len);
 
-volatile uint32 g_FblTransportSelect = FBL_TRANSPORT_CANFD;
+volatile uint32 g_FblTransportSelect = FBL_TRANSPORT_ETH;
 volatile uint32 g_FblStayInBoot = 1u;
 volatile uint32 g_FblStartRamUpdater = 0u;
+volatile uint16 g_FblLastResetReason = 0u;
+volatile uint8 g_FblDiagBootRequestSeen = 0u;
 
 typedef struct
 {
@@ -145,6 +175,8 @@ typedef struct
     volatile uint8 fcStatus;
     volatile uint8 fcBlockSize;
     volatile uint8 fcStMin;
+    uint8 addrOffset;
+    uint8 txAddrOffset;
 } FblIsoTp_Type;
 
 typedef struct
@@ -186,16 +218,24 @@ static const uint8 Fbl_DoIpGid[6] = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
 
 IFX_INTERRUPT(Fbl_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
+static uint8 Fbl_ReadNcrU8(uint32 addr);
+static void Fbl_WriteNcrU8(uint32 addr, uint8 value);
+static uint8 Fbl_NormalizeTransport(uint8 transport);
+static uint8 Fbl_ResetCounterForcesProgramming(uint8 resetCounter);
+static uint8 Fbl_IsAppValid(void);
 static void Fbl_PlatformInit(void);
 static void Fbl_CanReleaseFdRxPinFromScr(void);
-static void Fbl_CanInit(void);
+static void Fbl_CanClassicTrcvSetNormalMode(void);
+static void Fbl_CanInit(uint8 transport);
 static void Fbl_CanSend(const uint8 *data, uint8 len);
 static uint8 Fbl_CanDlcFromLen(uint8 len);
 static uint8 Fbl_CanLenFromDlc(uint8 dlc);
+static uint8 Fbl_CanPayloadLen(void);
 static void Fbl_IsoTpInit(void);
 static void Fbl_IsoTpRx(const uint8 *data, uint8 len);
 static void Fbl_IsoTpSend(const uint8 *data, uint16 len);
 static void Fbl_IsoTpSendFc(void);
+static uint8 Fbl_IsoTpDetectAddrOffset(const uint8 *data, uint8 len);
 static uint8 Fbl_IsoTpWaitFc(void);
 static void Fbl_IsoTpDelayStMin(uint8 stMin);
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
@@ -228,11 +268,110 @@ static void Fbl_Wr32(uint8 *p, uint32 v);
 static void Fbl_JumpToApp(void);
 static void Fbl_CopyAndJumpRamUpdater(void);
 
+static uint8 Fbl_ReadNcrU8(uint32 addr)
+{
+    return *((volatile uint8 *)addr);
+}
+
+static void Fbl_WriteNcrU8(uint32 addr, uint8 value)
+{
+    *((volatile uint8 *)addr) = value;
+}
+
+static uint8 Fbl_NormalizeTransport(uint8 transport)
+{
+    if((transport == FBL_TRANSPORT_CANFD) || (transport == FBL_TRANSPORT_CAN_CLASSIC))
+    {
+        return transport;
+    }
+
+    return FBL_TRANSPORT_ETH;
+}
+
+static uint8 Fbl_ResetCounterForcesProgramming(uint8 resetCounter)
+{
+    return ((resetCounter >= FBL_RESET_COUNTER_FORCE_MIN) &&
+            (resetCounter <= FBL_RESET_COUNTER_FORCE_MAX)) ? 1u : 0u;
+}
+
+static uint8 Fbl_IsAppValid(void)
+{
+    const uint32 *appStart = (const uint32 *)APP_START_NCACHED;
+    uint8 i;
+
+    for(i = 0u; i < 8u; i++)
+    {
+        if((appStart[i] != 0x00000000u) &&
+           (appStart[i] != 0xFFFFFFFFu) &&
+           (appStart[i] != 0x36363636u))
+        {
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
 void core0_main(void)
 {
+    IfxScuRcu_ResetCode resetCode;
+    uint16 resetInfo;
+    uint8 programmingRequest;
+    uint8 requestedTransport;
+    uint8 resetCounter;
+
+    resetCode = IfxScuRcu_evaluateReset();
+    resetInfo = MODULE_SCU.RSTCON2.B.USRINFO;
+    g_FblLastResetReason = resetInfo;
+
+    programmingRequest = Fbl_ReadNcrU8(FBL_NCR_PROGRAMMING_REQ_ADDR);
+    requestedTransport = Fbl_NormalizeTransport(Fbl_ReadNcrU8(FBL_NCR_COMM_INTERFACE_ADDR));
+    resetCounter = Fbl_ReadNcrU8(FBL_NCR_RESET_COUNTER_ADDR);
+
+    if(Fbl_ResetCounterForcesProgramming(resetCounter) != 0u)
+    {
+        Fbl_WriteNcrU8(FBL_NCR_COMM_INTERFACE_ADDR, FBL_TRANSPORT_ETH);
+        Fbl_WriteNcrU8(FBL_NCR_DIAG_SESSION_ADDR, FBL_DIAG_SESSION_PROGRAMMING);
+        g_FblTransportSelect = FBL_TRANSPORT_ETH;
+        g_FblStayInBoot = 0u;
+        g_FblDiagBootRequestSeen = 1u;
+    }
+    else if((programmingRequest == FBL_PROGRAMMING_REQUEST_ACTIVE) ||
+            (resetCode.resetReason == FBL_RESET_INFO_ENTER_DOIP) ||
+            (resetInfo == FBL_RESET_INFO_ENTER_DOIP))
+    {
+        g_FblTransportSelect = requestedTransport;
+        g_FblStayInBoot = 0u;
+        g_FblDiagBootRequestSeen = 1u;
+        Fbl_WriteNcrU8(FBL_NCR_DIAG_SESSION_ADDR, FBL_DIAG_SESSION_PROGRAMMING);
+    }
+    else
+    {
+        g_FblDiagBootRequestSeen = 0u;
+    }
+
+    if(programmingRequest == FBL_PROGRAMMING_REQUEST_ACTIVE)
+    {
+        Fbl_WriteNcrU8(FBL_NCR_PROGRAMMING_REQ_ADDR, 0u);
+    }
+
     Fbl_PlatformInit();
     Fbl_FlashInit();
     Fbl_IsoTpInit();
+
+    if(g_FblStayInBoot == 1u)
+    {
+        if(Fbl_IsAppValid() != 0u)
+        {
+            Fbl_JumpToApp();
+        }
+
+        g_FblStayInBoot = 0u;
+        g_FblTransportSelect = FBL_TRANSPORT_ETH;
+        Fbl_WriteNcrU8(FBL_NCR_DIAG_SESSION_ADDR, FBL_DIAG_SESSION_PROGRAMMING);
+    }
+
+    g_FblTransportSelect = Fbl_NormalizeTransport((uint8)g_FblTransportSelect);
 
     if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
     {
@@ -240,13 +379,7 @@ void core0_main(void)
     }
     else
     {
-        g_FblTransportSelect = FBL_TRANSPORT_CANFD;
-        Fbl_CanInit();
-    }
-
-    if(g_FblStayInBoot == 1u)
-    {
-        Fbl_JumpToApp();
+        Fbl_CanInit((uint8)g_FblTransportSelect);
     }
 
     while(1)
@@ -264,7 +397,7 @@ void core0_main(void)
         if(g_iso.rxReady != 0u)
         {
             g_iso.rxReady = 0u;
-            Fbl_UdsHandle(g_iso.rxBuf, g_iso.rxLen, FBL_TRANSPORT_CANFD);
+            Fbl_UdsHandle(g_iso.rxBuf, g_iso.rxLen, (uint8)g_FblTransportSelect);
         }
     }
 }
@@ -275,7 +408,6 @@ static void Fbl_PlatformInit(void)
     IfxScuWdt_disableCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
     gpio_init_pins();
-    can1_node3_init_pins();
     IfxCpu_enableInterrupts();
 }
 
@@ -292,43 +424,71 @@ static void Fbl_CanReleaseFdRxPinFromScr(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
-static void Fbl_CanInit(void)
+static void Fbl_CanClassicTrcvSetNormalMode(void)
 {
-    Fbl_CanReleaseFdRxPinFromScr();
-    can1_node3_init_pins();
+    IfxPort_setPinModeOutput(FBL_CAN_CLASSIC_TRCV_STB_PORT,
+            FBL_CAN_CLASSIC_TRCV_STB_PIN,
+            IfxPort_OutputMode_pushPull,
+            IfxPort_OutputIdx_general);
+    IfxPort_setPinLow(FBL_CAN_CLASSIC_TRCV_STB_PORT, FBL_CAN_CLASSIC_TRCV_STB_PIN);
+}
+
+static void Fbl_CanInit(uint8 transport)
+{
+    uint8 isClassic = (transport == FBL_TRANSPORT_CAN_CLASSIC) ? 1u : 0u;
+
+    if(isClassic != 0u)
+    {
+        can0_node0_init_pins();
+    }
+    else
+    {
+        Fbl_CanReleaseFdRxPinFromScr();
+        can1_node3_init_pins();
+    }
 
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, &MODULE_CAN1);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN0 : &MODULE_CAN1);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
-    g_can.nodeConfig.nodeId = IfxCan_NodeId_3;
-    g_can.nodeConfig.frame.mode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_0 : IfxCan_NodeId_3;
+    g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
-    g_can.nodeConfig.baudRate.prescaler = 3u;
-    g_can.nodeConfig.baudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.baudRate.timeSegment2 = 3u;
-    g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
-    g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-    g_can.nodeConfig.fastBaudRate.prescaler = 0u;
-    g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-    g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
-    g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+
+    if(isClassic == 0u)
+    {
+        g_can.nodeConfig.baudRate.prescaler = 3u;
+        g_can.nodeConfig.baudRate.timeSegment1 = 14u;
+        g_can.nodeConfig.baudRate.timeSegment2 = 3u;
+        g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
+        g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
+        g_can.nodeConfig.fastBaudRate.prescaler = 0u;
+        g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
+        g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
+        g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+    }
+
     g_can.nodeConfig.calculateBitTimingValues = TRUE;
 
     g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
     g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
-    g_can.nodeConfig.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.txConfig.txBufferDataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
 
-    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_dedicatedBuffers;
-    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_fifo0;
+    g_can.nodeConfig.rxConfig.rxFifo0DataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize =
+            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
+    g_can.nodeConfig.rxConfig.rxFifo0Size = (isClassic != 0u) ? 32u : 12u;
 
-    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
     g_can.nodeConfig.filterConfig.standardListSize = 1u;
     g_can.nodeConfig.filterConfig.extendedListSize = 0u;
     g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
@@ -336,27 +496,36 @@ static void Fbl_CanInit(void)
     g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
     g_can.nodeConfig.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
 
-    g_can.nodeConfig.interruptConfig.messageStoredToDedicatedRxBufferEnabled = TRUE;
-    g_can.nodeConfig.interruptConfig.reint.priority = FBL_CAN_RX_PRIO;
-    g_can.nodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
-    g_can.nodeConfig.interruptConfig.reint.typeOfService = IfxSrc_Tos_cpu0; // @suppress("Symbol is not resolved")
+    g_can.nodeConfig.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
+    g_can.nodeConfig.interruptConfig.rxf0n.priority = FBL_CAN_RX_PRIO;
+    g_can.nodeConfig.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_0;
 
     g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = 0x800u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = 0x880u;
-    g_can.nodeConfig.messageRAM.rxBuffersStartAddress = 0x980u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = 0xD00u;
+    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = (isClassic != 0u) ? 0x000u : 0x800u;
+    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = (isClassic != 0u) ? 0x080u : 0x880u;
+    g_can.nodeConfig.messageRAM.rxFifo0StartAddress = (isClassic != 0u) ? 0x180u : 0x980u;
+    g_can.nodeConfig.messageRAM.txBuffersStartAddress = (isClassic != 0u) ? 0x400u : 0xD00u;
 
     IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
 
     g_can.filter.number = 0u;
-    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    g_can.filter.type = IfxCan_FilterType_classic;
     g_can.filter.id1 = FBL_CAN_REQ_ID;
-    g_can.filter.rxBufferOffset = IfxCan_RxBufferId_0;
+    g_can.filter.id2 = FBL_CAN_REQ_ID;
     IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
 
-    IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    if(isClassic != 0u)
+    {
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        Fbl_CanClassicTrcvSetNormalMode();
+    }
+    else
+    {
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+    }
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
@@ -366,33 +535,44 @@ void Fbl_CanRxIsr(void)
 {
     uint8 len;
 
-    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_messageStoredToDedicatedRxBuffer);
-    g_can.rxMsg.bufferNumber = 0u;
+    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_rxFifo0NewMessage);
 
-    if(IfxCan_Can_isNewDataReceived(&g_can.canNode, 0u) != 0u)
+    while(IfxCan_Can_getRxFifo0FillLevel(&g_can.canNode) > 0u)
     {
+        IfxCan_Can_initMessage(&g_can.rxMsg);
+        g_can.rxMsg.readFromRxFifo0 = TRUE;
+        memset(g_can.rxData, 0u, sizeof(g_can.rxData));
         IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32 *)g_can.rxData);
 
         if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
         {
             len = Fbl_CanLenFromDlc((uint8)g_can.rxMsg.dataLengthCode);
+            if(len > Fbl_CanPayloadLen())
+            {
+                len = Fbl_CanPayloadLen();
+            }
             Fbl_IsoTpRx(g_can.rxData, len);
         }
-
-        IfxCan_Node_clearRxBufferNewDataFlag(g_can.canNode.node, 0u);
     }
 }
 
 static void Fbl_CanSend(const uint8 *data, uint8 len)
 {
     uint32 retry = FBL_CAN_TX_BUSY_RETRY_MAX;
+    uint8 maxLen = Fbl_CanPayloadLen();
+
+    if(len > maxLen)
+    {
+        len = maxLen;
+    }
 
     memset(g_can.txData, 0u, sizeof(g_can.txData));
     memcpy(g_can.txData, data, len);
 
     IfxCan_Can_initMessage(&g_can.txMsg);
     g_can.txMsg.messageId = FBL_CAN_RES_ID;
-    g_can.txMsg.frameMode = IfxCan_FrameMode_fdLongAndFast;
+    g_can.txMsg.frameMode = (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
+            IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
     g_can.txMsg.dataLengthCode = Fbl_CanDlcFromLen(len);
     g_can.txMsg.bufferNumber = 0u;
@@ -422,6 +602,12 @@ static uint8 Fbl_CanLenFromDlc(uint8 dlc)
     return map[dlc & 0x0Fu];
 }
 
+static uint8 Fbl_CanPayloadLen(void)
+{
+    return (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
+            FBL_CAN_CLASSIC_MAX_DL : FBL_CAN_MAX_DL;
+}
+
 static void Fbl_IsoTpInit(void)
 {
     memset(&g_iso, 0u, sizeof(g_iso));
@@ -429,31 +615,57 @@ static void Fbl_IsoTpInit(void)
 
 static void Fbl_IsoTpSendFc(void)
 {
-    uint8 fc[3] = {0x30u, 0x00u, 0x00u};
-    Fbl_CanSend(fc, 3u);
+    uint8 fc[64];
+    uint8 addrOffset = g_iso.txAddrOffset;
+
+    memset(fc, 0u, sizeof(fc));
+    if(addrOffset != 0u)
+    {
+        fc[0u] = FBL_CAN_EXT_ADDR_TESTER;
+    }
+
+    fc[addrOffset] = 0x30u;
+    fc[addrOffset + 1u] = 0x00u;
+    fc[addrOffset + 2u] = 0x00u;
+    Fbl_CanSend(fc, Fbl_CanPayloadLen());
+}
+
+static uint8 Fbl_IsoTpDetectAddrOffset(const uint8 *data, uint8 len)
+{
+    if((len > 1u) && (data[0u] == FBL_CAN_EXT_ADDR_ZGW))
+    {
+        return 1u;
+    }
+
+    return 0u;
 }
 
 static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
 {
     uint8 pci;
+    uint8 pciIdx;
     uint16 ffLen;
     uint8 copy;
     uint8 sn;
 
     if(len == 0u) { return; }
 
-    pci = data[0u] & 0xF0u;
+    g_iso.addrOffset = Fbl_IsoTpDetectAddrOffset(data, len);
+    if(len <= g_iso.addrOffset) { return; }
+
+    pciIdx = g_iso.addrOffset;
+    pci = data[pciIdx] & 0xF0u;
 
     if(pci == 0x00u)
     {
-        uint8 sfLen = data[0u] & 0x0Fu;
-        uint8 offset = 1u;
+        uint8 sfLen = data[pciIdx] & 0x0Fu;
+        uint8 offset = (uint8)(pciIdx + 1u);
 
         if(sfLen == 0u)
         {
-            if(len < 2u) { return; }
-            sfLen = data[1u];
-            offset = 2u;
+            if(len < (uint8)(pciIdx + 2u)) { return; }
+            sfLen = data[pciIdx + 1u];
+            offset = (uint8)(pciIdx + 2u);
         }
 
         if(sfLen == 0u) { return; }
@@ -462,54 +674,58 @@ static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
         {
             memcpy(g_iso.rxBuf, &data[offset], sfLen);
             g_iso.rxLen = sfLen;
+            g_iso.rxIdx = 0u;
+            g_iso.txAddrOffset = g_iso.addrOffset;
             g_iso.rxReady = 1u;
         }
     }
     else if(pci == 0x10u)
     {
-        if(len < 3u) { return; }
+        if(len < (uint8)(pciIdx + 3u)) { return; }
 
-        ffLen = (((uint16)(data[0u] & 0x0Fu)) << 8u) | data[1u];
+        ffLen = (((uint16)(data[pciIdx] & 0x0Fu)) << 8u) | data[pciIdx + 1u];
         if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
 
-        copy = (uint8)(len - 2u);
+        copy = (uint8)(len - (uint8)(pciIdx + 2u));
         if(copy > ffLen) { copy = (uint8)ffLen; }
 
-        memcpy(g_iso.rxBuf, &data[2u], copy);
+        memcpy(g_iso.rxBuf, &data[pciIdx + 2u], copy);
         g_iso.rxLen = ffLen;
         g_iso.rxIdx = copy;
         g_iso.nextSn = 1u;
+        g_iso.txAddrOffset = g_iso.addrOffset;
         Fbl_IsoTpSendFc();
     }
     else if(pci == 0x20u)
     {
-        if((len < 2u) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
+        if((len < (uint8)(pciIdx + 2u)) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
 
-        sn = data[0u] & 0x0Fu;
+        sn = data[pciIdx] & 0x0Fu;
         if(sn != g_iso.nextSn) { return; }
 
-        copy = (uint8)(len - 1u);
+        copy = (uint8)(len - (uint8)(pciIdx + 1u));
         if((g_iso.rxIdx + copy) > g_iso.rxLen)
         {
             copy = (uint8)(g_iso.rxLen - g_iso.rxIdx);
         }
 
-        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[1u], copy);
+        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[pciIdx + 1u], copy);
         g_iso.rxIdx += copy;
         g_iso.nextSn = (uint8)((g_iso.nextSn + 1u) & 0x0Fu);
 
         if(g_iso.rxIdx >= g_iso.rxLen)
         {
+            g_iso.txAddrOffset = g_iso.addrOffset;
             g_iso.rxReady = 1u;
         }
     }
     else if(pci == 0x30u)
     {
-        if(len < 3u) { return; }
+        if(len < (uint8)(pciIdx + 3u)) { return; }
 
-        g_iso.fcStatus = data[0u] & 0x0Fu;
-        g_iso.fcBlockSize = data[1u];
-        g_iso.fcStMin = data[2u];
+        g_iso.fcStatus = data[pciIdx] & 0x0Fu;
+        g_iso.fcBlockSize = data[pciIdx + 1u];
+        g_iso.fcStMin = data[pciIdx + 2u];
         g_iso.waitFc = 0u;
     }
     else
@@ -587,23 +803,73 @@ static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
     uint8 frame[64];
     uint8 chunk;
     uint8 blockCounter;
+    uint8 payloadLen;
+    uint8 addrOffset;
+    uint8 pciIdx;
+    uint8 sfMax;
+    uint8 ffPayload;
+    uint8 cfPayload;
 
-    if(len <= 7u)
+    if(len > FBL_ISOTP_MAX_PAYLOAD)
+    {
+        return;
+    }
+
+    payloadLen = Fbl_CanPayloadLen();
+    addrOffset = g_iso.txAddrOffset;
+    pciIdx = addrOffset;
+
+    if(addrOffset != 0u)
+    {
+        if(payloadLen <= 2u)
+        {
+            return;
+        }
+    }
+
+    sfMax = (uint8)(payloadLen - addrOffset - 1u);
+    if((payloadLen > 8u) && (sfMax > 7u))
+    {
+        sfMax = (uint8)(payloadLen - addrOffset - 2u);
+    }
+
+    if(len <= sfMax)
     {
         memset(frame, 0u, sizeof(frame));
-        frame[0u] = (uint8)len;
-        memcpy(&frame[1u], data, len);
-        Fbl_CanSend(frame, (uint8)(len + 1u));
+        if(addrOffset != 0u)
+        {
+            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+        }
+
+        if((payloadLen > 8u) && (len > 7u))
+        {
+            frame[pciIdx] = 0x00u;
+            frame[pciIdx + 1u] = (uint8)len;
+            memcpy(&frame[pciIdx + 2u], data, len);
+        }
+        else
+        {
+            frame[pciIdx] = (uint8)len;
+            memcpy(&frame[pciIdx + 1u], data, len);
+        }
+
+        Fbl_CanSend(frame, payloadLen);
         return;
     }
 
     memset(frame, 0u, sizeof(frame));
-    frame[0u] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
-    frame[1u] = (uint8)(len & 0xFFu);
-    chunk = 62u;
+    if(addrOffset != 0u)
+    {
+        frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+    }
+
+    frame[pciIdx] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
+    frame[pciIdx + 1u] = (uint8)(len & 0xFFu);
+    ffPayload = (uint8)(payloadLen - addrOffset - 2u);
+    chunk = ffPayload;
     if(chunk > len) { chunk = (uint8)len; }
-    memcpy(&frame[2u], data, chunk);
-    Fbl_CanSend(frame, 64u);
+    memcpy(&frame[pciIdx + 2u], data, chunk);
+    Fbl_CanSend(frame, payloadLen);
 
     g_iso.txLen = len;
     g_iso.txIdx = chunk;
@@ -640,16 +906,22 @@ static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
         Fbl_IsoTpDelayStMin(g_iso.fcStMin);
 
         memset(frame, 0u, sizeof(frame));
-        frame[0u] = (uint8)(0x20u | (g_iso.txSn & 0x0Fu));
+        if(addrOffset != 0u)
+        {
+            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
+        }
 
-        chunk = 63u;
+        frame[pciIdx] = (uint8)(0x20u | (g_iso.txSn & 0x0Fu));
+
+        cfPayload = (uint8)(payloadLen - addrOffset - 1u);
+        chunk = cfPayload;
         if((g_iso.txIdx + chunk) > g_iso.txLen)
         {
             chunk = (uint8)(g_iso.txLen - g_iso.txIdx);
         }
 
-        memcpy(&frame[1u], &data[g_iso.txIdx], chunk);
-        Fbl_CanSend(frame, (uint8)(chunk + 1u));
+        memcpy(&frame[pciIdx + 1u], &data[g_iso.txIdx], chunk);
+        Fbl_CanSend(frame, payloadLen);
         g_iso.txIdx += chunk;
         g_iso.txSn = (uint8)((g_iso.txSn + 1u) & 0x0Fu);
         blockCounter++;
@@ -661,6 +933,7 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     uint8 res[64];
     uint8 sid;
     uint16 rid;
+    uint16 did;
     uint32 addr;
     uint32 size;
     uint32 crcExpected;
@@ -693,13 +966,32 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     }
     else if(sid == UDS_SID_RDBI)
     {
-        if((len >= 3u) && (req[1u] == 0xF1u) && (req[2u] == 0x86u))
+        if(len != 3u)
+        {
+            Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        did = Fbl_Rd16(&req[1u]);
+
+        if(did == UDS_DID_ACTIVE_SESSION)
         {
             res[0u] = 0x62u;
-            res[1u] = 0xF1u;
-            res[2u] = 0x86u;
-            res[3u] = 0x02u;
+            Fbl_Wr16(&res[1u], did);
+            res[3u] = FBL_DIAG_SESSION_PROGRAMMING;
             Fbl_UdsSend(res, 4u, transport);
+        }
+        else if(did == UDS_DID_FBL_SW_VERSION)
+        {
+            res[0u] = 0x62u;
+            Fbl_Wr16(&res[1u], did);
+            res[3u] = APP_SW_VERSION_MAJOR;
+            res[4u] = APP_SW_VERSION_MINOR;
+            res[5u] = APP_SW_VERSION_PATCH;
+            res[6u] = FBL_SW_VERSION_MAJOR;
+            res[7u] = FBL_SW_VERSION_MINOR;
+            res[8u] = FBL_SW_VERSION_PATCH;
+            Fbl_UdsSend(res, 9u, transport);
         }
         else
         {

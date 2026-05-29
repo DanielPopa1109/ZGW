@@ -1,4 +1,5 @@
 #include "EthTimeSync.h"
+#include "GatewaySwc.h"
 #include "TimeBase.h"
 #include "TimeSync_Cfg.h"
 
@@ -156,7 +157,7 @@ static void EthTimeSync_SendPacket(void)
     remoteAddr.port = TIMESYNC_UDP_PORT;
 
     EthTimeSync_BuildPacket(packet);
-    sentLength = TcpIp_SendTo(EthTimeSync_Socket, &remoteAddr, packet, ETHTIMESYNC_PACKET_LENGTH);
+    sentLength = GatewaySwc_RequestTcpIpSendTo(EthTimeSync_Socket, &remoteAddr, packet, ETHTIMESYNC_PACKET_LENGTH);
     if (sentLength == (sint32)ETHTIMESYNC_PACKET_LENGTH)
     {
         EthTimeSync_SequenceCounter++;
@@ -172,24 +173,27 @@ static void EthTimeSync_SendPacket(void)
 
 void EthTimeSync_MainFunction(uint32 elapsedMs)
 {
-#if (TIMESYNC_UDP_ENABLE == STD_ON)
     uint64 nowNs;
 
     (void)elapsedMs;
 
     if (TcpIp_IsLinkAvailable() == 0u)
     {
+#if (TIMESYNC_UDP_ENABLE == STD_ON)
         EthTimeSync_NextTxTimeNs = 0ull;
         EthTimeSync_Status = ETHTIMESYNC_STATUS_WAIT_LINK;
+#endif
         return;
     }
 
+    nowNs = TimeBase_PlatformGetCounterNs();
+
+#if (TIMESYNC_UDP_ENABLE == STD_ON)
     if (EthTimeSync_Socket == TCPIP_INVALID_SOCKET)
     {
         EthTimeSync_OpenSocket();
     }
 
-    nowNs = TimeBase_PlatformGetCounterNs();
     if (EthTimeSync_NextTxTimeNs == 0ull)
     {
         EthTimeSync_NextTxTimeNs = nowNs + ETHTIMESYNC_TX_PERIOD_NS;
@@ -199,9 +203,8 @@ void EthTimeSync_MainFunction(uint32 elapsedMs)
         EthTimeSync_SendPacket();
         EthTimeSync_UpdateNextTxDeadline(nowNs);
     }
-#else
-    (void)elapsedMs;
 #endif
+
 }
 
 uint8 EthTimeSync_GetStatus(void)

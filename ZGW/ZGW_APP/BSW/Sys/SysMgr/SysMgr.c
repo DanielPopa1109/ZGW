@@ -38,6 +38,7 @@
 #define SYSMGR_MCUSM_SOURCE_RESET         0x01u
 #define SYSMGR_MCUSM_SOURCE_SCR_ECC_DBE   0x02u
 #define SYSMGR_MCUSM_SOURCE_SCR_WDT       0x04u
+#define SYSMGR_MCUSM_SOURCE_SAFETYKIT     0x08u
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
@@ -240,6 +241,12 @@ static uint8 SysMgr_GetMcuSmFaultSource(void)
         source |= SYSMGR_MCUSM_SOURCE_SCR_WDT;
     }
 
+    if ((McuSm_SafetyKitFailureMask != 0u) ||
+            (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST))
+    {
+        source |= SYSMGR_MCUSM_SOURCE_SAFETYKIT;
+    }
+
     return source;
 }
 
@@ -270,7 +277,14 @@ Std_ReturnType SysMgr_CaptureMcuSmFreezeFrame(
     buffer[2] = SysMgr_GetMcuSmFaultSource();
     buffer[3] = SysMgr_LastScrWakeReason;
     SysMgr_StoreU32(buffer, 4u, McuSm_LastResetReason);
-    SysMgr_StoreU32(buffer, 8u, McuSm_LastResetInformation);
+    if ((McuSm_LastResetReason == 0u) && (McuSm_SafetyKitFailureMask != 0u))
+    {
+        SysMgr_StoreU32(buffer, 8u, McuSm_SafetyKitFailureMask);
+    }
+    else
+    {
+        SysMgr_StoreU32(buffer, 8u, McuSm_LastResetInformation);
+    }
     SysMgr_StoreU32(buffer, 12u, SysMgr_LastPmsWcr2Status);
     SysMgr_StoreU32(buffer, 16u, SysMgr_LastPmsWstat2Status);
     buffer[20] = SysMgr_LastScrFaultStatus;
@@ -386,8 +400,6 @@ void SysMgr_GoSleep(void)
     }
 
     IfxAsclin_disableModule((Ifx_ASCLIN *)(void *)&MODULE_ASCLIN1);
-    //IfxCan_disableModule(&MODULE_CAN0);
-    //IfxCan_disableModule(&MODULE_CAN1);
     IfxGeth_disableModule(&MODULE_GETH);
     vTaskSuspendAll_core0();
     vTaskEndScheduler_core0();
@@ -529,9 +541,10 @@ void SysMgr_GoSleep(void)
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
     IfxMtu_clearSram((IfxMtu_MbistSel)77);
     IfxMtu_clearSram((IfxMtu_MbistSel)78);
-    IfxScr_enableSCR();
     IfxScr_copyProgram();
+    (void)TimeBase_RearmStandbyRtc();
     IfxScr_init(1);
+    IfxScr_enableSCR();
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
     if(SCU_RSTSTAT.B.STBYR)
     {
@@ -588,14 +601,28 @@ void SysMgr_ProcessResetDtc(void)
     if(0u == SysMgr_MainCounter)
     {
         boolean scrFaultDetected = SysMgr_HasScrFaultError();
+        boolean safetyKitFaultDetected = ((McuSm_SafetyKitFailureMask != 0u) ||
+                (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST)) ? TRUE : FALSE;
 
-        if((0u != McuSm_LastResetReason) || (scrFaultDetected != FALSE))
+        if((0u != McuSm_LastResetReason) || (scrFaultDetected != FALSE) || (safetyKitFaultDetected != FALSE))
         {
             Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_FAILED);
 
             if (scrFaultDetected != FALSE)
             {
                 SysMgr_ClearScrFaultStatus();
+            }
+
+            if (safetyKitFaultDetected != FALSE)
+            {
+                if (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST)
+                {
+                    McuSm_SafetyKitResetInhibit = 1u;
+                }
+                else
+                {
+                    McuSm_SafetyKitResetInhibit = 0u;
+                }
             }
         }
         else
@@ -653,7 +680,7 @@ void SysMgr_EcuStateMachine(void)
         else
         {
             SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = 1u;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }
@@ -672,7 +699,7 @@ void SysMgr_EcuStateMachine(void)
         else
         {
             SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = 1u;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }
@@ -686,7 +713,7 @@ void SysMgr_EcuStateMachine(void)
         else
         {
             SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = 1u;
+            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }

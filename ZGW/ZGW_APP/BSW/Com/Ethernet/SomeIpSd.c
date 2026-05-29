@@ -1,4 +1,5 @@
 #include "SomeIpSd.h"
+#include "GatewaySwc.h"
 #include "../../Time/TimeBase.h"
 #include <string.h>
 
@@ -262,7 +263,7 @@ static void SomeIpSd_SendOfferTo(const TcpIp_SockAddrType *remoteAddr,
 
     len = SomeIpSd_BuildOffer(tx, svc, ttl);
 
-    (void)SoAd_IfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
+    (void)GatewaySwc_RequestSoAdIfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
                           remoteAddr,
                           tx,
                           len);
@@ -300,7 +301,7 @@ static void SomeIpSd_SendSubscribeAck(const TcpIp_SockAddrType *remoteAddr,
                                      ttl,
                                      eventgroupId);
 
-    (void)SoAd_IfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
+    (void)GatewaySwc_RequestSoAdIfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
                           remoteAddr,
                           tx,
                           len);

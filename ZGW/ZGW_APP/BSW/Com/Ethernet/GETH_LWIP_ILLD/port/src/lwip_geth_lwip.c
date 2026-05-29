@@ -76,6 +76,9 @@
 #define IFX_LWIP_DHCP_FINE_PERIOD           (DHCP_FINE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  100
+#define LWIP_GETH_OS_POLL_PERIOD_MS         (5U)
+#define LWIP_GETH_RX_POLL_BUDGET            (64U)
+#define LWIP_GETH_CREATE_RX_TASK            (1U)
 #if LWIP_IPV4 && LWIP_ACD
 #define IFX_LWIP_ACD_PERIOD                 (ACD_TMR_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
 #endif
@@ -119,10 +122,17 @@ volatile uint32 g_LwipTcpipInitDoneCounter;
 volatile uint32 g_LwipRxTaskCreateResult;
 volatile uint32 g_LwipLinkTaskCreateResult;
 volatile uint32 g_LwipRxIsrBeforeTaskCounter;
+volatile uint32 g_LwipGratuitousArpCounter;
+volatile uint32 g_LwipSoftwareTimerTickCounter;
+volatile uint32 g_LwipRxPollLoopCounter;
+volatile uint32 g_LwipRxPollPacketCounter;
+volatile uint32 g_LwipRxPollBudgetHitCounter;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
  **********************************************************************************************************************/
+void lwip_geth_UpdateTickCount(void);
+
 /** \brief Timer interrupt callback */
 void lwip_geth_Lwip_onTimerTick(void)
 {
@@ -145,6 +155,18 @@ void lwip_geth_Lwip_onTimerTick(void)
 #endif
 
     lwip->timerFlags = timerFlags;
+}
+
+static void lwip_geth_Lwip_advancePolledTime(uint8 elapsedMs)
+{
+    uint8 tick;
+
+    for (tick = 0u; tick < elapsedMs; tick++)
+    {
+        lwip_geth_Lwip_onTimerTick();
+        lwip_geth_UpdateTickCount();
+        g_LwipSoftwareTimerTickCounter++;
+    }
 }
 
 static void lwip_geth_Lwip_applyLinkStatus(void)
@@ -206,15 +228,25 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 {
     Ifx_Lwip *lwip = &g_Lwip;
     uint16    timerFlags;
+    boolean   interruptState;
+
+    /* lwIP timer flags are generated here because this integration calls
+     * pollTimerFlags() from the 5 ms OS task instead of a 1 ms ISR.
+     */
+    lwip_geth_Lwip_advancePolledTime(LWIP_GETH_OS_POLL_PERIOD_MS);
 
     /* disable interrupts */
-    boolean interruptState = IfxCpu_disableInterrupts();
+    interruptState = IfxCpu_disableInterrupts();
 
     timerFlags       = lwip->timerFlags;
     lwip->timerFlags = 0;
 
     /* enable interrupts again */
     IfxCpu_restoreInterrupts(interruptState);
+
+#if LWIP_TCPIP_CORE_LOCKING
+    LOCK_TCPIP_CORE();
+#endif
 
 #if LWIP_DHCP
     if (timerFlags & IFX_LWIP_FLAG_DHCP_COARSE)
@@ -260,6 +292,8 @@ void lwip_geth_Lwip_pollTimerFlags(void)
         if (g_Lwip.netif.flags & NETIF_FLAG_LINK_UP)
         {
             etharp_tmr();
+            (void)etharp_gratuitous(&g_Lwip.netif);
+            g_LwipGratuitousArpCounter++;
         }
     }
 
@@ -278,15 +312,46 @@ void lwip_geth_Lwip_pollTimerFlags(void)
         }
     }
 #endif
+
+#if LWIP_TCPIP_CORE_LOCKING
+    UNLOCK_TCPIP_CORE();
+#endif
 }
 
 /** \brief Polling the ETH receive event flags */
 void lwip_geth_Lwip_pollReceiveFlags(void)
 {
-    /**
-     * Poll at most one frame. The RX task owns the blocking loop.
-     */
-    (void)lwip_geth_netif_input_once(&g_Lwip.netif);
+    uint8 processed;
+    uint8 budget = LWIP_GETH_RX_POLL_BUDGET;
+
+#if LWIP_GETH_CREATE_RX_TASK
+    if (g_Lwip.EthRxTask != NULL_PTR)
+    {
+        return;
+    }
+#endif
+
+    g_LwipRxPollLoopCounter++;
+
+    do
+    {
+        processed = lwip_geth_netif_input_once(&g_Lwip.netif);
+
+        if (processed != 0u)
+        {
+            g_LwipRxPollPacketCounter++;
+        }
+
+        if (budget > 0u)
+        {
+            budget--;
+        }
+    } while ((processed != 0u) && (budget > 0u));
+
+    if ((processed != 0u) && (budget == 0u))
+    {
+        g_LwipRxPollBudgetHitCounter++;
+    }
 }
 
 
@@ -334,7 +399,13 @@ void lwip_geth_LinkStatus(void *pvParameter)
 
     for (;;)
     {
+#if LWIP_TCPIP_CORE_LOCKING
+        LOCK_TCPIP_CORE();
+#endif
         lwip_geth_Lwip_applyLinkStatus();
+#if LWIP_TCPIP_CORE_LOCKING
+        UNLOCK_TCPIP_CORE();
+#endif
         vTaskDelay_core2(pdMS_TO_TICKS_core2(100u));
     }
 }
@@ -392,8 +463,13 @@ void lwip_geth_Lwip_init(void *arg)
     }
     /* Create a Task for checking the Link */
     g_LwipLinkTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
+#if LWIP_GETH_CREATE_RX_TASK
     /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
     g_LwipRxTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
+#else
+    g_Lwip.EthRxTask = NULL_PTR;
+    g_LwipRxTaskCreateResult = 0u;
+#endif
 #else
     if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
             (void *)0, lwip_geth_netif_init, ethernet_input) == NULL_PTR)

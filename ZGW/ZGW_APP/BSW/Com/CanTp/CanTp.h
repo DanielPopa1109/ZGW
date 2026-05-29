@@ -5,7 +5,8 @@
 
 #define CANTP_MAX_CHANNELS       8u
 #define CANTP_MAX_TX_BUFFERS     4u
-#define CANTP_MAX_PAYLOAD_LEN    4095u
+#define CANTP_LEGACY_MAX_PAYLOAD_LEN 4095u
+#define CANTP_MAX_PAYLOAD_LEN    8192u
 #define CANTP_MAIN_PERIOD_MS     5u
 
 #define CANTP_NPCI_SF            0x00u

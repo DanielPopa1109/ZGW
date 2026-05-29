@@ -12,6 +12,7 @@
 #define CODINGAPP_DID_STATUS                    0xF1C0u
 #define CODINGAPP_DID_IMAGE                     0xF1C1u
 #define CODINGAPP_DID_RX_MESSAGE_EXPECTED       0xF1C2u
+#define CODINGAPP_DID_CODING_VERSION            0xF1C3u
 
 #define CODINGAPP_ROUTINE_VALIDATE              0x0201u
 #define CODINGAPP_ROUTINE_WRITE_ALL             0x0202u

@@ -121,7 +121,15 @@ void Core0_HandleScrStartup(void)
 
     SysMgr_CaptureScrFaultBeforeScrReset();
 
-    TimeBase_CaptureStandbyRtcBeforeScrReset();
+    /* Capture SCRXRAM into NCR (cpu0_dlmu).
+     * McuSm_CaptureTimeImageFromScr() checks PMS_PMSWCR2.SCRECC internally:
+     *   - SCRECC == 0: XRAM is clean  -> XRAM image copied to McuSm_Trap4ScrRtcRecord (NCR)
+     *   - SCRECC != 0: XRAM has ECC error -> capture is skipped; the NCR image
+     *     previously saved by a TRAP4 handler (if any) is left untouched.
+     * NCR (cpu0_dlmu) survives MBIST.  TimeBase_ScrRtcBootImage lives in DSPR and
+     * is wiped by MBIST, so it is restored from NCR in Core0_InitSequence() after
+     * Core0_ExecuteSwSafetyKit() returns. */
+    McuSm_CaptureTimeImageFromScr();
 
     IfxScr_init(0u);
 
@@ -186,8 +194,6 @@ void Core0_ComInit(void)
 
     LinSM_Init();
 
-    LinIf_Init();
-
     LinTp_Init(1);
 
     LinSM_RequestComMode(0u, LINSM_FULL_COMMUNICATION);
@@ -211,6 +217,15 @@ void Core0_DemNvMInit(void)
 
     (void)TimeBase_LoadUtcFromNvM();
 
+    Core0_WaitForNvMIdle(0);
+
+    /* Prime the SCR XRAM standby record with the now-restored time so the SCR
+     * ISR can begin accumulating elapsed ticks immediately.  This also ensures
+     * the very first SDAT CAN frame after wakeup carries the correct time. */
+    (void)TimeBase_PrepareStandbyRtc();
+
+    Core0_WaitForNvMIdle(0);
+
     CodingApp_Init();
 
     Dem_Init(&Dem_Config);
@@ -229,6 +244,19 @@ void Core0_InitSequence(void)
     Core0_HandleScrStartup();
 
     Core0_ExecuteSwSafetyKit();
+
+    /* MBIST erases DSPR (wiping TimeBase_ScrRtcBootImage / TimeBase_ScrRtcBootImageValid)
+     * and SCRXRAM.  NCR in cpu0_dlmu is not erased by MBIST.
+     * Restore the time image from NCR into TimeBase_ScrRtcBootImage (DSPR) so that
+     * TimeBase_LoadUtcFromNvM() can apply the SCR-tracked elapsed time and
+     * immediately write it to NvM. */
+    if (McuSm_Trap4ScrRtcRecordValid != FALSE)
+    {
+        (void)TimeBase_RestoreStandbyRtcCapture(
+                McuSm_Trap4ScrRtcRecord,
+                (uint16)SCR_TIME_RECORD_LENGTH);
+        McuSm_Trap4ScrRtcRecordValid = FALSE;
+    }
 
     Core0_PinInit();
 
@@ -249,6 +277,8 @@ void Core0_InitSequence(void)
 
 void core0_main(void)
 {
+    //while(0x40000000 == SCU_RSTSTAT.U){__debug();}
+
     Core0_InitSequence();
 
     vTaskStartScheduler_core0();

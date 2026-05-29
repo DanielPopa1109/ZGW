@@ -7,12 +7,10 @@
 #include "Dem.h"
 #include "NvM.h"
 #include "NvM_Cfg.h"
-#include "BSW/Time/Dcm_TimeRoutine.h"
 
 #define CODINGAPP_UNUSED(x)                  ((void)(x))
 
 #define CODINGAPP_DEM_STATE_UNKNOWN          0xFFu
-#define CODINGAPP_DTC_FORMAT_IDENTIFIER_UDS  0x01u
 
 typedef struct
 {
@@ -53,6 +51,7 @@ static uint32 CodingApp_GetImageCrc(const CodingApp_NvImageType *image);
 static boolean CodingApp_IsBlank(const uint8 *data, uint16 len);
 static uint8 CodingApp_ValidateImage(const CodingApp_NvImageType *image);
 static uint16 CodingApp_CountExpectedMessages(const CodingApp_NvImageType *image);
+static uint16 CodingApp_GetCodingVersion(void);
 static void CodingApp_SetExpectedBit(CodingApp_NvImageType *image, uint16 index, boolean expected);
 static boolean CodingApp_GetExpectedBit(const CodingApp_NvImageType *image, uint16 index);
 static void CodingApp_UpdateDebug(void);
@@ -71,12 +70,17 @@ static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType 
 static Dcm_ReturnType CodingApp_StartReadNvM(uint8 *respData, Dcm_PduLengthType *respLen);
 static Dcm_ReturnType CodingApp_PollReadNvM(uint8 *respData, Dcm_PduLengthType *respLen);
 static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_PduLengthType *respLen);
-static Dcm_ReturnType CodingApp_ReadDtcByStatusMask(
-    uint8 subFunction,
-    uint8 statusMask,
-    uint8 *respData,
-    Dcm_PduLengthType *respLen
-);
+
+void DcmAppl_DiagnosticSessionChanged(uint8 connIdx, uint8 session)
+{
+    CODINGAPP_UNUSED(connIdx);
+
+    if (session == DCM_SESSION_DEFAULT)
+    {
+        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
+        CodingApp_PendingNvMStarted = FALSE;
+    }
+}
 
 void CodingApp_Init(void)
 {
@@ -248,6 +252,23 @@ Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dat
         return E_OK;
     }
 
+    if (did == CODINGAPP_DID_CODING_VERSION)
+    {
+        uint16 codingVersion;
+
+        requiredLen = 2u;
+        if (*dataLen < requiredLen)
+        {
+            return E_NOT_OK;
+        }
+
+        codingVersion = CodingApp_GetCodingVersion();
+        data[0u] = (uint8)((codingVersion >> 8u) & 0xFFu);
+        data[1u] = (uint8)(codingVersion & 0xFFu);
+        *dataLen = requiredLen;
+        return E_OK;
+    }
+
     return E_NOT_OK;
 }
 
@@ -322,18 +343,6 @@ Dcm_ReturnType CodingApp_RoutineControl(
     if ((respData == NULL_PTR) || (respLen == NULL_PTR))
     {
         return DCM_NRC_GENERAL_REJECT;
-    }
-
-    if (Dcm_TimeRoutine_IsRoutineId(routineId) != FALSE)
-    {
-        return Dcm_TimeRoutine_HandleRoutineControl(
-                opStatus,
-                routineControlType,
-                routineId,
-                reqData,
-                reqLen,
-                respData,
-                respLen);
     }
 
     if ((routineControlType != CODINGAPP_ROUTINE_START) &&
@@ -431,53 +440,6 @@ Dcm_ReturnType CodingApp_RoutineControl(
     return DCM_NRC_REQUEST_OUT_OF_RANGE;
 }
 
-Dcm_ReturnType DcmAppl_DiagnosticSessionControl(
-        uint8 connIdx,
-        Dcm_OpStatusType opStatus,
-        uint8 session,
-        uint8* respData,
-        Dcm_PduLengthType* respLen)
-{
-    CODINGAPP_UNUSED(connIdx);
-    CODINGAPP_UNUSED(opStatus);
-    CODINGAPP_UNUSED(respData);
-    CODINGAPP_UNUSED(respLen);
-
-    if ((session != DCM_SESSION_DEFAULT) &&
-            (session != DCM_SESSION_PROGRAMMING) &&
-            (session != DCM_SESSION_EXTENDED))
-    {
-        return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
-    }
-
-    if (session == DCM_SESSION_DEFAULT)
-    {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-        CodingApp_PendingNvMStarted = FALSE;
-    }
-
-    return DCM_E_OK;
-}
-
-Dcm_ReturnType DcmAppl_ClearDiagnosticInformation(
-        uint8 connIdx,
-        Dcm_OpStatusType opStatus,
-        uint32 dtcGroup)
-{
-    CODINGAPP_UNUSED(connIdx);
-    CODINGAPP_UNUSED(opStatus);
-
-    if (Dem_ClearDTC(
-            (Dem_DTCType)dtcGroup,
-            DEM_DTC_FORMAT_UDS,
-            DEM_DTC_ORIGIN_PRIMARY_MEMORY) == E_OK)
-    {
-        return DCM_E_OK;
-    }
-
-    return DCM_NRC_REQUEST_OUT_OF_RANGE;
-}
-
 Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
         uint8 connIdx,
         Dcm_OpStatusType opStatus,
@@ -530,59 +492,6 @@ Dcm_ReturnType DcmAppl_RoutineControl(
         respData,
         respLen
     );
-}
-
-Dcm_ReturnType DcmAppl_ReadDtcInformation(
-        uint8 connIdx,
-        Dcm_OpStatusType opStatus,
-        const uint8* reqData,
-        Dcm_PduLengthType reqLen,
-        uint8* respData,
-        Dcm_PduLengthType* respLen)
-{
-    uint8 subFunction;
-
-    CODINGAPP_UNUSED(connIdx);
-    CODINGAPP_UNUSED(opStatus);
-
-    if ((reqData == NULL_PTR) || (respData == NULL_PTR) || (respLen == NULL_PTR) || (reqLen < 1u))
-    {
-        return DCM_NRC_INCORRECT_LENGTH;
-    }
-
-    subFunction = reqData[0u];
-
-    if (subFunction == 0x01u)
-    {
-        if (reqLen != 2u)
-        {
-            return DCM_NRC_INCORRECT_LENGTH;
-        }
-
-        return CodingApp_ReadDtcByStatusMask(subFunction, reqData[1u], respData, respLen);
-    }
-
-    if (subFunction == 0x02u)
-    {
-        if (reqLen != 2u)
-        {
-            return DCM_NRC_INCORRECT_LENGTH;
-        }
-
-        return CodingApp_ReadDtcByStatusMask(subFunction, reqData[1u], respData, respLen);
-    }
-
-    if (subFunction == 0x0Au)
-    {
-        if (reqLen != 1u)
-        {
-            return DCM_NRC_INCORRECT_LENGTH;
-        }
-
-        return CodingApp_ReadDtcByStatusMask(subFunction, 0u, respData, respLen);
-    }
-
-    return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
 }
 
 static uint32 CodingApp_GetImageCrc(const CodingApp_NvImageType *image)
@@ -672,6 +581,27 @@ static uint16 CodingApp_CountExpectedMessages(const CodingApp_NvImageType *image
     }
 
     return count;
+}
+
+static uint16 CodingApp_GetCodingVersion(void)
+{
+    const CodingApp_NvImageType *nvImage;
+
+    if (CodingApp_Status.state == CODINGAPP_STATE_CODED)
+    {
+        return CodingApp_ActiveImage.version;
+    }
+
+    nvImage = (const CodingApp_NvImageType *)NvM_AppData_Ram;
+    if ((nvImage->magic == CODINGAPP_IMAGE_MAGIC) &&
+        (nvImage->length == (uint16)sizeof(CodingApp_NvImageType)) &&
+        (nvImage->version != 0u) &&
+        (nvImage->version != 0xFFFFu))
+    {
+        return nvImage->version;
+    }
+
+    return CODINGAPP_IMAGE_VERSION;
 }
 
 static void CodingApp_SetExpectedBit(CodingApp_NvImageType *image, uint16 index, boolean expected)
@@ -1048,76 +978,4 @@ static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_Pdu
     respData[8u] = (uint8)((CodingApp_Status.generation >> 8u) & 0xFFu);
     respData[9u] = (uint8)(CodingApp_Status.generation & 0xFFu);
     *respLen = 10u;
-}
-
-static Dcm_ReturnType CodingApp_ReadDtcByStatusMask(
-    uint8 subFunction,
-    uint8 statusMask,
-    uint8 *respData,
-    Dcm_PduLengthType *respLen
-)
-{
-    uint16 count;
-    uint16 pos;
-    Dem_DTCType dtc;
-    Dem_UdsStatusByteType status;
-
-    if ((respData == NULL_PTR) || (respLen == NULL_PTR))
-    {
-        return DCM_NRC_GENERAL_REJECT;
-    }
-
-    if (Dem_IsReady() == FALSE)
-    {
-        return DCM_NRC_CONDITIONS_NOT_CORRECT;
-    }
-
-    if (Dem_SetDTCFilter(
-            statusMask,
-            DEM_DTC_FORMAT_UDS,
-            DEM_DTC_ORIGIN_PRIMARY_MEMORY,
-            FALSE,
-            0u,
-            FALSE) != E_OK)
-    {
-        return DCM_NRC_CONDITIONS_NOT_CORRECT;
-    }
-
-    if (subFunction == 0x01u)
-    {
-        if (Dem_GetNumberOfFilteredDTC(&count) != E_OK)
-        {
-            return DCM_NRC_CONDITIONS_NOT_CORRECT;
-        }
-
-        respData[0u] = Dem_GetDTCStatusAvailabilityMask();
-        respData[1u] = CODINGAPP_DTC_FORMAT_IDENTIFIER_UDS;
-        respData[2u] = (uint8)((count >> 8u) & 0xFFu);
-        respData[3u] = (uint8)(count & 0xFFu);
-        *respLen = 4u;
-        return DCM_E_OK;
-    }
-
-    respData[0u] = Dem_GetDTCStatusAvailabilityMask();
-    pos = 1u;
-
-    while (Dem_GetNextFilteredDTC(&dtc, &status) == E_OK)
-    {
-        if ((pos + 4u) > DCM_MAX_DTC_RESPONSE_LEN)
-        {
-            return DCM_NRC_RESPONSE_TOO_LONG;
-        }
-
-        respData[pos] = (uint8)((dtc >> 16u) & 0xFFu);
-        pos++;
-        respData[pos] = (uint8)((dtc >> 8u) & 0xFFu);
-        pos++;
-        respData[pos] = (uint8)(dtc & 0xFFu);
-        pos++;
-        respData[pos] = status;
-        pos++;
-    }
-
-    *respLen = (Dcm_PduLengthType)pos;
-    return DCM_E_OK;
 }

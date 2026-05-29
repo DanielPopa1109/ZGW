@@ -4,6 +4,7 @@
 #include "Com.h"
 #include "ComStack_Types.h"
 #include "Dem_Types.h"
+#include "SoAd.h"
 #include "TcpIpH.h"
 
 #define GATEWAYSWC_VERSION_MAJOR        1u
@@ -12,10 +13,21 @@
 #define GATEWAYSWC_MAIN_PERIOD_MS       5u
 #define GATEWAYSWC_ROUTE_PERIOD_MS      10u
 #define GATEWAYSWC_OUTPUT_PERIOD_MS     10u
-#define GATEWAYSWC_ETH_PERIOD_MS        1000u //todo
+#define GATEWAYSWC_ETH_PERIOD_MS        1000u
 
 #define GATEWAYSWC_ETH_SOCON_ID         4u
 #define GATEWAYSWC_ETH_MAX_PAYLOAD      256u
+
+#define GATEWAYSWC_MCU_STATUS_UDP_ENABLE          STD_ON
+#define GATEWAYSWC_MCU_STATUS_UDP_PORT            35001u
+#define GATEWAYSWC_MCU_STATUS_UDP_PERIOD_MS       100u
+#define GATEWAYSWC_MCU_STATUS_UDP_BROADCAST_ADDR  0xFFFFFFFFu
+#define GATEWAYSWC_MCU_STATUS_PACKET_LENGTH       64u
+
+#define GATEWAYSWC_MCU_STATUS_DISABLED            0u
+#define GATEWAYSWC_MCU_STATUS_WAIT_LINK           1u
+#define GATEWAYSWC_MCU_STATUS_SOCKET_READY        2u
+#define GATEWAYSWC_MCU_STATUS_TX_ERROR            3u
 
 #define GATEWAYSWC_PDM_LOADS_PER_PDM    3u
 
@@ -172,10 +184,25 @@ extern volatile uint8 GatewaySwc_DebugDtcLastTxResult;
 
 void GatewaySwc_Init(void);
 void GatewaySwc_MainFunction(void);
+Std_ReturnType GatewaySwc_RequestComSendSignal(Com_SignalIdType signalId, const void *data);
+void GatewaySwc_RequestComMainFunctionTx(void);
+Std_ReturnType GatewaySwc_RequestCanIfTransmit(PduIdType txPduId, const uint8 *data, PduLengthType len);
+Std_ReturnType GatewaySwc_RequestLinIfTransmit(PduIdType txPduId, const uint8 *data, PduLengthType len);
+SoAd_ReturnType GatewaySwc_RequestSoAdIfTransmit(SoAd_SoConIdType soConId,
+                                                 const TcpIp_SockAddrType *remoteAddr,
+                                                 const uint8 *data,
+                                                 uint16 len);
+sint32 GatewaySwc_RequestTcpIpSendTo(TcpIp_SocketIdType sock,
+                                     const TcpIp_SockAddrType *remoteAddr,
+                                     const uint8 *data,
+                                     uint16 len);
+void GatewaySwc_RequestLinIfMainFunction(void);
 
 void GatewaySwc_SetCommands(const GatewaySwc_CommandType *cmd);
 void GatewaySwc_GetCommands(GatewaySwc_CommandType *cmd);
 void GatewaySwc_GetStatus(GatewaySwc_StatusType *status);
+uint8 GatewaySwc_GetMcuStatusStatus(void);
+uint32 GatewaySwc_GetMcuStatusTxCounter(void);
 uint16 GatewaySwc_GetRxMessageDiagCount(void);
 uint16 GatewaySwc_GetRxSignalDiagCount(void);
 Std_ReturnType GatewaySwc_GetRxMessageDiag(uint16 index, GatewaySwc_RxMessageDiagType *diag);

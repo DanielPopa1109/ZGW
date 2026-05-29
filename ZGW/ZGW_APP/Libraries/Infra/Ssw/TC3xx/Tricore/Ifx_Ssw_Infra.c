@@ -44,6 +44,94 @@
 /*-------------------------Infrastructure Functions---------------------------*/
 /******************************************************************************/
 
+volatile unsigned int IfxSsw_StartCoreCallCounter;
+volatile unsigned int IfxSsw_StartCoreCpu1Counter;
+volatile unsigned int IfxSsw_StartCoreCpu2Counter;
+volatile unsigned int IfxSsw_StartCoreCpu1Pc;
+volatile unsigned int IfxSsw_StartCoreCpu2Pc;
+volatile unsigned int IfxSsw_StartCoreCpu1SysconBefore;
+volatile unsigned int IfxSsw_StartCoreCpu2SysconBefore;
+volatile unsigned int IfxSsw_StartCoreCpu1SysconAfter;
+volatile unsigned int IfxSsw_StartCoreCpu2SysconAfter;
+volatile unsigned int IfxSsw_StartCoreCpu1PmcsrBefore;
+volatile unsigned int IfxSsw_StartCoreCpu2PmcsrBefore;
+volatile unsigned int IfxSsw_StartCoreCpu1PmcsrAfter;
+volatile unsigned int IfxSsw_StartCoreCpu2PmcsrAfter;
+volatile unsigned int IfxSsw_StartCoreCpu1DbgsrAfter;
+volatile unsigned int IfxSsw_StartCoreCpu2DbgsrAfter;
+
+static void Ifx_Ssw_requestCoreRunMode(Ifx_CPU *cpu)
+{
+    unsigned short safetyWdtPassword = Ifx_Ssw_getSafetyWatchdogPassword();
+
+    Ifx_Ssw_clearSafetyEndinit(safetyWdtPassword);
+
+    if (cpu == &MODULE_CPU1)
+    {
+        MODULE_SCU.PMCSR1.B.REQSLP = 0U;
+    }
+#if IFXCPU_NUM_MODULES > 2
+    else if (cpu == &MODULE_CPU2)
+    {
+        MODULE_SCU.PMCSR2.B.REQSLP = 0U;
+    }
+#endif
+    else
+    {
+        /* Do nothing. */
+    }
+
+    Ifx_Ssw_setSafetyEndinit(safetyWdtPassword);
+
+    cpu->DBGSR.B.HALT = 2U;
+}
+
+static void Ifx_Ssw_captureStartCoreBefore(Ifx_CPU *cpu, unsigned int programCounter)
+{
+    if (cpu == &MODULE_CPU1)
+    {
+        IfxSsw_StartCoreCpu1Counter++;
+        IfxSsw_StartCoreCpu1Pc = programCounter;
+        IfxSsw_StartCoreCpu1SysconBefore = cpu->SYSCON.U;
+        IfxSsw_StartCoreCpu1PmcsrBefore = MODULE_SCU.PMCSR1.U;
+    }
+#if IFXCPU_NUM_MODULES > 2
+    else if (cpu == &MODULE_CPU2)
+    {
+        IfxSsw_StartCoreCpu2Counter++;
+        IfxSsw_StartCoreCpu2Pc = programCounter;
+        IfxSsw_StartCoreCpu2SysconBefore = cpu->SYSCON.U;
+        IfxSsw_StartCoreCpu2PmcsrBefore = MODULE_SCU.PMCSR2.U;
+    }
+#endif
+    else
+    {
+        /* Do nothing. */
+    }
+}
+
+static void Ifx_Ssw_captureStartCoreAfter(Ifx_CPU *cpu)
+{
+    if (cpu == &MODULE_CPU1)
+    {
+        IfxSsw_StartCoreCpu1SysconAfter = cpu->SYSCON.U;
+        IfxSsw_StartCoreCpu1PmcsrAfter = MODULE_SCU.PMCSR1.U;
+        IfxSsw_StartCoreCpu1DbgsrAfter = cpu->DBGSR.U;
+    }
+#if IFXCPU_NUM_MODULES > 2
+    else if (cpu == &MODULE_CPU2)
+    {
+        IfxSsw_StartCoreCpu2SysconAfter = cpu->SYSCON.U;
+        IfxSsw_StartCoreCpu2PmcsrAfter = MODULE_SCU.PMCSR2.U;
+        IfxSsw_StartCoreCpu2DbgsrAfter = cpu->DBGSR.U;
+    }
+#endif
+    else
+    {
+        /* Do nothing. */
+    }
+}
+
 unsigned short Ifx_Ssw_getCpuWatchdogPassword(Ifx_SCU_WDTCPU *watchdog)
 {
     return Ifx_Ssw_getCpuWatchdogPasswordInline(watchdog);
@@ -140,19 +228,37 @@ void Ifx_Ssw_enableSafetyWatchdog(unsigned short password)
 
 void Ifx_Ssw_startCore(Ifx_CPU *cpu, unsigned int programCounter)
 {
-    /* Set the PC */
-    cpu->PC.B.PC = (unsigned int)programCounter >> 1U;
-
-    /* release boot halt mode if required */
     Ifx_CPU_SYSCON syscon;
+
+    IfxSsw_StartCoreCallCounter++;
+    Ifx_Ssw_captureStartCoreBefore(cpu, programCounter);
+
+    Ifx_Ssw_requestCoreRunMode(cpu);
+
     syscon = cpu->SYSCON;
 
+    /* Set the PC only while the core is still in boot halt mode. */
+    if (syscon.B.BHALT)
+    {
+        cpu->PC.B.PC = (unsigned int)programCounter >> 1U;
+    }
+    else
+    {
+        /* Core is already out of boot halt; do not rewrite PC. */
+    }
+
+    /* Release boot halt mode if required. */
     if (syscon.B.BHALT)
     {
         syscon.B.BHALT = 0U;
         cpu->SYSCON    = syscon;
     }
+    else
+    {
+        /* Do nothing. */
+    }
 
+    Ifx_Ssw_captureStartCoreAfter(cpu);
 }
 
 

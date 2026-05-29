@@ -10,11 +10,19 @@
 
 extern volatile uint8 OsInit_C0;
 volatile uint8 OsInit_C1 = 0u;
+volatile uint32 Core1_MainEnteredCounter = 0u;
+volatile uint32 Core1_WaitForCore0LoopCounter = 0u;
 
 void core1_main(void)
 {
+    Core1_MainEnteredCounter++;
+
     initCpuWatchdog(1u);
-    while(OsInit_C0 == 0u) serviceCpuWatchdog();
+    while(OsInit_C0 == 0u)
+    {
+        Core1_WaitForCore0LoopCounter++;
+        serviceCpuWatchdog();
+    }
     __dsync();
     Os_Init_C1();
     __dsync();

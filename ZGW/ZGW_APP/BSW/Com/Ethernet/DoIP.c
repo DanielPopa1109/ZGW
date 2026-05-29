@@ -1,33 +1,52 @@
 #include "DoIP.h"
+#include "GatewaySwc.h"
 #include <string.h>
+
+volatile uint32 DoIP_DebugUdpRxCounter = 0u;
+volatile uint32 DoIP_DebugVehicleIdReqCounter = 0u;
+volatile uint32 DoIP_DebugVehicleIdTxCounter = 0u;
+volatile uint32 DoIP_DebugVehicleIdTxFailCounter = 0u;
+volatile uint32 DoIP_DebugTcpRxCounter = 0u;
+volatile uint32 DoIP_DebugRoutingActivationReqCounter = 0u;
+volatile uint32 DoIP_DebugRoutingActivationTxCounter = 0u;
+volatile uint32 DoIP_DebugRoutingActivationTxFailCounter = 0u;
+volatile uint32 DoIP_DebugAliveReqTxCounter = 0u;
+volatile uint32 DoIP_DebugAliveResRxCounter = 0u;
+volatile uint32 DoIP_DebugTcpTimeoutCounter = 0u;
+volatile uint32 DoIP_DebugTcpDisconnectCounter = 0u;
+volatile uint32 DoIP_DebugTcpState = 0u;
+volatile uint32 DoIP_DebugAliveTimerMs = 0u;
+volatile uint32 DoIP_DebugInactivityTimerMs = 0u;
 
 typedef struct
 {
-    const DoIP_ConfigType *cfg;
-    DoIP_DcmRxIndicationFct dcmRxIndication;
+        const DoIP_ConfigType *cfg;
+        DoIP_DcmRxIndicationFct dcmRxIndication;
 
-    DoIP_TcpStateType tcpState;
+        DoIP_TcpStateType tcpState;
 
-    uint16_t testerLogicalAddress;
-    uint8_t routingActive;
+        uint16_t testerLogicalAddress;
+        uint8_t routingActive;
 
-    uint8_t tcpStream[DOIP_TCP_RX_STREAM_LEN];
-    uint16_t tcpStreamLen;
+        uint8_t tcpStream[DOIP_TCP_RX_STREAM_LEN];
+        uint16_t tcpStreamLen;
 
-    uint8_t txBuffer[DOIP_HEADER_LEN + DOIP_MAX_UDS_PAYLOAD_LEN + 4u];
+        uint8_t txBuffer[DOIP_HEADER_LEN + DOIP_MAX_UDS_PAYLOAD_LEN + 4u];
 
-    uint32_t malformedCnt;
-    uint32_t diagRxCnt;
-    uint32_t diagTxCnt;
-    uint32_t diagNackCnt;
-    uint32_t routingActivationCnt;
-    uint32_t aliveCheckCnt;
-    uint32_t vehicleIdReqCnt;
+        uint32_t malformedCnt;
+        uint32_t diagRxCnt;
+        uint32_t diagTxCnt;
+        uint32_t diagNackCnt;
+        uint32_t routingActivationCnt;
+        uint32_t aliveCheckCnt;
+        uint32_t vehicleIdReqCnt;
 
-    uint32 aliveTimerMs;
-    uint32 inactivityTimerMs;
-    uint32 tcpDisconnectCnt;
-    uint32 tcpTimeoutCnt;
+        uint32 aliveTimerMs;
+        uint32 inactivityTimerMs;
+        uint32 vehicleAnnouncementTimerMs;
+        uint32 tcpDisconnectCnt;
+        uint32 tcpTimeoutCnt;
+        uint8 vehicleAnnouncementRemaining;
 
 } DoIP_RuntimeType;
 
@@ -42,9 +61,9 @@ static uint16_t rd16(const uint8_t *p)
 static uint32_t rd32(const uint8_t *p)
 {
     return ((uint32_t)p[0] << 24u) |
-           ((uint32_t)p[1] << 16u) |
-           ((uint32_t)p[2] << 8u) |
-           ((uint32_t)p[3]);
+            ((uint32_t)p[1] << 16u) |
+            ((uint32_t)p[2] << 8u) |
+            ((uint32_t)p[3]);
 }
 
 static void wr16(uint8_t *p, uint16_t v)
@@ -71,8 +90,8 @@ static uint16_t DoIP_MakeHeader(uint8_t *buf, uint16_t payloadType, uint32_t pay
 }
 
 static void DoIP_SendGenericNack(SoAd_SoConIdType soConId,
-                                 const TcpIp_SockAddrType *remoteAddr,
-                                 uint8_t code)
+        const TcpIp_SockAddrType *remoteAddr,
+        uint8_t code)
 {
     uint8_t tx[DOIP_HEADER_LEN + 1u];
     uint16_t idx;
@@ -80,13 +99,13 @@ static void DoIP_SendGenericNack(SoAd_SoConIdType soConId,
     idx = DoIP_MakeHeader(tx, DOIP_PAYLOAD_GENERIC_NACK, 1u);
     tx[idx++] = code;
 
-    (void)SoAd_IfTransmit(soConId, remoteAddr, tx, idx);
+    (void)GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, idx);
 }
 
 static uint8_t DoIP_CheckHeader(const uint8_t *data,
-                                uint16_t len,
-                                uint16_t *payloadType,
-                                uint32_t *payloadLen)
+        uint16_t len,
+        uint16_t *payloadType,
+        uint32_t *payloadLen)
 {
     if ((data == 0) || (payloadType == 0) || (payloadLen == 0) || (len < DOIP_HEADER_LEN))
     {
@@ -94,7 +113,7 @@ static uint8_t DoIP_CheckHeader(const uint8_t *data,
     }
 
     if ((data[0] != DOIP_PROTOCOL_VERSION) ||
-        (data[1] != DOIP_INVERSE_PROTOCOL_VERSION))
+            (data[1] != DOIP_INVERSE_PROTOCOL_VERSION))
     {
         return 0u;
     }
@@ -140,8 +159,28 @@ static void DoIP_SendVehicleId(const TcpIp_SockAddrType *remoteAddr)
     tx[idx++] = 0x00u;
 
     DoIP_Rt.vehicleIdReqCnt++;
+    DoIP_DebugVehicleIdTxCounter++;
 
-    (void)SoAd_IfTransmit(DoIP_Rt.cfg->udpSoConId, remoteAddr, tx, idx);
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->udpSoConId, remoteAddr, tx, idx) != SOAD_OK)
+    {
+        DoIP_DebugVehicleIdTxFailCounter++;
+    }
+}
+
+static void DoIP_ResetVehicleAnnouncement(void)
+{
+    DoIP_Rt.vehicleAnnouncementTimerMs = DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS;
+    DoIP_Rt.vehicleAnnouncementRemaining = DOIP_VEHICLE_ANNOUNCE_COUNT;
+}
+
+static void DoIP_SendVehicleAnnouncement(void)
+{
+    TcpIp_SockAddrType broadcast;
+
+    broadcast.addr = 0xFFFFFFFFu;
+    broadcast.port = DOIP_UDP_PORT;
+
+    DoIP_SendVehicleId(&broadcast);
 }
 
 static void DoIP_SendRoutingActivationRes(uint16_t testerAddr, uint8_t code)
@@ -169,7 +208,11 @@ static void DoIP_SendRoutingActivationRes(uint16_t testerAddr, uint8_t code)
     tx[idx++] = 0x00u;
     tx[idx++] = 0x00u;
 
-    (void)SoAd_IfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    DoIP_DebugRoutingActivationTxCounter++;
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx) != SOAD_OK)
+    {
+        DoIP_DebugRoutingActivationTxFailCounter++;
+    }
 }
 
 static void DoIP_SendAliveRes(void)
@@ -184,7 +227,20 @@ static void DoIP_SendAliveRes(void)
 
     DoIP_Rt.aliveCheckCnt++;
 
-    (void)SoAd_IfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+}
+
+static void DoIP_SendAliveReq(void)
+{
+    uint8_t tx[DOIP_HEADER_LEN];
+    uint16_t idx;
+
+    idx = DoIP_MakeHeader(tx, DOIP_PAYLOAD_ALIVE_CHECK_REQ, 0u);
+
+    DoIP_Rt.aliveCheckCnt++;
+    DoIP_DebugAliveReqTxCounter++;
+
+    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
 }
 
 static void DoIP_SendDiagAck(uint16_t testerAddr, uint16_t ecuAddr)
@@ -202,7 +258,7 @@ static void DoIP_SendDiagAck(uint16_t testerAddr, uint16_t ecuAddr)
 
     tx[idx++] = 0x00u;
 
-    (void)SoAd_IfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
 }
 
 static void DoIP_SendDiagNack(uint16_t testerAddr, uint16_t ecuAddr, uint8_t nack)
@@ -222,7 +278,7 @@ static void DoIP_SendDiagNack(uint16_t testerAddr, uint16_t ecuAddr, uint8_t nac
 
     DoIP_Rt.diagNackCnt++;
 
-    (void)SoAd_IfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
 }
 
 static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
@@ -240,7 +296,7 @@ static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
     activationType = p[2];
 
     if ((testerAddr == 0u) ||
-        (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
+            (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
     {
         DoIP_SendRoutingActivationRes(testerAddr, DOIP_RA_RES_DENIED_UNKNOWN_SOURCE);
         return;
@@ -259,6 +315,7 @@ static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
     DoIP_Rt.aliveTimerMs = 0u;
     DoIP_Rt.inactivityTimerMs = 0u;
 
+    DoIP_DebugRoutingActivationReqCounter++;
     DoIP_SendRoutingActivationRes(testerAddr, DOIP_RA_RES_OK);
 }
 
@@ -279,14 +336,14 @@ static void DoIP_HandleDiagnostic(const uint8_t *p, uint32_t len)
     udsLen = (uint16_t)(len - 4u);
 
     if ((DoIP_Rt.tcpState != DOIP_TCP_ROUTING_ACTIVE) ||
-        (DoIP_Rt.routingActive == 0u))
+            (DoIP_Rt.routingActive == 0u))
     {
         DoIP_SendDiagNack(testerAddr, ecuAddr, DOIP_NACK_TRANSPORT_PROTOCOL_ERROR);
         return;
     }
 
     if ((testerAddr != DoIP_Rt.testerLogicalAddress) ||
-        (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
+            (testerAddr != DoIP_Rt.cfg->testerLogicalAddress))
     {
         DoIP_SendDiagNack(testerAddr, ecuAddr, DOIP_NACK_INVALID_SOURCE_ADDR);
         return;
@@ -333,6 +390,18 @@ static void DoIP_HandleTcpPayload(uint16_t type, const uint8_t *payload, uint32_
             }
             break;
 
+        case DOIP_PAYLOAD_ALIVE_CHECK_RES:
+            if (len >= 2u)
+            {
+                DoIP_Rt.aliveTimerMs = 0u;
+                DoIP_DebugAliveResRxCounter++;
+            }
+            else
+            {
+                DoIP_Rt.malformedCnt++;
+            }
+            break;
+
         case DOIP_PAYLOAD_DIAG_MSG:
             DoIP_HandleDiagnostic(payload, len);
             break;
@@ -352,9 +421,9 @@ static void DoIP_ProcessTcpStream(void)
     while (DoIP_Rt.tcpStreamLen >= DOIP_HEADER_LEN)
     {
         if (DoIP_CheckHeader(DoIP_Rt.tcpStream,
-                             DoIP_Rt.tcpStreamLen,
-                             &payloadType,
-                             &payloadLen) == 0u)
+                DoIP_Rt.tcpStreamLen,
+                &payloadType,
+                &payloadLen) == 0u)
         {
             DoIP_Rt.tcpStreamLen = 0u;
             DoIP_Rt.malformedCnt++;
@@ -378,8 +447,8 @@ static void DoIP_ProcessTcpStream(void)
         }
 
         DoIP_HandleTcpPayload(payloadType,
-                              &DoIP_Rt.tcpStream[DOIP_HEADER_LEN],
-                              payloadLen);
+                &DoIP_Rt.tcpStream[DOIP_HEADER_LEN],
+                payloadLen);
 
         if (DoIP_Rt.tcpStreamLen > frameLen)
         {
@@ -397,12 +466,29 @@ void DoIP_Init(const DoIP_ConfigType *config)
     memset(&DoIP_Rt, 0, sizeof(DoIP_Rt));
     DoIP_Rt.cfg = config;
     DoIP_Rt.tcpState = DOIP_TCP_OFFLINE;
+    DoIP_ResetVehicleAnnouncement();
 }
 
 void DoIP_MainFunction(uint32 elapsedMs)
 {
+    if ((DoIP_Rt.cfg != 0) && (DoIP_Rt.vehicleAnnouncementRemaining > 0u))
+    {
+        DoIP_Rt.vehicleAnnouncementTimerMs += elapsedMs;
+
+        if (DoIP_Rt.vehicleAnnouncementTimerMs >= DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS)
+        {
+            DoIP_Rt.vehicleAnnouncementTimerMs = 0u;
+            DoIP_Rt.vehicleAnnouncementRemaining--;
+            DoIP_SendVehicleAnnouncement();
+        }
+    }
+
     if (DoIP_Rt.tcpState == DOIP_TCP_OFFLINE)
     {
+        DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
+        DoIP_DebugAliveTimerMs = DoIP_Rt.aliveTimerMs;
+        DoIP_DebugInactivityTimerMs = DoIP_Rt.inactivityTimerMs;
+        DoIP_MainFunction_Counter++;
         return;
     }
 
@@ -415,21 +501,30 @@ void DoIP_MainFunction(uint32 elapsedMs)
         if (DoIP_Rt.aliveTimerMs >= DOIP_ALIVE_TIMEOUT_MS)
         {
             DoIP_Rt.aliveTimerMs = 0u;
-            DoIP_SendAliveRes();
+            DoIP_SendAliveReq();
         }
     }
 
     if (DoIP_Rt.inactivityTimerMs >= DOIP_INACTIVITY_TIMEOUT_MS)
     {
         DoIP_Rt.tcpTimeoutCnt++;
+        DoIP_DebugTcpTimeoutCounter++;
         DoIP_Rt.tcpState = DOIP_TCP_OFFLINE;
         DoIP_Rt.routingActive = 0u;
         DoIP_Rt.tcpStreamLen = 0u;
         DoIP_Rt.testerLogicalAddress = 0u;
         DoIP_Rt.aliveTimerMs = 0u;
         DoIP_Rt.inactivityTimerMs = 0u;
+
+        if (DoIP_Rt.cfg != 0)
+        {
+            SoAd_AbortTcpConnection(DoIP_Rt.cfg->tcpSoConId);
+        }
     }
 
+    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
+    DoIP_DebugAliveTimerMs = DoIP_Rt.aliveTimerMs;
+    DoIP_DebugInactivityTimerMs = DoIP_Rt.inactivityTimerMs;
     DoIP_MainFunction_Counter++;
 }
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
@@ -438,14 +533,16 @@ void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
 }
 
 void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
-                              const TcpIp_SockAddrType *remoteAddr,
-                              const uint8_t *data,
-                              uint16_t len)
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8_t *data,
+        uint16_t len)
 {
     uint16_t payloadType;
     uint32_t payloadLen;
 
     (void)soConId;
+
+    DoIP_DebugUdpRxCounter++;
 
     if ((DoIP_Rt.cfg == 0) || (remoteAddr == 0) || (data == 0))
     {
@@ -467,6 +564,7 @@ void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
     switch (payloadType)
     {
         case DOIP_PAYLOAD_VEHICLE_ID_REQ:
+            DoIP_DebugVehicleIdReqCounter++;
             if (payloadLen == 0u)
             {
                 DoIP_SendVehicleId(remoteAddr);
@@ -480,9 +578,9 @@ void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
 }
 
 void DoIP_SoAdTcpRxIndication(SoAd_SoConIdType soConId,
-                              const TcpIp_SockAddrType *remoteAddr,
-                              const uint8_t *data,
-                              uint16_t len)
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8_t *data,
+        uint16_t len)
 {
     (void)soConId;
     (void)remoteAddr;
@@ -491,6 +589,10 @@ void DoIP_SoAdTcpRxIndication(SoAd_SoConIdType soConId,
     {
         return;
     }
+
+    DoIP_DebugTcpRxCounter++;
+    DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_Rt.aliveTimerMs = 0u;
 
     if ((uint32_t)DoIP_Rt.tcpStreamLen + len > DOIP_TCP_RX_STREAM_LEN)
     {
@@ -512,11 +614,14 @@ void DoIP_SoAdTcpConnected(SoAd_SoConIdType soConId)
     (void)soConId;
 
     DoIP_Rt.tcpState = DOIP_TCP_CONNECTED;
+    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
     DoIP_Rt.routingActive = 0u;
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
     DoIP_Rt.aliveTimerMs = 0u;
     DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_Rt.vehicleAnnouncementRemaining = 0u;
+    DoIP_Rt.vehicleAnnouncementTimerMs = 0u;
 }
 
 void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
@@ -524,18 +629,21 @@ void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
     (void)soConId;
 
     DoIP_Rt.tcpDisconnectCnt++;
+    DoIP_DebugTcpDisconnectCounter++;
     DoIP_Rt.tcpState = DOIP_TCP_OFFLINE;
+    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
     DoIP_Rt.routingActive = 0u;
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
     DoIP_Rt.aliveTimerMs = 0u;
     DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_ResetVehicleAnnouncement();
 }
 
 DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
-                                            uint16_t targetAddress,
-                                            const uint8_t *uds,
-                                            uint16_t udsLen)
+        uint16_t targetAddress,
+        const uint8_t *uds,
+        uint16_t udsLen)
 {
     uint16_t idx;
 
@@ -545,14 +653,14 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
     }
 
     if ((DoIP_Rt.tcpState != DOIP_TCP_ROUTING_ACTIVE) ||
-        (DoIP_Rt.routingActive == 0u))
+            (DoIP_Rt.routingActive == 0u))
     {
         return DOIP_BUSY;
     }
 
     idx = DoIP_MakeHeader(DoIP_Rt.txBuffer,
-                          DOIP_PAYLOAD_DIAG_MSG,
-                          (uint32_t)udsLen + 4u);
+            DOIP_PAYLOAD_DIAG_MSG,
+            (uint32_t)udsLen + 4u);
 
     wr16(&DoIP_Rt.txBuffer[idx], sourceAddress);
     idx += 2u;
@@ -563,7 +671,7 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
     memcpy(&DoIP_Rt.txBuffer[idx], uds, udsLen);
     idx = (uint16_t)(idx + udsLen);
 
-    if (SoAd_IfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, DoIP_Rt.txBuffer, idx) != SOAD_OK)
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, DoIP_Rt.txBuffer, idx) != SOAD_OK)
     {
         return DOIP_BUSY;
     }

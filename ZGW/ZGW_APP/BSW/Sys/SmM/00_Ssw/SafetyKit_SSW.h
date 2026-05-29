@@ -38,9 +38,6 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-/* Keep SSW retained counters away from the SCR image copied at PMS_XRAM base. */
-#define SSW_STATUS_DATA_OFFSET  (0x1F00U)
-#define SSW_STATUS_DATA_ADDRESS (*(volatile SswStatusXramType*)((volatile uint8*)PMS_XRAM + SSW_STATUS_DATA_OFFSET))
 #define SAFETKIT_LBIST_MAX_RUNS     (3)
 #define SAFETKIT_FW_CHECK_MAX_RUNS  (2)
 #define LAST_IFXSCURCU_RESETTYPE_ENUM IfxScuRcu_ResetType_undefined /* Validate this parameter in case of iLLD update*/
@@ -77,13 +74,6 @@ typedef struct
 } SafetyKitResetCode;
 typedef struct
 {
-    uint8               lbistAppSwReq;      /* Amount of LBIST requests (by application software) */
-    uint8               lbistRuns;          /* Amount of LBIST executions */
-    uint8               mcuFwcheckRuns;     /* Amount of MCU_FW_CHECK executions*/
-    Ifx_SCU_RSTSTAT     RSTSTAT;            /* RSTSTAT register copy */
-} SswStatusXramType;
-typedef struct
-{
     SswSMStatusType    lbistStatus;
     SswSMStatusType    monbistStatus;
     SswSMStatusType    mcuFwcheckStatus;
@@ -99,5 +89,6 @@ typedef struct
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void runSafeAppSwStartup(void);
+void safetyKitUpdateNcrStatusAndResetReaction(boolean includeSmuStatus);
 void safetyKitTriggerWarmPorst(void);
 #endif /* SAFETYKIT_SSW_H_ */

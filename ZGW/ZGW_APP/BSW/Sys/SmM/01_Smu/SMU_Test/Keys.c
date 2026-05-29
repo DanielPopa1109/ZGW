@@ -110,6 +110,7 @@ void enableKeysTestSMU(void)
 {
     SmuStatusType result = fail;
 
+    g_SafetyKitStatus.unlockConfig = TRUE;
     result = coreKeysTestSMU();
 
     g_SafetyKitStatus.smuStatus.smuCoreKeysTestSts = result;

@@ -35,6 +35,7 @@
 #include "IfxMtu_cfg.h"
 #include "IfxSmu.h"
 #include "IfxDmu_Reg.h"
+#include "McuSm.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -51,6 +52,13 @@ volatile Ifx_SMU_AG g_SafetyKitSmuAlarmRegStatus[IFXSMU_NUM_ALARM_GROUPS];
 boolean safetyKitFwCheckSmuStmemLclcon(const FwCheckStruct *fwCheckTablSMU, const int structSize, const SafetyKitResetType resetType, FwCheckVerificationStruct *fwCheckVerification);
 IfxMtu_MbistSel safetyKitFwCheckSsh(const SafetyKitResetType resetType);
 IfxMtu_MbistSel safetyKitFwCheckCheckSshRegisters(const MemoryTestedStruct* sshTable, int tableSize);
+IfxMtu_MbistSel safetyKitFwCheckCheckLbistSshRegisters(const MemoryTestedStruct* sshTable, int tableSize);
+void safetyKitFwCheckGetExpectedSshValues(const MemoryTestedStruct *sshEntry, uint16 *expectedValueECCD,
+        uint16 *expectedValueFAULTSTS, uint16 *expectedValueERRINFO);
+boolean safetyKitFwCheckIsInitializedRamSshState(const MemoryTestedStruct *sshEntry, uint32 actualEccd,
+        uint32 actualFaultsts, uint32 actualErrinfo);
+void safetyKitFwCheckSetSshDiagnostics(IfxMtu_MbistSel mbistSel, uint32 actualEccd, uint32 actualFaultsts,
+        uint32 actualErrinfo, uint32 expectedEccd, uint32 expectedFaultsts, uint32 expectedErrinfo);
 boolean safetyKitFwCheckEvaluateRamInit(uint16 memoryMask);
 boolean safetyKitFwCheckEvaluateLmuInit(uint16 memoryMask);
 void safetyKitFwCheckClearSSH(const SafetyKitResetType resetType);
@@ -65,6 +73,21 @@ void safetyKitFwCheckRetriggerCheck(const SafetyKitResetType resetType);
  * */
 void safetyKitSswMcuFwCheck(void)
 {
+    boolean smuCheckPassed;
+    boolean stmemCheckPassed;
+    boolean lclconCheckPassed;
+    boolean sshCheckPassed;
+
+    McuSm_SswStatusData.mcuFwcheckRuns++;
+    McuSm_SafetyKitFwCheckLastSshFail = (uint32)IfxMtu_MbistSel_none;
+    McuSm_SafetyKitFwCheckResultMask = 0u;
+    McuSm_SafetyKitFwCheckSshActualEccd = 0u;
+    McuSm_SafetyKitFwCheckSshActualFaultsts = 0u;
+    McuSm_SafetyKitFwCheckSshActualErrinfo = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedEccd = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedFaultsts = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedErrinfo = 0u;
+
     /* Enable MTU module if not yet enabled */
     boolean mtuWasEnabled = IfxMtu_isModuleEnabled();
     if (mtuWasEnabled == FALSE)
@@ -82,27 +105,44 @@ void safetyKitSswMcuFwCheck(void)
         g_SafetyKitSmuAlarmRegStatus[alarmReg].U = MODULE_SMU.AG[alarmReg].U;
     }
 
-    if  (
-            /* Read SMU alarm register values and compare with expected ones(listed in Appendix A of the
-             * Safety Manual)
-             * Note: depending on the device and reset type different register values are expected */
-            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize,
-                    g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSMU))   &&
-                    /* Read SCU_STMEM register values and compare with expected ones(listed in Appendix A of the
-                     * Safety Manual) */
-                    (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckSTMEMTC375DP, fwCheckSTMEMTC375DPSize,
-                            g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSTMEM))  &&
-                            /* Read SCU_LCLCON register values and compare with expected ones (listed in Appendix A of the
-                             * Safety Manual) */
-                            (TRUE == safetyKitFwCheckSmuStmemLclcon(fwCheckLCLCONTC375DP,  fwCheckLCLCONTC375DPSize,
-                                    g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationLCLCON)) &&
-                                    /* Read SSH register values of all RAM and compare with expected ones (listed in Appendix A of
-                                     * the Safety Manual)*/
-                                    (IfxMtu_MbistSel_none == safetyKitFwCheckSsh(g_SafetyKitStatus.resetCode.resetType))
-    )
+    /* Read SMU alarm register values and compare with expected ones(listed in Appendix A of the Safety Manual).
+     * Note: depending on the device and reset type different register values are expected. */
+    smuCheckPassed = safetyKitFwCheckSmuStmemLclcon(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize,
+            g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSMU);
+    /* Read SCU_STMEM register values and compare with expected ones(listed in Appendix A of the Safety Manual). */
+    stmemCheckPassed = safetyKitFwCheckSmuStmemLclcon(fwCheckSTMEMTC375DP, fwCheckSTMEMTC375DPSize,
+            g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationSTMEM);
+    /* Read SCU_LCLCON register values and compare with expected ones(listed in Appendix A of the Safety Manual). */
+    lclconCheckPassed = safetyKitFwCheckSmuStmemLclcon(fwCheckLCLCONTC375DP, fwCheckLCLCONTC375DPSize,
+            g_SafetyKitStatus.resetCode.resetType, fwCheckVerificationLCLCON);
+    /* Read SSH register values of all RAM and compare with expected ones(listed in Appendix A of the Safety Manual). */
+    sshCheckPassed = (IfxMtu_MbistSel_none == safetyKitFwCheckSsh(g_SafetyKitStatus.resetCode.resetType)) ? TRUE : FALSE;
+
+    if (smuCheckPassed == FALSE)
+    {
+        McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_SMU_FAILED;
+    }
+    if (stmemCheckPassed == FALSE)
+    {
+        McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_STMEM_FAILED;
+    }
+    if (lclconCheckPassed == FALSE)
+    {
+        McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LCLCON_FAILED;
+    }
+    if (sshCheckPassed == FALSE)
+    {
+        McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_SSH_FAILED;
+    }
+
+    if ((smuCheckPassed != FALSE) &&
+            (stmemCheckPassed != FALSE) &&
+            (lclconCheckPassed != FALSE) &&
+            (sshCheckPassed != FALSE))
     {
         /* If all four checks have passed set FW check status variable to "passed" */
         g_SafetyKitStatus.sswStatus.mcuFwcheckStatus = passed;
+        McuSm_SswStatusData.mcuFwcheckStatus = (uint8)passed;
         /* If all registers and SMU alarm registers have reported the expected values .. */
         /* .. clear the content of the registers mentioned in the Appendix table */
         safetyKitFwCheckClearSSH(g_SafetyKitStatus.resetCode.resetType);
@@ -114,6 +154,10 @@ void safetyKitSswMcuFwCheck(void)
     else
     {
         g_SafetyKitStatus.sswStatus.mcuFwcheckStatus = failed;
+        McuSm_SswStatusData.mcuFwcheckStatus = (uint8)failed;
+        /* Preserve the verification arrays, but normalize expected FW-check artifacts before the reset reaction. */
+        safetyKitFwCheckClearSSH(g_SafetyKitStatus.resetCode.resetType);
+        safetyKitFwCheckClearSmuAlarms(fwCheckSMUTC375DP, fwCheckSMUTC375DPSize);
         /* Clear COLD PORST reason to preserve the data on the SCR XRAM */
         IfxScuRcu_clearColdResetStatus();
     }
@@ -156,8 +200,10 @@ boolean safetyKitFwCheckSmuStmemLclcon (const FwCheckStruct *fwCheckTable, const
         switch(resetType)
         {
             case safetyKitResetTypeColdpoweron:
-            case safetyKitResetTypeLbist:
                 ptrRegisterCheckStrct = &fwCheckTable[i].coldPORST;
+                break;
+            case safetyKitResetTypeLbist:
+                ptrRegisterCheckStrct = &fwCheckTable[i].lbistReset;
                 break;
             case safetyKitResetTypeWarmpoweron:
                 ptrRegisterCheckStrct = &fwCheckTable[i].warmPORST;
@@ -169,6 +215,7 @@ boolean safetyKitFwCheckSmuStmemLclcon (const FwCheckStruct *fwCheckTable, const
                 ptrRegisterCheckStrct = &fwCheckTable[i].applicationReset;
                 break;
             default:
+                ptrRegisterCheckStrct = &fwCheckTable[i].warmPORST;
                 break;
         }
 
@@ -199,12 +246,14 @@ boolean safetyKitFwCheckSmuStmemLclcon (const FwCheckStruct *fwCheckTable, const
  * */
 IfxMtu_MbistSel safetyKitFwCheckSsh(const SafetyKitResetType resetType)
 {
-    IfxMtu_MbistSel fwcheckSshResult;
+    IfxMtu_MbistSel fwcheckSshResult = IfxMtu_MbistSel_none;
     switch (resetType)
     {
         case safetyKitResetTypeColdpoweron :
-        case safetyKitResetTypeLbist :
             fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(coldPorstSSHTC375DP, coldPorstSSHTC375DPSize);
+            break;
+        case safetyKitResetTypeLbist :
+            fwcheckSshResult = safetyKitFwCheckCheckLbistSshRegisters(warmPorstSSHTC375DP, warmPorstSSHTC375DPSize);
             break;
         case safetyKitResetTypeWarmpoweron :
             fwcheckSshResult = safetyKitFwCheckCheckSshRegisters(warmPorstSSHTC375DP, warmPorstSSHTC375DPSize);
@@ -233,9 +282,12 @@ void safetyKitFwCheckClearSSH(const SafetyKitResetType resetType)
     switch(resetType)
     {
         case safetyKitResetTypeColdpoweron:
-        case safetyKitResetTypeLbist:
             sshTable    = coldPorstSSHTC375DP;
             tableSize  = coldPorstSSHTC375DPSize;
+            break;
+        case safetyKitResetTypeLbist:
+            sshTable    = warmPorstSSHTC375DP;
+            tableSize  = warmPorstSSHTC375DPSize;
             break;
         case safetyKitResetTypeWarmpoweron:
             sshTable    = warmPorstSSHTC375DP;
@@ -350,7 +402,7 @@ IfxMtu_MbistSel safetyKitFwCheckCheckSshRegisters (const MemoryTestedStruct* ssh
     IfxMtu_MbistSel mbistSel;
     Ifx_MTU_MC *mc;
     int a;
-    volatile uint16 expectedValueFAULTSTS, expectedValueECCD, expectedValueERRINFO;
+    uint16 expectedValueFAULTSTS, expectedValueECCD, expectedValueERRINFO;
 
     /* Iterate through all entries in the SSH_table */
     for (a = 0; a < tableSize; a++)
@@ -360,55 +412,16 @@ IfxMtu_MbistSel safetyKitFwCheckCheckSshRegisters (const MemoryTestedStruct* ssh
         /* Get pointer to MC object of tested SSH */
         mc = &MODULE_MTU.MC[mbistSel];
 
-        /* Evaluate which register values are expected for FAULTSTS, ECCD and ERRINFO registers. */
-        /* Check which memory type it is and evaluate if the RAM is initialized or not. Depending on this different
-         * FAULTSTS values are expected for CPU and LMU memories. */
-        if ( CPU_MEM_TYPE == sshTable[a].memoryType)
-        {
-            if (TRUE == safetyKitFwCheckEvaluateRamInit(sshTable[a].InSelMask))
-            {
-                expectedValueFAULTSTS = 0x9;
-            }
-            else
-            {
-                expectedValueFAULTSTS = 0x1;
-            }
-        }
-        else if ( LMU_MEM_TYPE == sshTable[a].memoryType)
-        {
-            if (TRUE == safetyKitFwCheckEvaluateLmuInit(sshTable[a].InSelMask))
-            {
-                expectedValueFAULTSTS = 0x9;
-            }
-            else
-            {
-                expectedValueFAULTSTS = 0x1;
-            }
-        }
-        else
-        {
-            expectedValueFAULTSTS = sshTable[a].sshRegistersDef.faultstsVal;
-        }
+        safetyKitFwCheckGetExpectedSshValues(&sshTable[a], &expectedValueECCD, &expectedValueFAULTSTS,
+                &expectedValueERRINFO);
 
-        expectedValueECCD = sshTable[a].sshRegistersDef.eccdVal;
-        expectedValueERRINFO = sshTable[a].sshRegistersDef.errinfoVal;
-
-        /* Exception: If AURIX woke up from standby, overwrite expected values with the dedicated standby values. */
-        if (g_SafetyKitStatus.wakeupFromStandby)
-        {
-            expectedValueFAULTSTS = sshTable[a].sshRegistersStb.faultstsVal;
-            expectedValueECCD = sshTable[a].sshRegistersStb.eccdVal;
-            expectedValueERRINFO = sshTable[a].sshRegistersStb.errinfoVal;
-        }
-        else
-        {
-            /* Do nothing. */
-        }
         /* Finally compare register values of selected memory with the expected ones, if any mismatch is detected
          * return the name of the selected memory and stop the function execution. */
         if (mc->ECCD.U != expectedValueECCD || mc->FAULTSTS.U != expectedValueFAULTSTS
                 || mc->ERRINFO[0].U != expectedValueERRINFO)
         {
+            safetyKitFwCheckSetSshDiagnostics(mbistSel, mc->ECCD.U, mc->FAULTSTS.U, mc->ERRINFO[0].U,
+                    expectedValueECCD, expectedValueFAULTSTS, expectedValueERRINFO);
             return (mbistSel);
         }
         else
@@ -417,7 +430,145 @@ IfxMtu_MbistSel safetyKitFwCheckCheckSshRegisters (const MemoryTestedStruct* ssh
         }
     }
 
+    McuSm_SafetyKitFwCheckLastSshFail = (uint32)IfxMtu_MbistSel_none;
     return (IfxMtu_MbistSel_none);
+}
+
+/*
+ * After an LBIST reset on this TC375DP target, SSH status registers can be observed in the no-fault zero state, in
+ * the table-derived state, in the default not-initialized state, or in an initialized RAM state derived from the
+ * DMU RAM initialization configuration. Treat these as valid and report any other state.
+ */
+IfxMtu_MbistSel safetyKitFwCheckCheckLbistSshRegisters (const MemoryTestedStruct* sshTable, int tableSize)
+{
+    IfxMtu_MbistSel mbistSel;
+    Ifx_MTU_MC *mc;
+    int a;
+    uint16 expectedValueECCD;
+    uint16 expectedValueFAULTSTS;
+    uint16 expectedValueERRINFO;
+    uint32 actualEccd;
+    uint32 actualFaultsts;
+    uint32 actualErrinfo;
+
+    for (a = 0; a < tableSize; a++)
+    {
+        mbistSel = sshTable[a].sshUnderTest;
+        mc = &MODULE_MTU.MC[mbistSel];
+        safetyKitFwCheckGetExpectedSshValues(&sshTable[a], &expectedValueECCD, &expectedValueFAULTSTS,
+                &expectedValueERRINFO);
+
+        actualEccd = mc->ECCD.U;
+        actualFaultsts = mc->FAULTSTS.U;
+        actualErrinfo = mc->ERRINFO[0].U;
+
+        if ((actualEccd == 0u) && (actualFaultsts == 0u) && (actualErrinfo == 0u))
+        {
+            McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_ZERO_ACCEPTED;
+        }
+        else if ((actualEccd == expectedValueECCD) && (actualFaultsts == expectedValueFAULTSTS)
+                && (actualErrinfo == expectedValueERRINFO))
+        {
+            McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_TABLE_ACCEPTED;
+        }
+        else if (FALSE != safetyKitFwCheckIsInitializedRamSshState(&sshTable[a], actualEccd, actualFaultsts,
+                actualErrinfo))
+        {
+            McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_INIT_ACCEPTED;
+        }
+        else if ((actualEccd == 0x5u) && (actualFaultsts == 0x1u) && (actualErrinfo == 0x0u))
+        {
+            McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_NOINIT_ACCEPTED;
+        }
+        else
+        {
+            safetyKitFwCheckSetSshDiagnostics(mbistSel, actualEccd, actualFaultsts, actualErrinfo,
+                    expectedValueECCD, expectedValueFAULTSTS, expectedValueERRINFO);
+            return (mbistSel);
+        }
+    }
+
+    McuSm_SafetyKitFwCheckLastSshFail = (uint32)IfxMtu_MbistSel_none;
+    return (IfxMtu_MbistSel_none);
+}
+
+boolean safetyKitFwCheckIsInitializedRamSshState(const MemoryTestedStruct *sshEntry, uint32 actualEccd,
+        uint32 actualFaultsts, uint32 actualErrinfo)
+{
+    boolean memoryInitialized;
+
+    if ((actualEccd != 0x5u) || (actualFaultsts != 0x9u) || (actualErrinfo != 0x0u))
+    {
+        return (FALSE);
+    }
+
+    if (CPU_MEM_TYPE == sshEntry->memoryType)
+    {
+        memoryInitialized = safetyKitFwCheckEvaluateRamInit(sshEntry->InSelMask);
+    }
+    else if (LMU_MEM_TYPE == sshEntry->memoryType)
+    {
+        memoryInitialized = safetyKitFwCheckEvaluateLmuInit(sshEntry->InSelMask);
+    }
+    else
+    {
+        memoryInitialized = FALSE;
+    }
+
+    return (memoryInitialized);
+}
+
+void safetyKitFwCheckGetExpectedSshValues(const MemoryTestedStruct *sshEntry, uint16 *expectedValueECCD,
+        uint16 *expectedValueFAULTSTS, uint16 *expectedValueERRINFO)
+{
+    if ( CPU_MEM_TYPE == sshEntry->memoryType)
+    {
+        if (TRUE == safetyKitFwCheckEvaluateRamInit(sshEntry->InSelMask))
+        {
+            *expectedValueFAULTSTS = 0x9;
+        }
+        else
+        {
+            *expectedValueFAULTSTS = 0x1;
+        }
+    }
+    else if ( LMU_MEM_TYPE == sshEntry->memoryType)
+    {
+        if (TRUE == safetyKitFwCheckEvaluateLmuInit(sshEntry->InSelMask))
+        {
+            *expectedValueFAULTSTS = 0x9;
+        }
+        else
+        {
+            *expectedValueFAULTSTS = 0x1;
+        }
+    }
+    else
+    {
+        *expectedValueFAULTSTS = sshEntry->sshRegistersDef.faultstsVal;
+    }
+
+    *expectedValueECCD = sshEntry->sshRegistersDef.eccdVal;
+    *expectedValueERRINFO = sshEntry->sshRegistersDef.errinfoVal;
+
+    if (g_SafetyKitStatus.wakeupFromStandby)
+    {
+        *expectedValueFAULTSTS = sshEntry->sshRegistersStb.faultstsVal;
+        *expectedValueECCD = sshEntry->sshRegistersStb.eccdVal;
+        *expectedValueERRINFO = sshEntry->sshRegistersStb.errinfoVal;
+    }
+}
+
+void safetyKitFwCheckSetSshDiagnostics(IfxMtu_MbistSel mbistSel, uint32 actualEccd, uint32 actualFaultsts,
+        uint32 actualErrinfo, uint32 expectedEccd, uint32 expectedFaultsts, uint32 expectedErrinfo)
+{
+    McuSm_SafetyKitFwCheckLastSshFail = (uint32)mbistSel;
+    McuSm_SafetyKitFwCheckSshActualEccd = actualEccd;
+    McuSm_SafetyKitFwCheckSshActualFaultsts = actualFaultsts;
+    McuSm_SafetyKitFwCheckSshActualErrinfo = actualErrinfo;
+    McuSm_SafetyKitFwCheckSshExpectedEccd = expectedEccd;
+    McuSm_SafetyKitFwCheckSshExpectedFaultsts = expectedFaultsts;
+    McuSm_SafetyKitFwCheckSshExpectedErrinfo = expectedErrinfo;
 }
 /*
  * Verify if CPU memory is initialized

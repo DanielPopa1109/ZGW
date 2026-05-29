@@ -82,14 +82,7 @@ void Ifx_Ssw_Lbist(void)
 {
     if (!IfxScuLbist_isDone())
     {
-        if(Ifx_Ssw_isColdPoweronReset())
-        {
-            IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig);
-        }
-        else
-        {
-            /* Do nothing. */
-        }
+        IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig);
     }
     else
     {

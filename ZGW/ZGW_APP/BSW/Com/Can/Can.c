@@ -1200,8 +1200,16 @@ static void Can_ProcessTxConfirmations(void)
             }
             else if (IfxCan_Can_isTxBufferRequestPending(node, txBufferId) == FALSE)
             {
-                Can_RequeuePendingTxBuffer(controller, bufferIdx);
-                Can_Runtime[controller].txFailCounter++;
+                if (Can_TxSyncPolling == FALSE)
+                {
+                    Can_TxPending[controller][bufferIdx].ageTicks++;
+
+                    if (Can_TxPending[controller][bufferIdx].ageTicks >= CAN_TX_HW_PENDING_TIMEOUT_TICKS)
+                    {
+                        Can_RequeuePendingTxBuffer(controller, bufferIdx);
+                        Can_Runtime[controller].txFailCounter++;
+                    }
+                }
             }
             else
             {
@@ -1586,13 +1594,20 @@ Std_ReturnType Can_SetControllerMode(uint8 Controller, Can_ControllerStateType T
     switch (Transition)
     {
         case CAN_READY:
-            if (Controller == CAN_CONTROLLER_CLASSIC)
+            if (Can_ControllerState[Controller] != CAN_READY)
             {
-                Can_InitClassicNode();
+                if (Controller == CAN_CONTROLLER_CLASSIC)
+                {
+                    Can_InitClassicNode();
+                }
+                else
+                {
+                    Can_InitFdNode();
+                }
             }
             else
             {
-                Can_InitFdNode();
+                /* Already initialized. */
             }
 
             Can_RequeuePendingTx(Controller);

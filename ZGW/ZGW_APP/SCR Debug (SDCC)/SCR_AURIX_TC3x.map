@@ -1,7 +1,7 @@
 Archive member included because of file (symbol)
 
 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
-                              (_resetvec)
+                              ./SCR/main.o (bits)
 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtxinit.rel)
                               C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel) (__sdcc_gsinit3_start)
 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtclear.rel)
@@ -14,6 +14,8 @@ C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\l
                               C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtclear.rel) (__sdcc_gsinit4B_start)
 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
                               C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel) (__sdcc_external_startup)
+C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
+                              ./SCR/main.o (__mullong_PARM_2)
 
 Allocating common symbols
 Common symbol       size              file
@@ -42,12 +44,13 @@ Discarded input sections
                 0x0000000000000000        0xd ./SCR/main.o
  .text.code.Scr_request_idle
                 0x0000000000000000        0x4 ./SCR/main.o
+ .text.code.SCR_RtcReadCounter
+                0x0000000000000000       0xb8 ./SCR/main.o
  COMMON         0x0000000000000000        0x8 ./SCR/main.o
  .text          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
  .data          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
  .bss           0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
  .bits.i51      0x0000000000000000        0x8 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
- .dbit.i51      0x0000000000000000        0x1 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
  .text          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtxinit.rel)
  .data          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtxinit.rel)
  .bss           0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtxinit.rel)
@@ -66,18 +69,21 @@ Discarded input sections
  .text          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
  .data          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
  .bss           0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
+ .text          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
+ .data          0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
+ .bss           0x0000000000000000        0x0 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
 
 Memory Configuration
 
 Name             Origin             Length             Used               Free               Attributes
-text             0x0000000000000000 0x0000000000001c00         0x000000000000080f         0x00000000000013f1 xr
+text             0x0000000000000000 0x0000000000001c00         0x0000000000000e0c         0x0000000000000df4 xr
 bit              0x0000000000000000 0x0000000000000080         0x0000000000000000         0x0000000000000080 rw !x
-data             0x0000000000000000 0x0000000000000100         0x0000000000000010         0x00000000000000f0 rw !x
+data             0x0000000000000000 0x0000000000000100         0x0000000000000035         0x00000000000000cb rw !x
 pdata            0x0000000000000000 0x0000000000000100         0x0000000000000000         0x0000000000000100 rw !x
-xdata            0x0000000000001c00 0x0000000000000400         0x0000000000000128         0x00000000000002d8 rw !x
+xdata            0x0000000000001c00 0x0000000000000400         0x000000000000016a         0x0000000000000296 rw !x
 edata            0x0000000000000000 0x0000000000000000         0x0000000000000000         0x0000000000000000 rw !x
 eeprom           0x0000000000000000 0x0000000000000000         0x0000000000000000         0x0000000000000000 rw !x
-*default*        0x0000000000000000 0xffffffffffffffff         0x0000000000001d28         0xffffffffffffe2d7
+*default*        0x0000000000000000 0xffffffffffffffff         0x0000000000001d6a         0xffffffffffffe295
 
 Linker script and memory map
 
@@ -220,8 +226,10 @@ LOAD ./SCR/main.o
 .isr12
  *(.isr12)
 
-.isr13
+.isr13          memory region -> text
+                0x000000000000006b        0x3
  *(.isr13)
+ .isr13         0x000000000000006b        0x3 ./SCR/main.o
 
 .isr14
  *(.isr14)
@@ -234,7 +242,7 @@ LOAD ./SCR/main.o
                 0x0000000000000101        0x2 SHORT 0x100 ADDR (.gsinit)
 
 .text           memory region -> text
-                0x0000000000000103      0x70c
+                0x0000000000000103      0xd08
  *(.init)
  *(.text.gsinit0)
  .text.gsinit0  0x0000000000000103        0x6 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
@@ -271,49 +279,56 @@ LOAD ./SCR/main.o
                 0x00000000000001ba       0x9f ./SCR/main.o
  .text.code.SCR_TimeStoreU32
                 0x0000000000000259       0x84 ./SCR/main.o
- .text.code.SCR_RtcReadCounter
-                0x00000000000002dd       0xb8 ./SCR/main.o
+ .text.code.SCR_TimeStoreBasePlusElapsedNs
+                0x00000000000002dd      0x1da ./SCR/main.o
+ .text.code.SCR_RtcCompareIsr
+                0x00000000000004b7      0x199 ./SCR/main.o
+                0x00000000000004b7                _SCR_RtcCompareIsr
  .text.code.SCR_TimeInit
-                0x0000000000000395       0xb0 ./SCR/main.o
+                0x0000000000000650      0x24d ./SCR/main.o
  .text.code.SCR_TimeUpdate
-                0x0000000000000445       0x70 ./SCR/main.o
+                0x000000000000089d       0x9b ./SCR/main.o
  .text.code.WCAN_WaitForSelectiveWakeAck
-                0x00000000000004b5       0x40 ./SCR/main.o
+                0x0000000000000938       0x40 ./SCR/main.o
  .text.code.WCAN_ClearEvents
-                0x00000000000004f5        0xa ./SCR/main.o
+                0x0000000000000978        0xa ./SCR/main.o
  .text.code.SCR_RequestStandbyWake
-                0x00000000000004ff       0x35 ./SCR/main.o
+                0x0000000000000982       0x35 ./SCR/main.o
  .text.code.SCR_ConfigureFaultWake
-                0x0000000000000534       0x1c ./SCR/main.o
+                0x00000000000009b7       0x1c ./SCR/main.o
  .text.code.SCR_WatchdogService
-                0x0000000000000550        0x4 ./SCR/main.o
+                0x00000000000009d3        0x4 ./SCR/main.o
  .text.code.SCR_CheckFaultWake
-                0x0000000000000554       0xac ./SCR/main.o
+                0x00000000000009d7       0xac ./SCR/main.o
  .text.code.WCAN_ConfigureWakeFrame
-                0x0000000000000600       0x37 ./SCR/main.o
+                0x0000000000000a83       0x37 ./SCR/main.o
  .text.code.WCAN_CheckWake
-                0x0000000000000637       0x8d ./SCR/main.o
+                0x0000000000000aba       0x8d ./SCR/main.o
  .text.code.WCAN_Init
-                0x00000000000006c4       0xe2 ./SCR/main.o
-                0x00000000000006c4                _WCAN_Init
+                0x0000000000000b47       0xe2 ./SCR/main.o
+                0x0000000000000b47                _WCAN_Init
  .text.code.main
-                0x00000000000007a6       0x65 ./SCR/main.o
-                0x00000000000007a6                _main
+                0x0000000000000c29       0x7d ./SCR/main.o
+                0x0000000000000c29                _main
  .text.code._sdcc_external_startup
-                0x000000000000080b        0x4 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
-                0x000000000000080b                __sdcc_external_startup
+                0x0000000000000ca6        0x4 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libsdcc.a(_startup.rel)
+                0x0000000000000ca6                __sdcc_external_startup
+ .text.code._mullong
+                0x0000000000000caa      0x161 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
+                0x0000000000000caa                __mullong
  *(.fini)
-                0x000000000000080f                _etext = .
+                0x0000000000000e0b                _etext = .
 
 .roxdata        memory region -> text
-                0x000000000000080f        0x0
-                0x000000000000080f                __roxdata_start = .
+                0x0000000000000e0b        0x1
+                0x0000000000000e0b                __roxdata_start = .
  *(.roxdata.*)
-                0x000000000000080f                __roxdata_end = .
+ .roxdata.init  0x0000000000000e0b        0x1 ./SCR/main.o
+                0x0000000000000e0c                __roxdata_end = .
                 0x0000000000000008                regsize = DEFINED (__RB3__)?0x20:DEFINED (__RB2__)?0x18:DEFINED (__RB1__)?0x10:0x8
 
 .reg            memory region -> data
-                0x0000000000000000        0x8 load address 0x000000000000080f
+                0x0000000000000000        0x8 load address 0x0000000000000e0b
                 0x0000000000000000                PROVIDE (__reg_start, .)
  *(.regbank)
                 0x0000000000000008                . = regsize
@@ -327,42 +342,44 @@ LOAD ./SCR/main.o
                 0x0000000000000000                PROVIDE (__bit_end, .)
 
 .dbit           memory region -> data
-                0x0000000000000020        0x0
+                0x0000000000000020        0x1 load address 0x0000000000000e2b
  *(.dbit*)
+ .dbit.i51      0x0000000000000020        0x1 C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\libmcs51.a(crtstart.rel)
+                0x0000000000000020                bits
 
 .bit            memory region -> bit
-                0x0000000000000000        0x0
-                0x0000000000000000                PROVIDE (__bit_start, .)
+                0x0000000000000008        0x0
+                0x0000000000000008                PROVIDE (__bit_start, .)
  *(.bitdata*)
-                0x0000000000000000                PROVIDE (__bit_end, .)
+                0x0000000000000008                PROVIDE (__bit_end, .)
 
 .ddata          memory region -> data
-                0x0000000000000008        0x8 load address 0x0000000000000817
-                0x0000000000000008                PROVIDE (__ddata_start, .)
+                0x0000000000000021       0x14 load address 0x0000000000000e2c
+                0x0000000000000021                PROVIDE (__ddata_start, .)
  *(.ddata*)
- .ddata.i51     0x0000000000000008        0x8 ./SCR/main.o
+ .ddata.i51     0x0000000000000021       0x14 ./SCR/main.o
  *(.gnu.linkonce.d*)
-                0x0000000000000010                __ddata_end = .
+                0x0000000000000035                __ddata_end = .
 
 .bss            memory region -> data
-                0x0000000000000010        0x0
-                0x0000000000000010                PROVIDE (__bss_start, .)
+                0x0000000000000035        0x0
+                0x0000000000000035                PROVIDE (__bss_start, .)
  *(.bss*)
  *(COMMON)
-                0x0000000000000010                PROVIDE (__bss_end, .)
+                0x0000000000000035                PROVIDE (__bss_end, .)
 
 .idata          memory region -> data
-                0x0000000000000010        0x0
-                0x0000000000000010                PROVIDE (__idata_start, .)
+                0x0000000000000035        0x0
+                0x0000000000000035                PROVIDE (__idata_start, .)
  *(.idata*)
-                0x0000000000000010                PROVIDE (__idata_end, .)
+                0x0000000000000035                PROVIDE (__idata_end, .)
 
 .ibss           memory region -> data
-                0x0000000000000010        0x0
-                0x0000000000000010                PROVIDE (__ibss_start, .)
+                0x0000000000000035        0x0
+                0x0000000000000035                PROVIDE (__ibss_start, .)
  *(.ibss*)
-                0x0000000000000010                PROVIDE (__ibss_end, .)
-                0x0000000000000010                PROVIDE (__stack_start, .)
+                0x0000000000000035                PROVIDE (__ibss_end, .)
+                0x0000000000000035                PROVIDE (__stack_start, .)
 
 .pdata          memory region -> xdata
                 0x0000000000001c01        0x0
@@ -372,21 +389,24 @@ LOAD ./SCR/main.o
                 0x0000000000001c01                PROVIDE (__xstack_start, .)
 
 .xdata          memory region -> xdata
-                0x0000000000001d00       0x28
+                0x0000000000001d00       0x6a
                 0x0000000000001d00                __xdatac_start = .
  *(.xdata.i51*)
- .xdata.i51     0x0000000000001d00       0x28 ./SCR/main.o
+ .xdata.i51     0x0000000000001d00       0x5d ./SCR/main.o
+ .xdata.i51     0x0000000000001d5d        0xc C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large\liblong.a(_mullong.rel)
+                0x0000000000001d5d                __mullong_PARM_2
  *(.xdata.abs*)
-                0x0000000000001d28                __xdatac_end = .
-                0x0000000000001d28                __xdatai_start = .
+                0x0000000000001d69                __xdatac_end = .
+                0x0000000000001d69                __xdatai_start = .
  *(.xdata.init*)
-                0x0000000000001d28                __xdatai_end = .
+ .xdata.init    0x0000000000001d69        0x1 ./SCR/main.o
+                0x0000000000001d6a                __xdatai_end = .
 
 .ixdata         memory region -> xdata
-                0x0000000000001d28        0x0
-                0x0000000000001d28                PROVIDE (__ixdata_start, .)
+                0x0000000000001d6a        0x0
+                0x0000000000001d6a                PROVIDE (__ixdata_start, .)
  *(.xbss*)
-                0x0000000000001d28                PROVIDE (__ixdata_end, .)
+                0x0000000000001d6a                PROVIDE (__ixdata_end, .)
 
 .edata          memory region -> edata
                 0x0000000000000000        0x0
@@ -396,11 +416,11 @@ LOAD ./SCR/main.o
                 0x0000000000001c01                s_PSEG = __pdata_start
                 0x0000000000000000                l_PSEG = (__pdata_end - __pdata_start)
                 0x0000000000001d00                s_XSEG = __xdatac_start
-                0x0000000000000028                l_XSEG = (__xdatac_end - __xdatac_start)
-                0x0000000000001d28                s_XISEG = __xdatai_start
-                0x0000000000000000                l_XISEG = (__xdatai_end - __xdatai_start)
-                0x000000000000080f                s_XINIT = __roxdata_start
-                0x0000000000000000                l_XINIT = (__roxdata_end - __roxdata_start)
+                0x0000000000000069                l_XSEG = (__xdatac_end - __xdatac_start)
+                0x0000000000001d69                s_XISEG = __xdatai_start
+                0x0000000000000001                l_XISEG = (__xdatai_end - __xdatai_start)
+                0x0000000000000e0b                s_XINIT = __roxdata_start
+                0x0000000000000001                l_XINIT = (__roxdata_end - __roxdata_start)
                 0x0000000000000001                _. = ASSERT ((__stack_start < 0xf0), Stack Iram above limit 0xF0)
                 0x0000000000000001                _. = ASSERT ((__ddata_end < 0x80), Direct Iram Data above Limit 0x80)
 

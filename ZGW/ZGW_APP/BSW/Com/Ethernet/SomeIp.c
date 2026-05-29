@@ -1,4 +1,5 @@
 #include "SomeIp.h"
+#include "GatewaySwc.h"
 #include <string.h>
 
 typedef struct
@@ -141,7 +142,7 @@ static void SomeIp_SendError(SoAd_SoConIdType soConId,
                        0,
                        0u);
 
-    (void)SoAd_IfTransmit(soConId, remoteAddr, tx, len);
+    (void)GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, len);
 }
 
 static void SomeIp_Dispatch(SoAd_SoConIdType soConId,
@@ -337,7 +338,7 @@ uint8_t SomeIp_SendResponse(SoAd_SoConIdType soConId,
                        payload,
                        payloadLen);
 
-    if (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
+    if (GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
     {
         SomeIp_Rt.txCnt++;
         return 1u;
@@ -375,7 +376,7 @@ uint8_t SomeIp_SendNotification(SoAd_SoConIdType soConId,
                        payload,
                        payloadLen);
 
-    if (SoAd_IfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
+    if (GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, len) == SOAD_OK)
     {
         SomeIp_Rt.txCnt++;
         return 1u;

@@ -6,9 +6,9 @@
  * Existing debug bytes use 0x1760..0x1769; keep this record directly after
  * them and away from the SCR image copied at PMS_XRAM base.
  */
-#define SCR_TIME_XRAM_BASE                  0x176Au
+#define SCR_TIME_XRAM_BASE                  0x1790u
 #define SCR_TIME_MAGIC                      0x54534352u /* "TSCR" */
-#define SCR_TIME_VERSION                    1u
+#define SCR_TIME_VERSION                    2u
 
 #define SCR_TIME_OFFSET_MAGIC               0u
 #define SCR_TIME_OFFSET_VERSION             4u
@@ -24,7 +24,31 @@
 #define SCR_TIME_OFFSET_SCR_FAULT_STATUS    33u
 #define SCR_TIME_OFFSET_SCR_NMI_STATUS      34u
 #define SCR_TIME_OFFSET_SCR_RST_STATUS      35u
-#define SCR_TIME_RECORD_LENGTH              36u
+#define SCR_TIME_OFFSET_VEHICLE_NS          36u
+#define SCR_TIME_OFFSET_DEBUG_RTC_CON       44u
+#define SCR_TIME_OFFSET_DEBUG_PMCON1        45u
+#define SCR_TIME_OFFSET_DEBUG_RTC_CNT0      46u
+#define SCR_TIME_OFFSET_DEBUG_RTC_CNT1      47u
+#define SCR_TIME_OFFSET_DEBUG_RTC_CNT2      48u
+#define SCR_TIME_OFFSET_DEBUG_RTC_CNT3      49u
+#define SCR_TIME_OFFSET_DEBUG_TIME_ACTIVE   50u
+#define SCR_TIME_OFFSET_DEBUG_FLAGS_READ    51u
+#define SCR_TIME_OFFSET_DEBUG_MAGIC0_READ   52u
+#define SCR_TIME_OFFSET_DEBUG_MAGIC1_READ   53u
+#define SCR_TIME_OFFSET_DEBUG_MAGIC2_READ   54u
+#define SCR_TIME_OFFSET_DEBUG_MAGIC3_READ   55u
+#define SCR_TIME_OFFSET_DEBUG_VERSION_READ  56u
+#define SCR_TIME_OFFSET_DEBUG_VALID_READ    57u
+#define SCR_TIME_OFFSET_DEBUG_INIT_STATUS   58u
+#define SCR_TIME_RECORD_LENGTH              59u
+
+#define BOOT_STAGE_RTC_INIT_ENTER      (0x60u)
+#define BOOT_STAGE_RTC_PMCON_DONE      (0x61u)
+#define BOOT_STAGE_RTC_STOP_DONE       (0x62u)
+#define BOOT_STAGE_RTC_CON_DONE        (0x63u)
+#define BOOT_STAGE_RTC_CNT_DONE        (0x64u)
+#define BOOT_STAGE_RTC_START_DONE      (0x65u)
+#define BOOT_STAGE_RTC_INIT_EXIT       (0x66u)
 
 #define SCR_TIME_VALID                      1u
 #define SCR_TIME_FLAG_ARMED                 0x01u
@@ -40,7 +64,14 @@
 #define SCR_TIME_FAULT_STATUS_ECC_DBE       0x01u
 #define SCR_TIME_FAULT_STATUS_WDT           0x02u
 
-/* Keep aligned with TIMESYNC_SCR_RTC_LOW_POWER_70KHZ in TimeSync_Cfg.h. */
+
 #define SCR_TIME_RTC_USE_PCLK_20MHZ         1u
+#define SCR_TIME_RTC_TICK_HZ_NUM            20000000u
+#define SCR_TIME_RTC_TICK_HZ_DEN            1u
+#define SCR_TIME_RTC_TICK_NS                50u
+#define SCR_TIME_USE_RTC_INTERRUPT          1u
+#define SCR_TIME_RTC_COMPARE_TICKS          2000000u
+#define SCR_TIME_USE_WDT_FALLBACK           0u
+#define SCR_TIME_WDT_TICK_NS                6400u
 
 #endif /* SCR_TIME_SHARED_H */

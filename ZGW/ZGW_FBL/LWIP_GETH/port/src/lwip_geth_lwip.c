@@ -76,6 +76,9 @@
 #define IFX_LWIP_DHCP_FINE_PERIOD           (DHCP_FINE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  ( ( portTickType ) 100 )
+#define LWIP_GETH_RX_POLL_BUDGET            (32U)
+#define LWIP_GETH_TIMER_US_PER_TICK         (1000U)
+#define LWIP_GETH_TIMER_CATCHUP_LIMIT       (100U)
 #if LWIP_IPV4 && LWIP_ACD
 #define IFX_LWIP_ACD_PERIOD                 (ACD_TMR_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
 #endif
@@ -108,12 +111,19 @@ Ifx_Lwip        g_Lwip;
 IfxGeth_Eth     g_IfxGeth;
 uint32          isrTxCount = 0;
 uint32          isrRxCount = 0;
-uint8           channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
-uint8           channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+IFX_ALIGN(32) uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
+IFX_ALIGN(32) uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+volatile uint32 g_LwipSoftwareTimerTickCounter;
+volatile uint32 g_LwipRxPollLoopCounter;
+volatile uint32 g_LwipRxPollPacketCounter;
+volatile uint32 g_LwipRxPollBudgetHitCounter;
+volatile uint32 g_LwipLastTimerUs;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
  **********************************************************************************************************************/
+void lwip_geth_UpdateTickCount(void);
+
 /** \brief Timer interrupt callback */
 void lwip_geth_Lwip_onTimerTick(void)
 {
@@ -138,14 +148,47 @@ void lwip_geth_Lwip_onTimerTick(void)
   lwip->timerFlags = timerFlags;
 }
 
+static void lwip_geth_Lwip_advanceElapsedTime(void)
+{
+  uint32 nowUs = TIMER_STM_GetTotalTime(lwip_geth_handle->stm_module);
+  uint32 elapsedUs = nowUs - g_LwipLastTimerUs;
+  uint32 ticks = elapsedUs / LWIP_GETH_TIMER_US_PER_TICK;
+  uint32 tick;
+
+  if (ticks == 0u)
+  {
+    return;
+  }
+
+  if (ticks > LWIP_GETH_TIMER_CATCHUP_LIMIT)
+  {
+    ticks = LWIP_GETH_TIMER_CATCHUP_LIMIT;
+    g_LwipLastTimerUs = nowUs;
+  }
+  else
+  {
+    g_LwipLastTimerUs += ticks * LWIP_GETH_TIMER_US_PER_TICK;
+  }
+
+  for (tick = 0u; tick < ticks; tick++)
+  {
+    lwip_geth_Lwip_onTimerTick();
+    lwip_geth_UpdateTickCount();
+    g_LwipSoftwareTimerTickCounter++;
+  }
+}
+
 /** \brief Polling the timer event flags */
 void lwip_geth_Lwip_pollTimerFlags(void)
 {
   Ifx_Lwip *lwip = &g_Lwip;
   uint16    timerFlags;
+  boolean   interruptState;
+
+  lwip_geth_Lwip_advanceElapsedTime();
 
   /* disable interrupts */
-  boolean interruptState = IfxCpu_disableInterrupts();
+  interruptState = IfxCpu_disableInterrupts();
 
   timerFlags       = lwip->timerFlags;
   lwip->timerFlags = 0;
@@ -206,7 +249,10 @@ void lwip_geth_Lwip_pollTimerFlags(void)
     ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
     if (ctrl_status.B.LNKSTS == 0)
     {
-      netif_set_link_down(&g_Lwip.netif);
+      /* Lab bring-up keeps lwIP administratively available even when the PHY
+       * helper reports link down while packets are visible on the wire.
+       */
+      netif_set_link_up(&g_Lwip.netif);
     }
     else
     {
@@ -257,10 +303,30 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 /** \brief Polling the ETH receive event flags */
 void lwip_geth_Lwip_pollReceiveFlags(void)
 {
-  /**
-   * We are assuming that the only interrupt source is an incoming packet
-   */
-  lwip_geth_netif_input(&g_Lwip.netif);
+  uint8 processed;
+  uint8 budget = LWIP_GETH_RX_POLL_BUDGET;
+
+  g_LwipRxPollLoopCounter++;
+
+  do
+  {
+    processed = lwip_geth_netif_input_once(&g_Lwip.netif);
+
+    if (processed != 0u)
+    {
+      g_LwipRxPollPacketCounter++;
+    }
+
+    if (budget > 0u)
+    {
+      budget--;
+    }
+  } while ((processed != 0u) && (budget > 0u));
+
+  if ((processed != 0u) && (budget == 0u))
+  {
+    g_LwipRxPollBudgetHitCounter++;
+  }
 }
 
 #if LWIP_GETH_RTOS_ENABLED
@@ -283,7 +349,7 @@ void lwip_geth_LinkStatus(void *pvParameter)
     ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
     if (ctrl_status.B.LNKSTS == 0)
     {
-      netif_set_link_down(&g_Lwip.netif);
+      netif_set_link_up(&g_Lwip.netif);
     }
     else
     {
@@ -382,6 +448,7 @@ void lwip_geth_Lwip_init(void)
   netif_set_status_callback(&g_Lwip.netif, LWIP_GETH_NETIF_STATUS_CB_FUNCTION);
 #endif
   netif_set_up(&g_Lwip.netif);
+  netif_set_link_up(&g_Lwip.netif);
 
 #if LWIP_NETIF_HOSTNAME
   g_Lwip.netif.hostname = lwip_geth_handle->app_config->hostname;
@@ -426,7 +493,7 @@ IFX_INTERRUPT(ISR_Geth_Tx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_TX)
 IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
 {
 #if !LWIP_GETH_RTOS_ENABLED
-  lwip_geth_netif_input(&g_Lwip.netif);
+  /* NO_SYS bootloader mode drains RX from FblEth_MainFunction. */
 #else
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );

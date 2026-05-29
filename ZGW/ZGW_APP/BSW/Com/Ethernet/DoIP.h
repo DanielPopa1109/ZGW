@@ -19,6 +19,8 @@
 
 #define DOIP_ALIVE_TIMEOUT_MS                 5000u
 #define DOIP_INACTIVITY_TIMEOUT_MS            30000u
+#define DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS     1000u
+#define DOIP_VEHICLE_ANNOUNCE_COUNT           5u
 
 #define DOIP_PAYLOAD_GENERIC_NACK             0x0000u
 #define DOIP_PAYLOAD_VEHICLE_ID_REQ           0x0001u
@@ -111,5 +113,13 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16 sourceAddress,
                                             uint16 udsLen);
 
 DoIP_TcpStateType DoIP_GetTcpState(void);
+
+extern volatile uint32 DoIP_DebugAliveReqTxCounter;
+extern volatile uint32 DoIP_DebugAliveResRxCounter;
+extern volatile uint32 DoIP_DebugTcpTimeoutCounter;
+extern volatile uint32 DoIP_DebugTcpDisconnectCounter;
+extern volatile uint32 DoIP_DebugTcpState;
+extern volatile uint32 DoIP_DebugAliveTimerMs;
+extern volatile uint32 DoIP_DebugInactivityTimerMs;
 
 #endif
