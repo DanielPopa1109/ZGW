@@ -1,7 +1,8 @@
 #ifndef DCM_CFG_H_
 #define DCM_CFG_H_
 
-#define DCM_DEFAULT_SERVICE_COUNT    27u
+/* Number of entries in Dcm_DefaultServices[] (Dcm.c). Keep in sync. */
+#define DCM_DEFAULT_SERVICE_COUNT    13u
 
 #define DCM_RX_CAN_PHYS          0u
 #define DCM_RX_CANFD_PHYS        2u

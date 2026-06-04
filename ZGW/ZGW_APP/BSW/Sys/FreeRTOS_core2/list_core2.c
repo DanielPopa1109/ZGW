@@ -28,6 +28,7 @@
 
 
 #include <stdlib.h>
+#include <stdint.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core2 prevents task_core2.h from redefining
  * all the API functions to use the MPU wrappers.  That should only be done when
@@ -37,11 +38,94 @@
 #include "FreeRTOS_core2.h"
 #include "list_core2.h"
 
+/* Route detected core2 list corruption to the common reset hook without
+ * pulling the full McuSm header into the FreeRTOS kernel unit. */
+extern void McuSm_PerformResetHook( uint32_t resetReason, uint32_t resetInformation );
+
+/* Mirror of the dedicated reset code from McuSm.h. Keep in sync if changed. */
+#define MCUSM_RESET_REASON_C2_LIST_CORRUPT             388u
+#define FREERTOS_CORE2_LIST_INSERT_MAX_SCAN            1024u
+#define FREERTOS_CORE2_LIST_CORRUPT_INFO_WALK_LIMIT    1u
+#define FREERTOS_CORE2_LIST_CORRUPT_INFO_NULL_NEXT     2u
+#define FREERTOS_CORE2_LIST_CORRUPT_INFO_LOW_NEXT      3u
+#define FREERTOS_CORE2_LIST_CORRUPT_INFO_REINSERT      4u
+
+volatile uint32_t FreeRTOS_core2_DebugListInsertFailReason;
+volatile uint32_t FreeRTOS_core2_DebugListInsertFailInfo;
+volatile uint32_t FreeRTOS_core2_DebugListInsertList;
+volatile uint32_t FreeRTOS_core2_DebugListInsertItem;
+volatile uint32_t FreeRTOS_core2_DebugListInsertItemValue;
+volatile uint32_t FreeRTOS_core2_DebugListInsertItemContainer;
+volatile uint32_t FreeRTOS_core2_DebugListInsertListItems;
+volatile uint32_t FreeRTOS_core2_DebugListInsertWalkCount;
+volatile uint32_t FreeRTOS_core2_DebugListInsertIterator;
+volatile uint32_t FreeRTOS_core2_DebugListInsertNext;
+volatile uint32_t FreeRTOS_core2_DebugListInsertNextValue;
+
+static void prvListInsertCorruptionReset_core2( const List_t_core2 * const pxList_core2,
+                                                const ListItem_t_core2 * const pxNewListItem_core2,
+                                                const ListItem_t_core2 * const pxIterator_core2,
+                                                const ListItem_t_core2 * const pxNext_core2,
+                                                uint32_t failInfo_core2,
+                                                uint32_t walkCount_core2 );
+
 /* Lint e9021, e961 and e750 are suppressed as a MISRA exception justified
  * because the MPU ports require MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core2 to be
  * defined for the header files above, but not in this file, in order to
  * generate the correct privileged Vs unprivileged linkage and placement. */
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core2 /*lint !e961 !e750 !e9021. */
+
+static void prvListInsertCorruptionReset_core2( const List_t_core2 * const pxList_core2,
+                                                const ListItem_t_core2 * const pxNewListItem_core2,
+                                                const ListItem_t_core2 * const pxIterator_core2,
+                                                const ListItem_t_core2 * const pxNext_core2,
+                                                uint32_t failInfo_core2,
+                                                uint32_t walkCount_core2 )
+{
+    FreeRTOS_core2_DebugListInsertFailReason = MCUSM_RESET_REASON_C2_LIST_CORRUPT;
+    FreeRTOS_core2_DebugListInsertFailInfo = failInfo_core2;
+    FreeRTOS_core2_DebugListInsertList = ( uint32_t ) pxList_core2;
+    FreeRTOS_core2_DebugListInsertItem = ( uint32_t ) pxNewListItem_core2;
+    FreeRTOS_core2_DebugListInsertIterator = ( uint32_t ) pxIterator_core2;
+    FreeRTOS_core2_DebugListInsertNext = ( uint32_t ) pxNext_core2;
+    FreeRTOS_core2_DebugListInsertWalkCount = walkCount_core2;
+
+    if( pxList_core2 != NULL )
+    {
+        FreeRTOS_core2_DebugListInsertListItems = ( uint32_t ) pxList_core2->uxNumberOfItems_core2;
+    }
+    else
+    {
+        FreeRTOS_core2_DebugListInsertListItems = 0u;
+    }
+
+    if( pxNewListItem_core2 != NULL )
+    {
+        FreeRTOS_core2_DebugListInsertItemValue = ( uint32_t ) pxNewListItem_core2->xItemValue_core2;
+        FreeRTOS_core2_DebugListInsertItemContainer = ( uint32_t ) pxNewListItem_core2->pxContainer_core2;
+    }
+    else
+    {
+        FreeRTOS_core2_DebugListInsertItemValue = 0u;
+        FreeRTOS_core2_DebugListInsertItemContainer = 0u;
+    }
+
+    if( ( pxNext_core2 != NULL ) && ( ( uint32_t ) pxNext_core2 >= 0x10000u ) )
+    {
+        FreeRTOS_core2_DebugListInsertNextValue = ( uint32_t ) pxNext_core2->xItemValue_core2;
+    }
+    else
+    {
+        FreeRTOS_core2_DebugListInsertNextValue = 0u;
+    }
+
+    McuSm_PerformResetHook( MCUSM_RESET_REASON_C2_LIST_CORRUPT, failInfo_core2 );
+
+    for( ; ; )
+    {
+        /* McuSm_PerformResetHook() should not return. */
+    }
+}
 
 /*-----------------------------------------------------------
 * PUBLIC LIST API documented in list.h
@@ -130,12 +214,24 @@ void vListInsert_core2( List_t_core2 * const pxList_core2,
 {
     ListItem_t_core2 * pxIterator_core2;
     const TickType_t_core2 xValueOfInsertion_core2 = pxNewListItem_core2->xItemValue_core2;
+    UBaseType_t_core2 uxWalkCount_core2 = ( UBaseType_t_core2 ) 0U;
+    UBaseType_t_core2 uxWalkLimit_core2;
 
     /* Only effective when configASSERT_core2() is also defined, these tests may catch
      * the list data structures being overwritten in memory.  They will not catch
      * data errors caused by incorrect configuration or use of FreeRTOS_core2. */
     listTEST_LIST_INTEGRITY_core2( pxList_core2 );
     listTEST_LIST_ITEM_INTEGRITY_core2( pxNewListItem_core2 );
+
+    if( pxNewListItem_core2->pxContainer_core2 != NULL )
+    {
+        prvListInsertCorruptionReset_core2( pxList_core2,
+                                            pxNewListItem_core2,
+                                            NULL,
+                                            NULL,
+                                            FREERTOS_CORE2_LIST_CORRUPT_INFO_REINSERT,
+                                            0u );
+    }
 
     /* Insert the new list item into the list, sorted in xItemValue_core2 order.
      *
@@ -176,10 +272,57 @@ void vListInsert_core2( List_t_core2 * const pxList_core2,
         *      configMAX_SYSCALL_INTERRUPT_PRIORITY.
         **********************************************************************/
 
-        for( pxIterator_core2 = ( ListItem_t_core2 * ) &( pxList_core2->xListEnd_core2 ); pxIterator_core2->pxNext_core2->xItemValue_core2 <= xValueOfInsertion_core2; pxIterator_core2 = pxIterator_core2->pxNext_core2 ) /*lint !e826 !e740 !e9087 The mini list structure is used as the list end to save RAM.  This is checked and valid. *//*lint !e440 The iterator moves to a different value, not xValueOfInsertion_core2. */
+        if( pxList_core2->uxNumberOfItems_core2 >= ( ( UBaseType_t_core2 ) FREERTOS_CORE2_LIST_INSERT_MAX_SCAN - ( UBaseType_t_core2 ) 1U ) )
         {
-            /* There is nothing to do here, just iterating to the wanted
-             * insertion position. */
+            uxWalkLimit_core2 = ( UBaseType_t_core2 ) FREERTOS_CORE2_LIST_INSERT_MAX_SCAN;
+        }
+        else
+        {
+            uxWalkLimit_core2 = pxList_core2->uxNumberOfItems_core2 + ( UBaseType_t_core2 ) 1U;
+        }
+
+        pxIterator_core2 = ( ListItem_t_core2 * ) &( pxList_core2->xListEnd_core2 ); /*lint !e826 !e740 !e9087 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
+        for( ; ; )
+        {
+            ListItem_t_core2 * const pxNext_core2 = pxIterator_core2->pxNext_core2;
+
+            if( pxNext_core2 == NULL )
+            {
+                prvListInsertCorruptionReset_core2( pxList_core2,
+                                                    pxNewListItem_core2,
+                                                    pxIterator_core2,
+                                                    pxNext_core2,
+                                                    FREERTOS_CORE2_LIST_CORRUPT_INFO_NULL_NEXT,
+                                                    ( uint32_t ) uxWalkCount_core2 );
+            }
+
+            if( ( uint32_t ) pxNext_core2 < 0x10000u )
+            {
+                prvListInsertCorruptionReset_core2( pxList_core2,
+                                                    pxNewListItem_core2,
+                                                    pxIterator_core2,
+                                                    pxNext_core2,
+                                                    FREERTOS_CORE2_LIST_CORRUPT_INFO_LOW_NEXT,
+                                                    ( uint32_t ) uxWalkCount_core2 );
+            }
+
+            if( pxNext_core2->xItemValue_core2 > xValueOfInsertion_core2 )
+            {
+                break;
+            }
+
+            pxIterator_core2 = pxNext_core2;
+            uxWalkCount_core2++;
+
+            if( uxWalkCount_core2 > uxWalkLimit_core2 )
+            {
+                prvListInsertCorruptionReset_core2( pxList_core2,
+                                                    pxNewListItem_core2,
+                                                    pxIterator_core2,
+                                                    pxNext_core2,
+                                                    FREERTOS_CORE2_LIST_CORRUPT_INFO_WALK_LIMIT,
+                                                    ( uint32_t ) uxWalkCount_core2 );
+            }
         }
     }
 

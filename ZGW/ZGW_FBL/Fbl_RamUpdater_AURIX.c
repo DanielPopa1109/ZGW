@@ -44,6 +44,9 @@
 #define FBL_END_NCACHED                  0xA002FFFFu
 #define FBL_SIZE_BYTES                   0x00030000u
 
+#define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
+#define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
+
 #define FBL_IMAGE_RAM_ADDR               0xB0100000u
 #define FBL_IMAGE_RAM_SIZE               FBL_SIZE_BYTES
 
@@ -75,6 +78,7 @@
 #define FBL_ETH_TYPE_IPV4                0x0800u
 #define FBL_IP_PROTO_UDP                 17u
 #define FBL_UDP_PORT                     13400u
+#define FBL_ETH_DMA_INIT_ATTEMPTS        2u
 
 #define FBL_IP0                          IP_ADDR0
 #define FBL_IP1                          IP_ADDR1
@@ -104,6 +108,21 @@
 #define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
 
 #define UDS_RID_COMMIT_FBL               0x0156u
+
+/* RDBI identifiers and version data must match the FBL application-update
+ * handler (Cpu0_Main.c Fbl_UdsHandle) so the programming sequence behaves
+ * identically while the RAM updater is active. */
+#define UDS_DID_ACTIVE_SOFTWARE_BLOCK    0xF100u
+#define UDS_DID_SOFTWARE_VERSION         0xF101u
+#define UDS_DID_ACTIVE_SESSION           0xF186u
+#define FBL_DIAG_SESSION_PROGRAMMING     0x02u
+#define FBL_ACTIVE_SOFTWARE_BLOCK        0x01u
+#define APP_SW_VERSION_MAJOR             1u
+#define APP_SW_VERSION_MINOR             0u
+#define APP_SW_VERSION_PATCH             0u
+#define FBL_SW_VERSION_MAJOR             1u
+#define FBL_SW_VERSION_MINOR             0u
+#define FBL_SW_VERSION_PATCH             0u
 
 #define RAM_FLASH_FUNC_BASE              0x70100000u
 #define RAM_FLASH_FUNC_LEN               192u
@@ -198,6 +217,9 @@ static uint8 g_ethTxFrame[FBL_ETH_MTU];
 static uint8 g_udsReq[FBL_ISOTP_MAX_PAYLOAD];
 static uint16 g_udsReqLen;
 static uint8 g_udsReqReady;
+volatile uint32 FblRam_EthDmaResetTimeoutCnt;
+volatile uint32 FblRam_EthDmaInitRetryCnt;
+volatile uint32 FblRam_EthDmaModeAfterInit;
 
 IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
@@ -214,6 +236,8 @@ static void Ram_IsoSendFc(void);
 static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len);
 
 static void Ram_EthInit(void);
+static uint8 Ram_EthInitModuleWithResetCheck(IfxGeth_Eth *geth, IfxGeth_Eth_Config *cfg);
+static void Ram_EthStopMacDma(Ifx_GETH *gethSFR);
 static void Ram_EthPoll(void);
 static uint16 Ram_EthRxFrame(uint8 *buf, uint16 maxLen);
 static void Ram_EthTxFrame(const uint8 *buf, uint16 len);
@@ -719,10 +743,20 @@ static void Ram_EthInit(void)
         GETH_GPCTL.B.ALTI0 = cfg.pins.rmiiPins->mdio->inSelect;
     }
 
-    IfxGeth_Eth_initModule(g_geth, &cfg);
+    if(Ram_EthInitModuleWithResetCheck(g_geth, &cfg) == 0u)
+    {
+        IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+        IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+        return;
+    }
 
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
-    (void)lwip_geth_private_Phy_Dp83825i_init();
+    if(lwip_geth_private_Phy_Dp83825i_init() == 0u)
+    {
+        IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
+        IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+        return;
+    }
 #endif
 
     IfxGeth_Eth_startTransmitters(g_geth, 1u);
@@ -753,6 +787,50 @@ static void Ram_EthInit(void)
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+}
+
+static void Ram_EthStopMacDma(Ifx_GETH *gethSFR)
+{
+    if(gethSFR == NULL_PTR)
+    {
+        return;
+    }
+
+    IfxGeth_mac_disableTransmitter(gethSFR);
+    IfxGeth_mac_disableReceiver(gethSFR);
+    IfxGeth_dma_stopTransmitter(gethSFR, IfxGeth_TxDmaChannel_0);
+    gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR = 0u;
+}
+
+static uint8 Ram_EthInitModuleWithResetCheck(IfxGeth_Eth *geth, IfxGeth_Eth_Config *cfg)
+{
+    uint32 attempt;
+
+    if((geth == NULL_PTR) || (cfg == NULL_PTR) || (cfg->gethSFR == NULL_PTR))
+    {
+        return 0u;
+    }
+
+    for(attempt = 0u; attempt < FBL_ETH_DMA_INIT_ATTEMPTS; attempt++)
+    {
+        if(attempt > 0u)
+        {
+            FblRam_EthDmaInitRetryCnt++;
+        }
+
+        Ram_EthStopMacDma(cfg->gethSFR);
+        IfxGeth_Eth_initModule(geth, cfg);
+        FblRam_EthDmaModeAfterInit = cfg->gethSFR->DMA_MODE.U;
+
+        if(IfxGeth_dma_isSoftwareResetDone(cfg->gethSFR) != 0)
+        {
+            return 1u;
+        }
+
+        FblRam_EthDmaResetTimeoutCnt++;
+    }
+
+    return 0u;
 }
 
 static void Ram_EthPoll(void)
@@ -1045,13 +1123,41 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     }
     else if(sid == UDS_SID_RDBI)
     {
-        if((len >= 3u) && (req[1u] == 0xF1u) && (req[2u] == 0x86u))
+        uint16 didReq;
+
+        if(len != 3u)
+        {
+            Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        didReq = Ram_Rd16(&req[1u]);
+
+        if(didReq == UDS_DID_ACTIVE_SESSION)
         {
             res[0u] = 0x62u;
-            res[1u] = 0xF1u;
-            res[2u] = 0x86u;
-            res[3u] = 0x02u;
+            Ram_Wr16(&res[1u], didReq);
+            res[3u] = FBL_DIAG_SESSION_PROGRAMMING;
             Ram_UdsSend(res, 4u, transport);
+        }
+        else if(didReq == UDS_DID_ACTIVE_SOFTWARE_BLOCK)
+        {
+            res[0u] = 0x62u;
+            Ram_Wr16(&res[1u], didReq);
+            res[3u] = FBL_ACTIVE_SOFTWARE_BLOCK;
+            Ram_UdsSend(res, 4u, transport);
+        }
+        else if(didReq == UDS_DID_SOFTWARE_VERSION)
+        {
+            res[0u] = 0x62u;
+            Ram_Wr16(&res[1u], didReq);
+            res[3u] = APP_SW_VERSION_MAJOR;
+            res[4u] = APP_SW_VERSION_MINOR;
+            res[5u] = APP_SW_VERSION_PATCH;
+            res[6u] = FBL_SW_VERSION_MAJOR;
+            res[7u] = FBL_SW_VERSION_MINOR;
+            res[8u] = FBL_SW_VERSION_PATCH;
+            Ram_UdsSend(res, 9u, transport);
         }
         else
         {
@@ -1604,10 +1710,15 @@ static uint32 Ram_Crc32(uint32 addr, uint32 len)
 
 static uint8 Ram_FblRangeValid(uint32 addr, uint32 len)
 {
+    uint32 end;
+
     if(len == 0u) { return 0u; }
-    if(addr < FBL_START_NCACHED) { return 0u; }
-    if((addr + len - 1u) > FBL_END_NCACHED) { return 0u; }
     if((addr + len) < addr) { return 0u; }
+    end = addr + len - 1u;
+    if((addr & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
+    if((end & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
+    if(addr < FBL_START_NCACHED) { return 0u; }
+    if(end > FBL_END_NCACHED) { return 0u; }
     if((addr - FBL_START_NCACHED + len) > FBL_IMAGE_RAM_SIZE) { return 0u; }
     return 1u;
 }

@@ -8,7 +8,7 @@
  */
 #define SCR_TIME_XRAM_BASE                  0x1790u
 #define SCR_TIME_MAGIC                      0x54534352u /* "TSCR" */
-#define SCR_TIME_VERSION                    2u
+#define SCR_TIME_VERSION                    3u
 
 #define SCR_TIME_OFFSET_MAGIC               0u
 #define SCR_TIME_OFFSET_VERSION             4u
@@ -40,7 +40,9 @@
 #define SCR_TIME_OFFSET_DEBUG_VERSION_READ  56u
 #define SCR_TIME_OFFSET_DEBUG_VALID_READ    57u
 #define SCR_TIME_OFFSET_DEBUG_INIT_STATUS   58u
-#define SCR_TIME_RECORD_LENGTH              59u
+#define SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH  59u
+#define SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH 63u
+#define SCR_TIME_RECORD_LENGTH              67u
 
 #define BOOT_STAGE_RTC_INIT_ENTER      (0x60u)
 #define BOOT_STAGE_RTC_PMCON_DONE      (0x61u)
@@ -71,6 +73,7 @@
 #define SCR_TIME_RTC_TICK_NS                50u
 #define SCR_TIME_USE_RTC_INTERRUPT          1u
 #define SCR_TIME_RTC_COMPARE_TICKS          2000000u
+#define SCR_TIME_RTC_COMPARE_NS             (SCR_TIME_RTC_COMPARE_TICKS * SCR_TIME_RTC_TICK_NS)
 #define SCR_TIME_USE_WDT_FALLBACK           0u
 #define SCR_TIME_WDT_TICK_NS                6400u
 

@@ -36,6 +36,26 @@
 #define IFX_PIN_PACKAGE_LQFP176         1
 
 /*********************************************************************************************************************/
+/*------------------------------------Explicit cached/non-cached placement-------------------------------------------*/
+/*********************************************************************************************************************/
+/* Use these only for coherency-sensitive data. Normal code stays in cached PFLASH and normal private data stays in
+ * core-local DSPR unless a DMA/peripheral/inter-core owner requires non-cached access. */
+#define AURIX_LMU_NC_BSS                __attribute__((section(".bss.lmu_nc")))
+#define AURIX_LMU_NC_DATA               __attribute__((section(".data.lmu_nc")))
+#define AURIX_ETH_DMA_NC                __attribute__((section(".bss.eth_dma_nc")))
+#define AURIX_SHARED_NC                 __attribute__((section(".bss.shared_nc")))
+
+/* The default iLLD ring size is 8 descriptors. That is too small for the
+ * lwIP/DoIP diagnostic traffic bursts seen during flashing, where TX can run
+ * out of software-owned descriptors before DMA returns them. */
+#define IFXGETH_MAX_TX_DESCRIPTORS      (16)
+#define IFXGETH_MAX_RX_DESCRIPTORS      (16)
+
+#if defined(__TASKING__) && !defined(Ifx__dsync)
+#define Ifx__dsync()                    __dsync()
+#endif
+
+/*********************************************************************************************************************/
 /*------------------------------------------Configuration for IfxScu_cfg.h-------------------------------------------*/
 /*********************************************************************************************************************/
 /* External oscillator frequency in Hz */

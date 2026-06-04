@@ -225,8 +225,6 @@ static void Dem_ApplyStoredDataLimit(
     if (eventIndex >= DEM_STORED_DATA_EVENT_LIMIT)
     {
         eventConfig->StorageEnabled = FALSE;
-        eventConfig->FreezeFrameCapture = NULL_PTR;
-        eventConfig->ExtendedDataCapture = NULL_PTR;
     }
 }
 

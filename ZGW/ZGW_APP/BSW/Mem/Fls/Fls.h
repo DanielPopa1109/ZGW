@@ -26,5 +26,6 @@ MemIf_JobResultType Fls_GetJobResult(void);
 void Fls_SetMode(MemIf_ModeType Mode);
 void Fls_MainFunction(void);
 uint32 Fls_GetPhysicalAddress(Fls_AddressType Address);
+void Fls_ClearDFlashSmuBusError(void);
 
 #endif /* FLS_H */

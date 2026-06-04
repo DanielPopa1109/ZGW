@@ -8,6 +8,8 @@
 #define ETHSM_MAX_CHANNELS 1u
 #define ETHSM_FIRST_SOCON  0u
 #define ETHSM_LAST_SOCON   4u
+#define ETHSM_DOIP_UDP_SOCON 0u
+#define ETHSM_DOIP_TCP_SOCON 1u
 
 typedef struct
 {
@@ -58,6 +60,11 @@ static void EthSM_CloseConfiguredSockets(void)
 
     for (id = ETHSM_FIRST_SOCON; id <= ETHSM_LAST_SOCON; id++)
     {
+        if ((id == ETHSM_DOIP_UDP_SOCON) || (id == ETHSM_DOIP_TCP_SOCON))
+        {
+            continue;
+        }
+
         (void)SoAd_CloseSoCon(id);
     }
 }

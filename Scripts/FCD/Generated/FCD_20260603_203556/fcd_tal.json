@@ -1,0 +1,578 @@
+{
+  "schema": "FCD_TAL_v1",
+  "created": "2026-06-03T20:35:57",
+  "steps": [
+    {
+      "step": 1,
+      "ecu": "ZGW_FBL",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 2,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 3,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA0030000",
+      "size": 64,
+      "crc32": "0x7B298ADE"
+    },
+    {
+      "step": 4,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_0_A0030000.bin"
+    },
+    {
+      "step": 5,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 6,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA0030000",
+      "size": 64,
+      "crc32": "0x7B298ADE"
+    },
+    {
+      "step": 7,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA0030140",
+      "size": 704,
+      "crc32": "0x559BE398"
+    },
+    {
+      "step": 8,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_1_A0030140.bin"
+    },
+    {
+      "step": 9,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 10,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA0030140",
+      "size": 704,
+      "crc32": "0x559BE398"
+    },
+    {
+      "step": 11,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA003040A",
+      "size": 22,
+      "crc32": "0x98FF013B"
+    },
+    {
+      "step": 12,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_2_A003040A.bin"
+    },
+    {
+      "step": 13,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 14,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA003040A",
+      "size": 22,
+      "crc32": "0x98FF013B"
+    },
+    {
+      "step": 15,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA003042A",
+      "size": 246,
+      "crc32": "0x852321C8"
+    },
+    {
+      "step": 16,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_3_A003042A.bin"
+    },
+    {
+      "step": 17,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 18,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA003042A",
+      "size": 246,
+      "crc32": "0x852321C8"
+    },
+    {
+      "step": 19,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA003052A",
+      "size": 2870,
+      "crc32": "0x22A33C3B"
+    },
+    {
+      "step": 20,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_4_A003052A.bin"
+    },
+    {
+      "step": 21,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 22,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA003052A",
+      "size": 2870,
+      "crc32": "0x22A33C3B"
+    },
+    {
+      "step": 23,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xA003106A",
+      "size": 192374,
+      "crc32": "0x2FEAB28E"
+    },
+    {
+      "step": 24,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_5_A003106A.bin"
+    },
+    {
+      "step": 25,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 26,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA003106A",
+      "size": 192374,
+      "crc32": "0x2FEAB28E"
+    },
+    {
+      "step": 27,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC002FFE0",
+      "size": 32,
+      "crc32": "0xD7F4C133"
+    },
+    {
+      "step": 28,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_6_C002FFE0.bin"
+    },
+    {
+      "step": 29,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 30,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC002FFE0",
+      "size": 32,
+      "crc32": "0xD7F4C133"
+    },
+    {
+      "step": 31,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC0030040",
+      "size": 256,
+      "crc32": "0xABA4742E"
+    },
+    {
+      "step": 32,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_7_C0030040.bin"
+    },
+    {
+      "step": 33,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 34,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0030040",
+      "size": 256,
+      "crc32": "0xABA4742E"
+    },
+    {
+      "step": 35,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC0030400",
+      "size": 10,
+      "crc32": "0x77F04B29"
+    },
+    {
+      "step": 36,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_8_C0030400.bin"
+    },
+    {
+      "step": 37,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 38,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0030400",
+      "size": 10,
+      "crc32": "0x77F04B29"
+    },
+    {
+      "step": 39,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC0030420",
+      "size": 10,
+      "crc32": "0x05DDF401"
+    },
+    {
+      "step": 40,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_9_C0030420.bin"
+    },
+    {
+      "step": 41,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 42,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0030420",
+      "size": 10,
+      "crc32": "0x05DDF401"
+    },
+    {
+      "step": 43,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC0030520",
+      "size": 10,
+      "crc32": "0x74318C3F"
+    },
+    {
+      "step": 44,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_10_C0030520.bin"
+    },
+    {
+      "step": 45,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 46,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0030520",
+      "size": 10,
+      "crc32": "0x74318C3F"
+    },
+    {
+      "step": 47,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xC0031060",
+      "size": 10,
+      "crc32": "0xF068C691"
+    },
+    {
+      "step": 48,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_11_C0031060.bin"
+    },
+    {
+      "step": 49,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 50,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0031060",
+      "size": 10,
+      "crc32": "0xF068C691"
+    },
+    {
+      "step": 51,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF42FFE0",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 52,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_12_CF42FFE0.bin"
+    },
+    {
+      "step": 53,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 54,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF42FFE0",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 55,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4301E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 56,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_13_CF4301E0.bin"
+    },
+    {
+      "step": 57,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 58,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4301E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 59,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4303E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 60,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_14_CF4303E0.bin"
+    },
+    {
+      "step": 61,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 62,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4303E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 63,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4305E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 64,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_15_CF4305E0.bin"
+    },
+    {
+      "step": 65,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 66,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4305E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 67,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF430FE0",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 68,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_16_CF430FE0.bin"
+    },
+    {
+      "step": 69,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 70,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF430FE0",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 71,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4311E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 72,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_17_CF4311E0.bin"
+    },
+    {
+      "step": 73,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 74,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4311E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 75,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4313E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 76,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_18_CF4313E0.bin"
+    },
+    {
+      "step": 77,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 78,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4313E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 79,
+      "ecu": "ZGW_FBL",
+      "service": "RequestDownload",
+      "address": "0xCF4315E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    },
+    {
+      "step": 80,
+      "ecu": "ZGW_FBL",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_FBL_19_CF4315E0.bin"
+    },
+    {
+      "step": 81,
+      "ecu": "ZGW_FBL",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 82,
+      "ecu": "ZGW_FBL",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF4315E0",
+      "size": 500,
+      "crc32": "0x7D0B1AFE"
+    }
+  ]
+}

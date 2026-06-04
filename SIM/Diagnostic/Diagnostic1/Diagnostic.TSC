@@ -14,7 +14,7 @@ FModuleType=0
 SubServiceCount=4
 
 [TfrmDiagnostics_EcuReset]
-SubServiceCount=5
+SubServiceCount=1
 
 [TfrmDiagnostics_ClearDiagnosticInformation]
 SubServiceCount=1
@@ -26,7 +26,7 @@ SubServiceCount=3
 SubServiceCount=0
 
 [TfrmDiagnostics_ReadDataByIdentifier]
-SubServiceCount=1
+SubServiceCount=3
 
 [TfrmDiagnostics_PowertrainData]
 SubServiceCount=0
@@ -44,31 +44,31 @@ SubServiceCount=0
 SubServiceCount=0
 
 [TfrmDiagnostics_ReadMemoryByAddress]
-SubServiceCount=1
+SubServiceCount=0
 
 [TfrmDiagnostics_ReadScalingDataByIdentifier]
-SubServiceCount=1
+SubServiceCount=0
 
 [TfrmDiagnostics_SecurityAccess]
-SubServiceCount=8
+SubServiceCount=0
 
 [TfrmDiagnostics_CommunicationControl]
-SubServiceCount=4
+SubServiceCount=2
 
 [TfrmDiagnostics_Authentication]
 SubServiceCount=1
 
 [TfrmDiagnostics_ReadDataByPeriodicIdentifier]
-SubServiceCount=4
+SubServiceCount=0
 
 [TfrmDiagnostics_DynamicallyDefineDataIdentifier]
 SubServiceCount=3
 
 [TfrmDiagnostics_WriteDataByIdentifier]
-SubServiceCount=2
+SubServiceCount=0
 
 [TfrmDiagnostics_InputOutputControlByIdentifier]
-SubServiceCount=4
+SubServiceCount=0
 
 [TfrmDiagnostics_OBD_ControlOperationOfOnBoardComponentSystem]
 SubServiceCount=0
@@ -89,10 +89,10 @@ SubServiceCount=1
 SubServiceCount=2
 
 [TfrmDiagnostics_WriteMemoryByAddress]
-SubServiceCount=1
+SubServiceCount=0
 
 [TfrmDiagnostics_TesterPresent]
-SubServiceCount=2
+SubServiceCount=1
 
 [TfrmDiagnostics_AccessTimingParameter]
 SubServiceCount=4
@@ -137,13 +137,13 @@ SubServiceCount=0
 SubServiceCount=0
 
 [TfrmDiagnostics_LinkControl]
-SubServiceCount=3
+SubServiceCount=0
 
 [TfrmDiagnostics_FileTransfer]
 SubServiceCount=3
 
 [TfrmDiagnostics_DownloadFile]
-SubServiceCount=0
+SubServiceCount=2
 
 [TfrmDiagnostics_AddFile]
 SubServiceCount=0
@@ -680,7 +680,7 @@ supporttexttable=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_0]
 isRegSystemVar=0
-FServiceName=ReadActiveDiagnosticSession
+FServiceName=Read Active Diagnostic Session
 FIsFunctionID=0
 FHasResponse=1
 FServiceCode=34
@@ -726,7 +726,7 @@ supporttexttable=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_1]
 isRegSystemVar=0
-FServiceName=ReadCodingImage
+FServiceName=Read Active Software Block
 FIsFunctionID=0
 FHasResponse=1
 FServiceCode=34
@@ -736,26 +736,26 @@ FResParametersCount=1
 FReqParaByteOrder=1
 FResParaByteOrder=1
 FGenrateKeyAutomatically=1
-FGUID=683000000000000000002034
+FGUID=399397038622423360978952082
 FHideDeleteButton=0
 FBlockAndFileUseDiffrentChecksum=0
 FLengthOfMemoryAddress=4
 FLengthOfMemorySize=4
 FByteOrderOfChecksum=1
-FMainTainOriginalFileStruct=1
+FMainTainOriginalFileStruct=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_1_IDPara0]
 FName=DataIdentifier
 FIsSubFunction=0
-FDefaultValue=61889
+FDefaultValue=61696
 FByteNum=2
 
 [TfrmDiagnostics_ReadDataByIdentifier_1_ResPara0]
 FByteOrder=1
 FStartBit=31
-FName=ResponseData
-FDefaultValue=0
-FDataType=UInt
+FName=Data
+FDefaultValue=00
+FDataType=Hex Array
 FConversionID=0
 FLength=8
 FBitMask=0
@@ -772,7 +772,7 @@ supporttexttable=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_2]
 isRegSystemVar=0
-FServiceName=ReadCodingRxMessageExpected
+FServiceName=Read Software Version
 FIsFunctionID=0
 FHasResponse=1
 FServiceCode=34
@@ -782,26 +782,26 @@ FResParametersCount=1
 FReqParaByteOrder=1
 FResParaByteOrder=1
 FGenrateKeyAutomatically=1
-FGUID=683000000000000000003034
+FGUID=399402817095421612329416570
 FHideDeleteButton=0
 FBlockAndFileUseDiffrentChecksum=0
 FLengthOfMemoryAddress=4
 FLengthOfMemorySize=4
 FByteOrderOfChecksum=1
-FMainTainOriginalFileStruct=1
+FMainTainOriginalFileStruct=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_2_IDPara0]
 FName=DataIdentifier
 FIsSubFunction=0
-FDefaultValue=61890
+FDefaultValue=61697
 FByteNum=2
 
 [TfrmDiagnostics_ReadDataByIdentifier_2_ResPara0]
 FByteOrder=1
 FStartBit=31
-FName=ResponseData
-FDefaultValue=0
-FDataType=UInt
+FName=Data
+FDefaultValue=00
+FDataType=Hex Array
 FConversionID=0
 FLength=8
 FBitMask=0
@@ -4085,3 +4085,179 @@ FDenominator=0
 FLowerLimit=0
 FUpperLimit=0
 supporttexttable=0
+
+[TfrmDiagnostics_DownloadFile_0]
+isRegSystemVar=0
+FServiceName=DownloadFile
+FIsFunctionID=0
+FHasResponse=1
+FServiceCode=3421751
+FIDParametersCount=0
+FReqParametersCount=0
+FResParametersCount=0
+FReqParaByteOrder=1
+FResParaByteOrder=1
+FGenrateKeyAutomatically=1
+FGUID=401325933525474484631324557
+FHideDeleteButton=0
+FBlockAndFileUseDiffrentChecksum=0
+FLengthOfMemoryAddress=4
+FLengthOfMemorySize=4
+FByteOrderOfChecksum=1
+FMainTainOriginalFileStruct=0
+FHexFilePath=
+FDataFileIsChanged=0
+FCheckSumDllPath=
+FBinStartAddr=0
+FBinExtractType=0
+FRequstDataFormatID=0
+FTransferBlockCheckType=0
+FUserDefinedTransferExit=37
+FType=2
+initVal=-1
+POLY=79764919
+sub=-1
+bits=0
+funcName=CRC32
+dllname=
+initConvert=1
+outConvert=1
+FShaType=0
+FRsaType=0
+FCertificate=
+FPadMode=0
+FEnableEraseBlock=0
+FEraseRoutineID=65280
+FEnableParaLength=1
+FRoutineControlExpectedResponse=00
+FEnableBlockChecksum=0
+FBlockCheckSumID=514
+EnableParaLength_Chk=0
+FExpectedChecksumResponseString=00
+FDelayTimeAfterTransferRequest=1
+FDelayTimeAfterTransferData=1
+FDelayTimeAfterTransferExit=1
+FUserDefMaxNumOfBlockLength=0
+FUserDefMaxNumOfBlockLengthValue=514
+FDataValidList=
+FSigPathAndData=
+FCRCPathAndData=
+FMaxDataFileBlock=-1
+FBlockMapList=
+FFilePathOnECU=
+FFilePathOnPC=
+FTransferConfigFilePath=
+FTransferPackageType=0
+FEnableIntegrityCheck=0
+FIntegrityCheckRoutineID=514
+FIntegrityCheckDataString=
+FIntegrityCheckDataFromConfig=
+FIntegrityExpectedResponseString=00
+FCompressionMethod=0
+FEncryptingMethod=0
+FLengthOfFileSize=4
+FUnCompressedFileSize=
+FCompressedFilesize=
+
+[TfrmDiagnostics_DownloadFile_0FileCRC]
+FType=0
+initVal=0
+POLY=0
+sub=0
+bits=0
+funcName=
+dllname=
+initConvert=0
+outConvert=0
+FShaType=0
+FRsaType=0
+FCertificate=
+FPadMode=0
+
+[TfrmDiagnostics_DownloadFile_1]
+isRegSystemVar=0
+FServiceName=DownloadFile1
+FIsFunctionID=0
+FHasResponse=1
+FServiceCode=3421751
+FIDParametersCount=0
+FReqParametersCount=0
+FResParametersCount=0
+FReqParaByteOrder=1
+FResParaByteOrder=1
+FGenrateKeyAutomatically=1
+FGUID=401333124925812493774073077
+FHideDeleteButton=0
+FBlockAndFileUseDiffrentChecksum=0
+FLengthOfMemoryAddress=4
+FLengthOfMemorySize=4
+FByteOrderOfChecksum=1
+FMainTainOriginalFileStruct=0
+FHexFilePath=
+FDataFileIsChanged=0
+FCheckSumDllPath=
+FBinStartAddr=0
+FBinExtractType=0
+FRequstDataFormatID=0
+FTransferBlockCheckType=0
+FUserDefinedTransferExit=37
+FType=2
+initVal=-1
+POLY=79764919
+sub=-1
+bits=0
+funcName=CRC32
+dllname=
+initConvert=1
+outConvert=1
+FShaType=0
+FRsaType=0
+FCertificate=
+FPadMode=0
+FEnableEraseBlock=0
+FEraseRoutineID=65280
+FEnableParaLength=1
+FRoutineControlExpectedResponse=00
+FEnableBlockChecksum=0
+FBlockCheckSumID=514
+EnableParaLength_Chk=0
+FExpectedChecksumResponseString=00
+FDelayTimeAfterTransferRequest=1
+FDelayTimeAfterTransferData=1
+FDelayTimeAfterTransferExit=1
+FUserDefMaxNumOfBlockLength=0
+FUserDefMaxNumOfBlockLengthValue=514
+FDataValidList=
+FSigPathAndData=
+FCRCPathAndData=
+FMaxDataFileBlock=-1
+FBlockMapList=
+FFilePathOnECU=
+FFilePathOnPC=
+FTransferConfigFilePath=
+FTransferPackageType=0
+FEnableIntegrityCheck=0
+FIntegrityCheckRoutineID=514
+FIntegrityCheckDataString=
+FIntegrityCheckDataFromConfig=
+FIntegrityExpectedResponseString=00
+FCompressionMethod=0
+FEncryptingMethod=0
+FLengthOfFileSize=4
+FUnCompressedFileSize=
+FCompressedFilesize=
+
+[TfrmDiagnostics_DownloadFile_1FileCRC]
+FType=0
+initVal=0
+POLY=0
+sub=0
+bits=0
+funcName=
+dllname=
+initConvert=0
+outConvert=0
+FShaType=0
+FRsaType=0
+FCertificate=
+FPadMode=0

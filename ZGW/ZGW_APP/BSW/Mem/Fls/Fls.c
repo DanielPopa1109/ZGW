@@ -4,6 +4,8 @@
 #include "IfxFlash.h"
 #include "IfxScuWdt.h"
 #include "IfxCpu.h"
+#include "IfxSmu.h"
+#include "IfxScu_reg.h"
 
 #define FLS_API_INIT               (0x00u)
 #define FLS_API_ERASE              (0x01u)
@@ -56,6 +58,12 @@ static Fls_StateType Fls_State =
 };
 
 volatile uint32 Fls_LastDmuError = 0u;
+volatile uint32 Fls_InitClearDmuStatusCount = 0u;
+volatile uint32 Fls_InitDmuErrorAfterClear = 0u;
+volatile uint32 Fls_DFlashSmuBusErrorClearCounter = 0u;
+volatile uint32 Fls_DFlashSmuBusErrorPendingBeforeClear = 0u;
+volatile uint32 Fls_DFlashTrapStatBeforeClear = 0u;
+volatile uint32 Fls_DFlashTrapStatAfterClear = 0u;
 
 static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
 {
@@ -84,6 +92,29 @@ static boolean Fls_DmuHasError(void)
 {
     Fls_LastDmuError = (uint32)(DMU_HF_ERRSR.U & FLS_DMU_ERR_MASK);
     return (Fls_LastDmuError != 0u) ? TRUE : FALSE;
+}
+
+void Fls_ClearDFlashSmuBusError(void)
+{
+    uint16 password;
+
+    Fls_DFlashSmuBusErrorPendingBeforeClear =
+            (uint32)((MODULE_SMU.AG[7].U >> 17u) & 0x1u);
+    Fls_DFlashTrapStatBeforeClear = SCU_TRAPSTAT.U;
+
+    if (Fls_DFlashSmuBusErrorPendingBeforeClear != 0u)
+    {
+        (void)IfxSmu_clearAlarmStatus(IfxSmu_Alarm_XBAR0_SRI_BusErrorEvent);
+
+        password = IfxScuWdt_getCpuWatchdogPassword();
+        IfxScuWdt_clearCpuEndinit(password);
+        SCU_TRAPCLR.B.SMUT = 1u;
+        IfxScuWdt_setCpuEndinit(password);
+
+        Fls_DFlashSmuBusErrorClearCounter++;
+    }
+
+    Fls_DFlashTrapStatAfterClear = SCU_TRAPSTAT.U;
 }
 
 static Std_ReturnType Fls_WaitDmuReady(void)
@@ -235,6 +266,11 @@ static Std_ReturnType Fls_EraseOneSector(Fls_AddressType address)
 void Fls_Init(const Fls_ConfigType *ConfigPtr)
 {
     (void)ConfigPtr;
+    Fls_ClearDmuStatus();
+    (void)Fls_DmuHasError();
+    Fls_InitDmuErrorAfterClear = Fls_LastDmuError;
+    Fls_InitClearDmuStatusCount++;
+
     Fls_State.status = MEMIF_IDLE;
     Fls_State.result = MEMIF_JOB_OK;
     Fls_State.job = FLS_JOB_NONE;

@@ -54,6 +54,8 @@ extern "C" {
 #define LWIP_SOCKET                         1
 #define LWIP_NETCONN                        1
 #define SYS_LIGHTWEIGHT_PROT                1
+#define LWIP_TCPIP_CORE_LOCKING             0
+#define LWIP_TCPIP_CORE_LOCKING_INPUT       0
 #define SO_REUSE                            1
 #define LWIP_COMPAT_SOCKETS                 0
 #define LWIP_FCNTL                          1
@@ -94,6 +96,24 @@ extern "C" {
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
+/* --------------------------------------------------------------------------
+ * Memory-integrity instrumentation (DIAGNOSTIC).
+ *
+ * The gateway takes an intermittent MPU null-pointer trap on core 2 whose root
+ * cause is a wild write originating in the lwIP/socket layer (the same
+ * corruption also shows up as an occasional total TX freeze when it lands on a
+ * pool/pcb/mbox instead of a task context). These checks make lwIP validate
+ * every pool element and heap block on each alloc/free and assert at the exact
+ * instant a canary or free-list is found corrupted, turning a far-away symptom
+ * into a localized stop. LWIP_PLATFORM_ASSERT is wired to a real trap in
+ * arch/cc.h. NOTE: this adds per-element padding (more RAM) and runtime cost -
+ * dial MEMP_/MEM_*_CHECK back to 0 once the corruptor is found and fixed.
+ * ------------------------------------------------------------------------ */
+#define MEMP_OVERFLOW_CHECK                 2
+#define MEMP_SANITY_CHECK                   1
+#define MEM_OVERFLOW_CHECK                  2
+#define MEM_SANITY_CHECK                    1
+
 #define LWIP_UDP                            1
 #define MEMP_NUM_UDP_PCB                    8
 
@@ -102,13 +122,30 @@ extern "C" {
 #define SO_REUSE_RXTOALL                    1
 
 #define LWIP_TCP                            1
-#define MEMP_NUM_TCP_PCB                    3
+/* DoIP is a single-client diagnostic server that the tester (FCD) opens and
+ * closes repeatedly. Three PCBs (the previous value) is too tight: a freshly
+ * arriving SYN, the active connection, and connections still draining in
+ * FIN_WAIT/TIME_WAIT from the previous session all compete for the same pool.
+ * When it is exhausted lwIP silently drops the incoming SYN (TCP has no
+ * out-of-memory response), and the tester's connect() times out with "no TCP
+ * listener answered". Give the pool real headroom. */
+#define MEMP_NUM_TCP_PCB                    8
 #define MEMP_NUM_TCP_PCB_LISTEN             3
 #define MEMP_NUM_TCP_SEG                    24
 #define TCP_MSS                             536
 #define TCP_WND                             2144
 #define TCP_SND_BUF                         2144
 #define TCP_SND_QUEUELEN                    16
+/* Keep TIME-WAIT short so a closed connection frees its PCB within a couple of
+ * seconds on this controlled point-to-point lab link, instead of the 60 s lwIP
+ * default that keeps reconnect pressure on the PCB pool. */
+#define TCP_MSL                             3000
+/* Reap a tester that vanished without a TCP FIN/RST (cable pull, PC sleep,
+ * killed tool) at the TCP layer. Without this a half-open ESTABLISHED PCB
+ * lingers forever - DoIP alive-check and inactivity abort are both disabled in
+ * this lab (see DoIP.h) - and permanently blocks the single DoIP connection.
+ * Keepalive timers are configured per accepted socket in TcpIpH.c. */
+#define LWIP_TCP_KEEPALIVE                  1
 
 #define LWIP_DHCP                           0
 

@@ -1,0 +1,12 @@
+{
+  "schema": "FCD_CAFD_v1",
+  "created": "2026-05-30T02:08:24",
+  "vin": "WBAJA9C51KG240310",
+  "parameters": [
+    {
+      "path": "test",
+      "value": "1",
+      "comment": "1"
+    }
+  ]
+}

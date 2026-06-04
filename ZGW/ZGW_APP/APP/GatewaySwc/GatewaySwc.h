@@ -212,6 +212,7 @@ Std_ReturnType GatewaySwc_GetRxSignalDiagSnapshot(uint16 index, GatewaySwc_RxDia
 Std_ReturnType GatewaySwc_CaptureRxDiagFreezeFrame(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 Std_ReturnType GatewaySwc_CaptureRxDiagExtendedData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 void GatewaySwc_ReportDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteType status);
+void GatewaySwc_OnDemEventCleared(Dem_EventIdType eventId);
 
 void GatewaySwc_EthRxIndication(uint8 soConId,
                                 const TcpIp_SockAddrType *remoteAddr,

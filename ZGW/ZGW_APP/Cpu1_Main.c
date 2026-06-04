@@ -9,7 +9,7 @@
 #include "IfxCpu_Intrinsics.h"
 
 extern volatile uint8 OsInit_C0;
-volatile uint8 OsInit_C1 = 0u;
+AURIX_SHARED_NC volatile uint8 OsInit_C1;
 volatile uint32 Core1_MainEnteredCounter = 0u;
 volatile uint32 Core1_WaitForCore0LoopCounter = 0u;
 
@@ -27,6 +27,6 @@ void core1_main(void)
     Os_Init_C1();
     __dsync();
     OsInit_C1 = 1u;
-    __dsync();
+    Ifx__dsync();
     vTaskStartScheduler_core1();
 }

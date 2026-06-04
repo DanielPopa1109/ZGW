@@ -140,6 +140,7 @@ typedef struct
  **********************************************************************************************************************/
 IFX_EXTERN volatile uint32 g_TickCount_1ms;
 IFX_EXTERN Ifx_Lwip g_Lwip;
+IFX_EXTERN volatile uint32 g_LwipNetifAddFailed;
 IFX_EXTERN IfxGeth_Eth g_IfxGeth ;
 IFX_EXTERN uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
 IFX_EXTERN uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];

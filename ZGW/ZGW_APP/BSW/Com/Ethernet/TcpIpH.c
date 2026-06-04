@@ -9,6 +9,16 @@
 
 #define TCPIP_MAX_SOCKETS 16u
 
+/* TCP keepalive applied to accepted server connections so a tester that
+ * disappears without a FIN/RST is detected and dropped at the TCP layer,
+ * freeing the connection instead of leaving a half-open ESTABLISHED PCB.
+ * lwIP takes the idle/interval values in seconds via setsockopt. A dead peer
+ * is reaped ~14 s after going silent (8 s idle + 3 probes x 2 s); a live but
+ * idle tester ACKs the probes and is unaffected. */
+#define TCPIP_TCP_KEEPALIVE_IDLE_S      8
+#define TCPIP_TCP_KEEPALIVE_INTERVAL_S  2
+#define TCPIP_TCP_KEEPALIVE_COUNT       3
+
 typedef struct
 {
     TcpIp_SocketIdType sock;
@@ -356,6 +366,23 @@ sint32 TcpIp_Listen(TcpIp_SocketIdType sock)
     return ret;
 }
 
+static void TcpIp_EnableKeepAlive(TcpIp_SocketIdType sock)
+{
+    int optval;
+
+    optval = 1;
+    (void)lwip_setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
+
+    optval = TCPIP_TCP_KEEPALIVE_IDLE_S;
+    (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &optval, sizeof(optval));
+
+    optval = TCPIP_TCP_KEEPALIVE_INTERVAL_S;
+    (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &optval, sizeof(optval));
+
+    optval = TCPIP_TCP_KEEPALIVE_COUNT;
+    (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
+}
+
 TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr)
 {
     struct sockaddr_in addr;
@@ -386,6 +413,7 @@ TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *rem
         slot->tcp = 1u;
 
         (void)lwip_fcntl(newSock, F_SETFL, O_NONBLOCK);
+        TcpIp_EnableKeepAlive(slot->sock);
 
         if (remoteAddr != 0)
         {

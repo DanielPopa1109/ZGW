@@ -32,6 +32,57 @@
 #define APP_START_NCACHED                0xA0030000u
 #define APP_END_NCACHED                  0xA07FFFFFu
 
+#define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
+#define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
+
+/* PFLASH alias bases.
+ * The same physical PFLASH is visible through a cached segment-8 alias (used for
+ * normal code execution) and a non-cached segment-A alias (required by the iLLD
+ * IfxFlash erase/program/verify primitives). Application code is linked/executed
+ * from the cached 0x8 alias; the FBL converts every download/erase/verify target
+ * to the non-cached 0xA alias before touching the flash controller. */
+#define PFLASH_CACHED_BASE               0x80000000u
+#define PFLASH_NONCACHED_BASE            0xA0000000u
+#define PFLASH_ALIAS_MASK                0x1FFFFFFFu
+
+/* Explicit FBL / APP PFLASH ranges, expressed in both aliases.
+ * Values mirror the linker memory objects (FBL BootManager_PFLASH = 192K,
+ * APP pfls0 starts at offset 0x30000). */
+#define FBL_PFLASH_START_CACHED          0x80000000u
+#define FBL_PFLASH_END_CACHED            0x8002FFFFu
+
+#define APP_PFLASH_START_CACHED          0x80030000u
+#define APP_PFLASH_END_CACHED            0x807FFFFFu
+
+#define APP_PFLASH_START_NC              0xA0030000u
+#define APP_PFLASH_END_NC                0xA07FFFFFu
+
+/* APP reset/start execution address (cached alias). The FBL jumps here. */
+#define APP_START_CACHED                 APP_PFLASH_START_CACHED
+
+/* DFLASH occupies segment-A too; reject it explicitly to catch PFLASH/DFLASH mixups. */
+#define DFLASH_START_NC                  0xAF000000u
+#define DFLASH_END_NC                    0xAFFFFFFFu
+
+typedef enum
+{
+    FBL_ADDR_OK = 0,
+    FBL_ADDR_ERR_OVERFLOW,
+    FBL_ADDR_ERR_ALIGN,
+    FBL_ADDR_ERR_NOT_APP,
+    FBL_ADDR_ERR_PROTECTED
+} Fbl_AddressStatus;
+
+static inline uint32 Fbl_ToCachedPflash(uint32 addr)
+{
+    return (addr & PFLASH_ALIAS_MASK) | PFLASH_CACHED_BASE;
+}
+
+static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
+{
+    return (addr & PFLASH_ALIAS_MASK) | PFLASH_NONCACHED_BASE;
+}
+
 #define PFLASH_BANK_A_START              0xA0000000u
 #define PFLASH_BANK_A_END                0xA03FFFFFu
 #define PFLASH_BANK_B_START              0xA0400000u
@@ -84,9 +135,10 @@
 #define UDS_RID_ERASE_APP                0x0001u
 #define UDS_RID_CRC_CHECK                0x0002u
 #define UDS_RID_START_FBL_RAM_UPDATER    0x0155u
+#define UDS_DID_ACTIVE_SOFTWARE_BLOCK    0xF100u
+#define UDS_DID_SOFTWARE_VERSION         0xF101u
 #define UDS_DID_ACTIVE_SESSION           0xF186u
-#define UDS_DID_SOFTWARE_VERSION         0xF187u
-#define UDS_DID_FBL_SW_VERSION           UDS_DID_SOFTWARE_VERSION
+#define FBL_ACTIVE_SOFTWARE_BLOCK        0x01u
 #define APP_SW_VERSION_MAJOR             1u
 #define APP_SW_VERSION_MINOR             0u
 #define APP_SW_VERSION_PATCH             0u
@@ -191,8 +243,9 @@ typedef struct
 typedef struct
 {
     uint8 active;
-    uint32 startAddr;
-    uint32 curAddr;
+    uint32 logicalAddr;   /* cached 0x8 address as requested by the tester (for diagnostics) */
+    uint32 startAddr;     /* internal non-cached 0xA flash address */
+    uint32 curAddr;       /* internal non-cached 0xA running flash address */
     uint32 length;
     uint32 received;
     uint8 nextBlock;
@@ -260,7 +313,7 @@ static uint32 Fbl_FlashFlush(void);
 static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data);
 static IfxFlash_FlashType Fbl_FlashBank(uint32 addr);
 static uint32 Fbl_Crc32(uint32 addr, uint32 len);
-static uint8 Fbl_AppRangeValid(uint32 addr, uint32 len);
+static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 length);
 static uint32 Fbl_Rd32(const uint8 *p);
 static uint16 Fbl_Rd16(const uint8 *p);
 static void Fbl_Wr16(uint8 *p, uint16 v);
@@ -981,7 +1034,14 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             res[3u] = FBL_DIAG_SESSION_PROGRAMMING;
             Fbl_UdsSend(res, 4u, transport);
         }
-        else if(did == UDS_DID_FBL_SW_VERSION)
+        else if(did == UDS_DID_ACTIVE_SOFTWARE_BLOCK)
+        {
+            res[0u] = 0x62u;
+            Fbl_Wr16(&res[1u], did);
+            res[3u] = FBL_ACTIVE_SOFTWARE_BLOCK;
+            Fbl_UdsSend(res, 4u, transport);
+        }
+        else if(did == UDS_DID_SOFTWARE_VERSION)
         {
             res[0u] = 0x62u;
             Fbl_Wr16(&res[1u], did);
@@ -1045,18 +1105,19 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         {
             if(len < 16u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
 
-            addr = Fbl_Rd32(&req[4u]);
+            addr = Fbl_Rd32(&req[4u]);   /* logical address from tester, cached 0x8 alias */
             size = Fbl_Rd32(&req[8u]);
             crcExpected = Fbl_Rd32(&req[12u]);
 
-            if(Fbl_AppRangeValid(addr, size) == 0u)
+            if(Fbl_ValidateDownloadRange(addr, size) != FBL_ADDR_OK)
             {
                 Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
                 return;
             }
 
             (void)Fbl_FlashFlush();
-            crcCalc = Fbl_Crc32(addr, size);
+            /* Verification reads use the non-cached 0xA alias so they never hit stale cache. */
+            crcCalc = Fbl_Crc32(Fbl_ToNonCachedPflash(addr), size);
 
             res[0u] = 0x71u;
             res[1u] = 0x01u;
@@ -1079,18 +1140,19 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             return;
         }
 
-        addr = Fbl_Rd32(&req[4u]);
+        addr = Fbl_Rd32(&req[4u]);   /* logical address from tester, cached 0x8 alias */
         size = Fbl_Rd32(&req[8u]);
 
-        if(Fbl_AppRangeValid(addr, size) == 0u)
+        if(Fbl_ValidateDownloadRange(addr, size) != FBL_ADDR_OK)
         {
             Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
             return;
         }
 
         g_dl.active = 1u;
-        g_dl.startAddr = addr;
-        g_dl.curAddr = addr;
+        g_dl.logicalAddr = addr;                        /* keep cached address for diagnostics */
+        g_dl.startAddr = Fbl_ToNonCachedPflash(addr);   /* program/verify via non-cached 0xA alias */
+        g_dl.curAddr = g_dl.startAddr;
         g_dl.length = size;
         g_dl.received = 0u;
         g_dl.nextBlock = 1u;
@@ -1155,6 +1217,10 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
             return;
         }
+
+        /* Programming of this block is complete: drop any stale instructions for
+         * the freshly written PFLASH before it can be executed. */
+        IfxCpu_invalidateProgramCache();
 
         if(g_dl.received != g_dl.length)
         {
@@ -1678,6 +1744,10 @@ static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len)
         start = subEnd;
     }
 
+    /* TriCore has no range-granular program-cache invalidate; do a full program
+     * cache invalidate so no stale instructions remain for the just-erased range. */
+    IfxCpu_invalidateProgramCache();
+
     return 0u;
 }
 
@@ -1806,13 +1876,59 @@ static uint32 Fbl_Crc32(uint32 addr, uint32 len)
     return crc ^ 0xFFFFFFFFu;
 }
 
-static uint8 Fbl_AppRangeValid(uint32 addr, uint32 len)
+/* Validate a download/verify target supplied by the tester.
+ * The address is a logical address and may be given in either the cached 0x8 or
+ * the non-cached 0xA PFLASH alias; validation is performed on the physical offset
+ * so both aliases are treated identically. Conversion to the non-cached alias is
+ * done by the caller (via Fbl_ToNonCachedPflash) only after this returns OK. */
+static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 length)
 {
-    if(len == 0u) { return 0u; }
-    if(addr < APP_START_NCACHED) { return 0u; }
-    if((addr + len - 1u) > APP_END_NCACHED) { return 0u; }
-    if((addr + len) < addr) { return 0u; }
-    return 1u;
+    uint32 seg;
+    uint32 offset;
+    uint32 endOffset;
+    const uint32 appStartOff = (APP_PFLASH_START_NC & PFLASH_ALIAS_MASK);
+    const uint32 appEndOff   = (APP_PFLASH_END_NC   & PFLASH_ALIAS_MASK);
+    const uint32 fblStartOff = (FBL_PFLASH_START_CACHED & PFLASH_ALIAS_MASK);
+    const uint32 fblEndOff   = (FBL_PFLASH_END_CACHED   & PFLASH_ALIAS_MASK);
+
+    if(length == 0u)                            { return FBL_ADDR_ERR_OVERFLOW; }
+    if((logicalAddr + length) < logicalAddr)    { return FBL_ADDR_ERR_OVERFLOW; }
+
+    /* Reject DFLASH and anything that is not a PFLASH cached/non-cached alias. */
+    if((logicalAddr >= DFLASH_START_NC) && (logicalAddr <= DFLASH_END_NC))
+    {
+        return FBL_ADDR_ERR_PROTECTED;
+    }
+
+    seg = logicalAddr & FLASH_ADDRESS_PREFIX_MASK;
+    if((seg != (PFLASH_CACHED_BASE    & FLASH_ADDRESS_PREFIX_MASK)) &&
+       (seg != (PFLASH_NONCACHED_BASE & FLASH_ADDRESS_PREFIX_MASK)))
+    {
+        return FBL_ADDR_ERR_NOT_APP;
+    }
+
+    offset    = logicalAddr & PFLASH_ALIAS_MASK;
+    endOffset = offset + length - 1u;
+
+    /* Reject writes into the FBL / BMHD / UCB / protected areas. */
+    if((offset <= fblEndOff) && (endOffset >= fblStartOff))
+    {
+        return FBL_ADDR_ERR_PROTECTED;
+    }
+
+    /* Must lie fully inside the configured APP PFLASH window. */
+    if((offset < appStartOff) || (endOffset > appEndOff))
+    {
+        return FBL_ADDR_ERR_NOT_APP;
+    }
+
+    /* TC3xx programs in 32-byte pages: the start must be page aligned. */
+    if((offset & (PFLASH_PAGE_SIZE - 1u)) != 0u)
+    {
+        return FBL_ADDR_ERR_ALIGN;
+    }
+
+    return FBL_ADDR_OK;
 }
 
 static uint32 Fbl_Rd32(const uint8 *p)
@@ -1842,8 +1958,13 @@ static void Fbl_Wr32(uint8 *p, uint32 v)
 static void Fbl_JumpToApp(void)
 {
     IfxCpu_disableInterrupts();
+
+    /* The updated application image was programmed through the non-cached alias.
+     * Invalidate the program cache so the core fetches the fresh image, then jump
+     * to the cached execution alias (0x8...). Never jump to the 0xA... alias. */
+    IfxCpu_invalidateProgramCache();
     __asm("isync");
-    __asm("ji %0" : : "a"(APP_START_NCACHED));
+    __asm("ji %0" : : "a"(APP_START_CACHED));
 }
 
 static void Fbl_CopyAndJumpRamUpdater(void)

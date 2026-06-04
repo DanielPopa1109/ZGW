@@ -148,10 +148,20 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
         return ERR_VAL;
     }
 
+    /* A tester reconnecting must always win. The previous connection may be a
+     * half-open ESTABLISHED PCB left behind by a tool that vanished without a
+     * FIN/RST; refusing the new connection (the old behaviour: tcp_abort(newPcb))
+     * would wedge the bootloader's single DoIP slot until a power cycle. Drop the
+     * stale PCB and take the new one instead. */
     if(g_tcpActivePcb != NULL)
     {
-        tcp_abort(newPcb);
-        return ERR_ABRT;
+        struct tcp_pcb *stale = g_tcpActivePcb;
+
+        g_tcpActivePcb = NULL;
+        tcp_arg(stale, NULL);
+        tcp_recv(stale, NULL);
+        tcp_err(stale, NULL);
+        tcp_abort(stale);
     }
 
     g_tcpActivePcb = newPcb;
@@ -160,6 +170,13 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
     tcp_arg(newPcb, NULL);
     tcp_recv(newPcb, FblEth_TcpRecvCb);
     tcp_err(newPcb, FblEth_TcpErrCb);
+
+    /* Detect a tester that disappears mid-session so the slot frees itself even
+     * with no reconnect attempt: probe after 8 s idle, then 3 probes 2 s apart. */
+    newPcb->so_options |= SOF_KEEPALIVE;
+    newPcb->keep_idle = 8000u;
+    newPcb->keep_intvl = 2000u;
+    newPcb->keep_cnt = 3u;
 
 #if TCP_NODELAY
     tcp_nagle_disable(newPcb);

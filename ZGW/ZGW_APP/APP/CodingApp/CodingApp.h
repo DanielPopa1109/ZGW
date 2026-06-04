@@ -26,6 +26,9 @@
 #define CODINGAPP_IMAGE_VERSION                 0x0001u
 
 #define CODINGAPP_RX_MESSAGE_EXPECTED_BYTES     (((uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT + 7u) / 8u)
+#define CODINGAPP_TX_PDU_MAX_ID                 COM_TX_PDU_LIN_ZGW_REQUEST_PCU48
+#define CODINGAPP_TX_PDU_ENABLED_BYTES          (((uint16)CODINGAPP_TX_PDU_MAX_ID + 8u) / 8u)
+#define CODINGAPP_MASK_BYTES                    (CODINGAPP_RX_MESSAGE_EXPECTED_BYTES + CODINGAPP_TX_PDU_ENABLED_BYTES)
 
 #define CODINGAPP_STATE_NOT_CODED               0u
 #define CODINGAPP_STATE_CODED                   1u
@@ -63,9 +66,11 @@ typedef struct
 
 void CodingApp_Init(void);
 void CodingApp_MainFunction(void);
+void CodingApp_OnDemEventCleared(Dem_EventIdType eventId);
 
 boolean CodingApp_IsCoded(void);
 boolean CodingApp_IsRxMessageExpected(uint16 diagIndex);
+boolean CodingApp_IsTxPduEnabled(PduIdType txPduId);
 
 Std_ReturnType CodingApp_GetStatus(CodingApp_StatusType *status);
 Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dataLen);

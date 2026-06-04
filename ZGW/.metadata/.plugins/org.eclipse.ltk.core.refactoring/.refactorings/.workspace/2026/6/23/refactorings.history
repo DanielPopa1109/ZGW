@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;ZGW_FBL/Lcf_Tasking_Tricore_Tc _LinkerFBL.lsl&apos;" deleteContents="false" description="Delete resource &apos;ZGW_FBL/Lcf_Tasking_Tricore_Tc _LinkerFBL.lsl&apos;" element1="/ZGW_FBL/Lcf_Tasking_Tricore_Tc _LinkerFBL.lsl" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1780314697470"/>
+</session>

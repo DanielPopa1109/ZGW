@@ -46,7 +46,12 @@
 
 extern volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 extern volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
+extern volatile uint32 lwip_geth_DebugDmaResetTimeoutCnt;
+extern volatile uint32 lwip_geth_DebugDmaInitRetryCnt;
+extern volatile uint32 lwip_geth_DebugDmaModeAfterInit;
+extern volatile uint32 lwip_geth_DebugDmaDescriptorClearCnt;
 extern volatile uint32 lwip_geth_DebugLowLevelInitState;
+extern volatile uint32 lwip_geth_DebugLowLevelInitResult;
 extern volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
 extern volatile uint32 lwip_geth_DebugRxAllocFailCnt;
 extern volatile uint32 lwip_geth_DebugRxNullBufferCnt;
@@ -68,6 +73,14 @@ extern volatile uint32 lwip_geth_DebugLastTxLen;
 extern volatile uint32 lwip_geth_DebugLastEthType;
 extern volatile uint32 lwip_geth_DebugLastTxDescrAddr;
 extern volatile uint32 lwip_geth_DebugLastTxBufferAddr;
+extern volatile uint32 lwip_geth_DebugLastTxDescOwnBefore;
+extern volatile uint32 lwip_geth_DebugLastTxDescOwnAfterKick;
+extern volatile uint32 lwip_geth_DebugLastTxDmaStatusAfterKick;
+extern volatile uint32 lwip_geth_DebugLastTxDmaTailAfterKick;
+extern volatile uint32 lwip_geth_DebugLastTxDmaCurrentDescAfterKick;
+extern volatile uint32 lwip_geth_DebugDmaCh0TxControlAfterStart;
+extern volatile uint32 lwip_geth_DebugDmaCh0RxControlAfterStart;
+extern volatile uint32 lwip_geth_DebugMacConfigurationAfterStart;
 extern volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 extern volatile uint32 lwip_geth_DebugLastRxBufferAddr;
 

@@ -77,6 +77,7 @@ volatile uint32 TimeBase_Dbg_NvmVehicleLow     = 0u;  /* restoredVehicleTimeNs &
 volatile uint8  TimeBase_Dbg_VehicleGtResult   = 0u;  /* 1 if scrVehicle > nvmVehicle */
 volatile uint8  TimeBase_Dbg_ElapsedPathOk     = 0u;  /* 1 if TryGetStandbyRtcElapsedNs E_OK */
 volatile uint32 TimeBase_Dbg_ElapsedTicks      = 0u;  /* ELAPSED_TICKS from boot image */
+volatile uint32 TimeBase_Dbg_ElapsedTicksHigh  = 0u;  /* ELAPSED_TICKS high word from boot image */
 
 static void TimeBase_EnterCritical(void);
 static void TimeBase_ExitCritical(void);
@@ -103,7 +104,8 @@ static uint8 TimeBase_ScrLoadU8(uint16 offset);
 static uint32 TimeBase_ScrLoadU32FromImage(const uint8 *image, uint16 offset);
 static uint64 TimeBase_ScrLoadU64FromImage(const uint8 *image, uint16 offset);
 static void TimeBase_ScrWriteImage(const uint8 *image);
-static uint64 TimeBase_ScrRtcTicksToNs(uint32 elapsedTicks);
+static uint64 TimeBase_ScrLoadElapsedTicksFromImage(const uint8 *image);
+static uint64 TimeBase_ScrRtcTicksToNs(uint64 elapsedTicks);
 static uint64 TimeBase_ApplyScrRtcCalibration(uint64 elapsedNs);
 static boolean TimeBase_IsScrRtcImageSafe(const uint8 *image);
 static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(TimeBase_TimeSourceType source, uint64 *elapsedNs, uint32 *syncStatusMask);
@@ -544,6 +546,12 @@ static uint64 TimeBase_ScrLoadU64FromImage(const uint8 *image, uint16 offset)
             (uint64)TimeBase_ScrLoadU32FromImage(image, (uint16)(offset + 4u));
 }
 
+static uint64 TimeBase_ScrLoadElapsedTicksFromImage(const uint8 *image)
+{
+    return ((uint64)TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH) << 32u) |
+            (uint64)TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_ELAPSED_TICKS);
+}
+
 static void TimeBase_ScrWriteImage(const uint8 *image)
 {
     uint16 index;
@@ -605,7 +613,7 @@ static boolean TimeBase_IsScrRtcImageSafe(const uint8 *image)
     return TRUE;
 }
 
-static uint64 TimeBase_ScrRtcTicksToNs(uint32 elapsedTicks)
+static uint64 TimeBase_ScrRtcTicksToNs(uint64 elapsedTicks)
 {
     uint64 scaledTicks;
     uint64 seconds;
@@ -633,7 +641,7 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
 {
     const uint8 *image = TimeBase_ScrRtcBootImage;
     uint8 flags;
-    uint32 elapsedTicks;
+    uint64 elapsedTicks;
 
     if ((elapsedNs == NULL_PTR) || (syncStatusMask == NULL_PTR))
     {
@@ -668,14 +676,16 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
         return E_NOT_OK;
     }
 
-    elapsedTicks = TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_ELAPSED_TICKS);
-    if (elapsedTicks == 0u)
+    elapsedTicks = TimeBase_ScrLoadElapsedTicksFromImage(image);
+    if (elapsedTicks == 0ull)
     {
-        elapsedTicks = TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_LAST_TICKS) -
-                TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_START_TICKS);
+        elapsedTicks =
+                (((uint64)TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH) << 32u) |
+                        (uint64)TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_LAST_TICKS)) -
+                (uint64)TimeBase_ScrLoadU32FromImage(image, SCR_TIME_OFFSET_RTC_START_TICKS);
     }
 
-    if (elapsedTicks == 0u)
+    if (elapsedTicks == 0ull)
     {
         return E_NOT_OK;
     }
@@ -686,9 +696,6 @@ static Std_ReturnType TimeBase_TryGetStandbyRtcElapsedNs(
 #if (TIMESYNC_SCR_RTC_CALIBRATION_PPM != 0)
     *syncStatusMask |= TIMEBASE_SYNC_STATUS_SCR_RTC_CALIBRATED;
 #endif
-
-    TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS] =
-            (uint8)((flags & (uint8)(~SCR_TIME_FLAG_ARMED)) | SCR_TIME_FLAG_CONSUMED);
 
     return E_OK;
 }
@@ -855,6 +862,8 @@ Std_ReturnType TimeBase_PrepareStandbyRtc(void)
         TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_RTC_START_TICKS, 0u);
         TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_RTC_LAST_TICKS, 0u);
         TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_ELAPSED_TICKS, 0u);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH, 0u);
+        TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH, 0u);
         TimeBase_StoreU32(TimeBase_ScrRtcStandbyImage, SCR_TIME_OFFSET_SYNC_STATUS, syncStatus);
         TimeBase_ScrRtcStandbyImageValid = TRUE;
         TimeBase_ScrWriteImage(TimeBase_ScrRtcStandbyImage);
@@ -1158,6 +1167,13 @@ Std_ReturnType TimeBase_LoadUtcFromNvM(void)
 
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
     TimeBase_Dbg_ElapsedTicks = TimeBase_ScrLoadU32FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_ELAPSED_TICKS);
+    TimeBase_Dbg_ElapsedTicksHigh = TimeBase_ScrLoadU32FromImage(TimeBase_ScrRtcBootImage, SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH);
+    TimeBase_Dbg_ElapsedPathOk = 0u;
+    TimeBase_Dbg_ScrVehicleHigh = 0u;
+    TimeBase_Dbg_ScrVehicleLow = 0u;
+    TimeBase_Dbg_NvmVehicleHigh = 0u;
+    TimeBase_Dbg_NvmVehicleLow = 0u;
+    TimeBase_Dbg_VehicleGtResult = 0u;
     if (TimeBase_TryGetStandbyRtcElapsedNs(source, &standbyElapsedNs, &standbySyncStatus) == E_OK)
     {
         TimeBase_Dbg_ElapsedPathOk = 1u;
@@ -1233,6 +1249,9 @@ Std_ReturnType TimeBase_LoadUtcFromNvM(void)
     if (standbyElapsedAccepted != FALSE)
     {
         syncStatus |= standbySyncStatus;
+        TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS] =
+                (uint8)((TimeBase_ScrRtcBootImage[SCR_TIME_OFFSET_FLAGS] & (uint8)(~SCR_TIME_FLAG_ARMED)) |
+                        SCR_TIME_FLAG_CONSUMED);
     }
 #endif
 

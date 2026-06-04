@@ -31,6 +31,7 @@ void EthStack_Init(void)
 
     DoIP_Init(&DoIP_Config);
     DoIP_SetDcmRxIndication(PduR_DoIPRxIndication);
+    DoIP_SetSessionResetIndication(PduR_DoIPResetSession);
 
     SomeIp_Init(&SomeIp_Config);
     SomeIpSd_Init(&SomeIpSd_Config);

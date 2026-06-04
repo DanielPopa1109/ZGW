@@ -28,6 +28,7 @@
 #define PDUR_DOIP_TX_STATE_EMPTY        0u
 #define PDUR_DOIP_TX_STATE_PENDING      1u
 #define PDUR_DOIP_TX_STATE_CONFIRM      2u
+#define PDUR_DOIP_TX_RETRY_LIMIT        20u
 
 
 /* ===================== Routing types ===================== */
@@ -124,6 +125,7 @@ typedef struct
     uint16 sourceAddress;
     uint16 targetAddress;
     uint16 udsLen;
+    uint8 txRetries;
     Std_ReturnType result;
     uint8 data[PDUR_MAX_TP_BUFFER];
 } PduR_DoIPTxMailboxType;
@@ -353,6 +355,13 @@ static PduR_DoIPRxMailboxType PduR_DoIPRxMailbox;
 static PduR_DoIPTxMailboxType PduR_DoIPTxMailbox;
 static PduR_DoIPTxConfirmationMailboxType PduR_DoIPTxConfirmationMailbox;
 static uint8 PduR_Initialized;
+
+/* Set by the DoIP TCP connect/disconnect callbacks (core2), consumed by
+ * PduR_DoIPCore0MainFunction (core0). The DoIP TP context and mailboxes are
+ * core0-owned, so the actual clear runs on core0 - core2 only raises this
+ * request, avoiding a cross-core write that could clobber an in-flight
+ * transaction. */
+static volatile uint8 PduR_DoIPSessionResetPending;
 
 volatile uint32 PduR_DoIPRxMailboxFullCounter;
 volatile uint32 PduR_DoIPRxDroppedBusyCounter;
@@ -777,11 +786,13 @@ void PduR_Init(void)
     PduR_DoIPTxMailbox.sourceAddress = 0u;
     PduR_DoIPTxMailbox.targetAddress = 0u;
     PduR_DoIPTxMailbox.udsLen = 0u;
+    PduR_DoIPTxMailbox.txRetries = 0u;
     PduR_DoIPTxMailbox.result = E_NOT_OK;
     PduR_DoIPTxConfirmationMailbox.valid = FALSE;
     PduR_DoIPTxConfirmationMailbox.keepContext = FALSE;
     PduR_DoIPTxConfirmationMailbox.txPduId = 0u;
     PduR_DoIPTxConfirmationMailbox.result = E_NOT_OK;
+    PduR_DoIPSessionResetPending = 0u;
 
     if (PduR_GetTpRxRouteCount() > PDUR_MAX_TP_RX_ROUTES)
     {
@@ -794,6 +805,44 @@ void PduR_Init(void)
 uint8 PduR_IsInitialized(void)
 {
     return PduR_Initialized;
+}
+
+void PduR_DoIPResetSession(void)
+{
+    /* Called from the DoIP TCP connect/disconnect callbacks, which run on core2.
+     * The DoIP TP context and mailboxes are owned by core0 (set/cleared by the
+     * RX drain and PduR_DcmTransmit), so we only raise a request here and let
+     * core0 perform the actual clear in PduR_DoIPCore0MainFunction. Writing the
+     * core0-owned state directly from core2 could clobber a transaction that is
+     * legitimately in flight on the freshly (re)established connection. */
+    PduR_DoIPSessionResetPending = 1u;
+    __dsync();
+}
+
+static void PduR_DoIPApplySessionReset(void)
+{
+    /* Runs on core0. Clears the DoIP TP request context and the TX/confirmation
+     * mailboxes so a new (or re-established) DoIP TCP connection starts clean.
+     * Without this, a context left "valid" or a mailbox left non-EMPTY by a
+     * previous connection (e.g. a transaction whose terminal response never
+     * drained) permanently gates all later diagnostic RX at the RX drain
+     * (PduR_DoIPRxDroppedBusyCounter) and TX in PduR_DcmTransmit - so routing
+     * activation still answers but every UDS request is dropped. */
+    /* Clear ONLY the request context - that is the sole state a stale connection
+     * leaves persistently stuck (PduR_DoIPCtx.valid == TRUE gates every later RX
+     * at the busy-drop in PduR_DoIPCore0MainFunction). The RX, TX and TX-
+     * confirmation mailboxes are deliberately NOT touched: each is drained (or
+     * dropped-and-cleared) on every core0 cycle, so none of them persists across
+     * connections, and clearing them here would destroy legitimate in-flight
+     * work - e.g. the first 10 01 arriving right after a reconnect (RX mailbox),
+     * or the TX confirmation of an ECUReset 51 01 that must still fire
+     * Dcm_TpTxConfirmation to actually perform the MCU reset (confirmation
+     * mailbox). */
+    PduR_DoIPCtx.valid = FALSE;
+    PduR_DoIPCtx.sourceAddress = 0u;
+    PduR_DoIPCtx.targetAddress = 0u;
+    Dcm_ResetDoIPSession();
+    __dsync();
 }
 
 Std_ReturnType PduR_ComTransmit(PduIdType TxPduId,
@@ -894,6 +943,7 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
             PduR_DoIPTxMailbox.sourceAddress = PduR_DoIPCtx.targetAddress;
             PduR_DoIPTxMailbox.targetAddress = PduR_DoIPCtx.sourceAddress;
             PduR_DoIPTxMailbox.udsLen = (uint16)len;
+            PduR_DoIPTxMailbox.txRetries = 0u;
             PduR_DoIPTxMailbox.keepContext = keepContext;
             PduR_DoIPTxMailbox.confirmDcm = (fastConfirm == FALSE) ? TRUE : FALSE;
             memcpy(PduR_DoIPTxMailbox.data, data, len);
@@ -901,11 +951,25 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
             PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_PENDING;
             __dsync();
 
-            if (fastConfirm != FALSE)
+            /* Release the request context as soon as a terminal response has been
+             * captured into the TX mailbox. Its addresses are already copied above,
+             * so the context is no longer needed to transmit it. Only a
+             * response-pending (0x78) keeps the context, because further responses
+             * for the same request still follow. Releasing here - on the same core
+             * that delivers RX - closes the window in which a fast follow-up request
+             * arrives after the response was handed off but before the cross-core TX
+             * confirmation completes, and would otherwise be dropped as "busy".
+             * Failed/suppressed responses are released via PduR_DcmReleaseNoResponse
+             * from Dcm_ClearProcessing, so no path leaks the context. */
+            if (keepContext == FALSE)
             {
                 PduR_DoIPCtx.valid = FALSE;
-                PduR_DoIPFastConfirmCounter++;
                 __dsync();
+            }
+
+            if (fastConfirm != FALSE)
+            {
+                PduR_DoIPFastConfirmCounter++;
                 Dcm_TxConfirmation(DcmTxPduId, E_OK);
             }
 
@@ -1216,7 +1280,6 @@ void PduR_DoIPCore0MainFunction(void)
     uint16 sourceAddress;
     uint16 targetAddress;
     uint16 udsLen;
-    uint8 keepContext;
     uint8 routeIdx;
 
     if (PduR_Initialized == FALSE)
@@ -1229,16 +1292,21 @@ void PduR_DoIPCore0MainFunction(void)
         __dsync();
         txPduId = PduR_DoIPTxConfirmationMailbox.txPduId;
         txResult = PduR_DoIPTxConfirmationMailbox.result;
-        keepContext = PduR_DoIPTxConfirmationMailbox.keepContext;
         PduR_DoIPTxConfirmationMailbox.valid = FALSE;
         __dsync();
 
+        /* The request context is released in PduR_DcmTransmit (for a terminal
+         * response) or PduR_DcmReleaseNoResponse (suppressed / failed response via
+         * Dcm_ClearProcessing), never here, so that a late confirmation cannot clear
+         * the context of a newer request that is already in flight. */
         Dcm_TxConfirmation(txPduId, txResult);
+    }
 
-        if ((keepContext == FALSE) || (txResult != E_OK))
-        {
-            PduR_DoIPCtx.valid = FALSE;
-        }
+    if (PduR_DoIPSessionResetPending != 0u)
+    {
+        PduR_DoIPSessionResetPending = 0u;
+        __dsync();
+        PduR_DoIPApplySessionReset();
     }
 
     if (PduR_DoIPRxMailbox.valid == FALSE)
@@ -1306,6 +1374,14 @@ void PduR_DoIPCore2MainFunction(void)
         }
         else
         {
+            if ((DoIP_GetTcpState() == DOIP_TCP_ROUTING_ACTIVE) &&
+                    (PduR_DoIPTxMailbox.txRetries < PDUR_DOIP_TX_RETRY_LIMIT))
+            {
+                PduR_DoIPTxMailbox.txRetries++;
+                __dsync();
+                return;
+            }
+
             PduR_DoIPTxFailCounter++;
         }
 

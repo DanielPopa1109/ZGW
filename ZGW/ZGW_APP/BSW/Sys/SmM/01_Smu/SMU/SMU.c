@@ -124,6 +124,16 @@ uint16 nbrAlarmsThatTriggerIsr1 = 0u;
 uint16 nbrAlarmsThatTriggerIsr2 = 0u;
 uint16 nbrAlarmsThatTriggerNMI  = 0u;
 uint16 nbrAlarmsThatAreDisabled = 0u;
+volatile uint32 Smu_DebugWatchdogAlarmActionConfigured;
+volatile uint32 Smu_DebugWatchdogAlarmGroup;
+volatile uint32 Smu_DebugWatchdogAlarmPosition;
+volatile uint32 Smu_DebugWatchdogAlarmAgcf0;
+volatile uint32 Smu_DebugWatchdogAlarmAgcf1;
+volatile uint32 Smu_DebugWatchdogAlarmAgcf2;
+volatile uint32 Smu_DebugTrapDis0BeforeEnable;
+volatile uint32 Smu_DebugTrapDis0AfterEnable;
+volatile uint32 Smu_DebugTrapStatBeforeEnable;
+volatile uint32 Smu_DebugTrapStatAfterEnable;
 /* Used to check SMU ISR groups config */
 volatile boolean isrConfigTestRunningSMU = FALSE;
 /* Used to visualize TFT pop up window for alarms which were configured with default configuration during AppSSW */
@@ -188,10 +198,27 @@ SmuStatusType activateSMU(void)
 SmuStatusType initSMUAlarmsSMU(void)
 {
     uint8 smuInterruptsToEnable = configArrayIGCS[0].igcs_config | configArrayIGCS[1].igcs_config | configArrayIGCS[2].igcs_config;
+
     /* Configure alarm internal reaction according to globalAlarmConfig set by user */
     for(uint8 i = 0u; i < USER_ALARM_NUMBER; i++)
     {
         IfxSmu_setAlarmAction(globalAlarmConfig[i].alarm, globalAlarmConfig[i].alarmReaction);
+        if(globalAlarmConfig[i].alarm == SMU_ALARM_WHICH_TRIGGERS_NMI)
+        {
+            uint16 alarmGroup = (uint16)SMU_ALARM_WHICH_TRIGGERS_NMI / 32u;
+            uint8 alarmPosition = (uint16)SMU_ALARM_WHICH_TRIGGERS_NMI % 32u;
+
+            Smu_DebugWatchdogAlarmActionConfigured = globalAlarmConfig[i].alarmReaction;
+            Smu_DebugWatchdogAlarmGroup = alarmGroup;
+            Smu_DebugWatchdogAlarmPosition = alarmPosition;
+            Smu_DebugWatchdogAlarmAgcf0 = (MODULE_SMU.AGCF[alarmGroup][0].U >> alarmPosition) & 0x1u;
+            Smu_DebugWatchdogAlarmAgcf1 = (MODULE_SMU.AGCF[alarmGroup][1].U >> alarmPosition) & 0x1u;
+            Smu_DebugWatchdogAlarmAgcf2 = (MODULE_SMU.AGCF[alarmGroup][2].U >> alarmPosition) & 0x1u;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
         /* Each IGCS group can trigger up to 3 isr simultaneously, so each alarm that can trigger a specific
          * isr (according to its IGCS group) is put in the corresponding array to speed-up the alarm source
          * detection process */
@@ -301,10 +328,15 @@ SmuStatusType initSMUAlarmsSMU(void)
         /* Do nothing. */
     }
     /* Non Maskable Interrupt config/enabling on CPUs */
-    /* Comment and/or uncomment depending on the CPU targeted */
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     /* Enable trap requests for the CPU, which takes care of the SMU software */
-    //SCU_TRAPDIS0.B.CPU0SMUT = 0;
+    Smu_DebugTrapDis0BeforeEnable = SCU_TRAPDIS0.U;
+    Smu_DebugTrapStatBeforeEnable = SCU_TRAPSTAT.U;
+    SCU_TRAPDIS0.B.CPU0SMUT = 0u;
+    SCU_TRAPDIS0.B.CPU1SMUT = 0u;
+    SCU_TRAPDIS0.B.CPU2SMUT = 0u;
+    Smu_DebugTrapDis0AfterEnable = SCU_TRAPDIS0.U;
+    Smu_DebugTrapStatAfterEnable = SCU_TRAPSTAT.U;
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
 

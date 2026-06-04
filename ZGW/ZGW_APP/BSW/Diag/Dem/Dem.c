@@ -1,6 +1,7 @@
 #include "Dem.h"
 #include "Dem_Int.h"
 #include "Dem_NvM.h"
+#include "APP/CodingApp/CodingApp.h"
 #include "IfxCpu.h"
 #include <string.h>
 #include <stddef.h>
@@ -391,6 +392,58 @@ static uint16 Dem_FindPrimaryEntryByDTC(Dem_DTCType dtc)
     }
 
     return DEM_PRIMARY_MEMORY_SIZE;
+}
+
+static Std_ReturnType Dem_CaptureLiveDataByDTC(
+    Dem_DTCType dtc,
+    boolean extendedData,
+    uint8 *buffer,
+    uint16 *length
+)
+{
+    uint16 eventIndex;
+    uint16 captureLength;
+    Dem_EventConfigType eventConfig;
+    Dem_CaptureDataFctType capture;
+
+    if ((buffer == NULL_PTR) || (length == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    eventIndex = Dem_FindEventIndexByDTC(dtc);
+    if (eventIndex >= DEM_MAX_EVENTS)
+    {
+        return E_NOT_OK;
+    }
+
+    if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    capture = (extendedData != FALSE) ?
+            eventConfig.ExtendedDataCapture :
+            eventConfig.FreezeFrameCapture;
+
+    if (capture == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    captureLength = *length;
+    if (capture(eventConfig.EventId, buffer, &captureLength) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    if (*length < captureLength)
+    {
+        return E_NOT_OK;
+    }
+
+    *length = captureLength;
+    return E_OK;
 }
 
 static uint16 Dem_AllocatePrimaryEntry(uint16 eventIndex)
@@ -1107,6 +1160,8 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
         Dem_InvokeStatusChanged(eventIndex, oldStatus, newStatus);
     }
 
+    GatewaySwc_OnDemEventCleared(eventConfig.EventId);
+    CodingApp_OnDemEventCleared(eventConfig.EventId);
     Dem_DebugUpdateEvent(eventIndex);
 }
 
@@ -1900,7 +1955,7 @@ Std_ReturnType Dem_GetFreezeFrameDataByDTC(
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
     {
-        return E_NOT_OK;
+        return Dem_CaptureLiveDataByDTC(DTC, FALSE, DestBuffer, BufSize);
     }
 
     copyLen = Dem_PrimaryMemory[entryIndex].freezeFrameLength;
@@ -1949,7 +2004,7 @@ Std_ReturnType Dem_GetExtendedDataRecordByDTC(
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
     {
-        return E_NOT_OK;
+        return Dem_CaptureLiveDataByDTC(DTC, TRUE, DestBuffer, BufSize);
     }
 
     copyLen = Dem_PrimaryMemory[entryIndex].extendedDataLength;

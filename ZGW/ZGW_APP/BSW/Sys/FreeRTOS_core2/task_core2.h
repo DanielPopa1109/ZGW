@@ -3014,6 +3014,16 @@ void vTaskRemoveFromUnorderedEventList_core2( ListItem_t_core2 * pxEventListItem
 portDONT_DISCARD_core2 void vTaskSwitchContext_core2( void ) PRIVILEGED_FUNCTION_core2;
 
 /*
+ * Diagnostic capture of the scheduler ready-list state. Intended for the port's
+ * NULL-pxCurrentTCB guard (reset reason 386) to localise scheduler corruption.
+ * Any output pointer may be NULL. THIS FUNCTION IS FOR DEBUG/PORT USE ONLY.
+ */
+void vTaskCaptureReadyListDiag_core2( UBaseType_t_core2 * puxTopReadyPriority_core2,
+                                      UBaseType_t_core2 * puxTopListItems_core2,
+                                      UBaseType_t_core2 * puxCurrentNumberOfTasks_core2,
+                                      void ** ppxIdleTaskHandle_core2 );
+
+/*
  * THESE FUNCTIONS MUST NOT BE USED FROM APPLICATION CODE.  THEY ARE USED BY
  * THE EVENT BITS MODULE.
  */

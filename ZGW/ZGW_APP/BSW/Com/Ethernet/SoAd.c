@@ -717,6 +717,8 @@ void SoAd_MainFunction(void)
             }
             else if (rt->state == SOAD_SOCON_CONNECTED)
             {
+                (void)SoAd_TryReplaceStaleTcpClient(rt, id);
+
                 len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
 
                 if (len == 0)
@@ -762,7 +764,7 @@ void SoAd_MainFunction(void)
 
                     if (SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len) != 0u)
                     {
-                        /* Heartbeat is a link probe, not upper-layer payload. */
+                        SysMgr_NotifyBusActivity();
                     }
                     else if ((rt->cfg->rxIndication != 0) &&
                             ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||

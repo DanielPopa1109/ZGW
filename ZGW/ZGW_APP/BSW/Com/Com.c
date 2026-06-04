@@ -1,6 +1,7 @@
 #include "Com.h"
 #include "PduR.h"
 #include "ComM/ComM.h"
+#include "APP/CodingApp/CodingApp.h"
 #include <string.h>
 
 #define COM_TRUE  1u
@@ -1949,6 +1950,14 @@ static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
         return E_NOT_OK;
     }
 
+    if (CodingApp_IsTxPduEnabled(cfg->pduId) == FALSE)
+    {
+        Com_TxRt[txIdx].dirty = COM_FALSE;
+        Com_TxRt[txIdx].periodDue = COM_FALSE;
+        Com_TxRt[txIdx].repetitionsLeft = 0u;
+        return E_NOT_OK;
+    }
+
     if ((Com_MainFunctionTxActive != COM_FALSE) &&
             (Com_TxLastTriggerSequence[txIdx] == Com_MainFunctionTxSequence))
     {
@@ -2078,6 +2087,7 @@ void Com_TriggerFullComRestartBurst(uint8 channel)
     for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
     {
         if ((Com_TxRt[i].active == COM_FALSE) ||
+            (Com_TxIpduCfg[i].txMode == COM_TX_MODE_NONE) ||
             (Com_TxIpduBelongsToChannel(Com_TxIpduCfg[i].pduId, channel) == COM_FALSE))
         {
             continue;

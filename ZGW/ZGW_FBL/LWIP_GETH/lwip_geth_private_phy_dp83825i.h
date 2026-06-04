@@ -50,6 +50,8 @@
 /***********************************************************************************************************************
  * FUNCTION PROTOTYPES
  **********************************************************************************************************************/
+IFX_EXTERN volatile uint32 IfxGeth_Eth_Phy_Dp83825i_mdioTimeoutCnt;
+IFX_EXTERN volatile uint32 IfxGeth_Eth_Phy_Dp83825i_resetTimeoutCnt;
 IFX_EXTERN void lwip_geth_private_Phy_Dp83825i_reset(void);
 IFX_EXTERN uint32 lwip_geth_private_Phy_Dp83825i_init(void);
 IFX_EXTERN uint32 lwip_geth_private_Phy_Dp83825i_link_status(void);

@@ -80,6 +80,10 @@ extern "C" {
 #define TCP_WND                             2144
 #define TCP_SND_BUF                         1072
 #define TCP_SND_QUEUELEN                    8
+/* Reap a tester that vanished without a TCP FIN/RST so the bootloader's single
+ * DoIP connection slot frees itself instead of staying wedged until a power
+ * cycle. Keepalive fields are set on the accepted PCB in FblEth_AurixLwip.c. */
+#define LWIP_TCP_KEEPALIVE                  1
 
 #define LWIP_DHCP                           0
 

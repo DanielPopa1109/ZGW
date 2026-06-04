@@ -3,6 +3,7 @@
 #include "IfxCpu_IntrinsicsTasking.h"
 #include "IfxCpu_reg.h"
 #include "IfxPms_reg.h"
+#include "Fls_Cfg.h"
 #include "BSW/Time/TimeBase.h"
 
 uint32 McuSm_AGs[12u];
@@ -55,6 +56,11 @@ volatile uint32 McuSm_Trap4ScrRtcRecordCounter;
 volatile uint32 McuSm_BusMpuConfigured;
 volatile uint32 McuSm_BusMpuWriteAccessMaskA;
 volatile uint32 McuSm_BusMpuWriteAccessMaskB;
+volatile uint32 McuSm_DFlashRecoveryRequest;
+volatile uint32 McuSm_DFlashRecoveryInfo;
+volatile uint32 McuSm_DFlashRecoveryCounter;
+volatile uint32 McuSm_DFlashRecoveryLastFeeAccessKind;
+volatile uint32 McuSm_DFlashRecoveryLastFeePhysicalAddress;
 
 void McuSm_InitializeBusMpu(void);
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
@@ -99,8 +105,11 @@ volatile uint8 debugvar = 0;
 
 extern uint8 _lc_gb_NCR[];
 extern uint8 _lc_ge_NCR[];
+extern volatile uint32 Fee_DebugLastFlashAccessKind;
+extern volatile uint32 Fee_DebugLastFlashPhysicalAddress;
 
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd);
+static boolean McuSm_IsDFlashAddress(uint32 address);
 static boolean McuSm_IsScrXramAddress(uint32 address);
 static void McuSm_ZeroFillRange(uint32 rangeStart, uint32 rangeEnd);
 static uint32 McuSm_LoadU32FromBuffer(const uint8 *buffer, uint16 offset);
@@ -109,42 +118,38 @@ static uint32 McuSm_GetTrap4ErrorAddress(IfxCpu_Trap trapInfo);
 static uint32 McuSm_Trap4ZeroFillIfRecoverable(uint32 errorAddress);
 
 #define MCUSM_RECORD_TRAP(trapClass, trapInfo)                 \
-    do                                                         \
-    {                                                          \
-        Ifx_CPU_CORE_ID mcuSmCoreIdReg;                        \
-        mcuSmCoreIdReg.U = __mfcr(CPU_CORE_ID);                \
-        McuSm_LastTrapClass = (trapClass);                     \
-        McuSm_LastTrapId = (trapInfo).tId;                     \
-        McuSm_LastTrapCoreId = mcuSmCoreIdReg.B.CORE_ID;       \
-        McuSm_LastTrapTAddr = (trapInfo).tAddr;                \
-        McuSm_LastTrapPcxi = __mfcr(CPU_PCXI);                 \
-        McuSm_LastTrapFcx = __mfcr(CPU_FCX);                   \
-        McuSm_LastTrapLcx = __mfcr(CPU_LCX);                   \
-        McuSm_LastTrapPsw = __mfcr(CPU_PSW);                   \
-        McuSm_TrapCounter++;                                   \
-    } while (0)
+        do                                                         \
+        {                                                          \
+            Ifx_CPU_CORE_ID mcuSmCoreIdReg;                        \
+            mcuSmCoreIdReg.U = __mfcr(CPU_CORE_ID);                \
+            McuSm_LastTrapClass = (trapClass);                     \
+            McuSm_LastTrapId = (trapInfo).tId;                     \
+            McuSm_LastTrapCoreId = mcuSmCoreIdReg.B.CORE_ID;       \
+            McuSm_LastTrapTAddr = (trapInfo).tAddr;                \
+            McuSm_LastTrapPcxi = __mfcr(CPU_PCXI);                 \
+            McuSm_LastTrapFcx = __mfcr(CPU_FCX);                   \
+            McuSm_LastTrapLcx = __mfcr(CPU_LCX);                   \
+            McuSm_LastTrapPsw = __mfcr(CPU_PSW);                   \
+            McuSm_TrapCounter++;                                   \
+        } while (0)
 
 void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 {
-    if(0xEFEFU != resetReason && 0xDFDFU != resetReason)
+    /* Record the reset reason + history FIRST so the cause is always captured
+     * in RAM, then (debug builds only) optionally halt, then reset. Previously
+     * an unconditional while(1){__debug();} sat here, so a real trap hung the
+     * gateway forever and never logged the reason or rebooted. */
+    if(McuSm_IndexResetHistory >= 20u)
     {
-        if(McuSm_IndexResetHistory >= 20u)
-        {
-            McuSm_IndexResetHistory = 0u;
-        }
+        McuSm_IndexResetHistory = 0u;
+    }
 
-        McuSm_LastResetReason = resetReason;
-        McuSm_LastResetInformation = resetInformation;
-        McuSm_ResetHistory[McuSm_IndexResetHistory].reason = resetReason;
-        McuSm_ResetHistory[McuSm_IndexResetHistory].information = resetInformation;
-        McuSm_IndexResetHistory++;
-        McuSm_FBL_ResetCounter += 1u;
-    }
-    else
-    {
-        McuSm_LastResetReason = 0u;
-        McuSm_LastResetInformation = 0u;
-    }
+    McuSm_LastResetReason = resetReason;
+    McuSm_LastResetInformation = resetInformation;
+    McuSm_ResetHistory[McuSm_IndexResetHistory].reason = resetReason;
+    McuSm_ResetHistory[McuSm_IndexResetHistory].information = resetInformation;
+    McuSm_IndexResetHistory++;
+    McuSm_FBL_ResetCounter += 1u;
 
     if(McuSm_IndexResetHistory >= 20u)
     {
@@ -155,6 +160,13 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
         /* Do nothing. */
     }
     
+#if (MCUSM_DEBUG_HALT_BEFORE_RESET != 0u)
+    /* Debug builds only: freeze here with the full trap context still live so
+     * it can be inspected over the debugger. Keep MCUSM_DEBUG_HALT_BEFORE_RESET
+     * at 0 (the default) for the field so a trap reboots the gateway. */
+    while(1){__debug();}
+#endif
+
     IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
 
 }
@@ -162,6 +174,39 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd)
 {
     return ((address >= rangeStart) && (address < rangeEnd)) ? TRUE : FALSE;
+}
+
+static boolean McuSm_IsDFlashAddress(uint32 address)
+{
+    return McuSm_IsAddressInRange(
+            address,
+            FLS_DFLASH0_BASE_ADDRESS,
+            FLS_DFLASH0_BASE_ADDRESS + FLS_DFLASH0_TOTAL_SIZE);
+}
+
+void McuSm_RequestDFlashRecovery(uint32 recoveryInfo)
+{
+    McuSm_DFlashRecoveryInfo = recoveryInfo;
+    McuSm_DFlashRecoveryLastFeeAccessKind = Fee_DebugLastFlashAccessKind;
+    McuSm_DFlashRecoveryLastFeePhysicalAddress = Fee_DebugLastFlashPhysicalAddress;
+    McuSm_DFlashRecoveryRequest = MCUSM_DFLASH_RECOVERY_MAGIC;
+    McuSm_DFlashRecoveryCounter++;
+}
+
+boolean McuSm_IsDFlashRecoveryRequested(void)
+{
+    if (McuSm_DFlashRecoveryRequest != MCUSM_DFLASH_RECOVERY_MAGIC)
+    {
+        return FALSE;
+    }
+
+    return McuSm_IsDFlashAddress(McuSm_DFlashRecoveryLastFeePhysicalAddress);
+}
+
+void McuSm_ClearDFlashRecoveryRequest(void)
+{
+    McuSm_DFlashRecoveryRequest = 0u;
+    McuSm_DFlashRecoveryInfo = 0u;
 }
 
 static boolean McuSm_IsScrXramAddress(uint32 address)
@@ -186,9 +231,9 @@ static void McuSm_ZeroFillRange(uint32 rangeStart, uint32 rangeEnd)
 static uint32 McuSm_LoadU32FromBuffer(const uint8 *buffer, uint16 offset)
 {
     return ((uint32)buffer[offset] << 24u) |
-           ((uint32)buffer[(uint16)(offset + 1u)] << 16u) |
-           ((uint32)buffer[(uint16)(offset + 2u)] << 8u) |
-           (uint32)buffer[(uint16)(offset + 3u)];
+            ((uint32)buffer[(uint16)(offset + 1u)] << 16u) |
+            ((uint32)buffer[(uint16)(offset + 2u)] << 8u) |
+            (uint32)buffer[(uint16)(offset + 3u)];
 }
 
 void McuSm_CaptureTimeImageFromScr(void)
@@ -196,14 +241,25 @@ void McuSm_CaptureTimeImageFromScr(void)
     McuSm_CaptureScrRtcRecord();
 }
 
+uint8 dbgcnt = 0;
+
 static void McuSm_CaptureScrRtcRecord(void)
 {
     volatile uint8 *scrTime = &((volatile uint8 *)PMS_XRAM)[SCR_TIME_XRAM_BASE];
     uint16 index;
 
+    /*
+     * Do not reject the record based on PMS_PMSWCR2.B.SCRECC.  The SCR updates
+     * PMS_XRAM through its 8-bit bus while tracking standby elapsed time, which
+     * can leave TriCore-side word ECC mismatches even for a valid handoff
+     * record.  TimeBase validates the SCR-reported wake/fault status before
+     * consuming the captured image.
+     */
+
     if (PMS_PMSWCR2.B.SCRECC != 0u)
     {
         McuSm_Trap4ScrRtcRecordValid = FALSE;
+        dbgcnt++;
         return;
     }
 
@@ -213,8 +269,8 @@ static void McuSm_CaptureScrRtcRecord(void)
     }
 
     if ((McuSm_LoadU32FromBuffer(McuSm_Trap4ScrRtcRecord, SCR_TIME_OFFSET_MAGIC) == SCR_TIME_MAGIC) &&
-        (McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_VERSION] == SCR_TIME_VERSION) &&
-        (McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_VALID] == SCR_TIME_VALID))
+            (McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_VERSION] == SCR_TIME_VERSION) &&
+            (McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_VALID] == SCR_TIME_VALID))
     {
         McuSm_Trap4ScrRtcRecordValid = TRUE;
         McuSm_Trap4ScrRtcRecordCounter++;
@@ -322,10 +378,10 @@ void McuSm_TRAP4(IfxCpu_Trap trapInfo)
     }
 
     if ((McuSm_IsScrXramAddress(McuSm_Trap4ErrorAddress) == FALSE) &&
-        (McuSm_IsAddressInRange(
-                McuSm_Trap4ErrorAddress,
-                (uint32)&_lc_gb_NCR[0u],
-                (uint32)&_lc_ge_NCR[0u]) == FALSE))
+            (McuSm_IsAddressInRange(
+                    McuSm_Trap4ErrorAddress,
+                    (uint32)&_lc_gb_NCR[0u],
+                    (uint32)&_lc_ge_NCR[0u]) == FALSE))
     {
         McuSm_CaptureScrRtcRecord();
     }
@@ -373,6 +429,15 @@ void McuSm_TRAP7(IfxCpu_Trap trapInfo)
         {
             /* Do nothing. */
         }
+    }
+
+    if ((agRstRsn == 7u) &&
+            (agRstInfo == 17u) &&
+            (McuSm_IsDFlashAddress(Fee_DebugLastFlashPhysicalAddress) != FALSE))
+    {
+        McuSm_RequestDFlashRecovery(
+                (Fee_DebugLastFlashAccessKind << 24u) |
+                (Fee_DebugLastFlashPhysicalAddress & 0x00FFFFFFu));
     }
 
     McuSm_PerformResetHook(agRstRsn, agRstInfo);

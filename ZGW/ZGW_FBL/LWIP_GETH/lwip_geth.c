@@ -69,6 +69,11 @@ LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
     tcpip_init(lwip_geth_Lwip_init,(void *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress);
 #else
     lwip_geth_Lwip_init();
+    if (g_LwipNetifAddFailed != 0u)
+    {
+      status = LWIP_GETH_STATUS_FAILURE;
+      return status;
+    }
     TIMER_STM_Init(handle->stm_module);
 #endif
     handle->app_is_initialized = TRUE;

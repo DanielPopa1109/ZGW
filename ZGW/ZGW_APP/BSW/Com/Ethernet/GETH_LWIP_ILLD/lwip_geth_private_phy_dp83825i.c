@@ -25,6 +25,7 @@
 #define DP83825I_PHYSTS_FULL_DUPLEX    0x0004u
 
 #define DP83825I_MDIO_MAX_WAIT         100000u
+#define DP83825I_RESET_SYNC_POLLS      100000u
 #define DP83825I_RESET_TIMEOUT_100MS   20u
 #define DP83825I_AUTONEG_TIMEOUT_100MS 50u
 
@@ -36,22 +37,28 @@ volatile uint32 Dp83825i_DebugPhyId1;
 volatile uint32 Dp83825i_DebugPhyId2;
 volatile uint32 Dp83825i_DebugBmcr;
 volatile uint32 Dp83825i_DebugBmsr;
+volatile uint32 Dp83825i_DebugPhysts;
 volatile uint32 Dp83825i_DebugReadOkCount;
 volatile uint32 Dp83825i_DebugReadFailCount;
+volatile uint32 Dp83825i_DebugInitFailCount;
+volatile uint32 Dp83825i_DebugResetWaitFailCount;
+volatile uint32 Dp83825i_DebugConfigureFailCount;
 
 void Dp83825i_DebugScanMdio(void)
 {
     uint32 addr;
-    uint32 id1;
-    uint32 id2;
-    uint32 bmcr;
-    uint32 bmsr;
+    uint32 id1 = 0u;
+    uint32 id2 = 0u;
+    uint32 bmcr = 0u;
+    uint32 bmsr = 0u;
+    uint32 physts = 0u;
 
     Dp83825i_DebugPhyAddrFound = 0xFFFFFFFFu;
     Dp83825i_DebugPhyId1 = 0u;
     Dp83825i_DebugPhyId2 = 0u;
     Dp83825i_DebugBmcr = 0u;
     Dp83825i_DebugBmsr = 0u;
+    Dp83825i_DebugPhysts = 0u;
 
     for (addr = 0u; addr < 32u; addr++)
     {
@@ -80,9 +87,12 @@ void Dp83825i_DebugScanMdio(void)
 
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMCR, &bmcr);
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMSR, &bmsr);
+            (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMSR, &bmsr);
+            (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYSTS, &physts);
 
             Dp83825i_DebugBmcr = bmcr;
             Dp83825i_DebugBmsr = bmsr;
+            Dp83825i_DebugPhysts = physts;
             break;
         }
     }
@@ -174,6 +184,12 @@ void lwip_geth_private_Phy_Dp83825i_reset(void)
 
 uint32 lwip_geth_private_Phy_Dp83825i_init(void)
 {
+    uint32 timeout;
+    uint32 bmcr;
+    uint32 bmsr;
+    uint32 bmsrSecond;
+    uint32 physts;
+
     Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_RESET;
     Dp83825i_Status.initDone = 0u;
     Dp83825i_Status.linkUp = 0u;
@@ -186,7 +202,78 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
     Dp83825i_Status.linkDownCnt = 0u;
     Dp83825i_Status.linkUpCnt = 0u;
 
-    lwip_geth_private_Phy_Dp83825i_reset();
+    if (lwip_geth_private_Phy_Dp83825i_write_mdio_reg(
+            DP83825I_PHY_ADDR,
+            DP83825I_REG_BMCR,
+            DP83825I_BMCR_RESET) == 0u)
+    {
+        Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+        Dp83825i_DebugInitFailCount++;
+        return 0u;
+    }
+
+    timeout = DP83825I_RESET_SYNC_POLLS;
+
+    do
+    {
+        if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMCR, &bmcr) == 0u)
+        {
+            Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+            Dp83825i_DebugInitFailCount++;
+            return 0u;
+        }
+
+        timeout--;
+    } while (((bmcr & DP83825I_BMCR_RESET) != 0u) && (timeout > 0u));
+
+    if ((bmcr & DP83825I_BMCR_RESET) != 0u)
+    {
+        Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+        Dp83825i_Status.resetTimeoutCnt++;
+        Dp83825i_DebugResetWaitFailCount++;
+        Dp83825i_DebugInitFailCount++;
+        return 0u;
+    }
+
+    if (lwip_geth_private_Phy_Dp83825i_write_mdio_reg(
+            DP83825I_PHY_ADDR,
+            DP83825I_REG_ANAR,
+            0x01E1u) == 0u)
+    {
+        Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+        Dp83825i_DebugConfigureFailCount++;
+        Dp83825i_DebugInitFailCount++;
+        return 0u;
+    }
+
+    if (lwip_geth_private_Phy_Dp83825i_write_mdio_reg(
+            DP83825I_PHY_ADDR,
+            DP83825I_REG_BMCR,
+            DP83825I_BMCR_AUTONEG_ENABLE | DP83825I_BMCR_RESTART_AUTONEG) == 0u)
+    {
+        Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+        Dp83825i_DebugConfigureFailCount++;
+        Dp83825i_DebugInitFailCount++;
+        return 0u;
+    }
+
+    Dp83825i_Status.initDone = 1u;
+    Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_DOWN;
+
+    if ((lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMSR, &bmsr) != 0u) &&
+        (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMSR, &bmsrSecond) != 0u) &&
+        (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_PHYSTS, &physts) != 0u) &&
+        (((bmsrSecond & DP83825I_BMSR_LINK_STATUS) != 0u) ||
+         ((physts & DP83825I_PHYSTS_LINK) != 0u)))
+    {
+        Dp83825i_DebugBmsr = bmsrSecond;
+        Dp83825i_DebugPhysts = physts;
+        Dp83825i_Status.linkUp = 1u;
+        Dp83825i_Status.speed100 = ((physts & DP83825I_PHYSTS_SPEED_10) == 0u) ? 1u : 0u;
+        Dp83825i_Status.fullDuplex = ((physts & DP83825I_PHYSTS_FULL_DUPLEX) != 0u) ? 1u : 0u;
+        Dp83825i_Status.linkUpCnt++;
+        Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_UP;
+    }
 
     return 1u;
 }
@@ -195,6 +282,7 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
 {
     uint32 bmcr;
     uint32 bmsr;
+    uint32 bmsrSecond;
     uint32 physts;
 
     switch (Dp83825i_Status.state)
@@ -255,6 +343,13 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 break;
             }
 
+            if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMSR, &bmsrSecond) == 0u)
+            {
+                Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+                break;
+            }
+            bmsr = bmsrSecond;
+
             if ((bmsr & DP83825I_BMSR_AUTONEG_DONE) != 0u)
             {
                 Dp83825i_Status.autonegDone = 1u;
@@ -284,13 +379,24 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 break;
             }
 
+            if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMSR, &bmsrSecond) == 0u)
+            {
+                Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
+                break;
+            }
+            bmsr = bmsrSecond;
+
             if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_PHYSTS, &physts) == 0u)
             {
                 Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
                 break;
             }
 
-            if ((bmsr & DP83825I_BMSR_LINK_STATUS) != 0u)
+            Dp83825i_DebugBmsr = bmsr;
+            Dp83825i_DebugPhysts = physts;
+
+            if (((bmsr & DP83825I_BMSR_LINK_STATUS) != 0u) ||
+                ((physts & DP83825I_PHYSTS_LINK) != 0u))
             {
                 Dp83825i_Status.linkUp = 1u;
                 Dp83825i_Status.speed100 = ((physts & DP83825I_PHYSTS_SPEED_10) == 0u) ? 1u : 0u;

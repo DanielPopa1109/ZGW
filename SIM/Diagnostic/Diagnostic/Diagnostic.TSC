@@ -14,7 +14,7 @@ FModuleType=0
 SubServiceCount=4
 
 [TfrmDiagnostics_EcuReset]
-SubServiceCount=5
+SubServiceCount=1
 
 [TfrmDiagnostics_ClearDiagnosticInformation]
 SubServiceCount=1
@@ -50,10 +50,10 @@ SubServiceCount=0
 SubServiceCount=0
 
 [TfrmDiagnostics_SecurityAccess]
-SubServiceCount=8
+SubServiceCount=0
 
 [TfrmDiagnostics_CommunicationControl]
-SubServiceCount=4
+SubServiceCount=2
 
 [TfrmDiagnostics_Authentication]
 SubServiceCount=1
@@ -68,7 +68,7 @@ SubServiceCount=3
 SubServiceCount=0
 
 [TfrmDiagnostics_InputOutputControlByIdentifier]
-SubServiceCount=4
+SubServiceCount=0
 
 [TfrmDiagnostics_OBD_ControlOperationOfOnBoardComponentSystem]
 SubServiceCount=0
@@ -92,7 +92,7 @@ SubServiceCount=2
 SubServiceCount=0
 
 [TfrmDiagnostics_TesterPresent]
-SubServiceCount=2
+SubServiceCount=1
 
 [TfrmDiagnostics_AccessTimingParameter]
 SubServiceCount=4
@@ -137,7 +137,7 @@ SubServiceCount=0
 SubServiceCount=0
 
 [TfrmDiagnostics_LinkControl]
-SubServiceCount=3
+SubServiceCount=0
 
 [TfrmDiagnostics_FileTransfer]
 SubServiceCount=3
@@ -680,7 +680,7 @@ supporttexttable=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_0]
 isRegSystemVar=0
-FServiceName=ReadActiveDiagnosticSession
+FServiceName=Read Active Diagnostic Session
 FIsFunctionID=0
 FHasResponse=1
 FServiceCode=34
@@ -726,7 +726,7 @@ supporttexttable=0
 
 [TfrmDiagnostics_ReadDataByIdentifier_1]
 isRegSystemVar=0
-FServiceName=ReadActiveSoftwareBlock
+FServiceName=Read Active Software Block
 FIsFunctionID=0
 FHasResponse=1
 FServiceCode=34
@@ -4105,8 +4105,8 @@ FLengthOfMemoryAddress=14
 FLengthOfMemorySize=14
 FByteOrderOfChecksum=1
 FMainTainOriginalFileStruct=0
-FHexFilePath=
-FDataFileIsChanged=0
+FHexFilePath=ZGW_APP.tsbinary
+FDataFileIsChanged=1
 FCheckSumDllPath=
 FBinStartAddr=0
 FBinExtractType=1556080408

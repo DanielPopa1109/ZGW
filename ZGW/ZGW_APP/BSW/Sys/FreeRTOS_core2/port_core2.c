@@ -58,6 +58,17 @@
 
 extern volatile unsigned long * pxCurrentTCB_core2;
 
+/* Route a corrupted-scheduler-state detection to the common reset hook (records
+ * the reason + reboots, or halts for debug). Declared locally to avoid pulling
+ * the full McuSm header into the FreeRTOS port. */
+extern void McuSm_PerformResetHook( uint32_t resetReason, uint32_t resetInformation );
+
+/* Mirror of the dedicated reset codes from McuSm.h. This unit intentionally
+ * does not include McuSm.h (to keep the iLLD/TriCore headers out of the
+ * FreeRTOS port), so keep these in sync with McuSm.h if the values change. */
+#define MCUSM_RESET_REASON_C2_TCB_CORRUPT      386u
+#define MCUSM_RESET_REASON_C2_STACKPTR_CORRUPT 387u
+
 /* Tick and context switch config */
 #define portTICK_COUNT_core2    ( configSTM_CLOCK_HZ_core2 / configTICK_RATE_HZ_core2 )
 
@@ -95,6 +106,25 @@ volatile uint32_t FreeRTOS_core2_TickCatchUpCounter = 0u;
 volatile uint32_t FreeRTOS_core2_TickLastNow = 0u;
 volatile uint32_t FreeRTOS_core2_TickLastCompare = 0u;
 volatile uint32_t FreeRTOS_core2_TickLastLateDelta = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextFailReason = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextFailCallDepth = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextFailCurrentTcb = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextFailTopOfStack = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextLastCurrentTcb = 0u;
+volatile uint32_t FreeRTOS_core2_DebugContextLastTopOfStack = 0u;
+volatile uint32_t FreeRTOS_core2_DebugSyscallYieldEnterTcb = 0u;
+volatile uint32_t FreeRTOS_core2_DebugSyscallYieldAfterSaveTcb = 0u;
+volatile uint32_t FreeRTOS_core2_DebugSyscallYieldAfterSwitchTcb = 0u;
+volatile uint32_t FreeRTOS_core2_DebugSyscallYieldCount = 0u;
+
+/* Ready-list snapshot captured by the NULL-pxCurrentTCB guard (reason 386).
+ * TopListItems != 0 with a NULL TCB => ready-list count/links corrupted;
+ * IdleTaskHandle == 0 or all lists empty => idle/runnable task missing
+ * (e.g. core2 heap exhaustion at task creation). */
+volatile uint32_t FreeRTOS_core2_DebugReadyListTopPriority = 0u;
+volatile uint32_t FreeRTOS_core2_DebugReadyListTopItems = 0u;
+volatile uint32_t FreeRTOS_core2_DebugReadyListNumTasks = 0u;
+volatile uint32_t FreeRTOS_core2_DebugReadyListIdleHandle = 0u;
 
 /* FreeRTOS_core2 required functions */
 BaseType_t_core2 xPortStartScheduler_core2( void )
@@ -302,6 +332,23 @@ void vPortStartFirstTask_core2()
     __nop();
 }
 
+/* Snapshot the scheduler ready-list state into the debug globals so the NULL-
+ * pxCurrentTCB guard reset (reason 386) records why the switch produced NULL. */
+static void vPortCaptureReadyListDiag_core2( void )
+{
+    UBaseType_t_core2 uxTopPriority = 0u;
+    UBaseType_t_core2 uxTopItems = 0u;
+    UBaseType_t_core2 uxNumTasks = 0u;
+    void * pxIdleHandle = NULL;
+
+    vTaskCaptureReadyListDiag_core2( &uxTopPriority, &uxTopItems, &uxNumTasks, &pxIdleHandle );
+
+    FreeRTOS_core2_DebugReadyListTopPriority = ( uint32_t ) uxTopPriority;
+    FreeRTOS_core2_DebugReadyListTopItems = ( uint32_t ) uxTopItems;
+    FreeRTOS_core2_DebugReadyListNumTasks = ( uint32_t ) uxNumTasks;
+    FreeRTOS_core2_DebugReadyListIdleHandle = ( uint32_t ) pxIdleHandle;
+}
+
 void vPortLoadContext_core2( unsigned char ucCallDepth_core2 )
 {
     uint32_t ** ppxTopOfStack;
@@ -312,6 +359,44 @@ void vPortLoadContext_core2( unsigned char ucCallDepth_core2 )
 
     /* Load the new CSA id from the stack and update the stack pointer */
     ppxTopOfStack = ( uint32_t ** ) pxCurrentTCB_core2;
+    FreeRTOS_core2_DebugContextLastCurrentTcb = ( uint32_t ) ppxTopOfStack;
+
+    if( ( uint32_t ) ppxTopOfStack >= 0x10000u )
+    {
+        FreeRTOS_core2_DebugContextLastTopOfStack = ( uint32_t ) ( *ppxTopOfStack );
+    }
+    else
+    {
+        FreeRTOS_core2_DebugContextLastTopOfStack = 0u;
+    }
+
+    /* Defensive integrity check. If the comms stack (lwIP) overruns memory and
+     * corrupts this core's scheduler state, pxCurrentTCB or the selected task's
+     * saved stack pointer can land in the null-protected low region. The bare
+     * dereferences below would then raise an MPU null-address (MPN) trap deep
+     * inside the context switch that is very hard to attribute. Catch it here
+     * and route to a logged, recoverable reset (reasons 386/387) instead. These
+     * codes are dedicated to this guard so they no longer collide with the
+     * FreeRTOS malloc-failed hooks (380) or Os_InitFailure (381). */
+    if( ( uint32_t ) ppxTopOfStack < 0x10000u )
+    {
+        vPortCaptureReadyListDiag_core2();
+        FreeRTOS_core2_DebugContextFailReason = MCUSM_RESET_REASON_C2_TCB_CORRUPT;
+        FreeRTOS_core2_DebugContextFailCallDepth = ( uint32_t ) ucCallDepth_core2;
+        FreeRTOS_core2_DebugContextFailCurrentTcb = ( uint32_t ) ppxTopOfStack;
+        FreeRTOS_core2_DebugContextFailTopOfStack = 0u;
+        McuSm_PerformResetHook( MCUSM_RESET_REASON_C2_TCB_CORRUPT, ( uint32_t ) ppxTopOfStack );
+    }
+    if( ( uint32_t ) *ppxTopOfStack < 0x10000u )
+    {
+        vPortCaptureReadyListDiag_core2();
+        FreeRTOS_core2_DebugContextFailReason = MCUSM_RESET_REASON_C2_STACKPTR_CORRUPT;
+        FreeRTOS_core2_DebugContextFailCallDepth = ( uint32_t ) ucCallDepth_core2;
+        FreeRTOS_core2_DebugContextFailCurrentTcb = ( uint32_t ) ppxTopOfStack;
+        FreeRTOS_core2_DebugContextFailTopOfStack = ( uint32_t ) ( *ppxTopOfStack );
+        McuSm_PerformResetHook( MCUSM_RESET_REASON_C2_STACKPTR_CORRUPT, ( uint32_t )( *ppxTopOfStack ) );
+    }
+
     uxLowerCSA = **ppxTopOfStack;
     ( *ppxTopOfStack )++;
     uxCriticalNesting_core2 = **ppxTopOfStack;
@@ -384,8 +469,12 @@ void vPortSaveContext_core2( unsigned char ucCallDepth_core2 )
 void vPortSyscallYield_core2()
 {
     /* Do a save, switch, execute */
+    FreeRTOS_core2_DebugSyscallYieldCount++;
+    FreeRTOS_core2_DebugSyscallYieldEnterTcb = ( uint32_t ) pxCurrentTCB_core2;
     vPortSaveContext_core2( configSYSCALL_CALL_DEPTH_core2 );
+    FreeRTOS_core2_DebugSyscallYieldAfterSaveTcb = ( uint32_t ) pxCurrentTCB_core2;
     vTaskSwitchContext_core2();
+    FreeRTOS_core2_DebugSyscallYieldAfterSwitchTcb = ( uint32_t ) pxCurrentTCB_core2;
     vPortLoadContext_core2( configSYSCALL_CALL_DEPTH_core2 );
 }
 

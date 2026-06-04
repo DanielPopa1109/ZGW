@@ -22,20 +22,10 @@ typedef NotifResultType Dcm_NotifResultType;
 
 #define DCM_S3_SERVER_TICKS 1000u
 
-#define DCM_SECURITY_LOCKED 0u
-#define DCM_SECURITY_L1     1u
-#define DCM_SECURITY_L2     2u
-#define DCM_SECURITY_L3     3u
-
 #define DCM_SESSION_MASK_DEFAULT     (1u << DCM_SESSION_DEFAULT)
 #define DCM_SESSION_MASK_PROGRAMMING (1u << DCM_SESSION_PROGRAMMING)
 #define DCM_SESSION_MASK_EXTENDED    (1u << DCM_SESSION_EXTENDED)
 #define DCM_SESSION_MASK_CODING      (1u << 4u)
-
-#define DCM_SEC_MASK_LOCKED          (1u << DCM_SECURITY_LOCKED)
-#define DCM_SEC_MASK_L1              (1u << DCM_SECURITY_L1)
-#define DCM_SEC_MASK_L2              (1u << DCM_SECURITY_L2)
-#define DCM_SEC_MASK_L3              (1u << DCM_SECURITY_L3)
 
 typedef uint8 Dcm_OpStatusType;
 
@@ -47,7 +37,6 @@ typedef uint8 Dcm_OpStatusType;
 #define DCM_MAX_RESPONSE_LEN         8192u
 #define DCM_RX_QUEUE_DEPTH           2u
 #define DCM_MAX_SERVICES             32u
-#define DCM_MAX_SECURITY_LEVELS      4u
 #define DCM_MAX_DID_RESPONSE_LEN     512u
 #define DCM_MAX_ROUTINE_RESPONSE_LEN 512u
 #define DCM_MAX_SERVICE_RESPONSE_LEN (DCM_MAX_RESPONSE_LEN - 1u)
@@ -80,11 +69,7 @@ typedef struct
 #define DCM_NRC_CONDITIONS_NOT_CORRECT                  0x22u
 #define DCM_NRC_REQUEST_SEQUENCE_ERROR                  0x24u
 #define DCM_NRC_REQUEST_OUT_OF_RANGE                    0x31u
-#define DCM_NRC_SECURITY_ACCESS_DENIED                  0x33u
 #define DCM_NRC_AUTHENTICATION_REQUIRED                 0x34u
-#define DCM_NRC_INVALID_KEY                             0x35u
-#define DCM_NRC_EXCEED_NUMBER_OF_ATTEMPTS               0x36u
-#define DCM_NRC_REQUIRED_TIME_DELAY_NOT_EXPIRED         0x37u
 #define DCM_NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED            0x70u
 #define DCM_NRC_TRANSFER_DATA_SUSPENDED                 0x71u
 #define DCM_NRC_GENERAL_PROGRAMMING_FAILURE             0x72u
@@ -103,7 +88,6 @@ typedef struct
 #define DCM_SID_READ_DATA_BY_IDENTIFIER                 0x22u
 #define DCM_SID_READ_MEMORY_BY_ADDRESS                  0x23u
 #define DCM_SID_READ_SCALING_DATA_BY_IDENTIFIER         0x24u
-#define DCM_SID_SECURITY_ACCESS                         0x27u
 #define DCM_SID_COMMUNICATION_CONTROL                   0x28u
 #define DCM_SID_AUTHENTICATION                          0x29u
 #define DCM_SID_READ_DATA_BY_PERIODIC_IDENTIFIER        0x2Au
@@ -131,7 +115,6 @@ typedef struct
 #define DCM_DID_ACTIVE_SOFTWARE_BLOCK                 0xF100u
 #define DCM_DID_APPLICATION_SOFTWARE_VERSION          0xF101u
 #define DCM_DID_ACTIVE_DIAGNOSTIC_SESSION               0xF186u
-#define DCM_DID_SOFTWARE_VERSION                        0xF187u
 
 #define DCM_ACTIVE_SOFTWARE_BLOCK_APP                   0x00u
 
@@ -203,6 +186,7 @@ typedef struct
 /* ===================== API ===================== */
 
 void Dcm_Init(const Dcm_ConfigType* ConfigPtr);
+void Dcm_ResetDoIPSession(void);
 void Dcm_MainFunction(void);
 void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result);

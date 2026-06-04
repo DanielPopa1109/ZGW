@@ -119,6 +119,7 @@
 #define IFNAME1 'n'
 #define LWIP_GETH_MDIO_WAIT_POLLS      100000u
 #define LWIP_GETH_PHY_RESET_POLLS      100000u
+#define LWIP_GETH_DMA_INIT_ATTEMPTS    2u
 #define LWIP_GETH_TX_WAIT_POLLS        100000u
 #define LWIP_GETH_RX_TASK_BUDGET       64u
 #define LWIP_GETH_RX_FRAME_INVALID     0xFFFFu
@@ -126,7 +127,12 @@
 
 volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
+volatile uint32 lwip_geth_DebugDmaResetTimeoutCnt;
+volatile uint32 lwip_geth_DebugDmaInitRetryCnt;
+volatile uint32 lwip_geth_DebugDmaModeAfterInit;
+volatile uint32 lwip_geth_DebugDmaDescriptorClearCnt;
 volatile uint32 lwip_geth_DebugLowLevelInitState;
+volatile uint32 lwip_geth_DebugLowLevelInitResult;
 volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
 volatile uint32 lwip_geth_DebugRxAllocFailCnt;
 volatile uint32 lwip_geth_DebugRxNullBufferCnt;
@@ -149,10 +155,40 @@ volatile uint32 lwip_geth_DebugLastTxLen;
 volatile uint32 lwip_geth_DebugLastEthType;
 volatile uint32 lwip_geth_DebugLastTxDescrAddr;
 volatile uint32 lwip_geth_DebugLastTxBufferAddr;
+volatile uint32 lwip_geth_DebugLastTxDescOwnBefore;
+volatile uint32 lwip_geth_DebugLastTxDescOwnAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaStatusAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaTailAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaCurrentDescAfterKick;
+volatile uint32 lwip_geth_DebugDmaCh0TxControlAfterStart;
+volatile uint32 lwip_geth_DebugDmaCh0RxControlAfterStart;
+volatile uint32 lwip_geth_DebugMacConfigurationAfterStart;
 volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 volatile uint32 lwip_geth_DebugLastRxBufferAddr;
 volatile uint32 lwip_geth_DebugRxCacheInvalidateCnt;
 volatile uint32 lwip_geth_DebugTxCacheWritebackCnt;
+
+/* Real lwIP assertion handler (wired from arch/cc.h). The MEMP_/MEM_ overflow
+ * and sanity checks call this the instant they detect a corrupted pool canary
+ * or free-list, i.e. at the source of the wild write rather than far away. We
+ * latch the location and halt so it can be caught over the debugger. Replace
+ * the halt with McuSm_PerformResetHook(382u, line) if a field-recoverable
+ * reset is preferred over a freeze. */
+volatile const char *lwip_geth_AssertMsg;
+volatile const char *lwip_geth_AssertFile;
+volatile int lwip_geth_AssertLine;
+
+void lwip_geth_AssertFail(const char *msg, const char *file, int line)
+{
+  lwip_geth_AssertMsg = msg;
+  lwip_geth_AssertFile = file;
+  lwip_geth_AssertLine = line;
+  __disable();
+  for (;;)
+  {
+    __debug();
+  }
+}
 
 /***********************************************************************************************************************
  * DATA STRUCTURES
@@ -274,6 +310,89 @@ static void lwip_geth_PrepareDmaMemory(const IfxGeth_Eth_Config *config)
   }
 }
 
+static void lwip_geth_ClearDmaDescriptorMemory(const IfxGeth_Eth_Config *config)
+{
+  const IfxGeth_Eth_TxChannelConfig *txConfig;
+  const IfxGeth_Eth_RxChannelConfig *rxConfig;
+  uint32 i;
+
+  if (config == NULL_PTR)
+  {
+    return;
+  }
+
+  for (i = 0u; i < config->dma.numOfTxChannels; i++)
+  {
+    txConfig = &config->dma.txChannel[i];
+
+    if ((txConfig->channelEnable != FALSE) && (txConfig->txDescrList != NULL_PTR))
+    {
+      memset((void *)txConfig->txDescrList->descr, 0,
+          (uint32)(IFXGETH_MAX_TX_DESCRIPTORS * sizeof(IfxGeth_TxDescr)));
+    }
+  }
+
+  for (i = 0u; i < config->dma.numOfRxChannels; i++)
+  {
+    rxConfig = &config->dma.rxChannel[i];
+
+    if ((rxConfig->channelEnable != FALSE) && (rxConfig->rxDescrList != NULL_PTR))
+    {
+      memset((void *)rxConfig->rxDescrList->descr, 0,
+          (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr)));
+    }
+  }
+
+  __dsync();
+  lwip_geth_DebugDmaDescriptorClearCnt++;
+}
+
+static void lwip_geth_StopMacDma(Ifx_GETH *gethSFR)
+{
+  if (gethSFR == NULL_PTR)
+  {
+    return;
+  }
+
+  IfxGeth_mac_disableTransmitter(gethSFR);
+  IfxGeth_mac_disableReceiver(gethSFR);
+  IfxGeth_dma_stopTransmitter(gethSFR, IfxGeth_TxDmaChannel_0);
+  gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR = 0u;
+  __dsync();
+}
+
+static uint8 lwip_geth_InitModuleWithResetCheck(IfxGeth_Eth *ethernetif, IfxGeth_Eth_Config *config)
+{
+  uint32 attempt;
+
+  if ((ethernetif == NULL_PTR) || (config == NULL_PTR) || (config->gethSFR == NULL_PTR))
+  {
+    return 0u;
+  }
+
+  for (attempt = 0u; attempt < LWIP_GETH_DMA_INIT_ATTEMPTS; attempt++)
+  {
+    if (attempt > 0u)
+    {
+      lwip_geth_DebugDmaInitRetryCnt++;
+    }
+
+    lwip_geth_StopMacDma(config->gethSFR);
+    lwip_geth_ClearDmaDescriptorMemory(config);
+    IfxGeth_Eth_initModule(ethernetif, config);
+    lwip_geth_DebugDmaModeAfterInit = config->gethSFR->DMA_MODE.U;
+
+    if (IfxGeth_dma_isSoftwareResetDone(config->gethSFR) != 0)
+    {
+      return 1u;
+    }
+
+    lwip_geth_DebugDmaResetTimeoutCnt++;
+  }
+
+  return 0u;
+}
+
 static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 packetLength)
 {
   volatile IfxGeth_TxDescr *firstDescr =
@@ -291,6 +410,10 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
     nextDescr = &firstDescr[1];
   }
 
+  lwip_geth_DebugLastTxDescOwnBefore = firstDescr->TDES3.R.OWN;
+  firstDescr->TDES2.U = 0u;
+  firstDescr->TDES3.U = 0u;
+
   firstDescr->TDES3.R.FL_TPL = packetLength;
   firstDescr->TDES3.R.TSE = 0u;
   firstDescr->TDES3.R.CIC_TPL = 3u;
@@ -306,6 +429,10 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
   IfxGeth_dma_setTxDescriptorTailPointer(ethernetif->gethSFR, IfxGeth_TxDmaChannel_0, (uint32)nextDescr);
   IfxGeth_Eth_wakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);
+  lwip_geth_DebugLastTxDescOwnAfterKick = firstDescr->TDES3.R.OWN;
+  lwip_geth_DebugLastTxDmaStatusAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].STATUS.U;
+  lwip_geth_DebugLastTxDmaTailAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TXDESC_TAIL_POINTER.U;
+  lwip_geth_DebugLastTxDmaCurrentDescAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].CURRENT_APP_TXDESC.U;
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = nextDescr;
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txCount++;
 }
@@ -427,12 +554,13 @@ static void *lwip_geth_WaitTransmitBufferBounded(IfxGeth_Eth *ethernetif)
  *        for this ethernetif
  */
 extern void Dp83825i_DebugScanMdio(void);
-static void lwip_geth_low_level_init(netif_t *netif)
+static uint8 lwip_geth_low_level_init(netif_t *netif)
 {
   IfxGeth_Eth *ethernetif = netif->state;
   int         i;
 
   lwip_geth_DebugLowLevelInitState = 1u;
+  lwip_geth_DebugLowLevelInitResult = 0u;
 
   /* set MAC hardware address length */
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
@@ -509,7 +637,11 @@ static void lwip_geth_low_level_init(netif_t *netif)
 
     /* initialize the module */
     lwip_geth_DebugLowLevelInitState = 2u;
-    IfxGeth_Eth_initModule(ethernetif, &GethConfig);
+    if (lwip_geth_InitModuleWithResetCheck(ethernetif, &GethConfig) == 0u)
+    {
+      lwip_geth_DebugLowLevelInitState = 0xE2u;
+      return 0u;
+    }
     lwip_geth_PrepareDmaMemory(&GethConfig);
 
     /* Normal operation: keep MAC destination filtering enabled. */
@@ -519,7 +651,11 @@ static void lwip_geth_low_level_init(netif_t *netif)
     Dp83825i_DebugScanMdio();
     /* initialize the PHY */
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
-    lwip_geth_private_Phy_Dp83825i_init();
+    if (lwip_geth_private_Phy_Dp83825i_init() == 0u)
+    {
+      lwip_geth_DebugLowLevelInitState = 0xE3u;
+      return 0u;
+    }
 #endif
     Dp83825i_DebugScanMdio();
 
@@ -530,6 +666,9 @@ static void lwip_geth_low_level_init(netif_t *netif)
     lwip_geth_DebugLowLevelInitState = 3u;
     IfxGeth_Eth_startTransmitters(ethernetif, 1);
     IfxGeth_Eth_startReceivers(ethernetif, 1);
+    lwip_geth_DebugDmaCh0TxControlAfterStart = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TX_CONTROL.U;
+    lwip_geth_DebugDmaCh0RxControlAfterStart = ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.U;
+    lwip_geth_DebugMacConfigurationAfterStart = ethernetif->gethSFR->MAC_CONFIGURATION.U;
 
     /* The ETH is ready for use now! */
     /* we set the LINK_UP flag if we have a valid link */
@@ -569,6 +708,8 @@ static void lwip_geth_low_level_init(netif_t *netif)
   }
 
   lwip_geth_DebugLowLevelInitState = 4u;
+  lwip_geth_DebugLowLevelInitResult = 1u;
+  return 1u;
 }
 
 /**
@@ -694,7 +835,12 @@ static uint16 lwip_geth_GetRxFrameSize(IfxGeth_RxDescr *descr)
   {
     uint32 frameLength = rdes3 & 0x7FFFu;
 
-    if (frameLength <= 4u)
+    /* Reject anything that cannot be a valid frame held by a single RX buffer.
+     * The hardware length field is 15 bits; without an upper bound a corrupted
+     * descriptor or an oversize frame makes the caller cache-invalidate and
+     * memcpy far past the end of the fixed RX DMA buffer (software checksum
+     * checking is also disabled, so nothing downstream catches it). */
+    if ((frameLength <= 4u) || (frameLength > IFXGETH_MAX_RX_BUFFER_SIZE))
     {
       len = LWIP_GETH_RX_FRAME_INVALID;
     }
@@ -974,7 +1120,10 @@ err_t lwip_geth_netif_init(netif_t *netif)
   netif->linkoutput = lwip_geth_low_level_output;
 
   /* initialize the hardware */
-  lwip_geth_low_level_init(netif);
+  if (lwip_geth_low_level_init(netif) == 0u)
+  {
+    return ERR_IF;
+  }
 
   return ERR_OK;
 }

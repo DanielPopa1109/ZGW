@@ -86,6 +86,11 @@
 
 //#define portTICK_PERIOD_MS (1000/configTICK_RATE_HZ)
 
+volatile u32_t sys_arch_DebugMutexUnlockFailCounter;
+volatile void *sys_arch_DebugMutexUnlockFailMutex;
+volatile void *sys_arch_DebugMutexUnlockFailNativeMutex;
+volatile void *sys_arch_DebugMutexUnlockFailTask;
+
 
 #if !configSUPPORT_DYNAMIC_ALLOCATION_core2
 # error "lwIP FreeRTOS port requires configSUPPORT_DYNAMIC_ALLOCATION"
@@ -235,6 +240,13 @@ sys_mutex_unlock(sys_mutex_t *mutex)
     LWIP_ASSERT("mutex->mut != NULL", mutex->mut != NULL);
 
     ret = xSemaphoreGiveRecursive_core2(mutex->mut);
+    if (ret != pdTRUE_core2)
+    {
+        sys_arch_DebugMutexUnlockFailCounter++;
+        sys_arch_DebugMutexUnlockFailMutex       = (void *)mutex;
+        sys_arch_DebugMutexUnlockFailNativeMutex = mutex->mut;
+        sys_arch_DebugMutexUnlockFailTask        = xTaskGetCurrentTaskHandle_core2();
+    }
     LWIP_ASSERT("failed to give the mutex", ret == pdTRUE_core2);
 }
 
@@ -517,7 +529,7 @@ sys_sem_t *
 sys_arch_netconn_sem_get(void)
 {
     void* ret;
-    xTaskHandle task = xTaskGetCurrentTaskHandle();
+    xTaskHandle task = xTaskGetCurrentTaskHandle_core2();
     LWIP_ASSERT("task != NULL", task != NULL);
 
     ret = pvTaskGetThreadLocalStoragePointer(task, 0);
@@ -528,7 +540,7 @@ void
 sys_arch_netconn_sem_alloc(void)
 {
     void *ret;
-    xTaskHandle task = xTaskGetCurrentTaskHandle();
+    xTaskHandle task = xTaskGetCurrentTaskHandle_core2();
     LWIP_ASSERT("task != NULL", task != NULL);
 
     ret = pvTaskGetThreadLocalStoragePointer(task, 0);
@@ -549,7 +561,7 @@ sys_arch_netconn_sem_alloc(void)
 void sys_arch_netconn_sem_free(void)
 {
     void* ret;
-    xTaskHandle task = xTaskGetCurrentTaskHandle();
+    xTaskHandle task = xTaskGetCurrentTaskHandle_core2();
     LWIP_ASSERT("task != NULL", task != NULL);
 
     ret = pvTaskGetThreadLocalStoragePointer(task, 0);
@@ -581,7 +593,7 @@ sys_lock_tcpip_core(void)
     sys_mutex_lock(&lock_tcpip_core);
     if (lwip_core_lock_count == 0)
     {
-        lwip_core_lock_holder_thread = xTaskGetCurrentTaskHandle();
+        lwip_core_lock_holder_thread = xTaskGetCurrentTaskHandle_core2();
     }
     lwip_core_lock_count++;
 }
@@ -607,7 +619,7 @@ void
 sys_mark_tcpip_thread(void)
 {
 #if !NO_SYS
-    lwip_tcpip_thread = xTaskGetCurrentTaskHandle();
+    lwip_tcpip_thread = xTaskGetCurrentTaskHandle_core2();
 #endif
 }
 
@@ -625,7 +637,7 @@ sys_check_core_locking(void)
 #if !NO_SYS
     if (lwip_tcpip_thread != 0)
     {
-        xTaskHandle current_thread = xTaskGetCurrentTaskHandle();
+        xTaskHandle current_thread = xTaskGetCurrentTaskHandle_core2();
 
 #if LWIP_TCPIP_CORE_LOCKING
         LWIP_ASSERT("Function called without core lock",

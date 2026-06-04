@@ -59,9 +59,9 @@
 /*-----------------------Exported Variables/Constants-------------------------*/
 /******************************************************************************/
 
-IfxGeth_RxDescrList IfxGeth_Eth_rxDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_RX_CHANNELS];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC IfxGeth_RxDescrList IfxGeth_Eth_rxDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_RX_CHANNELS];
 
-IfxGeth_TxDescrList IfxGeth_Eth_txDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_TX_CHANNELS];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC IfxGeth_TxDescrList IfxGeth_Eth_txDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_TX_CHANNELS];
 
 /******************************************************************************/
 /*-------------------------Function Implementations---------------------------*/

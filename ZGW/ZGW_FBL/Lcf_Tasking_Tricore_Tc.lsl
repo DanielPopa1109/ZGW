@@ -38,9 +38,9 @@
 #define LCF_ISTACK0_OFFSET  (LCF_CSA0_OFFSET - 256 - LCF_ISTACK0_SIZE)
 #define LCF_USTACK0_OFFSET  (LCF_ISTACK0_OFFSET - 256 - LCF_USTACK0_SIZE)
 #define LCF_HEAP0_OFFSET    (LCF_USTACK0_OFFSET - LCF_HEAP_SIZE)
-#define LCF_INTVEC0_START    (0x80000400) // 0x80002000
-#define LCF_TRAPVEC0_START   (0x80000060) // 0x80000060
-#define LCF_STARTPTR_CPU0 0x80000000
+#define LCF_INTVEC0_START    (0xA0000400) // 0x80002000
+#define LCF_TRAPVEC0_START   (0xA0000060) // 0x80000060
+#define LCF_STARTPTR_CPU0 0xA0000000
 #define INTTAB0             (LCF_INTVEC0_START)
 #define TRAPTAB0            (LCF_TRAPVEC0_START)
 #define RESET LCF_STARTPTR_CPU0
@@ -136,32 +136,21 @@ derivative tc37
         map (dest=bus:tc0:fpi_bus, dest_offset=0xc0000000, size=64k, priority=8);
         map (dest=bus:sri, dest_offset=0x70100000, size=64k);
     }    
+    /*
+     * Normal FBL code/const use the cached segment-8 PFLASH alias for performance. The segment-A alias is present
+     * in the same memory object only so absolute reset/vector/startup sections can be located without creating a
+     * duplicate ROM memory object.
+     */
     memory BootManager_PFLASH
     {
         mau = 8;
         size = 192K;    /* 0x30000 bytes: fixed FBL protected area */
         type = rom;
         fill = 0x36;
-        map cached    (dest=bus:sri, dest_offset=0x80000000, size=192K);
-        map not_cached (dest=bus:sri, dest_offset=0xa0000000, reserved, size=192K);
+        map cached (dest=bus:sri, dest_offset=0x80000000, size=192K);
+        map not_cached (dest=bus:sri, dest_offset=0xa0000000, size=192K);
     }
 
-    //memory pfls0
-    //{
-    //    mau = 8;
-    //    size = 3M;
-    //    type = rom;
-    //    map     cached (dest=bus:sri, dest_offset=0x80000000,           size=3M);
-    //    map not_cached (dest=bus:sri, dest_offset=0xa0000000, reserved, size=3M);
-    //}   
-    //memory pfls1
-    //{
-    //    mau = 8;
-    //    size = 3M;
-    //    type = rom;
-    //    map     cached (dest=bus:sri, dest_offset=0x80300000,           size=3M);
-    //    map not_cached (dest=bus:sri, dest_offset=0xa0300000, reserved, size=3M);
-    //}   
     memory dfls0
     {
         mau = 8;
@@ -181,8 +170,17 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        //map     cached (dest=bus:sri, dest_offset=0x90000000,           size=64k);
-        map not_cached (dest=bus:sri, dest_offset=0xb0000000, reserved, size=64k);
+        /* Cached DLMU for normal LMU data; private data should stay in DSPR where possible. */
+        map cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
+    }
+
+    memory cpu0_dlmu_nc
+    {
+        mau = 8;
+        size = 64k;
+        type = ram;
+        /* Non-cached segment-B alias only for explicit coherent DMA/shared sections. */
+        map not_cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
     }    
     //memory cpu1_dlmu
     //{
@@ -319,7 +317,7 @@ derivative tc37
                     select ".text.start";
                 }
             }
-            group  interface_const (run_addr=mem:BootManager_PFLASH[0x0020])
+            group  interface_const (run_addr=LCF_STARTPTR_CPU0 + 0x0020)
             {
                 select "*.interface_const";
             }
@@ -653,6 +651,48 @@ derivative tc37
                 //}
             }
         }       
+
+        /*
+         * Explicit non-cached DLMU/LMU sections.
+         * Use only for DMA/peripheral buffers, descriptors, and inter-core data that must be coherent without
+         * cache maintenance. Normal .data/.bss remains in DSPR or cached DLMU/LMU groups.
+         */
+        group data_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Initialized coherent data in segment B; startup copytable initializes this group. */
+            select "(.data.lmu_nc|.data.lmu_nc.*)";
+        }
+
+        group bss_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Zero-init coherent data in segment B. */
+            select "(.bss.lmu_nc|.bss.lmu_nc.*)";
+        }
+
+        group data_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Initialized Ethernet DMA data; prefer .bss.eth_dma_nc when possible. */
+            select "(.data.eth_dma_nc|.data.eth_dma_nc.*)";
+        }
+
+        group bss_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Ethernet DMA descriptors and RX/TX buffers in segment B. */
+            select "(.bss.eth_dma_nc|.bss.eth_dma_nc.*)";
+        }
+
+        group data_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Initialized inter-core shared data; startup copytable initializes this group. */
+            select "(.data.shared_nc|.data.shared_nc.*)";
+        }
+
+        group bss_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        {
+            /* Zero-init inter-core shared flags/state in segment B. */
+            select "(.bss.shared_nc|.bss.shared_nc.*)";
+        }
+
         /*Far Data Sections, selectable by toolchain*/
 //#        if LCF_DEFAULT_HOST == LCF_CPU2
 //        group (ordered, contiguous, align = 4, attributes=rw, run_addr = mem:dsram2)

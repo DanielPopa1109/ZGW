@@ -1,0 +1,326 @@
+{
+  "schema": "FCD_TAL_v1",
+  "created": "2026-05-30T02:05:48",
+  "steps": [
+    {
+      "step": 1,
+      "ecu": "ZGW_APP",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 2,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 3,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xA0030000",
+      "size": 2949632,
+      "crc32": "0x14EBB69C"
+    },
+    {
+      "step": 4,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_0_A0030000.bin"
+    },
+    {
+      "step": 5,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 6,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA0030000",
+      "size": 2949632,
+      "crc32": "0x14EBB69C"
+    },
+    {
+      "step": 7,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xA030022C",
+      "size": 3145172,
+      "crc32": "0x8F33259B"
+    },
+    {
+      "step": 8,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_1_A030022C.bin"
+    },
+    {
+      "step": 9,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 10,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA030022C",
+      "size": 3145172,
+      "crc32": "0x8F33259B"
+    },
+    {
+      "step": 11,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xC0300200",
+      "size": 44,
+      "crc32": "0x5D54D802"
+    },
+    {
+      "step": 12,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_2_C0300200.bin"
+    },
+    {
+      "step": 13,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 14,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xC0300200",
+      "size": 44,
+      "crc32": "0x5D54D802"
+    },
+    {
+      "step": 15,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF400000",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 16,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_3_CF400000.bin"
+    },
+    {
+      "step": 17,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 18,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF400000",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 19,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF400200",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 20,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_4_CF400200.bin"
+    },
+    {
+      "step": 21,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 22,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF400200",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 23,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF400400",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 24,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_5_CF400400.bin"
+    },
+    {
+      "step": 25,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 26,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF400400",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 27,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF400600",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 28,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_6_CF400600.bin"
+    },
+    {
+      "step": 29,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 30,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF400600",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 31,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF401000",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 32,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_7_CF401000.bin"
+    },
+    {
+      "step": 33,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 34,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF401000",
+      "size": 500,
+      "crc32": "0xCA31BAC4"
+    },
+    {
+      "step": 35,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF401200",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 36,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_8_CF401200.bin"
+    },
+    {
+      "step": 37,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 38,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF401200",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 39,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF401400",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 40,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_9_CF401400.bin"
+    },
+    {
+      "step": 41,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 42,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF401400",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 43,
+      "ecu": "ZGW_APP",
+      "service": "RequestDownload",
+      "address": "0xCF401600",
+      "size": 500,
+      "crc32": "0x83674A11"
+    },
+    {
+      "step": 44,
+      "ecu": "ZGW_APP",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_APP_10_CF401600.bin"
+    },
+    {
+      "step": 45,
+      "ecu": "ZGW_APP",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 46,
+      "ecu": "ZGW_APP",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xCF401600",
+      "size": 500,
+      "crc32": "0x83674A11"
+    }
+  ]
+}

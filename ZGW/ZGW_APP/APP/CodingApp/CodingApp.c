@@ -5,12 +5,15 @@
 
 #include "Crc.h"
 #include "Dem.h"
+#include "Fee.h"
+#include "Fls.h"
 #include "NvM.h"
 #include "NvM_Cfg.h"
 
 #define CODINGAPP_UNUSED(x)                  ((void)(x))
 
 #define CODINGAPP_DEM_STATE_UNKNOWN          0xFFu
+#define CODINGAPP_NVM_PENDING_POLL_LIMIT     10u
 
 typedef struct
 {
@@ -19,8 +22,9 @@ typedef struct
     uint16 length;
     uint32 generation;
     uint16 rxMessageCount;
-    uint16 reserved;
+    uint16 txPduCount;
     uint8 rxMessageExpected[CODINGAPP_RX_MESSAGE_EXPECTED_BYTES];
+    uint8 txPduEnabled[CODINGAPP_TX_PDU_ENABLED_BYTES];
     uint32 crc32;
 } CodingApp_NvImageType;
 
@@ -35,6 +39,7 @@ static CodingApp_NvImageType CodingApp_ActiveImage;
 static CodingApp_StatusType CodingApp_Status;
 static CodingApp_NvMJobType CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
 static boolean CodingApp_PendingNvMStarted = FALSE;
+static uint8 CodingApp_PendingNvMPollCount = 0u;
 static uint8 CodingApp_DemNotCodedState = CODINGAPP_DEM_STATE_UNKNOWN;
 static uint8 CodingApp_DemInvalidState = CODINGAPP_DEM_STATE_UNKNOWN;
 
@@ -54,6 +59,9 @@ static uint16 CodingApp_CountExpectedMessages(const CodingApp_NvImageType *image
 static uint16 CodingApp_GetCodingVersion(void);
 static void CodingApp_SetExpectedBit(CodingApp_NvImageType *image, uint16 index, boolean expected);
 static boolean CodingApp_GetExpectedBit(const CodingApp_NvImageType *image, uint16 index);
+static void CodingApp_SetTxPduEnabledBit(CodingApp_NvImageType *image, PduIdType txPduId, boolean enabled);
+static boolean CodingApp_GetTxPduEnabledBit(const CodingApp_NvImageType *image, PduIdType txPduId);
+static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId);
 static void CodingApp_UpdateDebug(void);
 static void CodingApp_SetState(uint8 state, uint8 validationStatus);
 static void CodingApp_BuildImageFromMask(
@@ -67,8 +75,7 @@ static Std_ReturnType CodingApp_ApplyValidImage(const CodingApp_NvImageType *ima
 static void CodingApp_LoadFromNvRam(void);
 static Dcm_ReturnType CodingApp_StartWriteAll(uint8 *respData, Dcm_PduLengthType *respLen);
 static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType *respLen);
-static Dcm_ReturnType CodingApp_StartReadNvM(uint8 *respData, Dcm_PduLengthType *respLen);
-static Dcm_ReturnType CodingApp_PollReadNvM(uint8 *respData, Dcm_PduLengthType *respLen);
+static void CodingApp_ClearPendingNvMJob(void);
 static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_PduLengthType *respLen);
 
 void DcmAppl_DiagnosticSessionChanged(uint8 connIdx, uint8 session)
@@ -77,8 +84,7 @@ void DcmAppl_DiagnosticSessionChanged(uint8 connIdx, uint8 session)
 
     if (session == DCM_SESSION_DEFAULT)
     {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-        CodingApp_PendingNvMStarted = FALSE;
+        CodingApp_ClearPendingNvMJob();
     }
 }
 
@@ -94,8 +100,7 @@ void CodingApp_Init(void)
     CodingApp_Status.state = CODINGAPP_STATE_NOT_CODED;
     CodingApp_Status.lastNvMResult = NVM_REQ_NOT_OK;
 
-    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-    CodingApp_PendingNvMStarted = FALSE;
+    CodingApp_ClearPendingNvMJob();
     CodingApp_DemNotCodedState = CODINGAPP_DEM_STATE_UNKNOWN;
     CodingApp_DemInvalidState = CODINGAPP_DEM_STATE_UNKNOWN;
 
@@ -143,6 +148,18 @@ void CodingApp_MainFunction(void)
     }
 }
 
+void CodingApp_OnDemEventCleared(Dem_EventIdType eventId)
+{
+    if (eventId == DEM_EVENT_ID_CODING_ECU_NOT_CODED)
+    {
+        CodingApp_DemNotCodedState = CODINGAPP_DEM_STATE_UNKNOWN;
+    }
+    else if (eventId == DEM_EVENT_ID_CODING_INVALID)
+    {
+        CodingApp_DemInvalidState = CODINGAPP_DEM_STATE_UNKNOWN;
+    }
+}
+
 boolean CodingApp_IsCoded(void)
 {
     return (CodingApp_Status.state == CODINGAPP_STATE_CODED) ? TRUE : FALSE;
@@ -156,6 +173,21 @@ boolean CodingApp_IsRxMessageExpected(uint16 diagIndex)
     }
 
     return CodingApp_GetExpectedBit(&CodingApp_ActiveImage, diagIndex);
+}
+
+boolean CodingApp_IsTxPduEnabled(PduIdType txPduId)
+{
+    if (CodingApp_IsTxPduCodingExempt(txPduId) != FALSE)
+    {
+        return TRUE;
+    }
+
+    if (CodingApp_Status.state != CODINGAPP_STATE_CODED)
+    {
+        return TRUE;
+    }
+
+    return CodingApp_GetTxPduEnabledBit(&CodingApp_ActiveImage, txPduId);
 }
 
 Std_ReturnType CodingApp_GetStatus(CodingApp_StatusType *status)
@@ -180,7 +212,7 @@ Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dat
 
     if (did == CODINGAPP_DID_STATUS)
     {
-        requiredLen = 20u;
+        requiredLen = 39u;
         if (*dataLen < requiredLen)
         {
             return E_NOT_OK;
@@ -206,6 +238,25 @@ Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dat
         data[17u] = (uint8)(CodingApp_Status.validationCounter & 0xFFu);
         data[18u] = CodingApp_Status.lastNvMResult;
         data[19u] = (uint8)CodingApp_PendingNvMJob;
+        data[20u] = (uint8)NvM_GetStatus();
+        data[21u] = (uint8)Fee_GetStatus();
+        data[22u] = (uint8)Fee_GetJobResult();
+        data[23u] = (uint8)Fls_GetStatus();
+        data[24u] = (uint8)Fls_GetJobResult();
+        data[25u] = CodingApp_PendingNvMPollCount;
+        data[26u] = CODINGAPP_NVM_PENDING_POLL_LIMIT;
+        data[27u] = (uint8)((NvM_WriteAllActiveIndex >> 8u) & 0xFFu);
+        data[28u] = (uint8)(NvM_WriteAllActiveIndex & 0xFFu);
+        data[29u] = (uint8)((NvM_WriteAllActiveBlockId >> 8u) & 0xFFu);
+        data[30u] = (uint8)(NvM_WriteAllActiveBlockId & 0xFFu);
+        data[31u] = (uint8)((NvM_WriteAllBlocksPlanned >> 8u) & 0xFFu);
+        data[32u] = (uint8)(NvM_WriteAllBlocksPlanned & 0xFFu);
+        data[33u] = (uint8)((NvM_WriteAllBlocksStarted >> 8u) & 0xFFu);
+        data[34u] = (uint8)(NvM_WriteAllBlocksStarted & 0xFFu);
+        data[35u] = (uint8)((NvM_WriteAllBlocksWritten >> 8u) & 0xFFu);
+        data[36u] = (uint8)(NvM_WriteAllBlocksWritten & 0xFFu);
+        data[37u] = (uint8)((NvM_WriteAllBlocksFailed >> 8u) & 0xFFu);
+        data[38u] = (uint8)(NvM_WriteAllBlocksFailed & 0xFFu);
         *dataLen = requiredLen;
         return E_OK;
     }
@@ -233,7 +284,7 @@ Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dat
 
     if (did == CODINGAPP_DID_RX_MESSAGE_EXPECTED)
     {
-        requiredLen = (Dcm_PduLengthType)CODINGAPP_RX_MESSAGE_EXPECTED_BYTES;
+        requiredLen = (Dcm_PduLengthType)CODINGAPP_MASK_BYTES;
         if (*dataLen < requiredLen)
         {
             return E_NOT_OK;
@@ -241,11 +292,15 @@ Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dat
 
         if (CodingApp_Status.state == CODINGAPP_STATE_CODED)
         {
-            memcpy(data, CodingApp_ActiveImage.rxMessageExpected, requiredLen);
+            memcpy(data, CodingApp_ActiveImage.rxMessageExpected, CODINGAPP_RX_MESSAGE_EXPECTED_BYTES);
+            memcpy(&data[CODINGAPP_RX_MESSAGE_EXPECTED_BYTES],
+                    CodingApp_ActiveImage.txPduEnabled,
+                    CODINGAPP_TX_PDU_ENABLED_BYTES);
         }
         else
         {
-            memset(data, 0, requiredLen);
+            memset(data, 0, CODINGAPP_RX_MESSAGE_EXPECTED_BYTES);
+            memset(&data[CODINGAPP_RX_MESSAGE_EXPECTED_BYTES], 0xFF, CODINGAPP_TX_PDU_ENABLED_BYTES);
         }
 
         *dataLen = requiredLen;
@@ -309,7 +364,7 @@ Dcm_ReturnType CodingApp_WriteDid(uint16 did, const uint8 *data, Dcm_PduLengthTy
 
     if (did == CODINGAPP_DID_RX_MESSAGE_EXPECTED)
     {
-        if (dataLen != (Dcm_PduLengthType)CODINGAPP_RX_MESSAGE_EXPECTED_BYTES)
+        if ((dataLen == 0u) || (dataLen > (Dcm_PduLengthType)CODINGAPP_MASK_BYTES))
         {
             return DCM_NRC_INCORRECT_LENGTH;
         }
@@ -353,8 +408,7 @@ Dcm_ReturnType CodingApp_RoutineControl(
 
     if (opStatus == DCM_CANCEL)
     {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-        CodingApp_PendingNvMStarted = FALSE;
+        CodingApp_ClearPendingNvMJob();
         CodingApp_FillRoutineResponse(CODINGAPP_ROUTINE_STATUS_FAILED, respData, respLen);
         return DCM_E_OK;
     }
@@ -392,13 +446,39 @@ Dcm_ReturnType CodingApp_RoutineControl(
 
     if (routineId == CODINGAPP_ROUTINE_WRITE_ALL)
     {
-        if (reqLen != 0u)
+        if (reqLen > (Dcm_PduLengthType)CODINGAPP_MASK_BYTES)
         {
             return DCM_NRC_INCORRECT_LENGTH;
         }
 
-        if (opStatus == DCM_INITIAL)
+        if ((reqLen != 0u) && (reqData == NULL_PTR))
         {
+            return DCM_NRC_INCORRECT_LENGTH;
+        }
+
+        /* Start vs. result-poll must be decided from the RoutineControl sub-function,
+         * not from opStatus: the DCM hands every fresh UDS request to the handler with
+         * opStatus == DCM_INITIAL (it only flips to DCM_PENDING while looping the NRC
+         * 0x78 response-pending path within one request). Keying off opStatus made each
+         * 0x31 0x03 requestResults poll re-enter CodingApp_StartWriteAll and kick off a
+         * brand-new NvM_WriteAll, so the routine never harvested its result. */
+        if (routineControlType == CODINGAPP_ROUTINE_START)
+        {
+            /* The coding mask is delivered as the routine option record. Writes are
+             * performed via RoutineControl - WriteDataByIdentifier (0x2E) is no
+             * longer supported. A zero-length request commits the image already
+             * staged in RAM; a shorter mask is zero-padded by
+             * CodingApp_BuildImageFromMask. */
+            if (reqLen != 0u)
+            {
+                CodingApp_BuildImageFromMask(&image, reqData, reqLen, CodingApp_Status.generation + 1u);
+
+                if (CodingApp_ApplyValidImage(&image, TRUE) != E_OK)
+                {
+                    return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
+                }
+            }
+
             return CodingApp_StartWriteAll(respData, respLen);
         }
 
@@ -412,12 +492,39 @@ Dcm_ReturnType CodingApp_RoutineControl(
             return DCM_NRC_INCORRECT_LENGTH;
         }
 
-        if (opStatus == DCM_INITIAL)
+        /* Return the active coding image synchronously. The active image is loaded
+         * from NVM at init and refreshed on every coding write, so it already
+         * mirrors the persisted block - there is no need for an asynchronous
+         * NvM_ReadBlock here. Doing it synchronously also avoids driving the DCM
+         * response-pending path twice in a row (start sub-function then
+         * requestResults), which could leave the DoIP request context busy and
+         * silently drop every later request. The routine result carries the
+         * rxMessageExpected bitmask appended after the status block, so the coding
+         * can be read back through RoutineControl 0x0203 itself. */
+        CodingApp_FillRoutineResponse(
+            (CodingApp_Status.state == CODINGAPP_STATE_CODED) ?
+                CODINGAPP_ROUTINE_STATUS_OK : CODINGAPP_ROUTINE_STATUS_FAILED,
+            respData,
+            respLen
+        );
+
+        if (CodingApp_Status.state == CODINGAPP_STATE_CODED)
         {
-            return CodingApp_StartReadNvM(respData, respLen);
+            memcpy(&respData[*respLen], CodingApp_ActiveImage.rxMessageExpected, CODINGAPP_RX_MESSAGE_EXPECTED_BYTES);
+            memcpy(&respData[*respLen + CODINGAPP_RX_MESSAGE_EXPECTED_BYTES],
+                    CodingApp_ActiveImage.txPduEnabled,
+                    CODINGAPP_TX_PDU_ENABLED_BYTES);
+        }
+        else
+        {
+            memset(&respData[*respLen], 0, CODINGAPP_RX_MESSAGE_EXPECTED_BYTES);
+            memset(&respData[*respLen + CODINGAPP_RX_MESSAGE_EXPECTED_BYTES],
+                    0xFF,
+                    CODINGAPP_TX_PDU_ENABLED_BYTES);
         }
 
-        return CodingApp_PollReadNvM(respData, respLen);
+        *respLen = (Dcm_PduLengthType)(*respLen + (Dcm_PduLengthType)CODINGAPP_MASK_BYTES);
+        return DCM_E_OK;
     }
 
     if (routineId == CODINGAPP_ROUTINE_LOAD_DEFAULTS)
@@ -553,6 +660,11 @@ static uint8 CodingApp_ValidateImage(const CodingApp_NvImageType *image)
         return CODINGAPP_VALIDATION_BAD_MESSAGE_COUNT;
     }
 
+    if (image->txPduCount != (uint16)CODINGAPP_TX_PDU_MAX_ID)
+    {
+        return CODINGAPP_VALIDATION_BAD_MESSAGE_COUNT;
+    }
+
     crc = CodingApp_GetImageCrc(image);
     if (crc != image->crc32)
     {
@@ -643,6 +755,57 @@ static boolean CodingApp_GetExpectedBit(const CodingApp_NvImageType *image, uint
     return ((image->rxMessageExpected[byteIndex] & bitMask) != 0u) ? TRUE : FALSE;
 }
 
+static void CodingApp_SetTxPduEnabledBit(CodingApp_NvImageType *image, PduIdType txPduId, boolean enabled)
+{
+    uint16 byteIndex;
+    uint8 bitMask;
+
+    if ((image == NULL_PTR) || (txPduId > (PduIdType)CODINGAPP_TX_PDU_MAX_ID))
+    {
+        return;
+    }
+
+    byteIndex = (uint16)(txPduId >> 3u);
+    bitMask = (uint8)(1u << (txPduId & 0x07u));
+
+    if (enabled != FALSE)
+    {
+        image->txPduEnabled[byteIndex] |= bitMask;
+    }
+    else
+    {
+        image->txPduEnabled[byteIndex] &= (uint8)~bitMask;
+    }
+}
+
+static boolean CodingApp_GetTxPduEnabledBit(const CodingApp_NvImageType *image, PduIdType txPduId)
+{
+    uint16 byteIndex;
+    uint8 bitMask;
+
+    if ((image == NULL_PTR) || (txPduId > (PduIdType)CODINGAPP_TX_PDU_MAX_ID))
+    {
+        return TRUE;
+    }
+
+    byteIndex = (uint16)(txPduId >> 3u);
+    bitMask = (uint8)(1u << (txPduId & 0x07u));
+
+    return ((image->txPduEnabled[byteIndex] & bitMask) != 0u) ? TRUE : FALSE;
+}
+
+static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId)
+{
+    if (((txPduId >= COM_TX_PDU_XCPREQUEST_7C8) && (txPduId <= COM_TX_PDU_XCPREQUEST_7C0)) ||
+        ((txPduId >= COM_TX_PDU_DIAGREQUEST_706) && (txPduId <= COM_TX_PDU_DIAGREQUEST_700)) ||
+        ((txPduId >= COM_TX_PDU_CANFD_PDM1_DIAGREQUEST) && (txPduId <= COM_TX_PDU_CANFD_PDM4_DIAGREQUEST)))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void CodingApp_UpdateDebug(void)
 {
     CodingApp_DebugState = CodingApp_Status.state;
@@ -694,6 +857,8 @@ static void CodingApp_BuildImageFromMask(
     image->length = (uint16)sizeof(CodingApp_NvImageType);
     image->generation = generation;
     image->rxMessageCount = (uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT;
+    image->txPduCount = (uint16)CODINGAPP_TX_PDU_MAX_ID;
+    memset(image->txPduEnabled, 0xFF, CODINGAPP_TX_PDU_ENABLED_BYTES);
 
     if (mask != NULL_PTR)
     {
@@ -704,7 +869,32 @@ static void CodingApp_BuildImageFromMask(
         }
 
         memcpy(image->rxMessageExpected, mask, copyLen);
+
+        if (maskLen > (Dcm_PduLengthType)CODINGAPP_RX_MESSAGE_EXPECTED_BYTES)
+        {
+            copyLen = (Dcm_PduLengthType)(maskLen - (Dcm_PduLengthType)CODINGAPP_RX_MESSAGE_EXPECTED_BYTES);
+            if (copyLen > (Dcm_PduLengthType)CODINGAPP_TX_PDU_ENABLED_BYTES)
+            {
+                copyLen = (Dcm_PduLengthType)CODINGAPP_TX_PDU_ENABLED_BYTES;
+            }
+
+            memcpy(image->txPduEnabled, &mask[CODINGAPP_RX_MESSAGE_EXPECTED_BYTES], copyLen);
+        }
     }
+
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_XCPREQUEST_7C8, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_XCPREQUEST_7C6, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_XCPREQUEST_7C4, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_XCPREQUEST_7C2, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_XCPREQUEST_7C0, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_706, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_704, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_702, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_700, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM1_DIAGREQUEST, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM2_DIAGREQUEST, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM3_DIAGREQUEST, TRUE);
+    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM4_DIAGREQUEST, TRUE);
 
     image->crc32 = CodingApp_GetImageCrc(image);
 }
@@ -800,164 +990,39 @@ static Dcm_ReturnType CodingApp_StartWriteAll(uint8 *respData, Dcm_PduLengthType
         return DCM_NRC_CONDITIONS_NOT_CORRECT;
     }
 
-    if (NvM_GetStatus() != NVM_IDLE)
-    {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_WRITE_ALL;
-        CodingApp_PendingNvMStarted = FALSE;
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_WriteAll() != E_OK)
-    {
-        return DCM_NRC_BUSY_REPEAT_REQUEST;
-    }
-
-    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_WRITE_ALL;
-    CodingApp_PendingNvMStarted = TRUE;
-    CodingApp_Status.writeAllCounter++;
+    /* NvM_WriteAll is intentionally NOT triggered here. The coding image has
+     * already been applied to the RAM mirror and the block is left dirty; it is
+     * persisted to NVM only by the automatic WriteAll on the next programming
+     * session entry (0x10 0x02), ECU hard reset (0x11 0x01), or the Go Sleep
+     * sequence. The routine completes synchronously and reports OK to indicate
+     * the coding data has been staged. */
+    CodingApp_ClearPendingNvMJob();
     CodingApp_UpdateDebug();
 
-    CODINGAPP_UNUSED(respData);
-    CODINGAPP_UNUSED(respLen);
-    return DCM_E_PENDING;
+    CodingApp_FillRoutineResponse(CODINGAPP_ROUTINE_STATUS_OK, respData, respLen);
+    return DCM_E_OK;
 }
 
 static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType *respLen)
 {
-    NvM_RequestResultType result;
-
-    if (CodingApp_PendingNvMJob != CODINGAPP_NVM_JOB_WRITE_ALL)
-    {
-        CodingApp_FillRoutineResponse(CODINGAPP_ROUTINE_STATUS_FAILED, respData, respLen);
-        return DCM_E_OK;
-    }
-
-    if (CodingApp_PendingNvMStarted == FALSE)
-    {
-        if (NvM_GetStatus() != NVM_IDLE)
-        {
-            return DCM_E_PENDING;
-        }
-
-        if (NvM_WriteAll() != E_OK)
-        {
-            CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-            return DCM_NRC_BUSY_REPEAT_REQUEST;
-        }
-
-        CodingApp_PendingNvMStarted = TRUE;
-        CodingApp_Status.writeAllCounter++;
-        CodingApp_UpdateDebug();
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_GetStatus() != NVM_IDLE)
-    {
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_GetErrorStatus(NVM_BLOCK_ID_APP_DATA, &result) != E_OK)
-    {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-        CodingApp_PendingNvMStarted = FALSE;
-        return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
-    }
-
-    CodingApp_Status.lastNvMResult = (uint8)result;
-    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-    CodingApp_PendingNvMStarted = FALSE;
-
-    if ((result == NVM_REQ_OK) || (result == NVM_REQ_BLOCK_SKIPPED))
-    {
-        CodingApp_Status.dirty = FALSE;
-        CodingApp_UpdateDebug();
-        CodingApp_FillRoutineResponse(
-            (result == NVM_REQ_BLOCK_SKIPPED) ? CODINGAPP_ROUTINE_STATUS_NOT_CHANGED : CODINGAPP_ROUTINE_STATUS_OK,
-            respData,
-            respLen
-        );
-        return DCM_E_OK;
-    }
-
-    CodingApp_UpdateDebug();
-    CodingApp_PendingNvMStarted = FALSE;
-    return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
-}
-
-static Dcm_ReturnType CodingApp_StartReadNvM(uint8 *respData, Dcm_PduLengthType *respLen)
-{
-    if (NvM_GetStatus() != NVM_IDLE)
-    {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_READ_BLOCK;
-        CodingApp_PendingNvMStarted = FALSE;
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_ReadBlock(NVM_BLOCK_ID_APP_DATA, NvM_AppData_Ram) != E_OK)
-    {
-        return DCM_NRC_BUSY_REPEAT_REQUEST;
-    }
-
-    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_READ_BLOCK;
-    CodingApp_PendingNvMStarted = TRUE;
-
-    CODINGAPP_UNUSED(respData);
-    CODINGAPP_UNUSED(respLen);
-    return DCM_E_PENDING;
-}
-
-static Dcm_ReturnType CodingApp_PollReadNvM(uint8 *respData, Dcm_PduLengthType *respLen)
-{
-    NvM_RequestResultType result;
-
-    if (CodingApp_PendingNvMJob != CODINGAPP_NVM_JOB_READ_BLOCK)
-    {
-        CodingApp_FillRoutineResponse(CODINGAPP_ROUTINE_STATUS_FAILED, respData, respLen);
-        return DCM_E_OK;
-    }
-
-    if (CodingApp_PendingNvMStarted == FALSE)
-    {
-        if (NvM_GetStatus() != NVM_IDLE)
-        {
-            return DCM_E_PENDING;
-        }
-
-        if (NvM_ReadBlock(NVM_BLOCK_ID_APP_DATA, NvM_AppData_Ram) != E_OK)
-        {
-            CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-            return DCM_NRC_BUSY_REPEAT_REQUEST;
-        }
-
-        CodingApp_PendingNvMStarted = TRUE;
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_GetStatus() != NVM_IDLE)
-    {
-        return DCM_E_PENDING;
-    }
-
-    if (NvM_GetErrorStatus(NVM_BLOCK_ID_APP_DATA, &result) != E_OK)
-    {
-        CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-        CodingApp_PendingNvMStarted = FALSE;
-        return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
-    }
-
-    CodingApp_Status.lastNvMResult = (uint8)result;
-    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
-    CodingApp_PendingNvMStarted = FALSE;
-    CodingApp_Status.dirty = FALSE;
-    CodingApp_LoadFromNvRam();
-
+    /* WriteAll no longer drives an asynchronous NvM job (see CodingApp_StartWriteAll):
+     * the coding image is staged in the RAM mirror and persisted only by the
+     * automatic WriteAll on programming-session entry (0x10 0x02), ECU hard reset
+     * (0x11 0x01), or Go Sleep. A result poll therefore just confirms the staging. */
+    CodingApp_ClearPendingNvMJob();
     CodingApp_FillRoutineResponse(
-        (CodingApp_Status.state == CODINGAPP_STATE_CODED) ? CODINGAPP_ROUTINE_STATUS_OK : CODINGAPP_ROUTINE_STATUS_FAILED,
+        (CodingApp_Status.state == CODINGAPP_STATE_CODED) ?
+            CODINGAPP_ROUTINE_STATUS_OK : CODINGAPP_ROUTINE_STATUS_FAILED,
         respData,
-        respLen
-    );
-
+        respLen);
     return DCM_E_OK;
+}
+
+static void CodingApp_ClearPendingNvMJob(void)
+{
+    CodingApp_PendingNvMJob = CODINGAPP_NVM_JOB_NONE;
+    CodingApp_PendingNvMStarted = FALSE;
+    CodingApp_PendingNvMPollCount = 0u;
 }
 
 static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_PduLengthType *respLen)

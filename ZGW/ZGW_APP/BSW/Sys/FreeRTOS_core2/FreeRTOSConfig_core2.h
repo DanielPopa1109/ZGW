@@ -6,6 +6,17 @@
 #define configCPU_CLOCK_HZ_core2                         ( ( unsigned long ) 300000000UL )
 #define configTICK_RATE_HZ_core2                         ( ( TickType_t_core2 ) 1000UL )
 #define configMAX_PRIORITIES_core2                       ( 31 )
+/* Use the generic (portable C) task selector, NOT the __clz bitmap one.
+ * This MUST be defined here (FreeRTOSConfig is included before portable_core2.h)
+ * to resolve a latent conflict: FreeRTOS_core2.h defaults this to 0 while
+ * portmacro_core2.h defaults it to 1, and include order silently selected the
+ * bitmap selector. The bitmap (uxTopReadyPriority_core2) trusts a per-priority
+ * "ready" bit; a single stale bit (observed: bit 28 = ASIL_APPL_Task_C2 left
+ * set after its ready list emptied) makes portGET_HIGHEST_PRIORITY pick a
+ * priority whose list is empty, yielding a NULL/!=runnable task and a context-
+ * switch fault (reset reason 386). The generic selector reads real list
+ * emptiness and walks down, so it is immune to a stale priority hint. */
+#define configUSE_PORT_OPTIMISED_TASK_SELECTION_core2    0
 #define configMINIMAL_STACK_SIZE_core2                   ( ( unsigned short ) 256 )
 #define configTOTAL_HEAP_SIZE_core2                      ( ( size_t ) 32920 )
 #define configMAX_TASK_NAME_LEN_core2                    ( 32 )
@@ -40,7 +51,13 @@
 /* Interrupt above priority 31 are not effected by critical sections, but cannot call interrupt safe FreeRTOS_core2 functions. */
 #define configMAX_API_CALL_INTERRUPT_PRIORITY_core2      31
 #ifdef __TASKING__
-#define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { }
+/* Trap on a failed assertion instead of silently continuing. The kernel's
+ * internal integrity checks (empty-list underflow in the task selector, list
+ * validity, etc.) run through configASSERT; leaving this empty let core2
+ * scheduler corruption sail through undetected until it surfaced much later as
+ * a NULL pxCurrentTCB_core2 in the context switch (reset reason 386). Halting
+ * here freezes the CPU at the origin of the corruption for inspection. */
+#define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { __disable(); __debug(); for( ;; ) {} }
 #elif defined(__clang__)
 #define configASSERT_core2( x_core2 )    if( ( x_core2 ) == 0 ) { __builtin_tricore_disable(); __builtin_tricore_debug(); }
 #endif

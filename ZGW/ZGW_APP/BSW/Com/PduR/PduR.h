@@ -69,5 +69,6 @@ void PduR_DoIPRxIndication(uint16 sourceAddress,
                            uint16 udsLen);
 void PduR_DoIPCore0MainFunction(void);
 void PduR_DoIPCore2MainFunction(void);
+void PduR_DoIPResetSession(void);
 
 #endif

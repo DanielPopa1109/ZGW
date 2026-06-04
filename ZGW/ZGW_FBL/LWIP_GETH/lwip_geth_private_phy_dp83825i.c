@@ -55,68 +55,95 @@
 #define IFXGETH_PHY_DP83825I_MDIO_ALNPAR        0x05
 #define IFXGETH_PHY_DP83825I_MDIO_ANER          0x06
 #define IFXGETH_PHY_DP83825I_MDIO_PHYSTS        0x10
-#define IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()  while (GETH_MAC_MDIO_ADDRESS.B.GB) {}
+#define IFXGETH_PHY_DP83825I_MDIO_WAIT_POLLS    100000u
+#define IFXGETH_PHY_DP83825I_RESET_POLLS        2000u
 
 /***********************************************************************************************************************
  * PRIVATE DATA
  **********************************************************************************************************************/
 static uint32 IfxGeth_Eth_Phy_Dp83825i_iPhyInitDone = 0;
+volatile uint32 IfxGeth_Eth_Phy_Dp83825i_mdioTimeoutCnt;
+volatile uint32 IfxGeth_Eth_Phy_Dp83825i_resetTimeoutCnt;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
  **********************************************************************************************************************/
+static uint32 lwip_geth_private_Phy_Dp83825i_wait_mdio_ready(void)
+{
+  uint32 timeout = IFXGETH_PHY_DP83825I_MDIO_WAIT_POLLS;
+
+  while ((GETH_MAC_MDIO_ADDRESS.B.GB != 0u) && (timeout > 0u))
+  {
+    timeout--;
+  }
+
+  if (timeout == 0u)
+  {
+    IfxGeth_Eth_Phy_Dp83825i_mdioTimeoutCnt++;
+    return 0u;
+  }
+
+  return 1u;
+}
+
 void lwip_geth_private_Phy_Dp83825i_reset(void)
 {
-  /* now we check the phy to know the board version */
-  IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
-
   /*
    * reset PHY
    * first we test to readout the reset bit to avoid timing issues (phy not yet ready)
    */
   uint32 value;
-  uint32 uiTimeout = 2000;
+  uint32 uiTimeout = IFXGETH_PHY_DP83825I_RESET_POLLS;
   do
   {
-    GETH_MAC_MDIO_ADDRESS.U = (0 << 21) | (0 << 16) | (0 << 8) | (3 << 2) | (1 << 0);
-    IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
-    value = GETH_MAC_MDIO_DATA.U;
+    lwip_geth_private_Phy_Dp83825i_read_mdio_reg(0u, IFXGETH_PHY_DP83825I_MDIO_BMCR, &value);
   } while ((value & 0x8000) && (uiTimeout--));      /* wait for reset to finish */
 
-  if (uiTimeout != 0xFFFFFFFF)
+  if (uiTimeout != 0xFFFFFFFFu)
   {
-    /* put data (reset the phy) */
-    GETH_MAC_MDIO_DATA.U = 0x8000;
-    GETH_MAC_MDIO_ADDRESS.U = (0 << 21) | (0 << 16) | (0 << 8) |  (1 << 2) | (1 << 0);
-    IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
+    lwip_geth_private_Phy_Dp83825i_write_mdio_reg(0u, IFXGETH_PHY_DP83825I_MDIO_BMCR, 0x8000u);
 
+    uiTimeout = IFXGETH_PHY_DP83825I_RESET_POLLS;
     do
     {
-      GETH_MAC_MDIO_ADDRESS.U = (0 << 21) | (0 << 16) | (0 << 8) | (3 << 2) | (1 << 0);
-      IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
-      value = GETH_MAC_MDIO_DATA.U;
-    } while (value & 0x8000);                       /* wait for reset to finish */
+      lwip_geth_private_Phy_Dp83825i_read_mdio_reg(0u, IFXGETH_PHY_DP83825I_MDIO_BMCR, &value);
+    } while ((value & 0x8000u) && (uiTimeout--));                       /* wait for reset to finish */
+
+    if (uiTimeout == 0xFFFFFFFFu)
+    {
+      IfxGeth_Eth_Phy_Dp83825i_resetTimeoutCnt++;
+      return;
+    }
 
     /* get ID */
-    GETH_MAC_MDIO_ADDRESS.U = (0 << 21) | (2 << 16) | (0 << 8) | (3 << 2) | (1 << 0);
-    IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
-    GETH_MAC_MDIO_ADDRESS.U = (0 << 21) | (3 << 16) | (0 << 8) | (3 << 2) | (1 << 0);
-    IFXGETH_PHY_DP83825I_WAIT_MDIO_READY()
+    lwip_geth_private_Phy_Dp83825i_read_mdio_reg(0u, IFXGETH_PHY_DP83825I_MDIO_PHYIDR1, &value);
+    lwip_geth_private_Phy_Dp83825i_read_mdio_reg(0u, IFXGETH_PHY_DP83825I_MDIO_PHYIDR2, &value);
+  }
+  else
+  {
+    IfxGeth_Eth_Phy_Dp83825i_resetTimeoutCnt++;
   }
 }
 
 uint32 lwip_geth_private_Phy_Dp83825i_init(void)
 {
-  IFXGETH_PHY_DP83825I_WAIT_MDIO_READY();
+  uint32 value;
+  uint32 uiTimeout = IFXGETH_PHY_DP83825I_RESET_POLLS;
 
   /* reset PHY */
   lwip_geth_private_Phy_Dp83825i_write_mdio_reg(0, IFXGETH_PHY_DP83825I_MDIO_BMCR, 0x8000);
-  uint32 value;
 
   do
   {
     lwip_geth_private_Phy_Dp83825i_read_mdio_reg(0, IFXGETH_PHY_DP83825I_MDIO_BMCR, &value);
-  } while (value & 0x8000);                         /* wait for reset to finish */
+  } while ((value & 0x8000u) && (uiTimeout--));                         /* wait for reset to finish */
+
+  if (uiTimeout == 0xFFFFFFFFu)
+  {
+    IfxGeth_Eth_Phy_Dp83825i_resetTimeoutCnt++;
+    IfxGeth_Eth_Phy_Dp83825i_iPhyInitDone = 0;
+    return 0u;
+  }
 
   /* Start Phy activity: enable auto-negotiation, restart auto-negotiation */
   lwip_geth_private_Phy_Dp83825i_write_mdio_reg(0, IFXGETH_PHY_DP83825I_MDIO_BMCR, 0x1200);
@@ -154,10 +181,25 @@ uint32 lwip_geth_private_Phy_Dp83825i_link_status(void)
 
 void lwip_geth_private_Phy_Dp83825i_read_mdio_reg(uint32 layeraddr, uint32 regaddr, uint32 *pdata)
 {
+  if (pdata == 0)
+  {
+    return;
+  }
+
+  if (lwip_geth_private_Phy_Dp83825i_wait_mdio_ready() == 0u)
+  {
+    *pdata = 0x8000u;
+    return;
+  }
+
   /* 5bit Physical Layer Adddress, 5bit GMII Regnr, 4bit csrclock divider, Read, Busy */
   GETH_MAC_MDIO_ADDRESS.U = (layeraddr << 21) | (regaddr << 16) | (0 << 8) | (3 << 2) | (1 << 0);
 
-  IFXGETH_PHY_DP83825I_WAIT_MDIO_READY();
+  if (lwip_geth_private_Phy_Dp83825i_wait_mdio_ready() == 0u)
+  {
+    *pdata = 0x8000u;
+    return;
+  }
 
   /* get data */
   *pdata = GETH_MAC_MDIO_DATA.U;
@@ -166,13 +208,18 @@ void lwip_geth_private_Phy_Dp83825i_read_mdio_reg(uint32 layeraddr, uint32 regad
 
 void lwip_geth_private_Phy_Dp83825i_write_mdio_reg(uint32 layeraddr, uint32 regaddr, uint32 data)
 {
+  if (lwip_geth_private_Phy_Dp83825i_wait_mdio_ready() == 0u)
+  {
+    return;
+  }
+
   /* put data */
   GETH_MAC_MDIO_DATA.U = data;
 
   /* 5bit Physical Layer Adddress, 5bit GMII Regnr, 4bit csrclock divider, Write, Busy */
   GETH_MAC_MDIO_ADDRESS.U = (layeraddr << 21) | (regaddr << 16) | (0 << 8) |  (1 << 2) | (1 << 0);
 
-  IFXGETH_PHY_DP83825I_WAIT_MDIO_READY();
+  (void)lwip_geth_private_Phy_Dp83825i_wait_mdio_ready();
 }
 
 #endif /* (PHY_DEVICE_NAME == PHY_DP83825I) */

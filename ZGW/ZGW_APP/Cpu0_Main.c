@@ -37,7 +37,7 @@
 #include "APP/CodingApp/CodingApp.h"
 #include "BSW/Time/TimeBase.h"
 
-volatile uint8 OsInit_C0 = 0u;
+AURIX_SHARED_NC volatile uint8 OsInit_C0;
 volatile uint32 Core0_WaitForNvMIdleLoopCounter = 0u;
 volatile uint32 Core0_ServiceDemNvMLoopCounter = 0u;
 
@@ -121,11 +121,10 @@ void Core0_HandleScrStartup(void)
 
     SysMgr_CaptureScrFaultBeforeScrReset();
 
-    /* Capture SCRXRAM into NCR (cpu0_dlmu).
-     * McuSm_CaptureTimeImageFromScr() checks PMS_PMSWCR2.SCRECC internally:
-     *   - SCRECC == 0: XRAM is clean  -> XRAM image copied to McuSm_Trap4ScrRtcRecord (NCR)
-     *   - SCRECC != 0: XRAM has ECC error -> capture is skipped; the NCR image
-     *     previously saved by a TRAP4 handler (if any) is left untouched.
+    /* Capture SCRXRAM into NCR (cpu0_dlmu).  The SCR writes the time handoff
+     * record through its 8-bit PMS_XRAM path, so PMS_PMSWCR2.SCRECC is not a
+     * reliable validity gate here.  The captured image is validated later by
+     * TimeBase before it is applied.
      * NCR (cpu0_dlmu) survives MBIST.  TimeBase_ScrRtcBootImage lives in DSPR and
      * is wiped by MBIST, so it is restored from NCR in Core0_InitSequence() after
      * Core0_ExecuteSwSafetyKit() returns. */
@@ -272,7 +271,7 @@ void Core0_InitSequence(void)
 
     OsInit_C0 = 1u;
 
-    __dsync();
+    Ifx__dsync();
 }
 
 void core0_main(void)

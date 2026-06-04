@@ -2006,6 +2006,30 @@ void GatewaySwc_ReportDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteType statu
     GatewaySwc_ExitDtcQueueCritical();
 }
 
+void GatewaySwc_OnDemEventCleared(Dem_EventIdType eventId)
+{
+    if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
+        (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
+    {
+        uint16 index = (uint16)(eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST);
+
+        if (index < (uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT)
+        {
+            GatewaySwc_DemMessageTimeoutState[index] = GATEWAYSWC_DEM_STATE_UNKNOWN;
+        }
+    }
+    else if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST) &&
+        (eventId <= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_LAST))
+    {
+        uint16 index = (uint16)(eventId - DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST);
+
+        if (index < (uint16)GATEWAYSWC_RX_SIGNAL_DIAG_COUNT)
+        {
+            GatewaySwc_DemSignalInvalidState[index] = GATEWAYSWC_DEM_STATE_UNKNOWN;
+        }
+    }
+}
+
 static uint8 GatewaySwc_EnterDtcQueueCritical(void)
 {
     uint32 coreIndex;

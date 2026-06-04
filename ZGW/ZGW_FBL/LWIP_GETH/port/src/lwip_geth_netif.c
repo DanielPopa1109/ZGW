@@ -109,6 +109,9 @@
 /* Define those to better describe your network interface. */
 #define IFNAME0 'e'
 #define IFNAME1 'n'
+#define LWIP_GETH_MDIO_WAIT_POLLS      100000u
+#define LWIP_GETH_PHY_RESET_POLLS      100000u
+#define LWIP_GETH_DMA_INIT_ATTEMPTS    2u
 #define LWIP_GETH_RX_TASK_BUDGET       64u
 #define LWIP_GETH_RX_FRAME_INVALID     0xFFFFu
 #define LWIP_GETH_CACHE_LINE_SIZE      32u
@@ -121,6 +124,14 @@
 #define __cacheawi(p) __asm__ volatile("cachea.wi [%0]0"::"a"(p))
 #endif
 
+volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
+volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
+volatile uint32 lwip_geth_DebugDmaResetTimeoutCnt;
+volatile uint32 lwip_geth_DebugDmaInitRetryCnt;
+volatile uint32 lwip_geth_DebugDmaModeAfterInit;
+volatile uint32 lwip_geth_DebugDmaDescriptorClearCnt;
+volatile uint32 lwip_geth_DebugLowLevelInitState;
+volatile uint32 lwip_geth_DebugLowLevelInitResult;
 volatile uint32 lwip_geth_DebugRxInvalidFrameCnt;
 volatile uint32 lwip_geth_DebugRxAllocFailCnt;
 volatile uint32 lwip_geth_DebugRxNullBufferCnt;
@@ -143,6 +154,14 @@ volatile uint32 lwip_geth_DebugLastTxLen;
 volatile uint32 lwip_geth_DebugLastEthType;
 volatile uint32 lwip_geth_DebugLastTxDescrAddr;
 volatile uint32 lwip_geth_DebugLastTxBufferAddr;
+volatile uint32 lwip_geth_DebugLastTxDescOwnBefore;
+volatile uint32 lwip_geth_DebugLastTxDescOwnAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaStatusAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaTailAfterKick;
+volatile uint32 lwip_geth_DebugLastTxDmaCurrentDescAfterKick;
+volatile uint32 lwip_geth_DebugDmaCh0TxControlAfterStart;
+volatile uint32 lwip_geth_DebugDmaCh0RxControlAfterStart;
+volatile uint32 lwip_geth_DebugMacConfigurationAfterStart;
 volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 volatile uint32 lwip_geth_DebugLastRxBufferAddr;
 volatile uint32 lwip_geth_DebugRxCacheInvalidateCnt;
@@ -268,6 +287,172 @@ static void lwip_geth_PrepareDmaMemory(const IfxGeth_Eth_Config *config)
   }
 }
 
+static void lwip_geth_ClearDmaDescriptorMemory(const IfxGeth_Eth_Config *config)
+{
+  const IfxGeth_Eth_TxChannelConfig *txConfig;
+  const IfxGeth_Eth_RxChannelConfig *rxConfig;
+  uint32 i;
+
+  if (config == NULL_PTR)
+  {
+    return;
+  }
+
+  for (i = 0u; i < config->dma.numOfTxChannels; i++)
+  {
+    txConfig = &config->dma.txChannel[i];
+
+    if ((txConfig->channelEnable != FALSE) && (txConfig->txDescrList != NULL_PTR))
+    {
+      memset((void *)txConfig->txDescrList->descr, 0,
+          (uint32)(IFXGETH_MAX_TX_DESCRIPTORS * sizeof(IfxGeth_TxDescr)));
+    }
+  }
+
+  for (i = 0u; i < config->dma.numOfRxChannels; i++)
+  {
+    rxConfig = &config->dma.rxChannel[i];
+
+    if ((rxConfig->channelEnable != FALSE) && (rxConfig->rxDescrList != NULL_PTR))
+    {
+      memset((void *)rxConfig->rxDescrList->descr, 0,
+          (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr)));
+    }
+  }
+
+  __dsync();
+  lwip_geth_DebugDmaDescriptorClearCnt++;
+}
+
+static void lwip_geth_StopMacDma(Ifx_GETH *gethSFR)
+{
+  if (gethSFR == NULL_PTR)
+  {
+    return;
+  }
+
+  IfxGeth_mac_disableTransmitter(gethSFR);
+  IfxGeth_mac_disableReceiver(gethSFR);
+  IfxGeth_dma_stopTransmitter(gethSFR, IfxGeth_TxDmaChannel_0);
+  gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR = 0u;
+  __dsync();
+}
+
+static uint8 lwip_geth_MdioWaitReadyBounded(void)
+{
+  uint32 timeout = LWIP_GETH_MDIO_WAIT_POLLS;
+
+  while ((GETH_MAC_MDIO_ADDRESS.B.GB != 0u) && (timeout > 0u))
+  {
+    timeout--;
+  }
+
+  if (timeout == 0u)
+  {
+    lwip_geth_DebugMdioWaitTimeoutCnt++;
+    return 0u;
+  }
+
+  return 1u;
+}
+
+static uint8 lwip_geth_MdioReadBounded(uint32 layerAddr, uint32 regAddr, uint32 *data)
+{
+  if ((data == NULL_PTR) || (lwip_geth_MdioWaitReadyBounded() == 0u))
+  {
+    return 0u;
+  }
+
+  GETH_MAC_MDIO_ADDRESS.U =
+      ((layerAddr & 0x1Fu) << 21) |
+      ((regAddr & 0x1Fu) << 16) |
+      (0u << 8) |
+      (3u << 2) |
+      (1u << 0);
+
+  if (lwip_geth_MdioWaitReadyBounded() == 0u)
+  {
+    return 0u;
+  }
+
+  *data = GETH_MAC_MDIO_DATA.U & 0xFFFFu;
+  return 1u;
+}
+
+static uint8 lwip_geth_MdioWriteBounded(uint32 layerAddr, uint32 regAddr, uint32 data)
+{
+  if (lwip_geth_MdioWaitReadyBounded() == 0u)
+  {
+    return 0u;
+  }
+
+  GETH_MAC_MDIO_DATA.U = data & 0xFFFFu;
+  GETH_MAC_MDIO_ADDRESS.U =
+      ((layerAddr & 0x1Fu) << 21) |
+      ((regAddr & 0x1Fu) << 16) |
+      (0u << 8) |
+      (1u << 2) |
+      (1u << 0);
+
+  return lwip_geth_MdioWaitReadyBounded();
+}
+
+static uint8 lwip_geth_PhyWaitResetDoneBounded(void)
+{
+  uint32 timeout = LWIP_GETH_PHY_RESET_POLLS;
+  uint32 bmcr = 0u;
+
+  while (timeout > 0u)
+  {
+    if (lwip_geth_MdioReadBounded(0u, 0u, &bmcr) == 0u)
+    {
+      break;
+    }
+
+    if ((bmcr & 0x8000u) == 0u)
+    {
+      return 1u;
+    }
+
+    timeout--;
+  }
+
+  lwip_geth_DebugPhyResetTimeoutCnt++;
+  return 0u;
+}
+
+static uint8 lwip_geth_InitModuleWithResetCheck(IfxGeth_Eth *ethernetif, IfxGeth_Eth_Config *config)
+{
+  uint32 attempt;
+
+  if ((ethernetif == NULL_PTR) || (config == NULL_PTR) || (config->gethSFR == NULL_PTR))
+  {
+    return 0u;
+  }
+
+  for (attempt = 0u; attempt < LWIP_GETH_DMA_INIT_ATTEMPTS; attempt++)
+  {
+    if (attempt > 0u)
+    {
+      lwip_geth_DebugDmaInitRetryCnt++;
+    }
+
+    lwip_geth_StopMacDma(config->gethSFR);
+    lwip_geth_ClearDmaDescriptorMemory(config);
+    IfxGeth_Eth_initModule(ethernetif, config);
+    lwip_geth_DebugDmaModeAfterInit = config->gethSFR->DMA_MODE.U;
+
+    if (IfxGeth_dma_isSoftwareResetDone(config->gethSFR) != 0)
+    {
+      return 1u;
+    }
+
+    lwip_geth_DebugDmaResetTimeoutCnt++;
+  }
+
+  return 0u;
+}
+
 static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 packetLength)
 {
   volatile IfxGeth_TxDescr *firstDescr =
@@ -285,6 +470,10 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
     nextDescr = &firstDescr[1];
   }
 
+  lwip_geth_DebugLastTxDescOwnBefore = firstDescr->TDES3.R.OWN;
+  firstDescr->TDES2.U = 0u;
+  firstDescr->TDES3.U = 0u;
+
   firstDescr->TDES3.R.FL_TPL = packetLength;
   firstDescr->TDES3.R.TSE = 0u;
   firstDescr->TDES3.R.CIC_TPL = 3u;
@@ -300,6 +489,10 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
   IfxGeth_dma_setTxDescriptorTailPointer(ethernetif->gethSFR, IfxGeth_TxDmaChannel_0, (uint32)nextDescr);
   IfxGeth_Eth_wakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);
+  lwip_geth_DebugLastTxDescOwnAfterKick = firstDescr->TDES3.R.OWN;
+  lwip_geth_DebugLastTxDmaStatusAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].STATUS.U;
+  lwip_geth_DebugLastTxDmaTailAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TXDESC_TAIL_POINTER.U;
+  lwip_geth_DebugLastTxDmaCurrentDescAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].CURRENT_APP_TXDESC.U;
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = nextDescr;
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txCount++;
 }
@@ -314,10 +507,13 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
  * @param netif the already initialized lwip network interface structure
  *        for this ethernetif
  */
-static void lwip_geth_low_level_init(netif_t *netif)
+static uint8 lwip_geth_low_level_init(netif_t *netif)
 {
   IfxGeth_Eth *ethernetif = netif->state;
   int         i;
+
+  lwip_geth_DebugLowLevelInitState = 1u;
+  lwip_geth_DebugLowLevelInitResult = 0u;
 
   /* set MAC hardware address length */
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
@@ -367,39 +563,45 @@ static void lwip_geth_low_level_init(netif_t *netif)
       GETH_GPCTL.B.ALTI0  = lwip_geth_handle->app_config->geth_lld_config->pins.rgmiiPins->mdio->inSelect;
     }
 
-    IFXGETH_PHY_WAIT_GMII_READY();
-    /* first we wait that we are able to communicate with the Phy */
-    do
+    if (lwip_geth_MdioWaitReadyBounded() != 0u)
     {
-      uint32 dataToSend = 0x8000;
-      IfxGeth_phy_Clause22_readMDIORegister(0,0,&dataToSend);
-    } while (GETH_MAC_MDIO_DATA.U & 0x8000);                                                      /* wait for reset to finish */
+      (void)lwip_geth_PhyWaitResetDoneBounded();
 
-    /* reset PHY */
-    /* put data */
-    IfxGeth_Phy_Clause22_writeMDIORegister(0,0,0x8000);
-
-    do
-    {
-      uint32 dataToSend = 0x8000;
-      IfxGeth_phy_Clause22_readMDIORegister(0,0,&dataToSend);
-    } while (GETH_MAC_MDIO_DATA.U & 0x8000);                                                      /* wait for reset to finish */
+      /* reset PHY */
+      if (lwip_geth_MdioWriteBounded(0u, 0u, 0x8000u) != 0u)
+      {
+        (void)lwip_geth_PhyWaitResetDoneBounded();
+      }
+    }
 
     /* initialize the module */
-    IfxGeth_Eth_initModule(ethernetif, &GethConfig);
+    lwip_geth_DebugLowLevelInitState = 2u;
+    if (lwip_geth_InitModuleWithResetCheck(ethernetif, &GethConfig) == 0u)
+    {
+      lwip_geth_DebugLowLevelInitState = 0xE2u;
+      return 0u;
+    }
     lwip_geth_PrepareDmaMemory(&GethConfig);
 
     /* initialize the PHY */
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
-    lwip_geth_private_Phy_Dp83825i_init();
+    if (lwip_geth_private_Phy_Dp83825i_init() == 0u)
+    {
+      lwip_geth_DebugLowLevelInitState = 0xE3u;
+      return 0u;
+    }
 #endif
 
 #if (PHY_DEVICE_NAME == PHY_RTL8211F)
     lwip_geth_private_Phy_Rtl8211f_init();
 #endif
     /* and enable transmitter/receiver */
+    lwip_geth_DebugLowLevelInitState = 3u;
     IfxGeth_Eth_startTransmitters(ethernetif, 1);
     IfxGeth_Eth_startReceivers(ethernetif, 1);
+    lwip_geth_DebugDmaCh0TxControlAfterStart = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TX_CONTROL.U;
+    lwip_geth_DebugDmaCh0RxControlAfterStart = ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.U;
+    lwip_geth_DebugMacConfigurationAfterStart = ethernetif->gethSFR->MAC_CONFIGURATION.U;
 
     /* The ETH is ready for use now! */
     /* we set the LINK_UP flag if we have a valid link */
@@ -437,6 +639,10 @@ static void lwip_geth_low_level_init(netif_t *netif)
       }
     }
   }
+
+  lwip_geth_DebugLowLevelInitState = 4u;
+  lwip_geth_DebugLowLevelInitResult = 1u;
+  return 1u;
 }
 
 /**
@@ -826,7 +1032,10 @@ err_t lwip_geth_netif_init(netif_t *netif)
   netif->linkoutput = lwip_geth_low_level_output;
 
   /* initialize the hardware */
-  lwip_geth_low_level_init(netif);
+  if (lwip_geth_low_level_init(netif) == 0u)
+  {
+    return ERR_IF;
+  }
 
   return ERR_OK;
 }

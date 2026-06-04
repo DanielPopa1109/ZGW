@@ -111,13 +111,14 @@ Ifx_Lwip        g_Lwip;
 IfxGeth_Eth     g_IfxGeth;
 uint32          isrTxCount = 0;
 uint32          isrRxCount = 0;
-IFX_ALIGN(32) uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
-IFX_ALIGN(32) uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
 volatile uint32 g_LwipSoftwareTimerTickCounter;
 volatile uint32 g_LwipRxPollLoopCounter;
 volatile uint32 g_LwipRxPollPacketCounter;
 volatile uint32 g_LwipRxPollBudgetHitCounter;
 volatile uint32 g_LwipLastTimerUs;
+volatile uint32 g_LwipNetifAddFailed;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -410,6 +411,8 @@ void netif_state_changed(struct netif* netif, netif_nsc_reason_t reason, const n
 void lwip_geth_Lwip_init(void)
 {
   ip_addr_t default_ipaddr, default_netmask, default_gw;
+
+  g_LwipNetifAddFailed = 0u;
 #if LWIP_DHCP
   IP4_ADDR(&default_gw, 0, 0, 0, 0);
   IP4_ADDR(&default_ipaddr, 0, 0, 0, 0);
@@ -430,15 +433,23 @@ void lwip_geth_Lwip_init(void)
   g_Lwip.eth_addr = *(eth_addr_t *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress;
 
 #if LWIP_GETH_RTOS_ENABLED
-  netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
-            (void *)0, lwip_geth_netif_init, tcpip_input);
+  if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+            (void *)0, lwip_geth_netif_init, tcpip_input) == NULL_PTR)
+  {
+    g_LwipNetifAddFailed = 1u;
+    return;
+  }
   /* Create a Task for checking the Link */
   xTaskCreate(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
   /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
   xTaskCreate(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);
 #else
-  netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
-            (void *)0, lwip_geth_netif_init, ethernet_input);
+  if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
+            (void *)0, lwip_geth_netif_init, ethernet_input) == NULL_PTR)
+  {
+    g_LwipNetifAddFailed = 1u;
+    return;
+  }
 #endif
 
   netif_set_default(&g_Lwip.netif);

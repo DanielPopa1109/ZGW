@@ -3080,6 +3080,48 @@ void vTaskSwitchContext_core2( void )
 }
 /*-----------------------------------------------------------*/
 
+/* Diagnostic snapshot of the scheduler's ready-list state. Used by the port's
+ * NULL-pxCurrentTCB guard (reset reason 386) to tell apart "ready list count
+ * corrupted" (uxTopListItems != 0 with a NULL owner) from "no runnable task /
+ * idle task missing" (idle handle NULL or every list empty). Pure reads, safe
+ * to call from the failing context. */
+void vTaskCaptureReadyListDiag_core2( UBaseType_t_core2 * puxTopReadyPriority_core2,
+                                      UBaseType_t_core2 * puxTopListItems_core2,
+                                      UBaseType_t_core2 * puxCurrentNumberOfTasks_core2,
+                                      void ** ppxIdleTaskHandle_core2 )
+{
+    UBaseType_t_core2 uxPrio_core2 = uxTopReadyPriority_core2;
+
+    if( puxTopReadyPriority_core2 != NULL )
+    {
+        *puxTopReadyPriority_core2 = uxPrio_core2;
+    }
+
+    if( puxTopListItems_core2 != NULL )
+    {
+        if( uxPrio_core2 < ( UBaseType_t_core2 ) configMAX_PRIORITIES_core2 )
+        {
+            *puxTopListItems_core2 = ( UBaseType_t_core2 ) listCURRENT_LIST_LENGTH_core2( &( pxReadyTasksLists_core2[ uxPrio_core2 ] ) );
+        }
+        else
+        {
+            /* uxTopReadyPriority itself is out of range -> corrupted. */
+            *puxTopListItems_core2 = ( UBaseType_t_core2 ) 0xFFFFFFFFu;
+        }
+    }
+
+    if( puxCurrentNumberOfTasks_core2 != NULL )
+    {
+        *puxCurrentNumberOfTasks_core2 = uxCurrentNumberOfTasks_core2;
+    }
+
+    if( ppxIdleTaskHandle_core2 != NULL )
+    {
+        *ppxIdleTaskHandle_core2 = ( void * ) xIdleTaskHandle_core2;
+    }
+}
+/*-----------------------------------------------------------*/
+
 void vTaskPlaceOnEventList_core2( List_t_core2 * const pxEventList_core2,
                             const TickType_t_core2 xTicksToWait_core2 )
 {

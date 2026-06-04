@@ -17,6 +17,15 @@
 #define MCUSM_FBL_COMM_CAN_CLASSIC             3u
 
 #define MCUSM_RESET_REASON_SAFETYKIT_TEST      385u
+/* vPortLoadContext_core2 integrity guards. These used to share 380u/381u with
+ * the FreeRTOS malloc-failed hooks and Os_InitFailure, which made the cause
+ * ambiguous; they now have dedicated codes. */
+#define MCUSM_RESET_REASON_C2_TCB_CORRUPT      386u
+#define MCUSM_RESET_REASON_C2_STACKPTR_CORRUPT 387u
+#define MCUSM_RESET_REASON_C2_LIST_CORRUPT     388u
+#define MCUSM_RESET_REASON_DFLASH_RECOVERY     390u
+
+#define MCUSM_DFLASH_RECOVERY_MAGIC            0xDFA17EC0u
 
 #define MCUSM_SAFETYKIT_FAIL_LBIST             (1u << 0u)
 #define MCUSM_SAFETYKIT_FAIL_MONBIST           (1u << 1u)
@@ -113,8 +122,16 @@ extern volatile uint32 McuSm_Trap4ScrRtcRecordCounter;
 extern volatile uint32 McuSm_BusMpuConfigured;
 extern volatile uint32 McuSm_BusMpuWriteAccessMaskA;
 extern volatile uint32 McuSm_BusMpuWriteAccessMaskB;
+extern volatile uint32 McuSm_DFlashRecoveryRequest;
+extern volatile uint32 McuSm_DFlashRecoveryInfo;
+extern volatile uint32 McuSm_DFlashRecoveryCounter;
+extern volatile uint32 McuSm_DFlashRecoveryLastFeeAccessKind;
+extern volatile uint32 McuSm_DFlashRecoveryLastFeePhysicalAddress;
 
 extern void McuSm_InitializeBusMpu(void);
+extern void McuSm_RequestDFlashRecovery(uint32 recoveryInfo);
+extern boolean McuSm_IsDFlashRecoveryRequested(void);
+extern void McuSm_ClearDFlashRecoveryRequest(void);
 extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
 extern void McuSm_CaptureTimeImageFromScr(void);
 extern void McuSm_TRAP1(IfxCpu_Trap trapInfo);

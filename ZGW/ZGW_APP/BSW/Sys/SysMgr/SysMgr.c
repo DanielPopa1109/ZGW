@@ -4,6 +4,7 @@
 #include "IfxCpu.h"
 #include "Can.h"
 #include "CanSM.h"
+#include "EthSM.h"
 #include "LinSM.h"
 #include "Crc.h"
 #include "task_core0.h"
@@ -87,6 +88,7 @@ static boolean SysMgr_IsFullComActive(void)
 {
 #if (SYSMGR_KEEP_AWAKE_WHILE_FULL_COM == 1u)
     CanSM_ComModeType canMode;
+    EthSM_ComModeType ethMode;
 
     if ((CanSM_GetCurrentComMode(CAN_CONTROLLER_CLASSIC, &canMode) == E_OK) &&
             (canMode == CANSM_COMM_FULL_COMMUNICATION))
@@ -101,6 +103,12 @@ static boolean SysMgr_IsFullComActive(void)
     }
 
     if (LinSM_GetState(0u) == LINSM_FULL_COMMUNICATION)
+    {
+        return TRUE;
+    }
+
+    if ((EthSM_GetCurrentComMode(0u, &ethMode) == E_OK) &&
+            (ethMode == ETHSM_FULL_COMMUNICATION))
     {
         return TRUE;
     }

@@ -41,6 +41,16 @@
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 IfxCpu_mutexLock safetyWatchdogLock;
+volatile uint32 SafetyKit_CpuWdtInitCount[3u];
+volatile uint32 SafetyKit_CpuWdtServiceCount[3u];
+volatile uint32 SafetyKit_CpuWdtInitCon0[3u];
+volatile uint32 SafetyKit_CpuWdtInitCon1[3u];
+volatile uint32 SafetyKit_CpuWdtLastServiceCon0[3u];
+volatile uint32 SafetyKit_CpuWdtLastServiceCon1[3u];
+volatile uint32 SafetyKit_CpuWdtLastServiceCore;
+volatile uint32 SafetyKit_SafetyWdtInitCon0;
+volatile uint32 SafetyKit_SafetyWdtInitCon1;
+volatile uint32 SafetyKit_SafetyWdtServiceCount;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -63,6 +73,8 @@ void initSafetyWatchdog(void)
     cfgSafetyWatchdog.reload = 63974;
 
     IfxScuWdt_initSafetyWatchdog(safetyWatchdog, &cfgSafetyWatchdog);
+    SafetyKit_SafetyWdtInitCon0 = safetyWatchdog->CON0.U;
+    SafetyKit_SafetyWdtInitCon1 = safetyWatchdog->CON1.U;
 
     /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in
      * use somewhere else */
@@ -84,6 +96,7 @@ void serviceSafetyWatchdog(void)
      * use somewhere else */
     if(IfxScuWdt_getSafetyWatchdogEndInit())
     {
+        SafetyKit_SafetyWdtServiceCount++;
         IfxScuWdt_setSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline());
     }
     else
@@ -129,8 +142,19 @@ void initCpuWatchdog(uint8 cpuIndex)
 
     cpuXwdgCfg.inputFrequency = IfxScu_WDTCON1_IR_divBy16384;
     cpuXwdgCfg.reload = 63974;
+    cpuXwdgCfg.disableWatchdog = FALSE;
 
     IfxScuWdt_initCpuWatchdog(ptrCpuXwatchdog, &cpuXwdgCfg);
+    if (cpuIndex < 3u)
+    {
+        SafetyKit_CpuWdtInitCount[cpuIndex]++;
+        SafetyKit_CpuWdtInitCon0[cpuIndex] = ptrCpuXwatchdog->CON0.U;
+        SafetyKit_CpuWdtInitCon1[cpuIndex] = ptrCpuXwatchdog->CON1.U;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
     /* Only service Cpu Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in used somewhere else */
     if(IfxScuWdt_getCpuWatchdogEndInit())
     {
@@ -147,12 +171,31 @@ void initCpuWatchdog(uint8 cpuIndex)
  * */
 void serviceCpuWatchdog(void)
 {
+    uint8 coreIndex = IfxCpu_getCoreIndex();
     /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in used somewhere else */
-    if(IfxScuWdt_getCpuWatchdogEndInitInline(&MODULE_SCU.WDTCPU[IfxCpu_getCoreIndex()]))
+    if(IfxScuWdt_getCpuWatchdogEndInitInline(&MODULE_SCU.WDTCPU[coreIndex]))
     {
-        uint16 password = IfxScuWdt_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[IfxCpu_getCoreIndex()]);
+        uint16 password = IfxScuWdt_getCpuWatchdogPasswordInline(&MODULE_SCU.WDTCPU[coreIndex]);
 
-        IfxScuWdt_setCpuEndinitInline(&MODULE_SCU.WDTCPU[IfxCpu_getCoreIndex()], password);
+        SafetyKit_CpuWdtLastServiceCore = coreIndex;
+        if (coreIndex < 3u)
+        {
+            SafetyKit_CpuWdtServiceCount[coreIndex]++;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+        IfxScuWdt_setCpuEndinitInline(&MODULE_SCU.WDTCPU[coreIndex], password);
+        if (coreIndex < 3u)
+        {
+            SafetyKit_CpuWdtLastServiceCon0[coreIndex] = MODULE_SCU.WDTCPU[coreIndex].CON0.U;
+            SafetyKit_CpuWdtLastServiceCon1[coreIndex] = MODULE_SCU.WDTCPU[coreIndex].CON1.U;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
     }
     else
     {

@@ -151,7 +151,8 @@ static __xdata uint32 SCR_TimeCurrentHigh;
 static uint8 SCR_TimeBaseActive = 0u;
 
 #if (SCR_TIME_USE_RTC_INTERRUPT != 0u)
-static __xdata uint32 SCR_TotalElapsedTicks;
+static __xdata uint32 SCR_TotalElapsedTicksLow;
+static __xdata uint32 SCR_TotalElapsedTicksHigh;
 #endif
 
 #if (SCR_TIME_USE_WDT_FALLBACK != 0u)
@@ -277,6 +278,7 @@ static uint32 SCR_RtcReadCounter(void)
 void SCR_RtcCompareIsr(void) __interrupt(XINTR13)
 {
     uint8 flags;
+    uint32 previousLow;
 
     /*
      * Within one protection window: clear CFRTC (write 0 to bit 6), stop the
@@ -293,24 +295,39 @@ void SCR_RtcCompareIsr(void) __interrupt(XINTR13)
     SCR_RTC_CON |= RTCC_MASK;
     SCR_LOCK_PROTECTED_BITS();
 
-    SCR_TotalElapsedTicks += (uint32)SCR_TIME_RTC_COMPARE_TICKS;
+    previousLow = SCR_TotalElapsedTicksLow;
+    SCR_TotalElapsedTicksLow += (uint32)SCR_TIME_RTC_COMPARE_TICKS;
+    if (SCR_TotalElapsedTicksLow < previousLow)
+    {
+        SCR_TotalElapsedTicksHigh++;
+    }
 
-    SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, SCR_TotalElapsedTicks);
-    SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS,  SCR_TotalElapsedTicks);
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, SCR_TotalElapsedTicksLow);
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH, SCR_TotalElapsedTicksHigh);
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, SCR_TotalElapsedTicksLow);
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH, SCR_TotalElapsedTicksHigh);
 
     flags = SCR_TimeLoadU8(SCR_TIME_OFFSET_FLAGS);
     if (((flags & SCR_TIME_FLAG_ARMED) != 0u) && (SCR_TimeBaseActive != 0u))
     {
-        SCR_TimeStoreBasePlusElapsedNs(
-                SCR_TIME_OFFSET_UTC_NS,
-                SCR_TimeBaseUtcHigh,
-                SCR_TimeBaseUtcLow,
-                SCR_TotalElapsedTicks);
-        SCR_TimeStoreBasePlusElapsedNs(
-                SCR_TIME_OFFSET_VEHICLE_NS,
-                SCR_TimeBaseVehicleHigh,
-                SCR_TimeBaseVehicleLow,
-                SCR_TotalElapsedTicks);
+        previousLow = SCR_TimeBaseUtcLow;
+        SCR_TimeBaseUtcLow += (uint32)SCR_TIME_RTC_COMPARE_NS;
+        if (SCR_TimeBaseUtcLow < previousLow)
+        {
+            SCR_TimeBaseUtcHigh++;
+        }
+
+        previousLow = SCR_TimeBaseVehicleLow;
+        SCR_TimeBaseVehicleLow += (uint32)SCR_TIME_RTC_COMPARE_NS;
+        if (SCR_TimeBaseVehicleLow < previousLow)
+        {
+            SCR_TimeBaseVehicleHigh++;
+        }
+
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_UTC_NS, SCR_TimeBaseUtcHigh);
+        SCR_TimeStoreU32((uint8)(SCR_TIME_OFFSET_UTC_NS + 4u), SCR_TimeBaseUtcLow);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_VEHICLE_NS, SCR_TimeBaseVehicleHigh);
+        SCR_TimeStoreU32((uint8)(SCR_TIME_OFFSET_VEHICLE_NS + 4u), SCR_TimeBaseVehicleLow);
     }
 }
 #endif
@@ -402,7 +419,8 @@ static void SCR_TimeInit(void)
         SCR_TimeBaseActive = 1u;
 
 #if (SCR_TIME_USE_RTC_INTERRUPT != 0u)
-        SCR_TotalElapsedTicks = 0u;
+        SCR_TotalElapsedTicksLow = 0u;
+        SCR_TotalElapsedTicksHigh = 0u;
 #elif (SCR_TIME_USE_WDT_FALLBACK != 0u)
         SCR_WdtAccumTicks = 0u;
         SCR_WdtPrevCount = ((uint16)SCR_WDT_H << 8) | (uint16)SCR_WDT_L;
@@ -411,6 +429,8 @@ static void SCR_TimeInit(void)
         SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_START_TICKS, 0u);
         SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, 0u);
         SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, 0u);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH, 0u);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH, 0u);
         SCR_TimeStoreU8(SCR_TIME_OFFSET_DEBUG_INIT_STATUS, SCR_TIME_INIT_STATUS_ACTIVE);
     }
 
@@ -460,6 +480,7 @@ static void SCR_TimeUpdate(void)
     *G_BOOT_STAGE_ADDR = BOOT_STAGE_TIME_COUNTER_READ;
 #if (SCR_TIME_USE_RTC_INTERRUPT == 0u)
     SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS, counter);
+    SCR_TimeStoreU32(SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH, 0u);
 #endif
     *G_BOOT_STAGE_ADDR = BOOT_STAGE_TIME_TICKS_STORED;
 
@@ -481,6 +502,7 @@ static void SCR_TimeUpdate(void)
         startCounter = SCR_TimeLoadU32(SCR_TIME_OFFSET_RTC_START_TICKS);
         elapsedTicks  = counter - startCounter;
         SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS, elapsedTicks);
+        SCR_TimeStoreU32(SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH, 0u);
         *G_BOOT_STAGE_ADDR = BOOT_STAGE_TIME_ELAPSED_STORED;
 #endif
         if (SCR_TimeBaseActive != 0u)

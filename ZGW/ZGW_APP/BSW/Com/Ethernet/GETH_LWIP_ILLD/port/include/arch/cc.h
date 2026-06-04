@@ -117,15 +117,23 @@ typedef u32_t  mem_ptr_t;
 
 #define abort(void)
 
+/* A failed lwIP assertion must STOP at the point of detection. The MEMP_/MEM_
+ * overflow & sanity checks (enabled in lwipopts.h) call LWIP_ASSERT the instant
+ * a pool canary or free-list is found corrupted; previously LWIP_PLATFORM_ASSERT
+ * was a no-op (and abort() is #defined to nothing), so a detected corruption was
+ * silently ignored and only crashed far away later. Route it to a real trap that
+ * records the location for the debugger (see lwip_geth_AssertFail). */
+extern volatile const char *lwip_geth_AssertMsg;
+extern volatile const char *lwip_geth_AssertFile;
+extern volatile int         lwip_geth_AssertLine;
+extern void                 lwip_geth_AssertFail(const char *msg, const char *file, int line);
+
+#define LWIP_PLATFORM_ASSERT(msg)  lwip_geth_AssertFail((msg), __FILE__, __LINE__)
+
 #ifdef LWIP_DEBUG
-#define LWIP_PLATFORM_ASSERT(msg)                                                \
-  printf("Assertion \"%s\" failed at line %d in %s\n", msg, __LINE__, __FILE__); \
-  abort()
 #define LWIP_PLATFORM_DIAG(msg)   printf msg; printf("\r\n");
 #else
-#define LWIP_PLATFORM_ASSERT(msg) ((void)0)
 #define LWIP_PLATFORM_DIAG(msg)   ((void)0)
-
 #endif
 
 #endif  //__LWIP_EE_CC_TRICORE_H__

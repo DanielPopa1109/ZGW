@@ -18,7 +18,9 @@
 #define DOIP_TCP_RX_STREAM_LEN                8192u
 
 #define DOIP_ALIVE_TIMEOUT_MS                 5000u
-#define DOIP_INACTIVITY_TIMEOUT_MS            30000u
+#define DOIP_INACTIVITY_TIMEOUT_MS            300000u
+#define DOIP_LAB_DISABLE_TCP_INACTIVITY_ABORT STD_ON
+#define DOIP_LAB_DISABLE_SERVER_ALIVE_REQ     STD_ON
 #define DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS     1000u
 #define DOIP_VEHICLE_ANNOUNCE_COUNT           5u
 
@@ -90,9 +92,12 @@ typedef void (*DoIP_DcmRxIndicationFct)(uint16 sourceAddress,
                                         const uint8 *uds,
                                         uint16 udsLen);
 
+typedef void (*DoIP_SessionResetFct)(void);
+
 void DoIP_Init(const DoIP_ConfigType *config);
 void DoIP_MainFunction(uint32 elapsedMs);
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb);
+void DoIP_SetSessionResetIndication(DoIP_SessionResetFct cb);
 
 void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
                               const TcpIp_SockAddrType *remoteAddr,

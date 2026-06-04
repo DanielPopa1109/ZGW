@@ -4,6 +4,7 @@
 #include "Fls.h"
 #include "Crc.h"
 #include "MemStack_Error.h"
+#include "McuSm.h"
 
 #define FEE_API_INIT                    (0x00u)
 #define FEE_API_SET_MODE                (0x01u)
@@ -36,6 +37,9 @@
 #define FEE_INVALID_ADDRESS             (0xFFFFFFFFu)
 #define FEE_HEADER_CRC_SIZE             ((uint32)offsetof(Fee_RecordHeaderType, headerCrc))
 #define FEE_SECTOR_HEADER_CRC_SIZE      ((uint32)offsetof(Fee_SectorHeaderType, headerCrc))
+#define FEE_DEBUG_FLASH_ACCESS_COPY     (1u)
+#define FEE_DEBUG_FLASH_ACCESS_ERASE    (2u)
+#define FEE_DEBUG_FLASH_ACCESS_DATA_CRC (3u)
 
 typedef struct
 {
@@ -166,6 +170,25 @@ static uint32 Fee_RecordStartOffset;
 static uint32 Fee_RecordTotalLength;
 static uint32 Fee_RecordPaddedLength;
 static uint32 Fee_NextSequence;
+volatile uint32 Fee_DebugLastFlashAccessKind = 0u;
+volatile uint32 Fee_DebugLastFlashOffset = 0u;
+volatile uint32 Fee_DebugLastFlashPhysicalAddress = 0u;
+volatile uint32 Fee_DebugLastFlashLength = 0u;
+volatile uint32 Fee_DebugLastScanSector = 0u;
+volatile uint32 Fee_DebugLastScanCursor = 0u;
+volatile uint32 Fee_DebugLastScanEnd = 0u;
+volatile uint32 Fee_DebugScanStepCounter = 0u;
+volatile uint32 Fee_DebugRecoveryFormatRequestSeen = 0u;
+volatile uint32 Fee_DebugRecoveryFormatStartCounter = 0u;
+volatile uint32 Fee_DebugRecoveryFormatDoneCounter = 0u;
+
+static void Fee_RecordFlashAccess(uint32 kind, uint32 offset, uint32 length)
+{
+    Fee_DebugLastFlashAccessKind = kind;
+    Fee_DebugLastFlashOffset = offset;
+    Fee_DebugLastFlashPhysicalAddress = Fls_GetPhysicalAddress(offset);
+    Fee_DebugLastFlashLength = length;
+}
 
 static uint32 Fee_Align8(uint32 value)
 {
@@ -184,6 +207,7 @@ static uint32 Fee_SectorEnd(uint8 sector)
 
 static void Fee_CopyFromFlash(uint32 offset, void *dst, uint32 length)
 {
+    Fee_RecordFlashAccess(FEE_DEBUG_FLASH_ACCESS_COPY, offset, length);
     memcpy(dst, (const void *)Fls_GetPhysicalAddress(offset), (size_t)length);
 }
 
@@ -191,6 +215,8 @@ static boolean Fee_IsFlashErased(uint32 offset, uint32 length)
 {
     const volatile uint8 *ptr = (const volatile uint8 *)Fls_GetPhysicalAddress(offset);
     uint32 i;
+
+    Fee_RecordFlashAccess(FEE_DEBUG_FLASH_ACCESS_ERASE, offset, length);
     for (i = 0u; i < length; i++)
     {
         if (ptr[i] != FLS_ERASED_VALUE)
@@ -360,6 +386,7 @@ static boolean Fee_IsRecordValidAt(uint32 recordOffset, uint32 sectorEnd, Fee_Re
     if (((header->flags & FEE_FLAG_INVALID) == 0u) && ((header->flags & FEE_FLAG_SECTOR_VALID) == 0u))
     {
         dataOffset = recordOffset + (uint32)sizeof(Fee_RecordHeaderType);
+        Fee_RecordFlashAccess(FEE_DEBUG_FLASH_ACCESS_DATA_CRC, dataOffset, header->length);
         crc = Crc_CalculateCRC32((const uint8 *)Fls_GetPhysicalAddress(dataOffset), header->length, 0u, TRUE);
         if (crc != header->dataCrc)
         {
@@ -457,6 +484,11 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
 
     while ((cursor + sizeof(Fee_RecordHeaderType) + sizeof(Fee_RecordTrailerType)) <= end)
     {
+        Fee_DebugLastScanSector = sector;
+        Fee_DebugLastScanCursor = cursor;
+        Fee_DebugLastScanEnd = end;
+        Fee_DebugScanStepCounter++;
+
         if (Fee_IsFlashErased(cursor, FLS_DFLASH0_PAGE_SIZE) == TRUE)
         {
             break;
@@ -693,12 +725,20 @@ static void Fee_RestorePendingJobAfterGc(void)
 
 void Fee_Init(const Fee_ConfigType *ConfigPtr)
 {
+    boolean recoveryFormatRequested;
+
     (void)ConfigPtr;
     memset(&Fee_State, 0, sizeof(Fee_State));
     Fee_RuntimeInit(Fee_Runtime);
     Fls_Init(NULL_PTR);
 
-    if (Fee_ChooseActiveSector() == TRUE)
+    recoveryFormatRequested = McuSm_IsDFlashRecoveryRequested();
+    if (recoveryFormatRequested != FALSE)
+    {
+        Fee_DebugRecoveryFormatRequestSeen++;
+    }
+
+    if ((recoveryFormatRequested == FALSE) && (Fee_ChooseActiveSector() == TRUE))
     {
         Fee_State.status = MEMIF_IDLE;
         Fee_State.result = MEMIF_JOB_OK;
@@ -706,6 +746,7 @@ void Fee_Init(const Fee_ConfigType *ConfigPtr)
     }
     else
     {
+        Fls_ClearDFlashSmuBusError();
         Fee_State.status = MEMIF_BUSY_INTERNAL;
         Fee_State.result = MEMIF_JOB_PENDING;
         Fee_State.activeSector = 0u;
@@ -713,6 +754,7 @@ void Fee_Init(const Fee_ConfigType *ConfigPtr)
         Fee_State.activeAppend = FEE_VIRTUAL_SECTOR0_OFFSET + (uint32)sizeof(Fee_SectorHeaderType);
         Fee_State.state = FEE_STATE_FORMAT_ERASE0_START;
         Fee_NextSequence = 1u;
+        Fee_DebugRecoveryFormatStartCounter++;
     }
 }
 
@@ -1154,6 +1196,8 @@ void Fee_MainFunction(void)
                 {
                     Fee_State.activeSector = 0u;
                     Fee_State.activeGeneration = 1u;
+                    McuSm_ClearDFlashRecoveryRequest();
+                    Fee_DebugRecoveryFormatDoneCounter++;
                     Fee_SetIdle(MEMIF_JOB_OK);
                 }
             }

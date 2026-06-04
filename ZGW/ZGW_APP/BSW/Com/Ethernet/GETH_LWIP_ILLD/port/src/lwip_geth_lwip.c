@@ -111,8 +111,12 @@ Ifx_Lwip        g_Lwip;
 IfxGeth_Eth     g_IfxGeth;
 uint32          isrTxCount = 0;
 uint32          isrRxCount = 0;
-IFX_ALIGN(32) uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
-IFX_ALIGN(32) uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+volatile uint32 g_LwipEthTxDescriptorCount = (uint32)IFXGETH_MAX_TX_DESCRIPTORS;
+volatile uint32 g_LwipEthRxDescriptorCount = (uint32)IFXGETH_MAX_RX_DESCRIPTORS;
+volatile uint32 g_LwipEthTxBufferBytes = (uint32)sizeof(channel0TxBuffer1);
+volatile uint32 g_LwipEthRxBufferBytes = (uint32)sizeof(channel0RxBuffer1);
 volatile uint8  g_LwipNetifReady;
 volatile uint8  g_LwipNetifFlagsAfterSet;
 volatile uint8  g_LwipNetifFlagsCurrent;
@@ -121,12 +125,15 @@ volatile uint8  g_LwipInitDone;
 volatile uint32 g_LwipTcpipInitDoneCounter;
 volatile uint32 g_LwipRxTaskCreateResult;
 volatile uint32 g_LwipLinkTaskCreateResult;
+volatile uint32 g_LwipLinkStatusCallbackFailCounter;
 volatile uint32 g_LwipRxIsrBeforeTaskCounter;
 volatile uint32 g_LwipGratuitousArpCounter;
 volatile uint32 g_LwipSoftwareTimerTickCounter;
 volatile uint32 g_LwipRxPollLoopCounter;
 volatile uint32 g_LwipRxPollPacketCounter;
 volatile uint32 g_LwipRxPollBudgetHitCounter;
+volatile uint32 g_LwipForcedMacConfigCounter;
+volatile uint32 g_LwipLinkTaskSkippedForForceUp;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -169,6 +176,18 @@ static void lwip_geth_Lwip_advancePolledTime(uint8 elapsedMs)
     }
 }
 
+static void lwip_geth_Lwip_configureForcedMacMode(IfxGeth_Eth *ethernetif)
+{
+    if (ethernetif == NULL_PTR)
+    {
+        return;
+    }
+
+    IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+    IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+    g_LwipForcedMacConfigCounter++;
+}
+
 static void lwip_geth_Lwip_applyLinkStatus(void)
 {
     Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
@@ -192,8 +211,10 @@ static void lwip_geth_Lwip_applyLinkStatus(void)
 #if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
         /* Bring-up fallback: the KIT_A2G_TC375_LITE RJ45 LED may show link while
          * the PHY status helper still reports down. Keep lwIP up so ARP/ping/UDP
-         * can be validated. Replace this with real DP83825I link handling later.
+         * can be validated. RMII still needs a deterministic MAC mode when the
+         * PHY helper reports down, otherwise Tx DMA can hold descriptors forever.
          */
+        lwip_geth_Lwip_configureForcedMacMode(ethernetif);
         lwip_geth_Lwip_forceNetifUp();
         return;
 #else
@@ -223,9 +244,31 @@ static void lwip_geth_Lwip_applyLinkStatus(void)
     lwip_geth_Lwip_forceNetifUp();
 }
 
+#if LWIP_GETH_RTOS_ENABLED && !LWIP_TCPIP_CORE_LOCKING
+static void lwip_geth_Lwip_applyLinkStatusCb(void *ctx)
+{
+    (void)ctx;
+    lwip_geth_Lwip_applyLinkStatus();
+}
+#endif
+
 /** \brief Polling the timer event flags */
 void lwip_geth_Lwip_pollTimerFlags(void)
 {
+#if LWIP_GETH_RTOS_ENABLED
+    /* With NO_SYS == 0, tcpip_thread already owns and runs the lwIP core timers
+     * (tcp_tmr, etharp_tmr, ...) via sys_check_timeouts(), and PHY link status is
+     * polled by the dedicated lwip_geth_LinkStatus task. Running those same timer
+     * state machines again here - from the cyclic 5 ms OS task, while
+     * LOCK_TCPIP_CORE() is a no-op because LWIP_TCPIP_CORE_LOCKING is disabled -
+     * races tcpip_thread on tcp_active_pcbs and the ARP table. That corruption is
+     * a prime suspect for the intermittent failures this stack shows: a lost
+     * listen PCB (no SYN-ACK -> tester TCP connect times out), a corrupted ARP
+     * table (UDP vehicle-id and TCP both go silent), or a use-after-free
+     * (unintended watchdog reset). So this poll does nothing in the RTOS build;
+     * it stays active only for the NO_SYS (raw-API) configuration, e.g. the FBL. */
+    return;
+#else
     Ifx_Lwip *lwip = &g_Lwip;
     uint16    timerFlags;
     boolean   interruptState;
@@ -316,6 +359,7 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 #if LWIP_TCPIP_CORE_LOCKING
     UNLOCK_TCPIP_CORE();
 #endif
+#endif /* LWIP_GETH_RTOS_ENABLED */
 }
 
 /** \brief Polling the ETH receive event flags */
@@ -370,6 +414,7 @@ void lwip_geth_Lwip_forceNetifUp(void)
      * incorrectly while the RJ45 LED and switch link are active. Force the lwIP
      * admin/link flags so sockets can open and ARP/UDP can be validated.
      */
+    lwip_geth_Lwip_configureForcedMacMode((IfxGeth_Eth *)g_Lwip.netif.state);
     g_Lwip.netif.flags |= (NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
 #else
     netif_set_up(&g_Lwip.netif);
@@ -401,10 +446,13 @@ void lwip_geth_LinkStatus(void *pvParameter)
     {
 #if LWIP_TCPIP_CORE_LOCKING
         LOCK_TCPIP_CORE();
-#endif
         lwip_geth_Lwip_applyLinkStatus();
-#if LWIP_TCPIP_CORE_LOCKING
         UNLOCK_TCPIP_CORE();
+#else
+        if (tcpip_try_callback(lwip_geth_Lwip_applyLinkStatusCb, NULL_PTR) != ERR_OK)
+        {
+            g_LwipLinkStatusCallbackFailCounter++;
+        }
 #endif
         vTaskDelay_core2(pdMS_TO_TICKS_core2(100u));
     }
@@ -461,8 +509,18 @@ void lwip_geth_Lwip_init(void *arg)
         LWIP_ASSERT("netif_add failed", 0);
         return;
     }
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+    /* In forced-link bring-up mode the netif is kept up and the MAC is forced
+     * to RMII 100M/full-duplex. Do not create the 100 ms link task: it posts a
+     * tcpip callback every cycle and can force a scheduler yield from inside
+     * xQueueGenericSend() before any useful link-state change exists.
+     */
+    g_LwipLinkTaskSkippedForForceUp = 1u;
+    g_LwipLinkTaskCreateResult = 0xFFFF0001u;
+#else
     /* Create a Task for checking the Link */
     g_LwipLinkTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_LinkStatus,"Eth Link Stat",LWIP_GETH_PHY_TASK_STACK_SIZE,NULL,LWIP_GETH_PHY_TASK_PRIO,NULL);
+#endif
 #if LWIP_GETH_CREATE_RX_TASK
     /* Task is woken up by an Rx Ethernet Event using Binary Semaphore */
     g_LwipRxTaskCreateResult = (uint32)xTaskCreate_core2(lwip_geth_netif_input,"Eth RX",LWIP_GETH_TASK_STACK_SIZE,&g_Lwip.netif,LWIP_GETH_TASK_PRIO_RX,&g_Lwip.EthRxTask);

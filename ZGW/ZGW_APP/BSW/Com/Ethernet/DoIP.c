@@ -22,11 +22,13 @@ typedef struct
 {
         const DoIP_ConfigType *cfg;
         DoIP_DcmRxIndicationFct dcmRxIndication;
+        DoIP_SessionResetFct sessionReset;
 
         DoIP_TcpStateType tcpState;
 
         uint16_t testerLogicalAddress;
         uint8_t routingActive;
+        volatile uint8_t tcpActivityPending;
 
         uint8_t tcpStream[DOIP_TCP_RX_STREAM_LEN];
         uint16_t tcpStreamLen;
@@ -52,6 +54,18 @@ typedef struct
 
 static DoIP_RuntimeType DoIP_Rt;
 long long DoIP_MainFunction_Counter = 0;
+
+static void DoIP_ResetTcpActivityTimers(void)
+{
+    DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_Rt.aliveTimerMs = 0u;
+    DoIP_Rt.tcpActivityPending = 0u;
+}
+
+static void DoIP_MarkTcpActivity(void)
+{
+    DoIP_Rt.tcpActivityPending = 1u;
+}
 
 static uint16_t rd16(const uint8_t *p)
 {
@@ -95,11 +109,17 @@ static void DoIP_SendGenericNack(SoAd_SoConIdType soConId,
 {
     uint8_t tx[DOIP_HEADER_LEN + 1u];
     uint16_t idx;
+    SoAd_ReturnType ret;
 
     idx = DoIP_MakeHeader(tx, DOIP_PAYLOAD_GENERIC_NACK, 1u);
     tx[idx++] = code;
 
-    (void)GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, idx);
+    ret = GatewaySwc_RequestSoAdIfTransmit(soConId, remoteAddr, tx, idx);
+
+    if ((ret == SOAD_OK) && (DoIP_Rt.cfg != 0) && (soConId == DoIP_Rt.cfg->tcpSoConId))
+    {
+        DoIP_MarkTcpActivity();
+    }
 }
 
 static uint8_t DoIP_CheckHeader(const uint8_t *data,
@@ -213,6 +233,10 @@ static void DoIP_SendRoutingActivationRes(uint16_t testerAddr, uint8_t code)
     {
         DoIP_DebugRoutingActivationTxFailCounter++;
     }
+    else
+    {
+        DoIP_MarkTcpActivity();
+    }
 }
 
 static void DoIP_SendAliveRes(void)
@@ -227,7 +251,10 @@ static void DoIP_SendAliveRes(void)
 
     DoIP_Rt.aliveCheckCnt++;
 
-    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx) == SOAD_OK)
+    {
+        DoIP_MarkTcpActivity();
+    }
 }
 
 static void DoIP_SendAliveReq(void)
@@ -258,7 +285,10 @@ static void DoIP_SendDiagAck(uint16_t testerAddr, uint16_t ecuAddr)
 
     tx[idx++] = 0x00u;
 
-    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx) == SOAD_OK)
+    {
+        DoIP_MarkTcpActivity();
+    }
 }
 
 static void DoIP_SendDiagNack(uint16_t testerAddr, uint16_t ecuAddr, uint8_t nack)
@@ -278,7 +308,10 @@ static void DoIP_SendDiagNack(uint16_t testerAddr, uint16_t ecuAddr, uint8_t nac
 
     DoIP_Rt.diagNackCnt++;
 
-    (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
+    if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx) == SOAD_OK)
+    {
+        DoIP_MarkTcpActivity();
+    }
 }
 
 static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
@@ -312,8 +345,7 @@ static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
     DoIP_Rt.routingActive = 1u;
     DoIP_Rt.tcpState = DOIP_TCP_ROUTING_ACTIVE;
     DoIP_Rt.routingActivationCnt++;
-    DoIP_Rt.aliveTimerMs = 0u;
-    DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_ResetTcpActivityTimers();
 
     DoIP_DebugRoutingActivationReqCounter++;
     DoIP_SendRoutingActivationRes(testerAddr, DOIP_RA_RES_OK);
@@ -361,6 +393,7 @@ static void DoIP_HandleDiagnostic(const uint8_t *p, uint32_t len)
         return;
     }
 
+    DoIP_MarkTcpActivity();
     DoIP_SendDiagAck(testerAddr, ecuAddr);
 
     DoIP_Rt.diagRxCnt++;
@@ -382,6 +415,7 @@ static void DoIP_HandleTcpPayload(uint16_t type, const uint8_t *payload, uint32_
         case DOIP_PAYLOAD_ALIVE_CHECK_REQ:
             if (len == 0u)
             {
+                DoIP_MarkTcpActivity();
                 DoIP_SendAliveRes();
             }
             else
@@ -393,7 +427,7 @@ static void DoIP_HandleTcpPayload(uint16_t type, const uint8_t *payload, uint32_
         case DOIP_PAYLOAD_ALIVE_CHECK_RES:
             if (len >= 2u)
             {
-                DoIP_Rt.aliveTimerMs = 0u;
+                DoIP_MarkTcpActivity();
                 DoIP_DebugAliveResRxCounter++;
             }
             else
@@ -492,19 +526,35 @@ void DoIP_MainFunction(uint32 elapsedMs)
         return;
     }
 
-    DoIP_Rt.inactivityTimerMs += elapsedMs;
-
-    if (DoIP_Rt.tcpState == DOIP_TCP_ROUTING_ACTIVE)
+    if (DoIP_Rt.tcpActivityPending != 0u)
     {
-        DoIP_Rt.aliveTimerMs += elapsedMs;
+        DoIP_ResetTcpActivityTimers();
+    }
+    else
+    {
+#if (DOIP_LAB_DISABLE_TCP_INACTIVITY_ABORT != STD_ON)
+        DoIP_Rt.inactivityTimerMs += elapsedMs;
+#else
+        DoIP_Rt.inactivityTimerMs = 0u;
+#endif
 
-        if (DoIP_Rt.aliveTimerMs >= DOIP_ALIVE_TIMEOUT_MS)
+#if (DOIP_LAB_DISABLE_SERVER_ALIVE_REQ != STD_ON)
+        if (DoIP_Rt.tcpState == DOIP_TCP_ROUTING_ACTIVE)
         {
-            DoIP_Rt.aliveTimerMs = 0u;
-            DoIP_SendAliveReq();
+            DoIP_Rt.aliveTimerMs += elapsedMs;
+
+            if (DoIP_Rt.aliveTimerMs >= DOIP_ALIVE_TIMEOUT_MS)
+            {
+                DoIP_Rt.aliveTimerMs = 0u;
+                DoIP_SendAliveReq();
+            }
         }
+#else
+        DoIP_Rt.aliveTimerMs = 0u;
+#endif
     }
 
+#if (DOIP_LAB_DISABLE_TCP_INACTIVITY_ABORT != STD_ON)
     if (DoIP_Rt.inactivityTimerMs >= DOIP_INACTIVITY_TIMEOUT_MS)
     {
         DoIP_Rt.tcpTimeoutCnt++;
@@ -513,14 +563,14 @@ void DoIP_MainFunction(uint32 elapsedMs)
         DoIP_Rt.routingActive = 0u;
         DoIP_Rt.tcpStreamLen = 0u;
         DoIP_Rt.testerLogicalAddress = 0u;
-        DoIP_Rt.aliveTimerMs = 0u;
-        DoIP_Rt.inactivityTimerMs = 0u;
+        DoIP_ResetTcpActivityTimers();
 
         if (DoIP_Rt.cfg != 0)
         {
             SoAd_AbortTcpConnection(DoIP_Rt.cfg->tcpSoConId);
         }
     }
+#endif
 
     DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
     DoIP_DebugAliveTimerMs = DoIP_Rt.aliveTimerMs;
@@ -530,6 +580,11 @@ void DoIP_MainFunction(uint32 elapsedMs)
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
 {
     DoIP_Rt.dcmRxIndication = cb;
+}
+
+void DoIP_SetSessionResetIndication(DoIP_SessionResetFct cb)
+{
+    DoIP_Rt.sessionReset = cb;
 }
 
 void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
@@ -591,14 +646,13 @@ void DoIP_SoAdTcpRxIndication(SoAd_SoConIdType soConId,
     }
 
     DoIP_DebugTcpRxCounter++;
-    DoIP_Rt.inactivityTimerMs = 0u;
-    DoIP_Rt.aliveTimerMs = 0u;
+    DoIP_MarkTcpActivity();
 
     if ((uint32_t)DoIP_Rt.tcpStreamLen + len > DOIP_TCP_RX_STREAM_LEN)
     {
         DoIP_Rt.tcpStreamLen = 0u;
         DoIP_Rt.malformedCnt++;
-        DoIP_Rt.inactivityTimerMs = 0u;
+        DoIP_MarkTcpActivity();
         DoIP_SendGenericNack(DoIP_Rt.cfg->tcpSoConId, 0, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
         return;
     }
@@ -618,10 +672,17 @@ void DoIP_SoAdTcpConnected(SoAd_SoConIdType soConId)
     DoIP_Rt.routingActive = 0u;
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
-    DoIP_Rt.aliveTimerMs = 0u;
-    DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_ResetTcpActivityTimers();
     DoIP_Rt.vehicleAnnouncementRemaining = 0u;
     DoIP_Rt.vehicleAnnouncementTimerMs = 0u;
+
+    /* Start the upper-layer (PduR/DCM) DoIP transaction state from a clean slate
+     * so a context/mailbox left stuck by a previous connection cannot gate this
+     * new connection's diagnostics. */
+    if (DoIP_Rt.sessionReset != 0)
+    {
+        DoIP_Rt.sessionReset();
+    }
 }
 
 void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
@@ -635,9 +696,15 @@ void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
     DoIP_Rt.routingActive = 0u;
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
-    DoIP_Rt.aliveTimerMs = 0u;
-    DoIP_Rt.inactivityTimerMs = 0u;
+    DoIP_ResetTcpActivityTimers();
     DoIP_ResetVehicleAnnouncement();
+
+    /* Release any upper-layer DoIP transaction context tied to the connection
+     * that just dropped, so it cannot leak into the next one. */
+    if (DoIP_Rt.sessionReset != 0)
+    {
+        DoIP_Rt.sessionReset();
+    }
 }
 
 DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
@@ -676,6 +743,7 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
         return DOIP_BUSY;
     }
 
+    DoIP_MarkTcpActivity();
     DoIP_Rt.diagTxCnt++;
 
     return DOIP_OK;

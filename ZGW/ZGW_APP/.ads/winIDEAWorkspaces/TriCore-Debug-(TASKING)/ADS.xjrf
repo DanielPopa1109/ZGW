@@ -720,11 +720,11 @@
        <RTUpdatePeriod>50</RTUpdatePeriod>
        <RTUpdateWhenRunning>true</RTUpdateWhenRunning>
        <RTUpdateWhenStopped>true</RTUpdateWhenStopped>
-       <UpdateOnBP>false</UpdateOnBP>
+       <UpdateOnBP>true</UpdateOnBP>
        <Access>
         <AllowRealTimeAccess>true</AllowRealTimeAccess>
-        <CacheAccesses>false</CacheAccesses>
-        <DisableSFRCaching>false</DisableSFRCaching>
+        <CacheAccesses>true</CacheAccesses>
+        <DisableSFRCaching>true</DisableSFRCaching>
        </Access>
       </Update1>
       <WatchExport>
@@ -832,20 +832,6 @@
     </Mode>
     <Op_System>
      <Debug>
-      <BPs>
-       <__.0>
-        <ActionEnabled>false</ActionEnabled>
-        <ActionParams></ActionParams>
-        <ActionScript></ActionScript>
-        <ActionShow>false</ActionShow>
-        <Condition>false</Condition>
-        <Count>0</Count>
-        <Enabled>false</Enabled>
-        <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Time\TimeBase.c&quot;::672</Location>
-        <ProcessFilter></ProcessFilter>
-       </__.0>
-      </BPs>
       <Processes.0>
        <URL></URL>
       </Processes.0>
@@ -1035,7 +1021,7 @@
           <Enabled>0</Enabled>
           <BP.0>
            <Access>1</Access>
-           <Address>TimeBase_NvMStoreCounter</Address>
+           <Address>0xB0000210</Address>
            <Enabled>1</Enabled>
            <EntireObject>1</EntireObject>
            <Range>1</Range>
