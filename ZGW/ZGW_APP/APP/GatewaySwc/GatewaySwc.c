@@ -565,10 +565,12 @@ void GatewaySwc_MainFunction(void)
         GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
     }
 
+    /* RX DTC evaluation stays on the 5 ms main cadence, not the 1 s runtime tick. */
+    GatewaySwc_UpdateRxDiagnostics();
+
     if (GatewaySwc_DiagTimerMs >= GATEWAYSWC_DIAG_PERIOD_MS)
     {
         GatewaySwc_DiagTimerMs = 0u;
-        GatewaySwc_UpdateRxDiagnostics();
     }
 
     GatewaySwc_FlushDtcTransitionQueue();
@@ -1661,6 +1663,10 @@ static void GatewaySwc_UpdateRxDiagnostics(void)
                 GatewaySwc_Status.rxDiagLastTimeoutPduId = (uint16)pduId;
             }
         }
+        else
+        {
+            GatewaySwc_RxMessageTimeoutActiveSamples[i] = 0u;
+        }
     }
 
     for (i = 0u; i < (uint16)GATEWAYSWC_RX_SIGNAL_DIAG_COUNT; i++)
@@ -1714,6 +1720,10 @@ static void GatewaySwc_UpdateRxDiagnostics(void)
                 GatewaySwc_RxSignalTimeoutCounter[i]++;
             }
         }
+        else
+        {
+            GatewaySwc_RxSignalTimeoutActiveSamples[i] = 0u;
+        }
 
         if ((status & GATEWAYSWC_RX_DIAG_STATUS_INVALID) != 0u)
         {
@@ -1727,6 +1737,10 @@ static void GatewaySwc_UpdateRxDiagnostics(void)
                 GatewaySwc_Status.rxDiagLastInvalidSignalId = (uint16)signalId;
                 GatewaySwc_Status.rxDiagLastInvalidValue = value;
             }
+        }
+        else
+        {
+            GatewaySwc_RxSignalInvalidActiveSamples[i] = 0u;
         }
     }
 

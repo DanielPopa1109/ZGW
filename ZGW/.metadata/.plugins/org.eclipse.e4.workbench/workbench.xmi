@@ -32,7 +32,7 @@
           <tags>persp.showIn:org.eclipse.tm.terminal.view.ui.TerminalsView</tags>
           <tags>persp.actionSet:com.ifx.ide.activeProject.build</tags>
           <tags>persp.newWizSC:com.infineon.aurix.buildsystem.managed.wizard.new</tags>
-          <children xsi:type="basic:PartSashContainer" xmi:id="_RETutVYbEfGMBbfkDf-zfQ" selectedElement="_RETuvFYbEfGMBbfkDf-zfQ" horizontal="true">
+          <children xsi:type="basic:PartSashContainer" xmi:id="_RETutVYbEfGMBbfkDf-zfQ" selectedElement="_RETutlYbEfGMBbfkDf-zfQ" horizontal="true">
             <children xsi:type="basic:PartSashContainer" xmi:id="_RETutlYbEfGMBbfkDf-zfQ" containerData="1620" selectedElement="_RETut1YbEfGMBbfkDf-zfQ">
               <children xsi:type="basic:PartStack" xmi:id="_RETut1YbEfGMBbfkDf-zfQ" elementId="Left" containerData="7540" selectedElement="_RETuuFYbEfGMBbfkDf-zfQ">
                 <tags>active</tags>
@@ -53,7 +53,7 @@
                 </children>
               </children>
             </children>
-            <children xsi:type="basic:PartSashContainer" xmi:id="_RETuvFYbEfGMBbfkDf-zfQ" containerData="8380" selectedElement="_RETuwVYbEfGMBbfkDf-zfQ">
+            <children xsi:type="basic:PartSashContainer" xmi:id="_RETuvFYbEfGMBbfkDf-zfQ" containerData="8380" selectedElement="_RETuvVYbEfGMBbfkDf-zfQ">
               <children xsi:type="basic:PartSashContainer" xmi:id="_RETuvVYbEfGMBbfkDf-zfQ" containerData="5719" selectedElement="_RETuvlYbEfGMBbfkDf-zfQ" horizontal="true">
                 <children xsi:type="advanced:Placeholder" xmi:id="_RETuvlYbEfGMBbfkDf-zfQ" elementId="org.eclipse.ui.editorss" containerData="6206" ref="_REUWpVYbEfGMBbfkDf-zfQ"/>
                 <children xsi:type="basic:PartStack" xmi:id="_RETuv1YbEfGMBbfkDf-zfQ" elementId="PartStack@54bc16f4" toBeRendered="false" containerData="3794">
@@ -323,7 +323,7 @@
     <sharedElements xsi:type="basic:Part" xmi:id="_REUWp1YbEfGMBbfkDf-zfQ" elementId="com.infineon.aurix.buildsystem.view.AURIXCView" contributionURI="bundleclass://org.eclipse.ui.workbench/org.eclipse.ui.internal.e4.compatibility.CompatibilityView" label="C/C++ Projects" iconURI="platform:/plugin/com.infineon.aurix.buildsystem/resources/assets/Icon_AURIX_16px_02.png" tooltip="" closeable="true">
       <persistedState key="originalCompatibilityViewClass" value="com.infineon.aurix.buildsystem.ui.AURIXCView"/>
       <persistedState key="originalCompatibilityViewBundle" value="com.infineon.aurix.buildsystem"/>
-      <persistedState key="memento" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xD;&#xA;&lt;view horizontalPosition=&quot;0&quot; verticalPosition=&quot;0&quot;>&#xD;&#xA;&lt;expanded>&#xD;&#xA;&lt;element path=&quot;C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_FBL&quot;/>&#xD;&#xA;&lt;/expanded>&#xD;&#xA;&lt;selection>&#xD;&#xA;&lt;element path=&quot;C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_FBL&quot;/>&#xD;&#xA;&lt;/selection>&#xD;&#xA;&lt;/view>"/>
+      <persistedState key="memento" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xD;&#xA;&lt;view horizontalPosition=&quot;0&quot; verticalPosition=&quot;0&quot;>&#xD;&#xA;&lt;selection>&#xD;&#xA;&lt;element path=&quot;C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_FBL&quot;/>&#xD;&#xA;&lt;/selection>&#xD;&#xA;&lt;/view>"/>
       <tags>View</tags>
       <tags>categoryTag:Infineon</tags>
       <tags>active</tags>
@@ -582,7 +582,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXHlYbEfGMBbfkDf-zfQ" elementId="org.eclipse.ui.workbench.file">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_A_lP8GBlEfGbaLI5grkkwg" elementId="print" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" command="_REWyj1YbEfGMBbfkDf-zfQ"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_kk4dMGMSEfG7-dH10hkPsQ" elementId="print" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" command="_REWyj1YbEfGMBbfkDf-zfQ"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXLFYbEfGMBbfkDf-zfQ" elementId="group.edit" toBeRendered="false">
         <tags>toolbarSeparator</tags>
@@ -590,8 +590,8 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXLlYbEfGMBbfkDf-zfQ" elementId="org.eclipse.ui.workbench.edit">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_A_nFIGBlEfGbaLI5grkkwg" elementId="undo" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/undo_edit.png" tooltip="Undo" enabled="false" command="_REWyeFYbEfGMBbfkDf-zfQ"/>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_A_nFIWBlEfGbaLI5grkkwg" elementId="redo" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/redo_edit.png" tooltip="Redo" enabled="false" command="_REWzIVYbEfGMBbfkDf-zfQ"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_kk6SYGMSEfG7-dH10hkPsQ" elementId="undo" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/undo_edit.png" tooltip="Undo" enabled="false" command="_REWyeFYbEfGMBbfkDf-zfQ"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_kk65cGMSEfG7-dH10hkPsQ" elementId="redo" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/redo_edit.png" tooltip="Redo" enabled="false" command="_REWzIVYbEfGMBbfkDf-zfQ"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXOFYbEfGMBbfkDf-zfQ" elementId="additions" toBeRendered="false">
         <tags>toolbarSeparator</tags>
@@ -612,7 +612,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXdFYbEfGMBbfkDf-zfQ" elementId="org.eclipse.ui.workbench.navigate">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_A_nsM2BlEfGbaLI5grkkwg" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_REWyLFYbEfGMBbfkDf-zfQ"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_kk7ggGMSEfG7-dH10hkPsQ" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_REWyLFYbEfGMBbfkDf-zfQ"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_REUXf1YbEfGMBbfkDf-zfQ" elementId="group.editor" toBeRendered="false">
         <tags>toolbarSeparator</tags>

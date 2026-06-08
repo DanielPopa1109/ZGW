@@ -7,6 +7,8 @@
 #define COM_TRUE  1u
 #define COM_FALSE 0u
 
+#define COM_RX_TIMEOUT_CYCLE_FACTOR 20u
+
 
 typedef struct
 {
@@ -1897,14 +1899,35 @@ static uint16 Com_MsToMainTicks(uint16 timeMs)
     return (ticks > 0xFFFFu) ? 0xFFFFu : (uint16)ticks;
 }
 
-static uint16 Com_GetRxDeadlineMainTicks(const Com_RxIpduConfigType* cfg)
+static uint16 Com_MultiplyMainTicks(uint16 ticks, uint16 factor)
+{
+    uint32 scaledTicks;
+
+    if ((ticks == 0u) || (factor == 0u))
+    {
+        return 0u;
+    }
+
+    scaledTicks = (uint32)ticks * (uint32)factor;
+
+    return (scaledTicks > 0xFFFFu) ? 0xFFFFu : (uint16)scaledTicks;
+}
+
+static uint16 Com_GetRxCycleMainTicks(const Com_RxIpduConfigType* cfg)
 {
     if (cfg == NULL_PTR)
     {
         return 0u;
     }
 
+    /* RX config stores the generated message cycle time in milliseconds. */
     return Com_MsToMainTicks(cfg->deadlineTicks);
+}
+
+static uint16 Com_GetRxDeadlineMainTicks(const Com_RxIpduConfigType* cfg)
+{
+    return Com_MultiplyMainTicks(Com_GetRxCycleMainTicks(cfg),
+            COM_RX_TIMEOUT_CYCLE_FACTOR);
 }
 
 static uint8 Com_TxIpduBelongsToChannel(PduIdType pduId, uint8 channel)
@@ -2270,7 +2293,6 @@ Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
         uint16* TimeoutTicksPtr)
 {
     uint8 rxIdx;
-    uint16 timeoutTicks;
 
     if ((CycleTicksPtr == NULL_PTR) || (TimeoutTicksPtr == NULL_PTR))
     {
@@ -2284,9 +2306,8 @@ Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
         return E_NOT_OK;
     }
 
-    timeoutTicks = Com_GetRxDeadlineMainTicks(&Com_RxIpduCfg[rxIdx]);
-    *TimeoutTicksPtr = timeoutTicks;
-    *CycleTicksPtr = timeoutTicks;
+    *CycleTicksPtr = Com_GetRxCycleMainTicks(&Com_RxIpduCfg[rxIdx]);
+    *TimeoutTicksPtr = Com_GetRxDeadlineMainTicks(&Com_RxIpduCfg[rxIdx]);
 
     return E_OK;
 }

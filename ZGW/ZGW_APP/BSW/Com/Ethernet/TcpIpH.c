@@ -9,15 +9,13 @@
 
 #define TCPIP_MAX_SOCKETS 16u
 
-/* TCP keepalive applied to accepted server connections so a tester that
- * disappears without a FIN/RST is detected and dropped at the TCP layer,
- * freeing the connection instead of leaving a half-open ESTABLISHED PCB.
- * lwIP takes the idle/interval values in seconds via setsockopt. A dead peer
- * is reaped ~14 s after going silent (8 s idle + 3 probes x 2 s); a live but
- * idle tester ACKs the probes and is unaffected. */
-#define TCPIP_TCP_KEEPALIVE_IDLE_S      8
-#define TCPIP_TCP_KEEPALIVE_INTERVAL_S  2
+/* TCP keepalive is only a stale-peer cleanup fallback. Keep it comfortably
+ * above diagnostic readout timing so a burst of tester-side waiting cannot be
+ * mistaken for a dead connection. */
+#define TCPIP_TCP_KEEPALIVE_IDLE_S      60
+#define TCPIP_TCP_KEEPALIVE_INTERVAL_S  10
 #define TCPIP_TCP_KEEPALIVE_COUNT       3
+#define TCPIP_TCP_SEND_RETRY_LIMIT      4u
 
 typedef struct
 {
@@ -383,6 +381,16 @@ static void TcpIp_EnableKeepAlive(TcpIp_SocketIdType sock)
     (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
 }
 
+static void TcpIp_EnableAcceptedTcpOptions(TcpIp_SocketIdType sock)
+{
+    int optval;
+
+    optval = 1;
+    (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
+
+    TcpIp_EnableKeepAlive(sock);
+}
+
 TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr)
 {
     struct sockaddr_in addr;
@@ -413,7 +421,7 @@ TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *rem
         slot->tcp = 1u;
 
         (void)lwip_fcntl(newSock, F_SETFL, O_NONBLOCK);
-        TcpIp_EnableKeepAlive(slot->sock);
+        TcpIp_EnableAcceptedTcpOptions(slot->sock);
 
         if (remoteAddr != 0)
         {
@@ -449,6 +457,10 @@ sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port)
 sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
 {
     sint32 ret;
+    sint32 result;
+    uint16 sent;
+    uint8 attempts;
+    int lastErr;
 
     if ((data == 0) || (len == 0u) || (TcpIp_IsLinkUp() == 0u))
     {
@@ -472,16 +484,40 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         return -1;
     }
 
-    ret = (sint32)lwip_send(sock, data, len, 0);
-    TcpIp_LastSendResult = ret;
+    sent = 0u;
+    attempts = TCPIP_TCP_SEND_RETRY_LIMIT;
+    lastErr = 0;
+    ret = -1;
 
-    if (ret < 0)
+    while ((sent < len) && (attempts > 0u))
     {
-        TcpIp_LastSocketError = errno;
+        ret = (sint32)lwip_send(sock, &data[sent], (uint16)(len - sent), 0);
+
+        if (ret > 0)
+        {
+            sent = (uint16)(sent + (uint16)ret);
+            attempts = TCPIP_TCP_SEND_RETRY_LIMIT;
+            continue;
+        }
+
+        if (ret < 0)
+        {
+            lastErr = errno;
+        }
+
+        attempts--;
+    }
+
+    result = (sent > 0u) ? (sint32)sent : ret;
+    TcpIp_LastSendResult = result;
+
+    if ((sent < len) && (lastErr != 0))
+    {
+        TcpIp_LastSocketError = lastErr;
     }
 
     TcpIp_Unlock();
-    return ret;
+    return result;
 }
 
 sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,

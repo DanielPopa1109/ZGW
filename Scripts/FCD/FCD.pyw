@@ -30,6 +30,16 @@ DEFAULT_BLOCK_SIZE = 512
 # 100 ms gap on top of that so the ZGW is never flooded back-to-back.
 REQUEST_SPACING_SECONDS = 0.1
 
+# Fault-memory detail readout can require hundreds of short 0x19 04/06 requests.
+# Keep the normal conservative pacing for writes/programming, but use a tighter
+# serialized gap for this read-only sequence.
+FAULT_MEMORY_REQUEST_SPACING_SECONDS = 0.02
+FAULT_MEMORY_DETAIL_TIMEOUT_SECONDS = 8.0
+
+POST_RESET_RECONNECT_DELAY_SECONDS = 1.0
+POST_RESET_UDS_READY_TIMEOUT_SECONDS = 30.0
+POST_RESET_UDS_READY_RETRY_SECONDS = 0.5
+
 # Lab ZGW CodingApp identifiers. These mirror APP/CodingApp/CodingApp.h.
 CODING_DID_STATUS = 0xF1C0
 CODING_DID_IMAGE = 0xF1C1
@@ -460,7 +470,13 @@ def uds_response_matches_request(response, request):
         return len(request) < 2 or (len(response) >= 2 and response[1] == request[1])
 
     if sid == 0x19:
-        return len(request) < 2 or (len(response) >= 2 and response[1] == request[1])
+        if len(request) < 2:
+            return True
+        if len(response) < 2 or response[1] != request[1]:
+            return False
+        if request[1] in (0x04, 0x06):
+            return len(request) < 5 or (len(response) >= 5 and response[2:5] == request[2:5])
+        return True
 
     if sid in (0x22, 0x2E, 0x2F):
         return len(request) < 3 or (len(response) >= 3 and response[1:3] == request[1:3])
@@ -594,6 +610,7 @@ class DoipClient:
         self.sock = None
         self.lock = threading.Lock()
         self._last_request_ts = 0.0
+        self.request_spacing_seconds = REQUEST_SPACING_SECONDS
 
     @property
     def connected(self):
@@ -602,7 +619,7 @@ class DoipClient:
     def _pace(self):
         # Enforce the minimum gap since the previous request was issued on this socket.
         # Called inside self.lock so it also serializes concurrent callers.
-        wait = REQUEST_SPACING_SECONDS - (time.monotonic() - self._last_request_ts)
+        wait = self.request_spacing_seconds - (time.monotonic() - self._last_request_ts)
         if wait > 0:
             time.sleep(wait)
         self._last_request_ts = time.monotonic()
@@ -1101,13 +1118,14 @@ class RawTcpUdsClient:
         self.sock = None
         self.lock = threading.Lock()
         self._last_request_ts = 0.0
+        self.request_spacing_seconds = REQUEST_SPACING_SECONDS
 
     @property
     def connected(self):
         return self.sock is not None
 
     def _pace(self):
-        wait = REQUEST_SPACING_SECONDS - (time.monotonic() - self._last_request_ts)
+        wait = self.request_spacing_seconds - (time.monotonic() - self._last_request_ts)
         if wait > 0:
             time.sleep(wait)
         self._last_request_ts = time.monotonic()
@@ -1296,7 +1314,7 @@ class FcdApp:
         )
 
         self.keepalive_var = tk.BooleanVar(value=True)
-        self.keepalive_period_var = tk.StringVar(value="1.0")
+        self.keepalive_period_var = tk.StringVar(value="2.0")
 
     def _build_diagnostics_tab(self):
         outer = ttk.Frame(self.diagnostics_tab)
@@ -1722,7 +1740,7 @@ class FcdApp:
             return True
         return self.client is not client
 
-    def reconnect_doip(self, client, reason, stop_event=None):
+    def reconnect_doip(self, client, reason, stop_event=None, log_success=True, deadline=None):
         if not isinstance(client, DoipClient):
             return
 
@@ -1730,16 +1748,20 @@ class FcdApp:
         last_error = None
         attempt = 0
 
-        self.log(
-            f"DoIP reconnect after {reason}: waiting for TCP {client.host}:{client.port} "
-            "until Disconnect"
-        )
+        if log_success:
+            self.log(
+                f"DoIP reconnect after {reason}: waiting for TCP {client.host}:{client.port} "
+                "until Disconnect"
+            )
         client.close()
         self.root.after(0, self._set_connected_status, False)
         if self._reconnect_cancelled(client, stop_event):
             raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button")
 
         while not self._reconnect_cancelled(client, stop_event):
+            if (deadline is not None) and (time.monotonic() >= deadline):
+                break
+
             attempt += 1
             try:
                 client.connect()
@@ -1751,7 +1773,8 @@ class FcdApp:
                     client.close()
                     break
                 self.root.after(0, self._set_connected_status, True)
-                self.log(f"DoIP reconnected after {reason}")
+                if log_success:
+                    self.log(f"DoIP reconnected after {reason}")
                 return
             except (OSError, TimeoutError, DoipError) as exc:
                 last_error = exc
@@ -1760,13 +1783,20 @@ class FcdApp:
                     self.log(f"DoIP reconnect after {reason}: attempt {attempt} failed: {exc}")
                 if self._reconnect_cancelled(client, stop_event):
                     break
-                if stop_event is not None:
-                    if stop_event.wait(0.5):
+                wait_time = 0.5
+                if deadline is not None:
+                    wait_time = min(wait_time, max(0.0, deadline - time.monotonic()))
+                    if wait_time <= 0.0:
                         break
-                elif self.worker_stop.wait(0.5):
+                if stop_event is not None:
+                    if stop_event.wait(wait_time):
+                        break
+                elif self.worker_stop.wait(wait_time):
                     break
 
         self.root.after(0, self._set_connected_status, False)
+        if (deadline is not None) and (time.monotonic() >= deadline):
+            raise FcdError(f"DoIP reconnect after {reason} timed out: {last_error}")
         if last_error is None:
             raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button")
         raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button: {last_error}")
@@ -2124,13 +2154,15 @@ class FcdApp:
     def send_uds_async(self, request, label="UDS"):
         def action():
             client = self.require_client()
-            self.log(f"TX {label}: {bytes_to_hex(request)}")
-            response = client.send_uds(request, timeout=float(self.timeout_var.get()))
+            request_bytes = bytes(request)
+            self.log(f"TX {label}: {bytes_to_hex(request_bytes)}")
+            response = client.send_uds(request_bytes, timeout=float(self.timeout_var.get()))
             self.log(f"RX {label}: {bytes_to_hex(response)}")
+            require_positive_response(response, request_bytes[0])
             if isinstance(client, DoipClient) and response:
-                if len(request) >= 2 and request[0] == 0x10 and (request[1] & 0x7F) == 0x02 and response[0] == 0x50:
+                if len(request_bytes) >= 2 and request_bytes[0] == 0x10 and (request_bytes[1] & 0x7F) == 0x02 and response[0] == 0x50:
                     self.reconnect_doip(client, "programming session")
-                elif len(request) >= 2 and request[0] == 0x11 and (request[1] & 0x7F) in (0x01, 0x03) and response[0] == 0x51:
+                elif len(request_bytes) >= 2 and request_bytes[0] == 0x11 and (request_bytes[1] & 0x7F) in (0x01, 0x03) and response[0] == 0x51:
                     self.reconnect_doip(client, "ECU reset")
 
         self.worker(label, action)
@@ -2156,36 +2188,49 @@ class FcdApp:
             period = 1.0
             self.keepalive_period_var.set(f"{period:.1f}")
 
+        last_success_log = 0.0
+
+        def log_keepalive_success(message):
+            nonlocal last_success_log
+            now = time.monotonic()
+            if now - last_success_log >= 60.0:
+                self.log(message)
+                last_success_log = now
+
         def loop():
             while not self.keepalive_stop.is_set():
                 client = self.client
                 try:
                     if client is not None and client.connected:
                         if isinstance(client, DoipClient):
-                            timeout = max(float(self.timeout_var.get()), 6.0)
-                            response = client.send_uds(b"\x3E\x00", timeout=timeout)
-                            require_positive_response(response, 0x3E)
-                            self.log(f"TesterPresent RX: {bytes_to_hex(response)}")
+                            timeout = max(float(self.timeout_var.get()), 3.0)
+                            client.send_uds_suppress_positive(b"\x3E\x80", timeout=timeout)
+                            log_keepalive_success("TesterPresent OK: 3E 80 DoIP ACK")
                         else:
                             response = client.send_uds(b"\x3E\x00", timeout=float(self.timeout_var.get()))
                             require_positive_response(response, 0x3E)
-                            self.log(f"TesterPresent RX: {bytes_to_hex(response)}")
+                            log_keepalive_success(f"TesterPresent RX: {bytes_to_hex(response)}")
                 except Exception as exc:
-                    self.log(f"TesterPresent ERROR: {exc}")
                     if self.keepalive_stop.is_set():
                         break
                     if isinstance(client, DoipClient) and self.client is client:
                         try:
-                            self.reconnect_doip(client, "TesterPresent failure", stop_event=self.keepalive_stop)
+                            self.reconnect_doip(
+                                client,
+                                "TesterPresent TCP refresh",
+                                stop_event=self.keepalive_stop,
+                                log_success=False,
+                            )
                             if self.keepalive_stop.is_set():
                                 break
-                            self.log("TesterPresent recovered after reconnect")
+                            log_keepalive_success("TesterPresent refreshed DoIP connection")
                         except Exception as reconnect_exc:
                             if self.keepalive_stop.is_set() or self.worker_stop.is_set() or self.client is not client:
                                 break
-                            self.log(f"TesterPresent reconnect stopped: {reconnect_exc}")
+                            self.log(f"TesterPresent ERROR: {exc}; reconnect stopped: {reconnect_exc}")
                             break
                     elif client is not None and self.client is client:
+                        self.log(f"TesterPresent ERROR: {exc}")
                         client.close()
                         self.root.after(0, self._set_connected_status, False)
                 self.keepalive_stop.wait(period)
@@ -2239,8 +2284,34 @@ class FcdApp:
         self.dtc_summary_var.set("No fault memory read yet")
 
     def clear_diagnostic_information_clicked(self):
-        request = b"\x14\xff\xff\xff"
-        self.send_uds_async(request, "ClearDiagnosticInformation 14 FF FF FF")
+        def action():
+            client = self.require_client()
+            keepalive_was_on = bool(self.keepalive_var.get()) or self.keepalive_is_running()
+            if keepalive_was_on:
+                self.stop_keepalive(update_var=False)
+                self.log("ClearDiagnosticInformation: paused automatic tester present")
+
+            sequence_ok = False
+            try:
+                for request, label, timeout in [
+                    (bytes([0x10, SESSION_EXTENDED]), "Extended Session for ClearDiagnosticInformation", 10.0),
+                    (b"\x14\xff\xff\xff", "ClearDiagnosticInformation 14 FF FF FF", max(5.0, float(self.timeout_var.get()))),
+                ]:
+                    self.log(f"TX {label}: {bytes_to_hex(request)}")
+                    response = self._send_uds_with_reconnect(client, request, label, timeout=timeout)
+                    self.log(f"RX {label}: {bytes_to_hex(response)}")
+                    require_positive_response(response, request[0])
+
+                self.log("ClearDiagnosticInformation: positive response accepted; active faults can be reported again if still present")
+                sequence_ok = True
+            finally:
+                if keepalive_was_on and self.client is not None and self.client.connected:
+                    self.start_keepalive()
+                elif (not sequence_ok) and (self.client is client) and (not client.connected):
+                    self.client = None
+                    self.root.after(0, self._set_connected_status, False)
+
+        self.worker("ClearDiagnosticInformation 14 FF FF FF", action)
 
     def read_fault_memory_clicked(self):
         try:
@@ -2261,6 +2332,9 @@ class FcdApp:
             rows = []
             summaries = []
             sequence_ok = False
+            old_request_spacing = getattr(client, "request_spacing_seconds", REQUEST_SPACING_SECONDS)
+            if hasattr(client, "request_spacing_seconds"):
+                client.request_spacing_seconds = FAULT_MEMORY_REQUEST_SPACING_SECONDS
             try:
                 for request, label in [
                     (bytes([0x19, 0x01, 0xFF]), "19 01 FF reportNumberOfDTCByStatusMask"),
@@ -2285,6 +2359,8 @@ class FcdApp:
                             row["extended"] = self._read_dtc_detail(client, dtc, 0x06, "extended data")
                 sequence_ok = True
             finally:
+                if hasattr(client, "request_spacing_seconds"):
+                    client.request_spacing_seconds = old_request_spacing
                 if keepalive_was_on and sequence_ok and self.client is not None and self.client.connected:
                     self.start_keepalive()
                 elif (not sequence_ok) and (self.client is client) and (not client.connected):
@@ -2328,7 +2404,7 @@ class FcdApp:
                 client,
                 request,
                 label,
-                timeout=max(2.0, float(self.timeout_var.get())),
+                timeout=max(FAULT_MEMORY_DETAIL_TIMEOUT_SECONDS, float(self.timeout_var.get())),
             )
             self.log(f"RX {label}: {bytes_to_hex(response)}")
             require_positive_response(response, 0x19)
@@ -2736,9 +2812,10 @@ class FcdApp:
             )
 
     def _tolerant_ecu_reset(self, client, reason):
-        # A hard reset makes the ECU drop TCP immediately, so the reply is best-effort:
-        # it may be a clean 51 01, a stale frame left in the buffer, or nothing at all.
-        # Do not validate it - we discard the socket and reconnect fresh afterwards.
+        # A hard reset response is best-effort: it may be a clean 51 01, a stale
+        # frame left in the buffer, or nothing at all. The ZGW defers the actual
+        # reset briefly after 51 01 so Ethernet can transmit the response, so wait
+        # before reconnecting or we can reconnect to the old pre-reset application.
         req = b"\x11\x01"
         self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
         try:
@@ -2747,7 +2824,66 @@ class FcdApp:
         except Exception as exc:
             self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
         if isinstance(client, DoipClient):
+            self.log(
+                f"ECUReset hardReset {reason}: waiting {POST_RESET_RECONNECT_DELAY_SECONDS:.1f} s "
+                "before DoIP reconnect"
+            )
+            if self.worker_stop.wait(POST_RESET_RECONNECT_DELAY_SECONDS):
+                raise FcdError(f"ECUReset hardReset {reason}: cancelled by Disconnect button")
             self.reconnect_doip(client, reason)
+            self._wait_for_post_reset_uds_ready(client, reason)
+
+    def _wait_for_post_reset_uds_ready(self, client, reason, timeout=POST_RESET_UDS_READY_TIMEOUT_SECONDS):
+        request = bytes([0x10, SESSION_DEFAULT])
+        deadline = time.monotonic() + float(timeout)
+        attempt = 0
+        last_error = None
+
+        if not isinstance(client, DoipClient):
+            return
+
+        self.log(f"Post-reset UDS readiness after {reason}: waiting up to {timeout:.1f} s")
+
+        while not self._reconnect_cancelled(client):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+
+            attempt += 1
+            try:
+                if attempt == 1 or attempt % 5 == 0:
+                    self.log(f"TX Post-reset Default Session probe: {bytes_to_hex(request)}")
+                response = client.send_uds(request, timeout=max(0.5, min(2.0, remaining)))
+                if attempt == 1 or attempt % 5 == 0:
+                    self.log(f"RX Post-reset Default Session probe: {bytes_to_hex(response)}")
+                require_positive_response(response, 0x10)
+                self.log(f"Post-reset UDS ready after {reason}")
+                return
+            except Exception as exc:
+                last_error = exc
+                if attempt == 1 or attempt % 5 == 0:
+                    self.log(f"Post-reset UDS not ready after {reason}: attempt {attempt} failed ({exc})")
+
+                client.close()
+                self.root.after(0, self._set_connected_status, False)
+
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                if self.worker_stop.wait(min(POST_RESET_UDS_READY_RETRY_SECONDS, remaining)):
+                    raise FcdError(f"Post-reset UDS readiness after {reason}: cancelled by Disconnect button")
+
+                try:
+                    self.reconnect_doip(
+                        client,
+                        f"{reason} UDS readiness",
+                        deadline=deadline,
+                    )
+                except FcdError as reconnect_exc:
+                    last_error = reconnect_exc
+                    break
+
+        raise FcdError(f"Post-reset UDS did not become ready after {reason}: {last_error}")
 
     def _parse_read_coding_result(self, result_resp):
         # Strip 0x71 + sub-function echo + 2-byte routine id, then the 10-byte status
@@ -2837,7 +2973,7 @@ class FcdApp:
 
         return text
 
-    def _read_coding_app_status(self, send, prefix):
+    def _read_coding_app_status(self, send, prefix, required=False):
         try:
             response = send(
                 b"\x22" + struct.pack(">H", CODING_DID_STATUS),
@@ -2848,6 +2984,8 @@ class FcdApp:
             self.log(f"{prefix}: CodingApp status decoded: {self._decode_coding_status_payload(payload)}")
         except Exception as exc:
             self.log(f"{prefix}: CodingApp status read failed: {exc}")
+            if required:
+                raise FcdError(f"{prefix}: CodingApp status read failed after reset") from exc
 
     def _run_coding_routine(self, send, rid, option, label, timeout=60.0, max_pending_polls=10):
         start_resp = send(
@@ -2925,7 +3063,7 @@ class FcdApp:
                 send = self._make_uds_sender(client, dry=False)
 
                 # --- Code the ECU from the coding session ---
-                self._send_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
+                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
                 self._run_coding_routine(send, write_rid, mask, "Write Coding", timeout=90.0)
                 self._run_coding_routine(send, check_rid, b"", "Check Coding", timeout=20.0)
 
@@ -2935,38 +3073,30 @@ class FcdApp:
                 send = self._make_uds_sender(client, dry=False)
 
                 # --- Read back the standard status and the persisted coding ---
-                # Some ZGW resets accept routing activation before DCM is ready to
-                # answer the first diagnostic frame. Treat this phase as best-effort:
-                # the write/check routines already succeeded before the reset.
-                self._try_send_session(send, SESSION_DEFAULT, "Default Session after coding reset")
-                self._try_send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
-                self._read_coding_app_status(send, "Code ECU")
+                self._send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
+                self._read_coding_app_status(send, "Code ECU", required=True)
                 for did, name in [
                     (DID_APP_SW_VERSION, "Read Software Version F101"),
                     (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
                     (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
                 ]:
-                    self._try_send(send, b"\x22" + struct.pack(">H", did), f"Code ECU: {name}")
+                    send(b"\x22" + struct.pack(">H", did), f"Code ECU: {name}")
 
-                start_resp = self._try_send(
-                    send,
+                send(
                     b"\x31\x01" + struct.pack(">H", read_rid),
                     "RoutineControl 0203 Read Coding start",
-                    timeout=5.0,
+                    timeout=10.0,
                 )
-                if start_resp:
-                    result_resp = self._try_send(
-                        send,
-                        b"\x31\x03" + struct.pack(">H", read_rid),
-                        "RoutineControl 0203 Read Coding result",
-                        timeout=5.0,
-                    )
-                    if result_resp:
-                        coding_payload = self._parse_read_coding_result(result_resp)
-                        self.root.after(0, self._load_mask_to_coding_tree, coding_payload)
+                result_resp = send(
+                    b"\x31\x03" + struct.pack(">H", read_rid),
+                    "RoutineControl 0203 Read Coding result",
+                    timeout=10.0,
+                )
+                coding_payload = self._parse_read_coding_result(result_resp)
+                self.root.after(0, self._load_mask_to_coding_tree, coding_payload)
 
                 # --- Leave the ECU in the default session ---
-                self._try_send_session(send, SESSION_DEFAULT, "Default Session")
+                self._send_session(send, SESSION_DEFAULT, "Default Session")
                 sequence_ok = True
             except Exception:
                 if send is not None and self.client is client and client.connected:
@@ -3065,7 +3195,7 @@ class FcdApp:
             # dry run, so the session request is always sent for real.
             send = self._make_uds_sender(client, dry=False)
             try:
-                self._send_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
+                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
                 mask = self._coding_rows_to_mask()
                 # The coding mask is delivered as the option record of the Write Coding
                 # routine start (0x0202). WriteDataByIdentifier (0x2E) is no longer
@@ -3091,7 +3221,7 @@ class FcdApp:
             # session (10 41) so the ZGW does not reject 0x31 in the default session.
             # Coding is never a dry run - send the session and routine for real.
             send = self._make_uds_sender(client, dry=False)
-            self._send_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
+            self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
             send(b"\x31\x01" + struct.pack(">H", rid), "Load Coding Default", timeout=20.0)
 
         self.worker("Load Coding Default", action)
@@ -3104,7 +3234,7 @@ class FcdApp:
             # post-flash coding flow (_execute_coding_after_flash). Coding is never a
             # dry run, so the session request is always sent for real.
             send = self._make_uds_sender(client, dry=False)
-            self._send_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
+            self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
             for control_type, label in [(0x01, "start"), (0x03, "result")]:
                 req = bytes([0x31, control_type]) + struct.pack(">H", rid)
                 self.log(f"TX Check Coding {label}: {bytes_to_hex(req)}")
@@ -3567,16 +3697,53 @@ class FcdApp:
 
         return send
 
-    def _send_session(self, send, session, label, allow_no_response=False):
+    def _send_session(self, send, session, label, allow_no_response=False, timeout=10.0):
         response = send(
             bytes([0x10, session & 0xFF]),
             label,
-            timeout=10.0,
+            timeout=timeout,
             allow_no_response=allow_no_response,
         )
         if isinstance(response, bytes) and len(response) >= 2:
             self.log(f"{label}: active_session_response=0x{response[1]:02X}")
+            if response[1] != (session & 0xFF):
+                raise FcdError(
+                    f"{label}: requested session 0x{session:02X}, response echoed 0x{response[1]:02X}"
+                )
         return response
+
+    def _read_active_diag_session(self, send, prefix, timeout=2.0):
+        response = send(
+            b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION),
+            f"{prefix}: Read Active Diagnostic Session F186",
+            timeout=timeout,
+        )
+        require_positive_response(response, 0x22)
+        if (len(response) < 4) or (response[1] != 0xF1) or (response[2] != 0x86):
+            raise FcdError(f"{prefix}: malformed active-session DID response {bytes_to_hex(response)}")
+        session = response[3]
+        self.log(f"{prefix}: active_session=0x{session:02X}")
+        return session
+
+    def _ensure_session(self, send, session, label, timeout=3.0):
+        try:
+            return self._send_session(send, session, label, timeout=timeout)
+        except Exception as session_exc:
+            self.log(f"{label}: no positive session response ({session_exc}); verifying active session")
+            try:
+                active_session = self._read_active_diag_session(send, label, timeout=2.0)
+            except Exception as verify_exc:
+                raise FcdError(
+                    f"{label}: session response missing and active session could not be verified"
+                ) from verify_exc
+
+            if active_session == (session & 0xFF):
+                self.log(f"{label}: active session is 0x{active_session:02X}; continuing")
+                return b""
+
+            raise FcdError(
+                f"{label}: requested session 0x{session:02X}, active session is 0x{active_session:02X}"
+            ) from session_exc
 
     def _try_send_session(self, send, session, label, timeout=3.0):
         try:
@@ -3631,10 +3798,12 @@ class FcdApp:
         self._read_standard_status(send, prefix)
 
     def _execute_hard_reset(self, client, reason):
-        send = self._make_uds_sender(client)
-        send(b"\x11\x01", f"ECUReset hardReset {reason}", timeout=5.0, allow_no_response=True)
-        if isinstance(client, DoipClient) and not self.dry_run_var.get():
-            self.reconnect_doip(client, reason)
+        if self.dry_run_var.get():
+            send = self._make_uds_sender(client)
+            send(b"\x11\x01", f"ECUReset hardReset {reason}", timeout=5.0, allow_no_response=True)
+            return
+
+        self._tolerant_ecu_reset(client, reason)
 
     def _execute_post_programming_extended(self, client):
         send = self._make_uds_sender(client)
@@ -3646,35 +3815,32 @@ class FcdApp:
 
     def _execute_coding_after_flash(self, client):
         send = self._make_uds_sender(client)
-        self._send_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
+        self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
         self._run_coding_routine(send, CODING_ROUTINE_WRITE_ALL, b"", "Write Coding", timeout=90.0)
         self._run_coding_routine(send, CODING_ROUTINE_VALIDATE, b"", "Check Coding", timeout=20.0)
         self._execute_hard_reset(client, "after coding")
 
     def _execute_final_readback(self, client):
         send = self._make_uds_sender(client)
-        self._try_send_session(send, SESSION_DEFAULT, "Default Session after coding reset")
-        self._try_send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
-        self._read_coding_app_status(send, "Final")
+        self._send_session(send, SESSION_DEFAULT, "Default Session after coding reset")
+        self._send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
+        self._read_coding_app_status(send, "Final", required=True)
         for did, name in [
             (DID_APP_SW_VERSION, "Read Software Version F101"),
             (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
             (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
         ]:
-            self._try_send(send, b"\x22" + struct.pack(">H", did), f"Final: {name}")
-        start_resp = self._try_send(
-            send,
+            send(b"\x22" + struct.pack(">H", did), f"Final: {name}")
+        send(
             b"\x31\x01" + struct.pack(">H", CODING_ROUTINE_READ_NVM),
             "RoutineControl 0203 Read Coding start",
-            timeout=5.0,
+            timeout=10.0,
         )
-        if start_resp:
-            self._try_send(
-                send,
-                b"\x31\x03" + struct.pack(">H", CODING_ROUTINE_READ_NVM),
-                "RoutineControl 0203 Read Coding result",
-                timeout=5.0,
-            )
+        send(
+            b"\x31\x03" + struct.pack(">H", CODING_ROUTINE_READ_NVM),
+            "RoutineControl 0203 Read Coding result",
+            timeout=10.0,
+        )
 
     def _read_payload_data(self, payload):
         if payload.get("data_base64"):

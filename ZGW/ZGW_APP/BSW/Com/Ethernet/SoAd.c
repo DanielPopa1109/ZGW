@@ -703,43 +703,72 @@ void SoAd_MainFunction(void)
                         rt->cfg->tcpConnected(id);
                     }
 
-                    len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
+                    {
+                        uint8 budget = SOAD_RX_DRAIN_BUDGET_PER_SOCON;
 
-                    if (len > 0)
-                    {
-                        SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
-                    }
-                    else if (len == 0)
-                    {
-                        SoAd_TcpDisconnectToOpen(rt, id);
+                        do
+                        {
+                            len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
+
+                            if (len == 0)
+                            {
+                                SoAd_TcpDisconnectToOpen(rt, id);
+                            }
+                            else if (len < 0)
+                            {
+                                if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
+                                {
+                                    SoAd_TcpDisconnectToOpen(rt, id);
+                                }
+                            }
+                            else
+                            {
+                                SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
+                            }
+
+                            if (budget > 0u)
+                            {
+                                budget--;
+                            }
+                        } while ((rt->state == SOAD_SOCON_CONNECTED) &&
+                                (len > 0) &&
+                                (budget > 0u));
                     }
                 }
             }
             else if (rt->state == SOAD_SOCON_CONNECTED)
             {
+                uint8 budget = SOAD_RX_DRAIN_BUDGET_PER_SOCON;
+
                 (void)SoAd_TryReplaceStaleTcpClient(rt, id);
 
-                len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
+                do
+                {
+                    len = TcpIp_Recv(rt->activeSock, buffer, (uint16)sizeof(buffer));
 
-                if (len == 0)
-                {
-                    SoAd_TcpDisconnectToOpen(rt, id);
-                }
-                else if (len < 0)
-                {
-                    if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
+                    if (len == 0)
                     {
                         SoAd_TcpDisconnectToOpen(rt, id);
                     }
+                    else if (len < 0)
+                    {
+                        if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
+                        {
+                            SoAd_TcpDisconnectToOpen(rt, id);
+                        }
+                    }
                     else
                     {
-                        /* nonblocking no-data condition */
+                        SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
                     }
-                }
-                else
-                {
-                    SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
-                }
+
+                    if (budget > 0u)
+                    {
+                        budget--;
+                    }
+                } while ((rt->state == SOAD_SOCON_CONNECTED) &&
+                        (len > 0) &&
+                        (budget > 0u));
             }
         }
         else

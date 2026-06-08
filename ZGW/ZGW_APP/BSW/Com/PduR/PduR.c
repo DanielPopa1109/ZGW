@@ -821,6 +821,10 @@ void PduR_DoIPResetSession(void)
 
 static void PduR_DoIPApplySessionReset(void)
 {
+    PduIdType staleTxPduId;
+    Std_ReturnType staleTxResult;
+    uint8 confirmStaleTx;
+
     /* Runs on core0. Clears the DoIP TP request context and the TX/confirmation
      * mailboxes so a new (or re-established) DoIP TCP connection starts clean.
      * Without this, a context left "valid" or a mailbox left non-EMPTY by a
@@ -828,19 +832,44 @@ static void PduR_DoIPApplySessionReset(void)
      * drained) permanently gates all later diagnostic RX at the RX drain
      * (PduR_DoIPRxDroppedBusyCounter) and TX in PduR_DcmTransmit - so routing
      * activation still answers but every UDS request is dropped. */
-    /* Clear ONLY the request context - that is the sole state a stale connection
-     * leaves persistently stuck (PduR_DoIPCtx.valid == TRUE gates every later RX
-     * at the busy-drop in PduR_DoIPCore0MainFunction). The RX, TX and TX-
-     * confirmation mailboxes are deliberately NOT touched: each is drained (or
-     * dropped-and-cleared) on every core0 cycle, so none of them persists across
-     * connections, and clearing them here would destroy legitimate in-flight
-     * work - e.g. the first 10 01 arriving right after a reconnect (RX mailbox),
-     * or the TX confirmation of an ECUReset 51 01 that must still fire
-     * Dcm_TpTxConfirmation to actually perform the MCU reset (confirmation
-     * mailbox). */
+    staleTxPduId = 0u;
+    staleTxResult = E_NOT_OK;
+    confirmStaleTx = FALSE;
+
+    if ((PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_EMPTY) &&
+            (PduR_DoIPTxMailbox.confirmDcm != FALSE))
+    {
+        staleTxPduId = PduR_DoIPTxMailbox.txPduId;
+        staleTxResult = (PduR_DoIPTxMailbox.state == PDUR_DOIP_TX_STATE_CONFIRM) ?
+                PduR_DoIPTxMailbox.result :
+                E_NOT_OK;
+        confirmStaleTx = TRUE;
+    }
+
+    PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
+    PduR_DoIPTxMailbox.keepContext = FALSE;
+    PduR_DoIPTxMailbox.confirmDcm = FALSE;
+    PduR_DoIPTxMailbox.txPduId = 0u;
+    PduR_DoIPTxMailbox.sourceAddress = 0u;
+    PduR_DoIPTxMailbox.targetAddress = 0u;
+    PduR_DoIPTxMailbox.udsLen = 0u;
+    PduR_DoIPTxMailbox.txRetries = 0u;
+    PduR_DoIPTxMailbox.result = E_NOT_OK;
+
+    PduR_DoIPTxConfirmationMailbox.valid = FALSE;
+    PduR_DoIPTxConfirmationMailbox.keepContext = FALSE;
+    PduR_DoIPTxConfirmationMailbox.txPduId = 0u;
+    PduR_DoIPTxConfirmationMailbox.result = E_NOT_OK;
+
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
     PduR_DoIPCtx.targetAddress = 0u;
+
+    if (confirmStaleTx != FALSE)
+    {
+        Dcm_TxConfirmation(staleTxPduId, staleTxResult);
+    }
+
     Dcm_ResetDoIPSession();
     __dsync();
 }

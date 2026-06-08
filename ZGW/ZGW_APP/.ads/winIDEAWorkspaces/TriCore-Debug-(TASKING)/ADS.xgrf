@@ -193,7 +193,7 @@
          <Encoding>0</Encoding>
          <FileName>C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\BSW\Sys\McuSm\McuSm.c</FileName>
          <FileType>0</FileType>
-         <ScrollPos>148</ScrollPos>
+         <ScrollPos>124</ScrollPos>
         </__.11>
         <__.120>
          <BookmarkList></BookmarkList>
@@ -589,11 +589,11 @@
         </__.4>
         <__.50>
          <BookmarkList></BookmarkList>
-         <CaretPos>138747</CaretPos>
+         <CaretPos>167970</CaretPos>
          <Encoding>0</Encoding>
          <FileName>C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\BSW\Sys\FreeRTOS_core2\tasks_core2.c</FileName>
          <FileType>0</FileType>
-         <ScrollPos>3047</ScrollPos>
+         <ScrollPos>3706</ScrollPos>
         </__.50>
         <__.51>
          <BookmarkList></BookmarkList>
@@ -1116,6 +1116,10 @@
         <ViewId>11</ViewId>
         <ViewType>Output_Progress</ViewType>
        </__.5>
+       <__.6>
+        <ViewId>44</ViewId>
+        <ViewType>Document</ViewType>
+       </__.6>
       </AllViewBaseData>
       <CoreRegisterViews>
        <__.0>
@@ -1165,6 +1169,11 @@
         <ViewId>43</ViewId>
         <ViewType>Document</ViewType>
        </__.0>
+       <__.1>
+        <RelativePath>..\..\..\BSW\Sys\FreeRTOS_core2\tasks_core2.c</RelativePath>
+        <ViewId>44</ViewId>
+        <ViewType>Document</ViewType>
+       </__.1>
       </DocumentViews>
       <MemoryViews>
        <__.0>
@@ -1476,6 +1485,10 @@
              <Options>37</Options>
              <ChildItems>
               <__.0>
+               <Name>ZGW_FBL.elf</Name>
+               <Options>36</Options>
+              </__.0>
+              <__.1>
                <Name>ZGW_APP.elf</Name>
                <Options>37</Options>
                <ChildItems>
@@ -1536,7 +1549,7 @@
                  </ChildItems>
                 </__.0>
                </ChildItems>
-              </__.0>
+              </__.1>
              </ChildItems>
             </__.0>
            </ChildItems>
@@ -1678,7 +1691,7 @@
             </ExpressionDisplay>
            </__.3>
            <__.4>
-            <Name>Os_CpuLoadPercent_core2,,ZGW_APP.elf</Name>
+            <Name>((Dcm_Conn)[5]).session,,ZGW_APP.elf</Name>
             <ExpressionDisplay>
              <Color>false</Color>
              <ColorBack>16777215</ColorBack>
@@ -1701,6 +1714,42 @@
              <Scale>Linear</Scale>
             </ExpressionDisplay>
            </__.5>
+           <__.6>
+            <Name>Os_CpuLoadPercent_core2,,ZGW_APP.elf</Name>
+            <ExpressionDisplay>
+             <Color>false</Color>
+             <ColorBack>16777215</ColorBack>
+             <ColorText>0</ColorText>
+             <Enabled>false</Enabled>
+             <Hi>0</Hi>
+             <Lo>0</Lo>
+             <Scale>Linear</Scale>
+            </ExpressionDisplay>
+           </__.6>
+           <__.7>
+            <Name>GatewaySwc_MainFunction_Counter,,ZGW_APP.elf</Name>
+            <ExpressionDisplay>
+             <Color>false</Color>
+             <ColorBack>16777215</ColorBack>
+             <ColorText>0</ColorText>
+             <Enabled>false</Enabled>
+             <Hi>0</Hi>
+             <Lo>0</Lo>
+             <Scale>Linear</Scale>
+            </ExpressionDisplay>
+           </__.7>
+           <__.8>
+            <Name>g_SafetyKitStatus.wakeupFromStandby</Name>
+            <ExpressionDisplay>
+             <Color>false</Color>
+             <ColorBack>16777215</ColorBack>
+             <ColorText>0</ColorText>
+             <Enabled>false</Enabled>
+             <Hi>0</Hi>
+             <Lo>0</Lo>
+             <Scale>Linear</Scale>
+            </ExpressionDisplay>
+           </__.8>
           </Variables>
          </VariableData>
          <WatchPaneData.0>
@@ -1722,13 +1771,13 @@
      <ViewLayout>
       <Frames>
        <__.0>
-        <FocusedViewId>12</FocusedViewId>
+        <FocusedViewId>6</FocusedViewId>
         <FrameState>3</FrameState>
         <IsPrimary>true</IsPrimary>
         <Bounds>
          <Bottom>1039</Bottom>
-         <Left>89</Left>
-         <Right>1063</Right>
+         <Left>2009</Left>
+         <Right>2983</Right>
          <Top>0</Top>
         </Bounds>
         <Dock>
@@ -1779,7 +1828,7 @@
           </__.0>
           <__.1>
            <DockType>None</DockType>
-           <Extent>0.385378</Extent>
+           <Extent>0.211276</Extent>
            <IsDocumentPane>false</IsDocumentPane>
            <IsPinned>false</IsPinned>
            <IsPrimaryDocumentPane>false</IsPrimaryDocumentPane>
@@ -1790,7 +1839,7 @@
            <Children>
             <__.0>
              <DockType>None</DockType>
-             <Extent>0.491564</Extent>
+             <Extent>0.714286</Extent>
              <IsDocumentPane>true</IsDocumentPane>
              <IsPinned>false</IsPinned>
              <IsPrimaryDocumentPane>true</IsPrimaryDocumentPane>
@@ -1810,11 +1859,22 @@
                <TopTabViewId>-1</TopTabViewId>
                <ViewId>43</ViewId>
               </__.0>
+              <__.1>
+               <DockType>Document</DockType>
+               <Extent>1</Extent>
+               <IsDocumentPane>false</IsDocumentPane>
+               <IsPinned>false</IsPinned>
+               <IsPrimaryDocumentPane>false</IsPrimaryDocumentPane>
+               <IsTabbed>false</IsTabbed>
+               <Orientation>None</Orientation>
+               <TopTabViewId>-1</TopTabViewId>
+               <ViewId>44</ViewId>
+              </__.1>
              </Children>
             </__.0>
             <__.1>
              <DockType>View</DockType>
-             <Extent>0.508436</Extent>
+             <Extent>0.285714</Extent>
              <IsDocumentPane>false</IsDocumentPane>
              <IsPinned>false</IsPinned>
              <IsPrimaryDocumentPane>false</IsPrimaryDocumentPane>
@@ -1827,7 +1887,7 @@
           </__.1>
           <__.2>
            <DockType>View</DockType>
-           <Extent>0.313507</Extent>
+           <Extent>0.487609</Extent>
            <IsDocumentPane>false</IsDocumentPane>
            <IsPinned>false</IsPinned>
            <IsPrimaryDocumentPane>false</IsPrimaryDocumentPane>
