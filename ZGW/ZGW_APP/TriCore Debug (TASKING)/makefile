@@ -80,6 +80,7 @@ RM := rm -rf
 -include BSW/Com/CanIf/subdir.mk
 -include BSW/Com/Can/subdir.mk
 -include BSW/Com/subdir.mk
+-include APP/ParallelFlashSwc/subdir.mk
 -include APP/GatewaySwc/subdir.mk
 -include APP/CodingApp/subdir.mk
 -include subdir.mk

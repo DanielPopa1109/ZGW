@@ -7,10 +7,10 @@ void Dcm_DoIP_RxIndication(uint16_t sourceAddress,
                            const uint8_t *uds,
                            uint16_t udsLen)
 {
-    PduR_DoIPRxIndication((uint16)sourceAddress,
-                          (uint16)targetAddress,
-                          uds,
-                          (uint16)udsLen);
+    (void)PduR_DoIPRxIndication((uint16)sourceAddress,
+                                (uint16)targetAddress,
+                                uds,
+                                (uint16)udsLen);
 }
 
 void Dcm_DoIP_TxConfirmation(const uint8_t *udsResponse,

@@ -12,6 +12,10 @@ typedef struct
     uint32 virtualSectorSize;
 } Fee_ConfigType;
 
+extern volatile uint32 Fee_NextWriteDFlashAddress;
+extern volatile uint32 Fee_DebugLastFlashPhysicalAddress;
+extern volatile uint32 Fee_DebugLastFlashAccessPhysicalAddress;
+
 void Fee_Init(const Fee_ConfigType *ConfigPtr);
 void Fee_SetMode(MemIf_ModeType Mode);
 Std_ReturnType Fee_Read(uint16 BlockNumber, uint16 BlockOffset, uint8 *DataBufferPtr, uint16 Length);
@@ -21,6 +25,8 @@ Std_ReturnType Fee_EraseImmediateBlock(uint16 BlockNumber);
 void Fee_Cancel(void);
 MemIf_StatusType Fee_GetStatus(void);
 MemIf_JobResultType Fee_GetJobResult(void);
+boolean Fee_IsDeferredFormatPending(void);
+Std_ReturnType Fee_StartDeferredFormat(void);
 void Fee_MainFunction(void);
 
 #endif /* FEE_H */

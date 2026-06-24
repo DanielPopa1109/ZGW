@@ -48,7 +48,9 @@
 #define INCLUDE_vTaskSuspend_core2                       1
 #define INCLUDE_vTaskDelayUntil_core2                    1
 #define INCLUDE_vTaskDelay_core2                         1
-/* Interrupt above priority 31 are not effected by critical sections, but cannot call interrupt safe FreeRTOS_core2 functions. */
+/* Interrupts above priority 31 are not affected by critical sections and must
+ * not call FreeRTOS APIs. Keep the FreeRTOS tick/context interrupts at or below
+ * this mask level so scheduler list updates are atomic. */
 #define configMAX_API_CALL_INTERRUPT_PRIORITY_core2      31
 #ifdef __TASKING__
 /* Trap on a failed assertion instead of silently continuing. The kernel's
@@ -65,8 +67,8 @@
 #define configASSERT_core2( x_core2 ) ((void)(x_core2)) /* Empty macro to remove compiler warning(s) about unused variables */
 #endif
 /* AURIX TCxxx definitions */
-#define configCONTEXT_INTERRUPT_PRIORITY_core2    254
-#define configTIMER_INTERRUPT_PRIORITY_core2      255 /* This value must not be bigger then context priority */
+#define configCONTEXT_INTERRUPT_PRIORITY_core2    30
+#define configTIMER_INTERRUPT_PRIORITY_core2      31
 #define configCPU_NR_core2                        2
 #define configPROVIDE_SYSCALL_TRAP_core2          0
 #define configSYSCALL_CALL_DEPTH_core2            2

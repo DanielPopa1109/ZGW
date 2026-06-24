@@ -62,6 +62,11 @@ Std_ReturnType Dem_NvM_StartWrite(uint16 blockId, const void *srcPtr)
     return NvM_WriteBlock(blockId, NULL_PTR);
 }
 
+boolean Dem_NvM_IsIdle(void)
+{
+    return (NvM_GetStatus() == NVM_IDLE) ? TRUE : FALSE;
+}
+
 Dem_NvMRequestResultType Dem_NvM_GetResult(uint16 blockId)
 {
     NvM_RequestResultType result;
@@ -116,6 +121,16 @@ Std_ReturnType Dem_NvM_UpdateRamBlock(uint16 blockId, const void *srcPtr)
 
     memcpy(block->ramBlockDataAddress, srcPtr, block->nvBlockLength);
     return NvM_SetRamBlockStatus(blockId, TRUE);
+}
+
+Std_ReturnType Dem_NvM_UpdateRamBlockForced(uint16 blockId, const void *srcPtr)
+{
+    if (Dem_NvM_CopyToRamBlock(blockId, srcPtr) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    return NvM_ForceRamBlockChanged(blockId);
 }
 
 Std_ReturnType Dem_NvM_SetRamBlockStatus(uint16 blockId, boolean changed)

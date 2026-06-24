@@ -62,7 +62,7 @@ When UTC is corrected by UDS or future gPTP, TimeBase updates the NvM RAM image 
 
 ## SCR RTC Standby Elapsed Time
 
-The SCR firmware runs the SCR RTC and updates a retained handoff record in SCR XRAM. The handoff record starts at `0x176A`, directly after the existing SCR debug bytes at `0x1760..0x1769`.
+The SCR firmware runs the SCR RTC and updates a retained handoff record in SCR XRAM. The handoff record starts at `0x1790`, after the existing SCR debug bytes at `0x1760..0x1769`.
 
 Standby sequence:
 
@@ -79,9 +79,9 @@ SysMgr_GoSleep()
   start/restart SCR and enter standby
 ```
 
-When the SCR starts for standby and sees the armed record, it resets the SCR RTC counter to zero and records `rtc_start_ticks = 0`. While the TC375 is in standby, the SCR main loop keeps writing `rtc_last_ticks` and `elapsed_ticks`. On the next core0 startup, `TimeBase_CaptureStandbyRtcBeforeScrReset()` copies the SCR XRAM record before the existing SCR RAM cleanup (`IfxMtu_MbistSel_scrXram = 77`) can erase it. `TimeBase_LoadUtcFromNvM()` then adds the captured elapsed time to the NvM UTC.
+When the SCR starts for standby and sees the armed record, it resets the SCR RTC counter to zero and records `rtc_start_ticks = 0`. While the TC375 is in standby, the SCR main loop keeps writing `rtc_last_ticks` and `elapsed_ticks`. On the next core0 startup, `McuSm_CaptureWakeupImagesFromScr()` restores the retained McuSm state and copies the SCR XRAM time record before the existing SCR RAM cleanup (`IfxMtu_MbistSel_scrXram = 77`) can erase it. `Core0_InitSequence()` then passes the captured image to TimeBase before `TimeBase_Init()`, and `TimeBase_LoadUtcFromNvM()` adds the captured elapsed time to the NvM UTC.
 
-If McuSm TRAP4 reacts to a bus error whose failing address is inside SCR XRAM, the handler copies the SCR RTC record into an application-side TimeBase capture and an NCR-backed McuSm backup before zero-filling XRAM. If the failing address is inside the NCR linker group, the handler zero-fills NCR and then re-captures the SCR RTC record into the restored NCR backup. `Core0_HandleScrStartup()` imports that backup before SCR reset/copy/disable, so the RTC handoff is not lost by the zero-fill reaction.
+If McuSm TRAP4 reacts to a bus error whose failing address is outside SCR XRAM, the handler copies the SCR RTC record into the McuSm wakeup image before any reset reaction. McuSm serializes its retained state into the SCR XRAM handoff area before software resets and standby, and `Core0_HandleScrStartup()` restores that state before SCR reset/copy/disable.
 
 Configured default tick conversion:
 
@@ -260,8 +260,8 @@ When raw Ethernet and hardware timestamps are available, enable `TIMESYNC_GPTP_E
 ## Integration Points
 
 - `TimeBase_Init()` during core0 BSW/system init.
-- `TimeBase_CaptureStandbyRtcBeforeScrReset()` at the start of `Core0_HandleScrStartup()`, before SCR reset/copy/clear.
-- `TimeBase_RestoreStandbyRtcCapture()` at the start of `Core0_HandleScrStartup()` if McuSm TRAP4 preserved an SCR RTC record after an XRAM/NCR zero-fill reaction.
+- `McuSm_CaptureWakeupImagesFromScr()` at the start of `Core0_HandleScrStartup()`, before SCR reset/copy/clear.
+- `TimeBase_RestoreStandbyRtcCapture()` during `Core0_InitSequence()` if McuSm captured an SCR RTC record through the SCR XRAM state handoff.
 - `TimeBase_LoadUtcFromNvM()` after `NvM_ReadAll()` and before `Dem_Init()`.
 - `TimeBase_MainFunction()` in the core0 5 ms diagnostic cyclic task.
 - `TimeBase_PrepareStandbyRtc()` in `SysMgr_GoSleep()` after NvM is idle and immediately before `NvM_WriteAll()`.

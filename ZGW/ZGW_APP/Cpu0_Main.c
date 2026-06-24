@@ -35,22 +35,34 @@
 #include "Nm.h"
 #include "ComM.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "APP/GatewaySwc/GatewaySwc.h"
+#include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 #include "BSW/Time/TimeBase.h"
 
 AURIX_SHARED_NC volatile uint8 OsInit_C0;
 volatile uint32 Core0_WaitForNvMIdleLoopCounter = 0u;
 volatile uint32 Core0_ServiceDemNvMLoopCounter = 0u;
+volatile uint32 Core0_WaitForNvMIdleTimeoutCounter = 0u;
+volatile uint32 Core0_WaitForNvMIdleLastFailureReason = 0u;
+volatile uint32 Core0_WaitForNvMIdleLastNvMStatus = 0u;
+volatile uint32 Core0_WaitForNvMIdleLastFeeStatus = 0u;
+volatile uint32 Core0_WaitForNvMIdleLastFlsStatus = 0u;
+volatile uint32 Core0_ServiceDemNvMTimeoutCounter = 0u;
+volatile uint32 Core0_ServiceDemNvMLastFailureReason = 0u;
+volatile uint32 Core0_ServiceDemNvMLastNvMStatus = 0u;
+volatile uint32 Core0_ServiceDemNvMLastFeeStatus = 0u;
+volatile uint32 Core0_ServiceDemNvMLastFlsStatus = 0u;
 
 #define CORE0_NVM_IDLE_WAIT_LOOP_LIMIT      1000000u
 
+#define CORE0_NVM_WAIT_REASON_INIT                  1u
+#define CORE0_NVM_WAIT_REASON_READ_ALL              2u
+#define CORE0_NVM_WAIT_REASON_TIME_LOAD             3u
+#define CORE0_NVM_WAIT_REASON_TIME_STANDBY          4u
+#define CORE0_NVM_WAIT_REASON_DEM_INIT              5u
+#define CORE0_NVM_WAIT_REASON_OPERATION_CYCLE_START 6u
+
 extern void Ssw_StartCores(void);
-
-static void Core0_ServiceWatchdogs(void)
-{
-    serviceCpuWatchdog();
-
-    serviceSafetyWatchdog();
-}
 
 static void Core0_ServiceMemoryStack(void)
 {
@@ -59,15 +71,14 @@ static void Core0_ServiceMemoryStack(void)
     Fee_MainFunction();
 
     NvM_MainFunction();
-
-    Core0_ServiceWatchdogs();
 }
 
 static void Core0_WaitForNvMIdle(uint32 FailureReason)
 {
     uint32 waitLoops = 0u;
+    NvM_StatusType nvmStatus;
 
-    while (NvM_GetStatus() != NVM_IDLE)
+    while ((nvmStatus = NvM_GetStatus()) != NVM_IDLE)
     {
         Core0_WaitForNvMIdleLoopCounter++;
 
@@ -77,6 +88,13 @@ static void Core0_WaitForNvMIdle(uint32 FailureReason)
 
         if (waitLoops >= CORE0_NVM_IDLE_WAIT_LOOP_LIMIT)
         {
+            nvmStatus = NvM_GetStatus();
+            Core0_WaitForNvMIdleTimeoutCounter++;
+            Core0_WaitForNvMIdleLastFailureReason = FailureReason;
+            Core0_WaitForNvMIdleLastNvMStatus = (uint32)nvmStatus;
+            Core0_WaitForNvMIdleLastFeeStatus = (uint32)Fee_GetStatus();
+            Core0_WaitForNvMIdleLastFlsStatus = (uint32)Fls_GetStatus();
+            (void)NvM_CancelJobs();
             break;
         }
     }
@@ -85,6 +103,7 @@ static void Core0_WaitForNvMIdle(uint32 FailureReason)
 static void Core0_ServiceDemNvM(uint32 FailureReason)
 {
     uint32 waitLoops = 0u;
+    NvM_StatusType nvmStatus;
 
     do
     {
@@ -98,10 +117,19 @@ static void Core0_ServiceDemNvM(uint32 FailureReason)
 
         if (waitLoops >= CORE0_NVM_IDLE_WAIT_LOOP_LIMIT)
         {
+            nvmStatus = NvM_GetStatus();
+            Core0_ServiceDemNvMTimeoutCounter++;
+            Core0_ServiceDemNvMLastFailureReason = FailureReason;
+            Core0_ServiceDemNvMLastNvMStatus = (uint32)nvmStatus;
+            Core0_ServiceDemNvMLastFeeStatus = (uint32)Fee_GetStatus();
+            Core0_ServiceDemNvMLastFlsStatus = (uint32)Fls_GetStatus();
+            (void)NvM_CancelJobs();
             break;
         }
 
-    } while (NvM_GetStatus() != NVM_IDLE);
+        nvmStatus = NvM_GetStatus();
+
+    } while (nvmStatus != NVM_IDLE);
 }
 
 void Core0_InitWatchdog(void)
@@ -109,8 +137,6 @@ void Core0_InitWatchdog(void)
     initCpuWatchdog(0u);
 
     initSafetyWatchdog();
-
-    Core0_ServiceWatchdogs();
 }
 
 void Core0_HandleScrStartup(void)
@@ -121,14 +147,10 @@ void Core0_HandleScrStartup(void)
 
     SysMgr_CaptureScrFaultBeforeScrReset();
 
-    /* Capture SCRXRAM into NCR (cpu0_dlmu).  The SCR writes the time handoff
-     * record through its 8-bit PMS_XRAM path, so PMS_PMSWCR2.SCRECC is not a
-     * reliable validity gate here.  The captured image is validated later by
-     * TimeBase before it is applied.
-     * NCR (cpu0_dlmu) survives MBIST.  TimeBase_ScrRtcBootImage lives in DSPR and
-     * is wiped by MBIST, so it is restored from NCR in Core0_InitSequence() after
-     * Core0_ExecuteSwSafetyKit() returns. */
-    McuSm_CaptureTimeImageFromScr();
+    /* Capture retained SCR XRAM records before the SCR image is reset and copied.
+     * The SCR writes the time handoff through its 8-bit PMS_XRAM path, so
+     * PMS_PMSWCR2.SCRECC is not a reliable validity gate here. */
+    McuSm_CaptureWakeupImagesFromScr();
 
     IfxScr_init(0u);
 
@@ -143,21 +165,13 @@ void Core0_HandleScrStartup(void)
 
 void Core0_ExecuteSwSafetyKit(void)
 {
-    Core0_ServiceWatchdogs();
-
     runSafeAppSwStartup();
 
-    Core0_ServiceWatchdogs();
-
     McuSm_InitializeBusMpu();
-
-    Core0_ServiceWatchdogs();
 
     initSafetyKit();
 
     Ssw_StartCores();
-
-    Core0_ServiceWatchdogs();
 }
 
 void Core0_PinInit(void)
@@ -208,32 +222,33 @@ void Core0_DemNvMInit(void)
 
     NvM_Init(NULL_PTR);
 
-    Core0_WaitForNvMIdle(0);
+    Core0_WaitForNvMIdle(CORE0_NVM_WAIT_REASON_INIT);
 
     NvM_ReadAll();
 
-    Core0_WaitForNvMIdle(0);
+    Core0_WaitForNvMIdle(CORE0_NVM_WAIT_REASON_READ_ALL);
 
     (void)TimeBase_LoadUtcFromNvM();
 
-    Core0_WaitForNvMIdle(0);
+    Core0_WaitForNvMIdle(CORE0_NVM_WAIT_REASON_TIME_LOAD);
 
-    /* Prime the SCR XRAM standby record with the now-restored time so the SCR
-     * ISR can begin accumulating elapsed ticks immediately.  This also ensures
-     * the very first SDAT CAN frame after wakeup carries the correct time. */
     (void)TimeBase_PrepareStandbyRtc();
 
-    Core0_WaitForNvMIdle(0);
+    Core0_WaitForNvMIdle(CORE0_NVM_WAIT_REASON_TIME_STANDBY);
 
     CodingApp_Init();
 
+    ParallelFlashSwc_Init();
+
+    GatewaySwc_Init();
+
     Dem_Init(&Dem_Config);
 
-    Core0_ServiceDemNvM(0);
+    Core0_ServiceDemNvM(CORE0_NVM_WAIT_REASON_DEM_INIT);
 
     Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE, DEM_CYCLE_STATE_START);
 
-    Core0_ServiceDemNvM(0);
+    Core0_ServiceDemNvM(CORE0_NVM_WAIT_REASON_OPERATION_CYCLE_START);
 }
 
 void Core0_InitSequence(void)
@@ -244,11 +259,6 @@ void Core0_InitSequence(void)
 
     Core0_ExecuteSwSafetyKit();
 
-    /* MBIST erases DSPR (wiping TimeBase_ScrRtcBootImage / TimeBase_ScrRtcBootImageValid)
-     * and SCRXRAM.  NCR in cpu0_dlmu is not erased by MBIST.
-     * Restore the time image from NCR into TimeBase_ScrRtcBootImage (DSPR) so that
-     * TimeBase_LoadUtcFromNvM() can apply the SCR-tracked elapsed time and
-     * immediately write it to NvM. */
     if (McuSm_Trap4ScrRtcRecordValid != FALSE)
     {
         (void)TimeBase_RestoreStandbyRtcCapture(

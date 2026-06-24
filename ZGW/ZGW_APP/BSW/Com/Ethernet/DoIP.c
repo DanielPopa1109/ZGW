@@ -67,6 +67,45 @@ static void DoIP_MarkTcpActivity(void)
     DoIP_Rt.tcpActivityPending = 1u;
 }
 
+static uint8_t DoIP_IsRoutedExtendedUds(const uint8_t *uds, uint16_t udsLen)
+{
+    uint8_t firstByte;
+
+    if ((uds == 0) || (udsLen == 0u))
+    {
+        return 0u;
+    }
+
+    firstByte = uds[0u];
+
+    if ((firstByte >= 0x42u) && (firstByte <= 0x4Fu))
+    {
+        return 1u;
+    }
+
+    if ((firstByte >= 0x50u) && (firstByte <= 0x52u))
+    {
+        return 1u;
+    }
+
+    if ((firstByte >= 0x53u) && (firstByte <= 0x59u))
+    {
+        return 1u;
+    }
+
+    if ((firstByte >= 0x60u) && (firstByte <= 0x7Fu))
+    {
+        return 1u;
+    }
+
+    if ((firstByte >= 0x90u) && (firstByte <= 0xAFu))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
 static uint16_t rd16(const uint8_t *p)
 {
     return (uint16_t)(((uint16_t)p[0] << 8u) | p[1]);
@@ -356,6 +395,7 @@ static void DoIP_HandleDiagnostic(const uint8_t *p, uint32_t len)
     uint16_t testerAddr;
     uint16_t ecuAddr;
     uint16_t udsLen;
+    Std_ReturnType rxResult;
 
     if (len < 5u)
     {
@@ -394,13 +434,26 @@ static void DoIP_HandleDiagnostic(const uint8_t *p, uint32_t len)
     }
 
     DoIP_MarkTcpActivity();
-    DoIP_SendDiagAck(testerAddr, ecuAddr);
+
+    if (DoIP_Rt.dcmRxIndication == 0)
+    {
+        DoIP_SendDiagNack(testerAddr, ecuAddr, DOIP_NACK_TARGET_UNREACHABLE);
+        return;
+    }
+
+    rxResult = DoIP_Rt.dcmRxIndication(testerAddr, ecuAddr, &p[4], udsLen);
+
+    if (rxResult != E_OK)
+    {
+        DoIP_SendDiagNack(testerAddr, ecuAddr, DOIP_NACK_OUT_OF_MEMORY);
+        return;
+    }
 
     DoIP_Rt.diagRxCnt++;
 
-    if (DoIP_Rt.dcmRxIndication != 0)
+    if (DoIP_IsRoutedExtendedUds(&p[4], udsLen) == 0u)
     {
-        DoIP_Rt.dcmRxIndication(testerAddr, ecuAddr, &p[4], udsLen);
+        DoIP_SendDiagAck(testerAddr, ecuAddr);
     }
 }
 

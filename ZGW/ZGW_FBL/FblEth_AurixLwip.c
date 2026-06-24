@@ -12,26 +12,33 @@
 
 #define DOIP_TCP_PORT              13400u
 #define DOIP_UDP_PORT              13400u
-#define FBL_ETH_RX_QUEUE_DEPTH     4u
-#define FBL_ETH_RX_BUF_SIZE        1600u
+#define FBL_ETH_UDP_RX_QUEUE_DEPTH 4u
+#define FBL_ETH_UDP_RX_BUF_SIZE    1600u
+#define FBL_ETH_TCP_RX_STREAM_SIZE 16384u
+#define FBL_ETH_TCP_RX_CHUNK_SIZE  1600u
+#define FBL_ETH_TCP_SEND_RETRY_MAX 4u
+
+extern void Fbl_DoIpTcpConnected(void);
+extern void Fbl_DoIpTcpDisconnected(void);
+extern void Fbl_DoIpTcpRxOverflow(void);
 
 typedef struct
 {
-    uint8 data[FBL_ETH_RX_BUF_SIZE];
+    uint8 data[FBL_ETH_UDP_RX_BUF_SIZE];
     uint16 len;
+    ip_addr_t remoteIp;
+    uint16 remotePort;
+    uint8 remoteValid;
 } FblEth_RxItemType;
 
 static struct tcp_pcb *g_tcpListenPcb;
 static struct tcp_pcb *g_tcpActivePcb;
 static struct udp_pcb *g_udpPcb;
 
-static FblEth_RxItemType g_tcpQ[FBL_ETH_RX_QUEUE_DEPTH];
-static FblEth_RxItemType g_udpQ[FBL_ETH_RX_QUEUE_DEPTH];
+static uint8 g_tcpStream[FBL_ETH_TCP_RX_STREAM_SIZE];
+static volatile uint16 g_tcpStreamLen;
 
-static volatile uint8 g_tcpWr;
-static volatile uint8 g_tcpRd;
-static volatile uint8 g_tcpCnt;
-
+static FblEth_RxItemType g_udpQ[FBL_ETH_UDP_RX_QUEUE_DEPTH];
 static volatile uint8 g_udpWr;
 static volatile uint8 g_udpRd;
 static volatile uint8 g_udpCnt;
@@ -42,7 +49,7 @@ static uint8 g_udpRemoteValid;
 
 static uint8 g_ethInitDone;
 
-static void FblEth_CopyPbuf(uint8 *dst, uint16 *dstLen, const struct pbuf *p)
+static void FblEth_CopyPbuf(uint8 *dst, uint16 *dstLen, uint16 maxLen, const struct pbuf *p)
 {
     const struct pbuf *q;
     uint16 copied = 0u;
@@ -51,9 +58,9 @@ static void FblEth_CopyPbuf(uint8 *dst, uint16 *dstLen, const struct pbuf *p)
     {
         uint16 chunk = q->len;
 
-        if((copied + chunk) > FBL_ETH_RX_BUF_SIZE)
+        if((copied + chunk) > maxLen)
         {
-            chunk = (uint16)(FBL_ETH_RX_BUF_SIZE - copied);
+            chunk = (uint16)(maxLen - copied);
         }
 
         if(chunk > 0u)
@@ -62,7 +69,7 @@ static void FblEth_CopyPbuf(uint8 *dst, uint16 *dstLen, const struct pbuf *p)
             copied = (uint16)(copied + chunk);
         }
 
-        if(copied >= FBL_ETH_RX_BUF_SIZE)
+        if(copied >= maxLen)
         {
             break;
         }
@@ -71,28 +78,58 @@ static void FblEth_CopyPbuf(uint8 *dst, uint16 *dstLen, const struct pbuf *p)
     *dstLen = copied;
 }
 
-static void FblEth_QueueTcp(const struct pbuf *p)
+static void FblEth_ResetTcpStream(void)
 {
-    if(g_tcpCnt >= FBL_ETH_RX_QUEUE_DEPTH)
-    {
-        return;
-    }
-
-    FblEth_CopyPbuf(g_tcpQ[g_tcpWr].data, &g_tcpQ[g_tcpWr].len, p);
-    g_tcpWr = (uint8)((g_tcpWr + 1u) % FBL_ETH_RX_QUEUE_DEPTH);
-    g_tcpCnt++;
+    g_tcpStreamLen = 0u;
+    memset(g_tcpStream, 0u, sizeof(g_tcpStream));
 }
 
-static void FblEth_QueueUdp(const struct pbuf *p)
+static uint8 FblEth_QueueTcp(const struct pbuf *p)
 {
-    if(g_udpCnt >= FBL_ETH_RX_QUEUE_DEPTH)
+    const struct pbuf *q;
+    uint16 copied = g_tcpStreamLen;
+
+    if(p == NULL)
     {
-        return;
+        return 0u;
     }
 
-    FblEth_CopyPbuf(g_udpQ[g_udpWr].data, &g_udpQ[g_udpWr].len, p);
-    g_udpWr = (uint8)((g_udpWr + 1u) % FBL_ETH_RX_QUEUE_DEPTH);
+    if((uint32)g_tcpStreamLen + (uint32)p->tot_len > (uint32)sizeof(g_tcpStream))
+    {
+        FblEth_ResetTcpStream();
+        return 0u;
+    }
+
+    for(q = p; q != NULL; q = q->next)
+    {
+        if(q->len > 0u)
+        {
+            memcpy(&g_tcpStream[copied], q->payload, q->len);
+            copied = (uint16)(copied + q->len);
+        }
+    }
+
+    g_tcpStreamLen = copied;
+
+    return 1u;
+}
+
+static uint8 FblEth_QueueUdp(const struct pbuf *p, const ip_addr_t *addr, uint16 port)
+{
+    if((p == NULL) || (addr == NULL) || (g_udpCnt >= FBL_ETH_UDP_RX_QUEUE_DEPTH))
+    {
+        return 0u;
+    }
+
+    FblEth_CopyPbuf(g_udpQ[g_udpWr].data, &g_udpQ[g_udpWr].len, FBL_ETH_UDP_RX_BUF_SIZE, p);
+    ip_addr_copy(g_udpQ[g_udpWr].remoteIp, *addr);
+    g_udpQ[g_udpWr].remotePort = port;
+    g_udpQ[g_udpWr].remoteValid = 1u;
+
+    g_udpWr = (uint8)((g_udpWr + 1u) % FBL_ETH_UDP_RX_QUEUE_DEPTH);
     g_udpCnt++;
+
+    return 1u;
 }
 
 static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
@@ -114,6 +151,8 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
         if(g_tcpActivePcb == tpcb)
         {
             g_tcpActivePcb = NULL;
+            FblEth_ResetTcpStream();
+            Fbl_DoIpTcpDisconnected();
         }
 
         tcp_arg(tpcb, NULL);
@@ -124,7 +163,10 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
         return ERR_OK;
     }
 
-    FblEth_QueueTcp(p);
+    if(FblEth_QueueTcp(p) == 0u)
+    {
+        Fbl_DoIpTcpRxOverflow();
+    }
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
 
@@ -137,6 +179,8 @@ static void FblEth_TcpErrCb(void *arg, err_t err)
     (void)err;
 
     g_tcpActivePcb = NULL;
+    FblEth_ResetTcpStream();
+    Fbl_DoIpTcpDisconnected();
 }
 
 static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
@@ -165,6 +209,7 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
     }
 
     g_tcpActivePcb = newPcb;
+    FblEth_ResetTcpStream();
 
     tcp_setprio(newPcb, TCP_PRIO_NORMAL);
     tcp_arg(newPcb, NULL);
@@ -182,6 +227,8 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
     tcp_nagle_disable(newPcb);
 #endif
 
+    Fbl_DoIpTcpConnected();
+
     return ERR_OK;
 }
 
@@ -194,16 +241,18 @@ static void FblEth_UdpRecvCb(void *arg,
     (void)arg;
     (void)upcb;
 
-    if((p == NULL) || (addr == NULL))
+    if(p == NULL)
     {
         return;
     }
 
-    FblEth_QueueUdp(p);
+    if(addr == NULL)
+    {
+        pbuf_free(p);
+        return;
+    }
 
-    ip_addr_copy(g_udpRemoteIp, *addr);
-    g_udpRemotePort = port;
-    g_udpRemoteValid = 1u;
+    (void)FblEth_QueueUdp(p, addr, port);
 
     pbuf_free(p);
 }
@@ -218,6 +267,10 @@ static void FblEth_StartTcpServer(void)
     {
         return;
     }
+
+#if SO_REUSE
+    g_tcpListenPcb->so_options |= SOF_REUSEADDR;
+#endif
 
     err = tcp_bind(g_tcpListenPcb, IP_ANY_TYPE, DOIP_TCP_PORT);
 
@@ -249,6 +302,10 @@ static void FblEth_StartUdpServer(void)
         return;
     }
 
+#if SO_REUSE
+    g_udpPcb->so_options |= SOF_REUSEADDR;
+#endif
+
     err = udp_bind(g_udpPcb, IP_ANY_TYPE, DOIP_UDP_PORT);
 
     if(err != ERR_OK)
@@ -268,12 +325,8 @@ void FblEth_Init(void)
         return;
     }
 
-    memset(g_tcpQ, 0u, sizeof(g_tcpQ));
+    FblEth_ResetTcpStream();
     memset(g_udpQ, 0u, sizeof(g_udpQ));
-
-    g_tcpWr = 0u;
-    g_tcpRd = 0u;
-    g_tcpCnt = 0u;
 
     g_udpWr = 0u;
     g_udpRd = 0u;
@@ -308,28 +361,42 @@ void FblEth_MainFunction(void)
 
 uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len)
 {
+    uint16 outLen;
+    uint16 remaining;
+
     if((buf == NULL) || (len == NULL))
     {
         return 0u;
     }
 
-    if(g_tcpCnt == 0u)
+    if(g_tcpStreamLen == 0u)
     {
         return 0u;
     }
 
-    memcpy(buf, g_tcpQ[g_tcpRd].data, g_tcpQ[g_tcpRd].len);
-    *len = g_tcpQ[g_tcpRd].len;
+    outLen = g_tcpStreamLen;
+    if(outLen > FBL_ETH_TCP_RX_CHUNK_SIZE)
+    {
+        outLen = FBL_ETH_TCP_RX_CHUNK_SIZE;
+    }
 
-    g_tcpQ[g_tcpRd].len = 0u;
-    g_tcpRd = (uint8)((g_tcpRd + 1u) % FBL_ETH_RX_QUEUE_DEPTH);
-    g_tcpCnt--;
+    memcpy(buf, g_tcpStream, outLen);
+    *len = outLen;
+
+    remaining = (uint16)(g_tcpStreamLen - outLen);
+    if(remaining > 0u)
+    {
+        memmove(g_tcpStream, &g_tcpStream[outLen], remaining);
+    }
+    g_tcpStreamLen = remaining;
 
     return 1u;
 }
 
 uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len)
 {
+    FblEth_RxItemType *item;
+
     if((buf == NULL) || (len == NULL))
     {
         return 0u;
@@ -340,11 +407,25 @@ uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len)
         return 0u;
     }
 
-    memcpy(buf, g_udpQ[g_udpRd].data, g_udpQ[g_udpRd].len);
-    *len = g_udpQ[g_udpRd].len;
+    item = &g_udpQ[g_udpRd];
 
-    g_udpQ[g_udpRd].len = 0u;
-    g_udpRd = (uint8)((g_udpRd + 1u) % FBL_ETH_RX_QUEUE_DEPTH);
+    memcpy(buf, item->data, item->len);
+    *len = item->len;
+
+    if(item->remoteValid != 0u)
+    {
+        ip_addr_copy(g_udpRemoteIp, item->remoteIp);
+        g_udpRemotePort = item->remotePort;
+        g_udpRemoteValid = 1u;
+    }
+    else
+    {
+        g_udpRemoteValid = 0u;
+    }
+
+    item->len = 0u;
+    item->remoteValid = 0u;
+    g_udpRd = (uint8)((g_udpRd + 1u) % FBL_ETH_UDP_RX_QUEUE_DEPTH);
     g_udpCnt--;
 
     return 1u;
@@ -353,22 +434,49 @@ uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len)
 void FblEth_TcpSend(const uint8 *buf, uint16 len)
 {
     err_t err;
+    uint16 sent = 0u;
+    uint8 retry = FBL_ETH_TCP_SEND_RETRY_MAX;
 
     if((g_tcpActivePcb == NULL) || (buf == NULL) || (len == 0u))
     {
         return;
     }
 
-    if(tcp_sndbuf(g_tcpActivePcb) < len)
+    while((sent < len) && (retry > 0u) && (g_tcpActivePcb != NULL))
     {
-        return;
-    }
+        uint16 sndBuf = tcp_sndbuf(g_tcpActivePcb);
+        uint16 chunk;
 
-    err = tcp_write(g_tcpActivePcb, buf, len, TCP_WRITE_FLAG_COPY);
+        if(sndBuf == 0u)
+        {
+            (void)tcp_output(g_tcpActivePcb);
+            retry--;
+            continue;
+        }
 
-    if(err == ERR_OK)
-    {
-        (void)tcp_output(g_tcpActivePcb);
+        chunk = (uint16)(len - sent);
+        if(chunk > sndBuf)
+        {
+            chunk = sndBuf;
+        }
+        if(chunk > TCP_MSS)
+        {
+            chunk = TCP_MSS;
+        }
+
+        err = tcp_write(g_tcpActivePcb, &buf[sent], chunk, TCP_WRITE_FLAG_COPY);
+
+        if(err == ERR_OK)
+        {
+            sent = (uint16)(sent + chunk);
+            retry = FBL_ETH_TCP_SEND_RETRY_MAX;
+            (void)tcp_output(g_tcpActivePcb);
+        }
+        else
+        {
+            (void)tcp_output(g_tcpActivePcb);
+            retry--;
+        }
     }
 }
 

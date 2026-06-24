@@ -28,8 +28,56 @@ const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
         DCM_BUS_CAN_CLASSIC
     },
     {
+        DCM_RX_CAN_EXT_PHYS_2,
+        DCM_TX_CAN_EXT_PHYS_2,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_CLASSIC
+    },
+    {
+        DCM_RX_CAN_EXT_PHYS_3,
+        DCM_TX_CAN_EXT_PHYS_3,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_CLASSIC
+    },
+    {
+        DCM_RX_CAN_EXT_PHYS_4,
+        DCM_TX_CAN_EXT_PHYS_4,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_CLASSIC
+    },
+    {
         DCM_RX_CANFD_EXT_PHYS,
         DCM_TX_CANFD_EXT_PHYS,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_FD
+    },
+    {
+        DCM_RX_CANFD_EXT_PHYS_2,
+        DCM_TX_CANFD_EXT_PHYS_2,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_FD
+    },
+    {
+        DCM_RX_CANFD_EXT_PHYS_3,
+        DCM_TX_CANFD_EXT_PHYS_3,
+        0x710u,
+        0x711u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_FD
+    },
+    {
+        DCM_RX_CANFD_EXT_PHYS_4,
+        DCM_TX_CANFD_EXT_PHYS_4,
         0x710u,
         0x711u,
         DCM_ADDR_PHYSICAL,

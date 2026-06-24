@@ -3,8 +3,8 @@
 
 #include "CanIf.h"
 
-#define CANTP_MAX_CHANNELS       8u
-#define CANTP_MAX_TX_BUFFERS     4u
+#define CANTP_MAX_CHANNELS       16u
+#define CANTP_MAX_TX_BUFFERS     6u
 #define CANTP_LEGACY_MAX_PAYLOAD_LEN 4095u
 #define CANTP_MAX_PAYLOAD_LEN    8192u
 #define CANTP_MAIN_PERIOD_MS     5u
@@ -38,6 +38,13 @@
 
 #define CANTP_PADDING_OFF        0u
 #define CANTP_PADDING_ON         1u
+
+#define CANTP_DEBUG_EXT_TX_OK             0u
+#define CANTP_DEBUG_EXT_TX_BAD_CONFIG     1u
+#define CANTP_DEBUG_EXT_TX_NO_CHANNEL     2u
+#define CANTP_DEBUG_EXT_TX_NOT_EXTENDED   3u
+#define CANTP_DEBUG_EXT_TX_BUSY           4u
+#define CANTP_DEBUG_EXT_TX_TRANSMIT_FAIL  5u
 
 typedef enum
 {
@@ -95,9 +102,28 @@ void CanTp_Init(const CanTp_ConfigType* ConfigPtr);
 void CanTp_MainFunction(void);
 
 Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLengthType len);
+Std_ReturnType CanTp_TransmitExtendedAddress(PduIdType CanTpTxSduId,
+                                             uint8 targetAddress,
+                                             const uint8* data,
+                                             PduLengthType len);
+Std_ReturnType CanTp_TransmitExtendedAddressAssumeFlowControl(PduIdType CanTpTxSduId,
+                                                              uint8 targetAddress,
+                                                              const uint8* data,
+                                                              PduLengthType len);
+uint8 CanTp_IsExtendedAddressTxActive(uint8 targetAddress);
+uint8 CanTp_IsTxSduIdle(PduIdType CanTpTxSduId);
 void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType len);
 void CanTp_TxConfirmation(PduIdType CanIfTxPduId);
 
 extern const CanTp_ConfigType CanTp_Config;
+extern volatile uint32 CanTp_DebugExtendedTxRequests;
+extern volatile uint32 CanTp_DebugExtendedTxOk;
+extern volatile uint32 CanTp_DebugExtendedTxFail;
+extern volatile uint16 CanTp_DebugExtendedLastUpperTxPdu;
+extern volatile uint16 CanTp_DebugExtendedLastLen;
+extern volatile uint8 CanTp_DebugExtendedLastTarget;
+extern volatile uint8 CanTp_DebugExtendedLastChannel;
+extern volatile uint8 CanTp_DebugExtendedLastState;
+extern volatile uint8 CanTp_DebugExtendedLastReason;
 
 #endif

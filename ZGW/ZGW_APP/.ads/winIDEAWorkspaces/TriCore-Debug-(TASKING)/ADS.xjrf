@@ -709,7 +709,7 @@
         <DisplayCollapsedArrayStruct>true</DisplayCollapsedArrayStruct>
         <DisplayPointerMemArea>true</DisplayPointerMemArea>
         <EnumDisplay>Enum</EnumDisplay>
-        <Hex>false</Hex>
+        <Hex>true</Hex>
         <MaxParseUpload>256</MaxParseUpload>
         <QualifiedNames>Unique</QualifiedNames>
         <UseSpacers>true</UseSpacers>
@@ -832,20 +832,6 @@
     </Mode>
     <Op_System>
      <Debug>
-      <BPs>
-       <__.0>
-        <ActionEnabled>false</ActionEnabled>
-        <ActionParams></ActionParams>
-        <ActionScript></ActionScript>
-        <ActionShow>false</ActionShow>
-        <Condition>false</Condition>
-        <Count>0</Count>
-        <Enabled>true</Enabled>
-        <Expression></Expression>
-        <Location>&quot;..\..\..\BSW\Sys\McuSm\McuSm.c&quot;::142</Location>
-        <ProcessFilter></ProcessFilter>
-       </__.0>
-      </BPs>
       <Processes.0>
        <URL></URL>
       </Processes.0>
@@ -1035,10 +1021,10 @@
           <Enabled>0</Enabled>
           <BP.0>
            <Access>1</Access>
-           <Address>0xB0000210</Address>
-           <Enabled>1</Enabled>
-           <EntireObject>1</EntireObject>
-           <Range>1</Range>
+           <Address></Address>
+           <Enabled>0</Enabled>
+           <EntireObject>0</EntireObject>
+           <Range>0</Range>
            <Event>
             <BBM>0</BBM>
             <BOD>0</BOD>
@@ -1053,7 +1039,7 @@
           <BP.1>
            <Access>1</Access>
            <Address></Address>
-           <Enabled>1</Enabled>
+           <Enabled>0</Enabled>
            <EntireObject>0</EntireObject>
            <Range>0</Range>
            <Event>
@@ -3761,7 +3747,7 @@
        <CallPoint>
         <Attach_ConnectToSoC_Same>true</Attach_ConnectToSoC_Same>
         <Attach_InitSoC_Same>true</Attach_InitSoC_Same>
-        <Attach_StopToExecute>true</Attach_StopToExecute>
+        <Attach_StopToExecute>false</Attach_StopToExecute>
         <Debug_ConnectToSoC_Same>true</Debug_ConnectToSoC_Same>
         <Debug_InitSoC_Same>true</Debug_InitSoC_Same>
         <Program_ResetAfterProgram>false</Program_ResetAfterProgram>
@@ -3814,7 +3800,7 @@
         <SubCPU>TC375TP</SubCPU>
         <Aurix>
          <AllowCacheMonExec>false</AllowCacheMonExec>
-         <ApplicationLBIST>true</ApplicationLBIST>
+         <ApplicationLBIST>false</ApplicationLBIST>
          <BRKIN>HIGH</BRKIN>
          <ClearICRIEWhenStopped>false</ClearICRIEWhenStopped>
          <DAPClock>4000</DAPClock>

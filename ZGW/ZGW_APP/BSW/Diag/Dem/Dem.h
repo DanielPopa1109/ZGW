@@ -102,16 +102,7 @@ Std_ReturnType Dem_GetNextFilteredDTC(
     Dem_UdsStatusByteType *DTCStatus
 );
 
-Std_ReturnType Dem_GetFreezeFrameDataByDTC(
-    Dem_DTCType DTC,
-    Dem_DTCFormatType DTCFormat,
-    Dem_DTCOriginType DTCOrigin,
-    uint8 RecordNumber,
-    uint8 *DestBuffer,
-    uint16 *BufSize
-);
-
-Std_ReturnType Dem_GetExtendedDataRecordByDTC(
+Std_ReturnType Dem_GetSnapshotDataByDTC(
     Dem_DTCType DTC,
     Dem_DTCFormatType DTCFormat,
     Dem_DTCOriginType DTCOrigin,

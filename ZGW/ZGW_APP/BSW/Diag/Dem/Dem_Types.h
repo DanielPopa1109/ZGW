@@ -95,8 +95,7 @@ typedef struct
 
     boolean StorageEnabled;
 
-    Dem_CaptureDataFctType FreezeFrameCapture;
-    Dem_CaptureDataFctType ExtendedDataCapture;
+    Dem_CaptureDataFctType SnapshotDataCapture;
     Dem_EventStatusChangedFctType StatusChangedCallback;
 } Dem_EventConfigType;
 

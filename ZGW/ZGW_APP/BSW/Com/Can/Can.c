@@ -20,8 +20,8 @@
         ((CAN_TX_HW_PENDING_TIMEOUT_MS + CAN_MAINFUNCTION_PERIOD_MS - 1u) / CAN_MAINFUNCTION_PERIOD_MS)
 #define CAN_TX_ATTEMPTS_PER_MAIN \
         (CAN_TX_BUDGET_PER_MAIN + CAN_NUM_CONTROLLERS)
-#define CAN_TX_HW_BUFFER_COUNT_CLASSIC 1u
-#define CAN_TX_HW_BUFFER_COUNT_FD      4u
+#define CAN_TX_HW_BUFFER_COUNT_CLASSIC 4u
+#define CAN_TX_HW_BUFFER_COUNT_FD      8u
 #define CAN_TX_HW_BUFFER_COUNT_MAX     CAN_TX_HW_BUFFER_COUNT_FD
 
 typedef struct
@@ -470,7 +470,7 @@ static void Can_ResetQueues(void)
     Can_ExitCritical(irqState);
 }
 
-static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
+static Std_ReturnType Can_TxQueuePushInternal(const Can_PduType* pdu, boolean replaceDuplicate)
 {
     Can_TxQueueElementType* e;
     boolean irqState;
@@ -487,7 +487,9 @@ static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
 
     if (pdu->controllerId < CAN_NUM_CONTROLLERS)
     {
-        for (bufferIdx = 0u; bufferIdx < Can_GetTxBufferCount(pdu->controllerId); bufferIdx++)
+        for (bufferIdx = 0u;
+                (replaceDuplicate != FALSE) && (bufferIdx < Can_GetTxBufferCount(pdu->controllerId));
+                bufferIdx++)
         {
             if ((Can_TxPending[pdu->controllerId][bufferIdx].active != FALSE) &&
                     (Can_TxPending[pdu->controllerId][bufferIdx].swPduHandle == pdu->swPduHandle))
@@ -507,12 +509,15 @@ static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
                 (e->pdu.swPduHandle == pdu->swPduHandle) &&
                 (e->pdu.controllerId == pdu->controllerId))
         {
-            e->pdu = *pdu;
-            memcpy(e->data, pdu->sdu, pdu->dlc);
-            e->pdu.sdu = e->data;
+            if (replaceDuplicate != FALSE)
+            {
+                e->pdu = *pdu;
+                memcpy(e->data, pdu->sdu, pdu->dlc);
+                e->pdu.sdu = e->data;
 
-            Can_ExitCritical(irqState);
-            return E_OK;
+                Can_ExitCritical(irqState);
+                return E_OK;
+            }
         }
 
         idx++;
@@ -551,6 +556,16 @@ static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
     Can_ExitCritical(irqState);
 
     return E_OK;
+}
+
+static Std_ReturnType Can_TxQueuePush(const Can_PduType* pdu)
+{
+    return Can_TxQueuePushInternal(pdu, TRUE);
+}
+
+static Std_ReturnType Can_TxQueuePushNoReplace(const Can_PduType* pdu)
+{
+    return Can_TxQueuePushInternal(pdu, FALSE);
 }
 
 static Std_ReturnType Can_TxQueuePeek(Can_PduType* pdu)
@@ -1124,6 +1139,16 @@ Std_ReturnType Can_Write(PduIdType Hth, const Can_PduType* PduInfo)
     return Can_TxQueuePush(PduInfo);
 }
 
+Std_ReturnType Can_WriteNoReplace(PduIdType Hth, const Can_PduType* PduInfo)
+{
+    if (Can_ValidatePdu(Hth, PduInfo) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    return Can_TxQueuePushNoReplace(PduInfo);
+}
+
 static IfxCan_Can_Node* Can_GetNode(uint8 controllerId)
 {
     if (controllerId == CAN_CONTROLLER_CLASSIC)
@@ -1161,6 +1186,64 @@ static boolean Can_FindFreeTxBuffer(uint8 controllerId, IfxCan_Can_Node* node, u
     }
 
     return FALSE;
+}
+
+static boolean Can_TxQueueHasReadyOtherController(uint8 controllerId)
+{
+    boolean irqState;
+    boolean found = FALSE;
+    uint8 idx;
+    uint8 count;
+    uint8 txBufferIdx;
+    Can_PduType pdu;
+    const Can_TxQueueElementType* e;
+    IfxCan_Can_Node* node;
+
+    irqState = Can_EnterCritical();
+
+    idx = Can_TxTail;
+    for (count = 0u; count < Can_TxCount; count++)
+    {
+        e = &Can_TxQueue[idx];
+
+        if (e->used != FALSE)
+        {
+            if ((e->pdu.controllerId != controllerId) &&
+                    (e->pdu.controllerId < CAN_NUM_CONTROLLERS))
+            {
+                pdu = e->pdu;
+                found = TRUE;
+                break;
+            }
+        }
+
+        idx++;
+        if (idx >= CAN_TX_QUEUE_SIZE)
+        {
+            idx = 0u;
+        }
+    }
+
+    Can_ExitCritical(irqState);
+
+    if (found == FALSE)
+    {
+        return FALSE;
+    }
+
+    if (Can_ControllerState[pdu.controllerId] != CAN_READY)
+    {
+        return FALSE;
+    }
+
+    node = Can_GetNode(pdu.controllerId);
+
+    if (node == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    return Can_FindFreeTxBuffer(pdu.controllerId, node, &txBufferIdx);
 }
 
 static void Can_ProcessTxConfirmations(void)
@@ -1303,7 +1386,8 @@ static void Can_ProcessTx(void)
         {
             Can_TxControllerNotReadyCounter++;
 
-            if (Can_TxQueueRotate() == E_OK)
+            if ((Can_TxQueueHasReadyOtherController(pdu.controllerId) != FALSE) &&
+                    (Can_TxQueueRotate() == E_OK))
             {
                 continue;
             }
@@ -1323,7 +1407,8 @@ static void Can_ProcessTx(void)
         {
             Can_TxPendingBusyCounter++;
 
-            if (Can_TxQueueRotate() == E_OK)
+            if ((Can_TxQueueHasReadyOtherController(pdu.controllerId) != FALSE) &&
+                    (Can_TxQueueRotate() == E_OK))
             {
                 continue;
             }
@@ -1366,7 +1451,8 @@ static void Can_ProcessTx(void)
 
             Can_TxSendRetryCounter++;
 
-            if (Can_TxQueueRotate() == E_OK)
+            if ((Can_TxQueueHasReadyOtherController(pdu.controllerId) != FALSE) &&
+                    (Can_TxQueueRotate() == E_OK))
             {
                 continue;
             }

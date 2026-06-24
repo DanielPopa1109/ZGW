@@ -89,6 +89,6 @@ typedef struct
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void runSafeAppSwStartup(void);
-void safetyKitUpdateNcrStatusAndResetReaction(boolean includeSmuStatus);
+void safetyKitUpdateMcuSmStatusAndResetReaction(boolean includeSmuStatus);
 void safetyKitTriggerWarmPorst(void);
 #endif /* SAFETYKIT_SSW_H_ */

@@ -31,7 +31,7 @@ void Dcm_EthTp_RxIndication(uint16_t sourceAddress,
         return;
     }
 
-    PduR_DoIPRxIndication(sourceAddress, targetAddress, data, len);
+    (void)PduR_DoIPRxIndication(sourceAddress, targetAddress, data, len);
 
     if (DcmEth.rxPending != 0u)
     {

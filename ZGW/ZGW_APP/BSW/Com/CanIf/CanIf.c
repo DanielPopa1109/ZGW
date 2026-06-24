@@ -8,7 +8,10 @@ static uint8 CanIf_BusOffState[CAN_NUM_CONTROLLERS];
 static uint8 CanIf_ErrorPassiveState[CAN_NUM_CONTROLLERS];
 static uint8 CanIf_ErrorWarningState[CAN_NUM_CONTROLLERS];
 
-#define CANIF_CANTP_TX_POLL_LIMIT 1000u
+/* CAN-TP transmit uses the normal asynchronous Can_MainFunction path. Keep a
+ * small synchronous drain only as a latency fast path; a large spin here can
+ * starve DoIP/Core0 while FCD sends dense routed coding bursts. */
+#define CANIF_CANTP_TX_POLL_LIMIT 16u
 
 volatile uint32 CanIf_ComTxAsyncQueuedCounter = 0u;
 volatile uint32 CanIf_ComTxAsyncRejectedCounter = 0u;
@@ -141,8 +144,16 @@ static const CanIf_RxPduConfigType CanIf_RxPduConfig[] =
 
 static const CanIf_TxPduConfigType CanIf_TxPduConfig[] =
 {
-    { CANIF_PDU_CLASSIC_PHYS_TX, CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, 0x711u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
-    { CANIF_PDU_FD_PHYS_TX,      CAN_HTH_FD,      CAN_CONTROLLER_FD,      0x711u, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_PHYS_TX,      CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_FD_PHYS_TX,           CAN_HTH_FD,      CAN_CONTROLLER_FD,      CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_EXT_PHYS_TX0, CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_EXT_PHYS_TX1, CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_FD_EXT_PHYS_TX0,      CAN_HTH_FD,      CAN_CONTROLLER_FD,      CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_FD_EXT_PHYS_TX1,      CAN_HTH_FD,      CAN_CONTROLLER_FD,      CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_EXT_PHYS_TX2, CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_CLASSIC_EXT_PHYS_TX3, CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 8u,  CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_FD_EXT_PHYS_TX2,      CAN_HTH_FD,      CAN_CONTROLLER_FD,      CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
+    { CANIF_PDU_FD_EXT_PHYS_TX3,      CAN_HTH_FD,      CAN_CONTROLLER_FD,      CANIF_DIAGREQUEST_TESTER_CAN_ID, CAN_ID_STANDARD, CAN_FRAME_FD,      64u, CANIF_TX_TARGET_CANTP },
     { CANIF_TX_PDU_VEHICLESTATE                            , CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, 0x3A0u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 1u, CANIF_TX_TARGET_COM },
     { CANIF_TX_PDU_DISPLAYOUTTEMP                          , CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, 0x221u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 4u, CANIF_TX_TARGET_COM },
     { CANIF_TX_PDU_STATUSBODYDATA1                         , CAN_HTH_CLASSIC, CAN_CONTROLLER_CLASSIC, 0x040u, CAN_ID_STANDARD, CAN_FRAME_CLASSIC, 4u, CANIF_TX_TARGET_COM },
@@ -251,6 +262,7 @@ Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLeng
 {
     const CanIf_TxPduConfigType* cfg;
     Can_PduType pdu;
+    Std_ReturnType writeResult;
 
     if ((data == NULL_PTR) || (len == 0u))
     {
@@ -310,7 +322,16 @@ Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLeng
     pdu.dlc = (uint8)len;
     pdu.sdu = data;
 
-    if (Can_Write(cfg->hth, &pdu) != E_OK)
+    if (cfg->target == CANIF_TX_TARGET_CANTP)
+    {
+        writeResult = Can_WriteNoReplace(cfg->hth, &pdu);
+    }
+    else
+    {
+        writeResult = Can_Write(cfg->hth, &pdu);
+    }
+
+    if (writeResult != E_OK)
     {
         if (cfg->target == CANIF_TX_TARGET_COM)
         {

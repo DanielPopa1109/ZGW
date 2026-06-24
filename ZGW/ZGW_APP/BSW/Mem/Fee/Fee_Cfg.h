@@ -4,6 +4,8 @@
 #include "Std_Types.h"
 #include "Fls_Cfg.h"
 #include "Dem_Int.h"
+#include "APP/CodingApp/CodingApp.h"
+#include "BSW/Time/TimeBase.h"
 
 typedef enum
 {
@@ -23,8 +25,10 @@ typedef struct
 #define FEE_ALIGN8_SIZE(size)               (((size) + 7u) & ~7u)
 #define FEE_MAX2(a, b)                      (((a) > (b)) ? (a) : (b))
 #define FEE_BLOCK_DEM_PRIMARY_SIZE          ((uint32)sizeof(Dem_NvImageType))
-#define FEE_BLOCK_APP_DATA_SIZE             (2048u)
-#define FEE_BLOCK_TIMEBASE_SIZE             (32u)
+#define FEE_BLOCK_APP_DATA_SIZE             CODINGAPP_NVM_IMAGE_SIZE
+#define FEE_BLOCK_APP_DATA_LEGACY_NUMBER    (2u)
+#define FEE_BLOCK_APP_DATA_LEGACY_SIZE      (64u)
+#define FEE_BLOCK_TIMEBASE_SIZE             TIMEBASE_NVM_IMAGE_SIZE
 #define FEE_MAX_CONFIGURED_BLOCK_SIZE       FEE_MAX2(FEE_BLOCK_DEM_PRIMARY_SIZE, \
                                                      FEE_MAX2(FEE_BLOCK_APP_DATA_SIZE, \
                                                               FEE_BLOCK_TIMEBASE_SIZE))

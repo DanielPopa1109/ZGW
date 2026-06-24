@@ -6,7 +6,7 @@ const Fee_BlockConfigType Fee_BlockConfig[FEE_CONFIGURED_BLOCKS] =
     {
         NVM_BLOCK_ID_DEM_PRIMARY,
         NVM_BLOCK_DEM_PRIMARY_LENGTH,
-        FEE_BLOCK_NATIVE,
+        FEE_BLOCK_REDUNDANT,
         FALSE
     },
     {

@@ -23,7 +23,8 @@ static SemaphoreHandle_t_core2 SoAd_ApiMutex;
 
 long long SoAd_MainFunction_Counter = 0;
 
-#define SOAD_RX_DRAIN_BUDGET_PER_SOCON      16u
+#define SOAD_RX_DRAIN_BUDGET_PER_SOCON      128u
+#define SOAD_RX_BUFFER_SIZE                 512u
 #define SOAD_PC_HEARTBEAT_PORT              30600u
 #define SOAD_PC_HEARTBEAT_PAYLOAD           "PCHeartbeat"
 #define SOAD_PC_HEARTBEAT_ACK_PAYLOAD       "AURIXHeartbeatAck"
@@ -53,6 +54,8 @@ volatile uint32 SoAd_DebugPcHeartbeatBroadcastAckCounter = 0u;
 volatile uint32 SoAd_DebugPcHeartbeatLastRemoteAddr = 0u;
 volatile uint16 SoAd_DebugPcHeartbeatLastRemotePort = 0u;
 volatile uint32 SoAd_DebugTcpStaleReplaceCounter = 0u;
+volatile uint32 SoAd_DebugSocketLossCounter = 0u;
+volatile SoAd_SoConIdType SoAd_DebugLastSocketLossSoConId = 0u;
 volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
 
 static void SoAd_InitLock(void)
@@ -188,6 +191,46 @@ static uint8 SoAd_IsTcpWouldBlock(sint32 err)
 #endif
 }
 
+/* Only a definitely-fatal connection error should tear down a socket. A
+ * would-block / try-again result, or an unset / unrecognized errno, is treated
+ * as transient and must NOT trigger SoAd_HandleSocketLoss / disconnect: doing so
+ * for the DoIP server resets the DoIP TP session and takes routing out of
+ * ROUTING_ACTIVE, which makes DoIP_SendDiagnosticResponse drop the in-flight UDS
+ * response (e.g. the 50 03 to a 10 03) - the tester then times out even though
+ * the link is healthy. Genuinely lost sockets are still recovered via the
+ * socket-table check in SoAd_RuntimeSocketLost and the len==0 peer-close path. */
+static uint8 SoAd_IsTcpFatalError(sint32 err)
+{
+    if (SoAd_IsTcpWouldBlock(err) != 0u)
+    {
+        return 0u;
+    }
+
+#if defined(ECONNRESET)
+    if (err == ECONNRESET)   { return 1u; }
+#endif
+#if defined(ECONNABORTED)
+    if (err == ECONNABORTED) { return 1u; }
+#endif
+#if defined(ENOTCONN)
+    if (err == ENOTCONN)     { return 1u; }
+#endif
+#if defined(EPIPE)
+    if (err == EPIPE)        { return 1u; }
+#endif
+#if defined(ESHUTDOWN)
+    if (err == ESHUTDOWN)    { return 1u; }
+#endif
+#if defined(EBADF)
+    if (err == EBADF)        { return 1u; }
+#endif
+#if defined(ECONNREFUSED)
+    if (err == ECONNREFUSED) { return 1u; }
+#endif
+
+    return 0u;
+}
+
 static void SoAd_TcpDisconnectToOpen(SoAd_SoConRuntimeType *rt, SoAd_SoConIdType id)
 {
     if ((rt == 0) || (rt->cfg == 0))
@@ -320,7 +363,29 @@ static const SoAd_SocketConnectionConfigType *SoAd_FindConfig(SoAd_SoConIdType i
 
 static uint8 SoAd_RuntimeSocketLost(const SoAd_SoConRuntimeType *rt)
 {
-    (void)rt;
+    if (rt == 0)
+    {
+        return 0u;
+    }
+
+    if (rt->state == SOAD_SOCON_CLOSED)
+    {
+        return 0u;
+    }
+
+    if ((rt->listenSock == TCPIP_INVALID_SOCKET) ||
+            (TcpIp_IsSocketOpen(rt->listenSock) == 0u))
+    {
+        return 1u;
+    }
+
+    if ((rt->state == SOAD_SOCON_CONNECTED) &&
+            ((rt->activeSock == TCPIP_INVALID_SOCKET) ||
+                    (TcpIp_IsSocketOpen(rt->activeSock) == 0u)))
+    {
+        return 1u;
+    }
+
     return 0u;
 }
 
@@ -338,6 +403,8 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     rt = &SoAd_Runtime[id];
     cfg = rt->cfg;
     reopen = rt->requestedOpen;
+    SoAd_DebugSocketLossCounter++;
+    SoAd_DebugLastSocketLossSoConId = id;
 
     if ((cfg != 0) &&
             (cfg->tcpDisconnected != 0) &&
@@ -414,6 +481,8 @@ void SoAd_Init(const SoAd_ConfigType *cfg)
     SoAd_DebugPcHeartbeatAckCounter = 0u;
     SoAd_DebugPcHeartbeatLastRemoteAddr = 0u;
     SoAd_DebugPcHeartbeatLastRemotePort = 0u;
+    SoAd_DebugSocketLossCounter = 0u;
+    SoAd_DebugLastSocketLossSoConId = 0u;
 }
 
 uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
@@ -586,6 +655,10 @@ static uint8 SoAd_TryReplaceStaleTcpClient(SoAd_SoConRuntimeType *rt, SoAd_SoCon
 
     if (newSock < 0)
     {
+        if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
+        {
+            SoAd_HandleSocketLoss(id);
+        }
         return 0u;
     }
 
@@ -644,7 +717,7 @@ static void SoAd_DispatchTcpRx(SoAd_SoConRuntimeType *rt,
 void SoAd_MainFunction(void)
 {
     uint8 id;
-    uint8 buffer[512];
+    uint8 buffer[SOAD_RX_BUFFER_SIZE];
     sint32 len;
     TcpIp_SockAddrType remote;
     SoAd_SoConRuntimeType *rt;
@@ -716,7 +789,7 @@ void SoAd_MainFunction(void)
                             }
                             else if (len < 0)
                             {
-                                if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
+                                if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
                                 {
                                     SoAd_TcpDisconnectToOpen(rt, id);
                                 }
@@ -735,12 +808,21 @@ void SoAd_MainFunction(void)
                                 (budget > 0u));
                     }
                 }
+                else if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
+                {
+                    SoAd_HandleSocketLoss(id);
+                }
             }
             else if (rt->state == SOAD_SOCON_CONNECTED)
             {
                 uint8 budget = SOAD_RX_DRAIN_BUDGET_PER_SOCON;
 
                 (void)SoAd_TryReplaceStaleTcpClient(rt, id);
+
+                if (rt->state != SOAD_SOCON_CONNECTED)
+                {
+                    continue;
+                }
 
                 do
                 {
@@ -752,7 +834,7 @@ void SoAd_MainFunction(void)
                     }
                     else if (len < 0)
                     {
-                        if (SoAd_IsTcpWouldBlock(TcpIp_LastSocketError) == 0u)
+                        if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
                         {
                             SoAd_TcpDisconnectToOpen(rt, id);
                         }
@@ -802,6 +884,11 @@ void SoAd_MainFunction(void)
                         rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
                         SysMgr_NotifyBusActivity();
                     }
+                }
+                else if ((len < 0) && (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u))
+                {
+                    SoAd_HandleSocketLoss(id);
+                    break;
                 }
 
                 if (budget > 0u)
@@ -874,6 +961,13 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
         soAdResult = (tcpIpResult == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
         SoAd_DebugLastTxTcpIpResult = tcpIpResult;
         SoAd_DebugLastTxResult = (uint8)soAdResult;
+
+        if ((soAdResult != SOAD_OK) &&
+                (TcpIp_IsSocketOpen(rt->activeSock) == 0u))
+        {
+            SoAd_TcpDisconnectToOpen(rt, id);
+        }
+
         SoAd_Unlock();
         return soAdResult;
     }

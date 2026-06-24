@@ -203,6 +203,8 @@ void safetyKitTriggerLbist(void)
     /* Clear COLD PORST reason to preserve the data on the SCR XRAM */
     IfxScuRcu_clearColdResetStatus();
 
+    McuSm_SaveRetainedStateToScr();
+
     /* Trigger LBIST with the derivative default configuration for TC375DP/TC37x. */
     IfxScuLbist_triggerInline(&IfxScuLbist_defaultConfig);
 

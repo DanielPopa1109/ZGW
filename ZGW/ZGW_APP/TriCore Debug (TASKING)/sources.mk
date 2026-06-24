@@ -32,6 +32,7 @@ SECONDARY_SIZE :=
 SUBDIRS := \
 APP/CodingApp \
 APP/GatewaySwc \
+APP/ParallelFlashSwc \
 BSW/Com/Can \
 BSW/Com/CanIf \
 BSW/Com/CanNm \

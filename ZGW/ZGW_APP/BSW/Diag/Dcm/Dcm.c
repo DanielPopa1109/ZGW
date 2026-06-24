@@ -1,5 +1,6 @@
 /* Dcm.c */
 #include "Dcm.h"
+#include "Dcm_Cfg.h"
 #include <string.h>
 #include "Dem.h"
 #include "IfxCpu.h"
@@ -8,7 +9,9 @@
 #include "PduR.h"
 #include "Os.h"
 #include "NvM.h"
+#include "SysMgr.h"
 #include "BSW/Time/Dcm_TimeRoutine.h"
+#include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 
 /* ===================== Internal types ===================== */
 
@@ -88,6 +91,11 @@ typedef struct
 
 
 long long Dcm_MainFunction_Counter = 0;
+volatile uint32 Dcm_DebugExtForwardRequests = 0u;
+volatile uint8 Dcm_DebugExtForwardLastExt = 0u;
+volatile uint8 Dcm_DebugExtForwardLastSid = 0u;
+volatile uint16 Dcm_DebugExtForwardLastLen = 0u;
+volatile uint8 Dcm_DebugExtForwardLastResult = DCM_E_NOT_OK;
 
 /* ===================== Static ===================== */
 
@@ -96,7 +104,7 @@ static Dcm_ConnectionStateType Dcm_Conn[DCM_MAX_CONNECTIONS];
 static uint8 Dcm_RxBuffer[DCM_MAX_PDU_LEN];
 static uint8 Dcm_ActiveReqBuffer[DCM_MAX_PDU_LEN];
 static uint8 Dcm_TxBuffer[DCM_MAX_RESPONSE_LEN];
-static uint8 Dcm_QueueBuffer[DCM_RX_QUEUE_DEPTH][DCM_MAX_PDU_LEN];
+static uint8 Dcm_QueueBuffer[DCM_RX_QUEUE_DEPTH][DCM_RX_QUEUE_BUFFER_LEN];
 static uint8 Dcm_ActiveProtocolConnection = 0xFFu;
 static Dcm_NvMWriteAllStateType Dcm_NvMWriteAllState = DCM_NVM_WRITE_ALL_IDLE;
 static uint8 Dcm_NvMWriteAllOwnerConn = 0xFFu;
@@ -111,8 +119,10 @@ static uint8 Dcm_NvMWriteAllOwnerSid = 0u;
  * Dcm_MainFunction with interrupts still enabled, giving lwIP/GETH several main
  * cycles to put the response on the wire (and retransmit if needed) first. */
 #define DCM_HARD_RESET_DELAY_TICKS 40u   /* ~200 ms at the 5 ms main period */
+#define DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS 600u /* ~3 s bounded NvM drain */
 static uint8 Dcm_PendingHardReset = FALSE;
 static uint16 Dcm_HardResetCountdown = 0u;
+static uint16 Dcm_HardResetNvMDrainCountdown = 0u;
 
 /* ===================== Forward ===================== */
 static void Dcm_SendBusyRepeatIfPossible(uint8 connIdx, uint8 sid, Dcm_AddressingType addressing);
@@ -123,6 +133,8 @@ static Dcm_PduLengthType Dcm_GetTxPayloadLimit(uint8 connIdx);
 static void Dcm_ProcessConnection(uint8 connIdx);
 static void Dcm_LoadNextRequest(uint8 connIdx);
 static void Dcm_StartProcessing(uint8 connIdx, const uint8* req, Dcm_PduLengthType len, Dcm_AddressingType addressing);
+static uint8 Dcm_CanProcessImmediateEthForward(uint8 connIdx);
+static void Dcm_ProcessImmediateEthForward(uint8 connIdx);
 
 static uint32 Dcm_GetTick(void)
 {
@@ -427,9 +439,12 @@ static void Dcm_AbortPendingOperation(uint8 connIdx, uint8 nrc)
 }
 
 static const Dcm_ServiceType* Dcm_FindService(uint8 sid); // @suppress("Unused function declaration")
+static uint8 Dcm_IsLocalServiceSid(uint8 sid);
+static uint8 Dcm_IsExtendedAddressForwardSid(uint8 sid);
 static uint8 Dcm_GetSubFunction(uint8 rawSubFunction);
 static uint8 Dcm_IsSuppressPosRspBitSet(uint8 rawSubFunction);
 static uint16 Dcm_GetSessionMask(uint8 session);
+static void Dcm_CancelActiveOperation(uint8 connIdx);
 static void Dcm_ResetConnectionRuntime(uint8 connIdx);
 static void Dcm_ResetNvMWriteAllState(void);
 static Dcm_ReturnType Dcm_PollNvMWriteAllBeforeDiagnosticReset(uint8 connIdx, uint8 sid, Dcm_OpStatusType opStatus);
@@ -443,7 +458,7 @@ static void Dcm_ResetDelay(void);
 static Dcm_ReturnType Dcm_ClearDiagnosticInformation(uint8 connIdx, Dcm_OpStatusType opStatus, uint32 dtcGroup);
 static Dcm_ReturnType Dcm_ReadDtcInformation(uint8 connIdx, Dcm_OpStatusType opStatus, const uint8* reqData, Dcm_PduLengthType reqLen, uint8* respData, Dcm_PduLengthType* respLen);
 static Dcm_ReturnType Dcm_ReadDtcByStatusMask(uint8 subFunction, uint8 statusMask, uint8* respData, Dcm_PduLengthType* respLen);
-static Dcm_ReturnType Dcm_ReadDtcStoredDataByDtc(uint8 subFunction, Dem_DTCType dtc, uint8 recordNumber, uint8* respData, Dcm_PduLengthType* respLen);
+static Dcm_ReturnType Dcm_ReadDtcSnapshotDataByDtc(uint8 subFunction, Dem_DTCType dtc, uint8 recordNumber, uint8* respData, Dcm_PduLengthType* respLen);
 static Dcm_ReturnType Dcm_SelectFblInterfaceRoutine(uint8 routineControlType, const uint8* reqData, Dcm_PduLengthType reqLen, uint8* respData, Dcm_PduLengthType* respLen);
 
 /* Services */
@@ -460,8 +475,65 @@ static Dcm_ReturnType Dcm_Service_0x36(uint8, Dcm_OpStatusType, const uint8*, Dc
 static Dcm_ReturnType Dcm_Service_0x37(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x3E(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 static Dcm_ReturnType Dcm_Service_0x85(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
+static Dcm_ReturnType Dcm_Service_ExtendedAddressForward(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
 /* Unsupported services (handlers removed): 0x23, 0x24, 0x29, 0x2A, 0x2C, 0x2E,
  * 0x2F, 0x38, 0x3D, 0x83, 0x84, 0x86, 0x87. */
+
+static uint8 Dcm_CanProcessImmediateEthForward(uint8 connIdx)
+{
+    const Dcm_ConnectionStateType* c;
+    uint8 sid;
+
+    if ((Dcm_ConfigPtr == NULL_PTR) ||
+            (connIdx >= Dcm_ConfigPtr->numConnections) ||
+            (connIdx >= DCM_MAX_CONNECTIONS))
+    {
+        return FALSE;
+    }
+
+    if (Dcm_ConfigPtr->connections[connIdx].busType != DCM_BUS_ETHERNET)
+    {
+        return FALSE;
+    }
+
+    c = &Dcm_Conn[connIdx];
+
+    if ((c->state != DCM_CONN_PROCESSING) ||
+            (c->activeReqLen < 2u))
+    {
+        return FALSE;
+    }
+
+    sid = c->activeReq[0];
+
+    if (Dcm_IsExtendedAddressForwardSid(sid) != FALSE)
+    {
+        return TRUE;
+    }
+
+    if ((sid == DCM_SID_TESTER_PRESENT) &&
+            (Dcm_IsSuppressPosRspBitSet(c->activeReq[1]) != FALSE))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void Dcm_ProcessImmediateEthForward(uint8 connIdx)
+{
+    uint8 guard;
+
+    for (guard = 0u; guard <= DCM_RX_QUEUE_DEPTH; guard++)
+    {
+        if (Dcm_CanProcessImmediateEthForward(connIdx) == FALSE)
+        {
+            return;
+        }
+
+        Dcm_ProcessConnection(connIdx);
+    }
+}
 
 /* ===================== Default config ===================== */
 
@@ -485,6 +557,12 @@ const Dcm_ServiceType Dcm_DefaultServices[] =
         { DCM_SID_REQUEST_TRANSFER_EXIT,      Dcm_Service_0x37 },
         { DCM_SID_TESTER_PRESENT,             Dcm_Service_0x3E },
         { DCM_SID_CONTROL_DTC_SETTING,        Dcm_Service_0x85 }
+};
+
+static const Dcm_ServiceType Dcm_ExtendedAddressForwardService =
+{
+        0x00u,
+        Dcm_Service_ExtendedAddressForward
 };
 
 typedef struct
@@ -560,6 +638,43 @@ static uint8 Dcm_CheckServiceAccess(uint8 connIdx, uint8 sid, uint8* nrc)
     return FALSE;
 }
 
+static void Dcm_CancelActiveOperation(uint8 connIdx)
+{
+    Dcm_ConnectionStateType* c;
+    Dcm_PduLengthType reqLen;
+    Dcm_PduLengthType respLen;
+    const uint8* reqData;
+
+    if (connIdx >= DCM_MAX_CONNECTIONS)
+    {
+        return;
+    }
+
+    c = &Dcm_Conn[connIdx];
+    if (c->service == NULL_PTR)
+    {
+        return;
+    }
+
+    reqLen = c->activeReqLen;
+    reqData = c->activeReq;
+    if (reqLen > 0u)
+    {
+        reqData = &c->activeReq[1u];
+        reqLen--;
+    }
+
+    respLen = 0u;
+    c->opStatus = DCM_CANCEL;
+    (void)c->service->handler(
+            connIdx,
+            DCM_CANCEL,
+            reqData,
+            reqLen,
+            &c->txBuffer[0u],
+            &respLen);
+}
+
 static void Dcm_ResetConnectionRuntime(uint8 connIdx)
 {
     if (connIdx >= DCM_MAX_CONNECTIONS)
@@ -567,6 +682,7 @@ static void Dcm_ResetConnectionRuntime(uint8 connIdx)
         return;
     }
 
+    Dcm_CancelActiveOperation(connIdx);
     memset(&Dcm_Conn[connIdx], 0, sizeof(Dcm_Conn[connIdx]));
     Dcm_AssignSharedBuffers(connIdx);
     Dcm_Conn[connIdx].state = DCM_CONN_IDLE;
@@ -614,11 +730,6 @@ void Dcm_ResetDoIPSession(void)
 
     for (i = 0u; (i < Dcm_ConfigPtr->numConnections) && (i < DCM_MAX_CONNECTIONS); i++)
     {
-        if (Dcm_ConfigPtr->connections[i].busType != DCM_BUS_ETHERNET)
-        {
-            continue;
-        }
-
         if (Dcm_Conn[i].session != DCM_SESSION_DEFAULT)
         {
             DcmAppl_DiagnosticSessionChanged(i, DCM_SESSION_DEFAULT);
@@ -632,12 +743,11 @@ void Dcm_ResetDoIPSession(void)
         Dcm_ResetConnectionRuntime(i);
     }
 
-    if ((Dcm_ActiveProtocolConnection < Dcm_ConfigPtr->numConnections) &&
-            (Dcm_ActiveProtocolConnection < DCM_MAX_CONNECTIONS) &&
-            (Dcm_ConfigPtr->connections[Dcm_ActiveProtocolConnection].busType == DCM_BUS_ETHERNET))
-    {
-        Dcm_ActiveProtocolConnection = 0xFFu;
-    }
+    /* A DoIP TCP reconnect starts a new tester transaction domain. DCM owns
+     * shared diagnostic buffers and one active-protocol gate, so stale CAN/LIN
+     * forwarding work from the previous DoIP session must not block the new
+     * direct Ethernet request. */
+    Dcm_ActiveProtocolConnection = 0xFFu;
 
     if (resetNvMWriteAll == TRUE)
     {
@@ -648,6 +758,7 @@ void Dcm_ResetDoIPSession(void)
 void Dcm_MainFunction(void)
 {
     uint8 i;
+    NvM_StatusType nvmStatus;
 
     if (Dcm_ConfigPtr == NULL_PTR)
     {
@@ -688,24 +799,35 @@ void Dcm_MainFunction(void)
         }
         else
         {
-            Dcm_PendingHardReset = FALSE;
-            Dcm_ResetDelay();
-            IfxCpu_disableInterrupts();
-            IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+            nvmStatus = NvM_GetStatus();
+            if (((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL)) &&
+                    (Dcm_HardResetNvMDrainCountdown > 0u))
+            {
+                Dcm_HardResetNvMDrainCountdown--;
+            }
+            else
+            {
+                Dcm_PendingHardReset = FALSE;
+                Dcm_ResetDelay();
+                SysMgr_ClearMcuSmSwErrorTriggerData();
+                McuSm_SaveRetainedStateToScr();
+                IfxCpu_disableInterrupts();
+                IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+            }
         }
     }
 
     Dcm_MainFunction_Counter++;
 }
 
-void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
+Std_ReturnType Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
 {
     Dcm_PduInfoType info;
     Dcm_PduLengthType bufferSize;
 
     if ((data == NULL_PTR) || (len == 0u))
     {
-        return;
+        return E_NOT_OK;
     }
 
     info.SduDataPtr = (uint8*)data;
@@ -716,7 +838,7 @@ void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
             (Dcm_PduLengthType)len,
             &bufferSize) != BUFREQ_OK)
     {
-        return;
+        return E_NOT_OK;
     }
 
     if (Dcm_CopyRxData((Dcm_PduIdType)rxPduId,
@@ -724,10 +846,11 @@ void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
             &bufferSize) != BUFREQ_OK)
     {
         Dcm_TpRxIndication((Dcm_PduIdType)rxPduId, NTFRSLT_E_NOT_OK);
-        return;
+        return E_NOT_OK;
     }
 
     Dcm_TpRxIndication((Dcm_PduIdType)rxPduId, NTFRSLT_OK);
+    return E_OK;
 }
 
 uint8 Dcm_GetActiveSession(uint8 connIdx)
@@ -791,7 +914,9 @@ BufReq_ReturnType Dcm_StartOfReception(
         return BUFREQ_E_BUSY;
     }
 
-    if ((c->state != DCM_CONN_IDLE) && (c->qCount >= DCM_RX_QUEUE_DEPTH))
+    if ((c->state != DCM_CONN_IDLE) &&
+            ((c->qCount >= DCM_RX_QUEUE_DEPTH) ||
+             (TpSduLength > DCM_RX_QUEUE_BUFFER_LEN)))
     {
         *bufferSizePtr = 0u;
         return BUFREQ_E_BUSY;
@@ -852,6 +977,70 @@ BufReq_ReturnType Dcm_CopyRxData(
     return BUFREQ_OK;
 }
 
+static uint8 Dcm_IsBusForwardRxPdu(Dcm_PduIdType rxPduId)
+{
+    /* The CAN/CAN-FD extended-physical connections are used exclusively to reach bus
+     * nodes, so any inbound message on them is a forwarded slave response - never a
+     * request the ZGW should service. */
+    if ((rxPduId >= DCM_RX_CAN_EXT_PHYS) && (rxPduId <= DCM_RX_CANFD_EXT_PHYS_4))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/* If the reception on connIdx is a forwarded slave response, relay it to the DoIP
+ * tester (prefixed with the originating node's extended address) and report that it
+ * was consumed, so it is NOT dispatched as a new request. Returns FALSE to let the
+ * caller process the message normally. */
+static uint8 Dcm_TryRelayForwardedResponse(uint8 connIdx)
+{
+    Dcm_ConnectionStateType* c;
+    Dcm_PduIdType rxPduId;
+    uint8 ext;
+    uint8 isCanFdExt;
+
+    c = &Dcm_Conn[connIdx];
+    rxPduId = Dcm_ConfigPtr->connections[connIdx].rxPduId;
+    isCanFdExt = Dcm_IsBusForwardRxPdu(rxPduId);
+
+    if ((isCanFdExt == FALSE) && (rxPduId != DCM_RX_LIN_PHYS))
+    {
+        return FALSE;
+    }
+
+    if (c->rxCopiedLen == 0u)
+    {
+        /* Nothing to relay. Consume on the dedicated EXT connections, fall through on LIN. */
+        return isCanFdExt;
+    }
+
+    if (ParallelFlashSwc_GetForwardResponseExt(rxPduId, &ext) == E_OK)
+    {
+        (void)PduR_DoIPRelayForwardedResponse(ext, c->rxBuffer, (uint16)c->rxCopiedLen);
+        return TRUE;
+    }
+
+    if (isCanFdExt != FALSE)
+    {
+        /* Dedicated CAN/CAN-FD EXT connection with no per-PDU record: a single-frame
+         * reply can surface on a sibling channel's PDU. The tester serialises routed
+         * requests, so tag it with the most recently forwarded node. If even that is
+         * unknown, drop it rather than letting Dcm_ProcessConnection mistake the
+         * 0x59-style response SID for a new extended-address forward onto the bus. */
+        if (ParallelFlashSwc_GetLastForwardExt(&ext) == E_OK)
+        {
+            (void)PduR_DoIPRelayForwardedResponse(ext, c->rxBuffer, (uint16)c->rxCopiedLen);
+        }
+        return TRUE;
+    }
+
+    /* Shared LIN connection (0x712/0x71A) with no forward record falls through to
+     * normal request processing. */
+    return FALSE;
+}
+
 void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
 {
     uint8 connIdx;
@@ -886,6 +1075,15 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
         return;
     }
 
+    /* A reply forwarded from a bus node is relayed straight back to the DoIP tester
+     * and must not be dispatched as a request on this connection. */
+    if (Dcm_TryRelayForwardedResponse(connIdx) != FALSE)
+    {
+        c->rxCopiedLen = 0u;
+        c->rxExpectedLen = 0u;
+        return;
+    }
+
     c->s3Timer = DCM_S3_SERVER_TICKS;
 
     if (c->state == DCM_CONN_IDLE)
@@ -894,7 +1092,8 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
     }
     else
     {
-        if (c->qCount < DCM_RX_QUEUE_DEPTH)
+        if ((c->qCount < DCM_RX_QUEUE_DEPTH) &&
+                (c->rxCopiedLen <= DCM_RX_QUEUE_BUFFER_LEN))
         {
             q = &c->queue[c->qHead];
             memcpy(q->data, c->rxBuffer, c->rxCopiedLen);
@@ -917,6 +1116,8 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
                     Dcm_ConfigPtr->connections[connIdx].addressing);
         }
     }
+
+    Dcm_ProcessImmediateEthForward(connIdx);
 
     c->rxCopiedLen = 0u;
     c->rxExpectedLen = 0u;
@@ -1076,26 +1277,23 @@ static void Dcm_ProcessConnection(uint8 connIdx)
     if (c->service == NULL_PTR)
     {
         c->sid = c->activeReq[0];
-        c->service = Dcm_FindService(c->sid);
 
-        if (c->service == NULL_PTR)
+        if (Dcm_IsExtendedAddressForwardSid(c->sid) != FALSE)
         {
-            nrc = DCM_NRC_SERVICE_NOT_SUPPORTED;
+            c->service = &Dcm_ExtendedAddressForwardService;
+        }
+        else
+        {
+            c->service = Dcm_FindService(c->sid);
 
-            if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) &&
-                    (Dcm_ShouldSuppressFunctionalNrc(nrc) == TRUE))
+            if (c->service == NULL_PTR)
             {
-                Dcm_ClearProcessing(connIdx);
-                return;
+                c->service = &Dcm_ExtendedAddressForwardService;
             }
-
-            Dcm_BuildNegativeResponse(connIdx, c->sid, nrc);
-            c->service = NULL_PTR;
-            (void)Dcm_StartTx(connIdx);
-            return;
         }
 
-        if (Dcm_CheckServiceAccess(connIdx, c->sid, &nrc) == FALSE)
+        if ((c->service != &Dcm_ExtendedAddressForwardService) &&
+                (Dcm_CheckServiceAccess(connIdx, c->sid, &nrc) == FALSE))
         {
             if ((c->activeAddressing == DCM_ADDR_FUNCTIONAL) &&
                     (Dcm_ShouldSuppressFunctionalNrc(nrc) == TRUE))
@@ -1113,14 +1311,28 @@ static void Dcm_ProcessConnection(uint8 connIdx)
 
     respLen = 0u;
 
-    ret = c->service->handler(
-            connIdx,
-            c->opStatus,
-            &c->activeReq[1],
-            (Dcm_PduLengthType)(c->activeReqLen - 1u),
-            &c->txBuffer[1],
-            &respLen
-    );
+    if (c->service == &Dcm_ExtendedAddressForwardService)
+    {
+        ret = c->service->handler(
+                connIdx,
+                c->opStatus,
+                &c->activeReq[1],
+                (Dcm_PduLengthType)(c->activeReqLen - 1u),
+                &c->txBuffer[0],
+                &respLen
+        );
+    }
+    else
+    {
+        ret = c->service->handler(
+                connIdx,
+                c->opStatus,
+                &c->activeReq[1],
+                (Dcm_PduLengthType)(c->activeReqLen - 1u),
+                &c->txBuffer[1],
+                &respLen
+        );
+    }
 
     if (ret == DCM_E_PENDING)
     {
@@ -1165,7 +1377,20 @@ static void Dcm_ProcessConnection(uint8 connIdx)
             return;
         }
 
-        txLen = (Dcm_PduLengthType)(respLen + 1u);
+        if ((c->service == &Dcm_ExtendedAddressForwardService) && (respLen == 0u))
+        {
+            Dcm_ClearProcessing(connIdx);
+            return;
+        }
+
+        if (c->service == &Dcm_ExtendedAddressForwardService)
+        {
+            txLen = respLen;
+        }
+        else
+        {
+            txLen = (Dcm_PduLengthType)(respLen + 1u);
+        }
 
         if (txLen > Dcm_GetTxPayloadLimit(connIdx))
         {
@@ -1177,7 +1402,10 @@ static void Dcm_ProcessConnection(uint8 connIdx)
             return;
         }
 
-        c->txBuffer[0] = (uint8)(c->sid + 0x40u);
+        if (c->service != &Dcm_ExtendedAddressForwardService)
+        {
+            c->txBuffer[0] = (uint8)(c->sid + 0x40u);
+        }
         c->txLen = txLen;
         c->txOffset = 0u;
         c->service = NULL_PTR;
@@ -1311,6 +1539,51 @@ static const Dcm_ServiceType* Dcm_FindService(uint8 sid)
     return NULL_PTR;
 }
 
+static uint8 Dcm_IsLocalServiceSid(uint8 sid)
+{
+    uint8 isLocal;
+
+    switch (sid)
+    {
+        case DCM_SID_DIAGNOSTIC_SESSION_CONTROL:
+        case DCM_SID_ECU_RESET:
+        case DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION:
+        case DCM_SID_READ_DTC_INFORMATION:
+        case DCM_SID_READ_DATA_BY_IDENTIFIER:
+        case DCM_SID_COMMUNICATION_CONTROL:
+        case DCM_SID_ROUTINE_CONTROL:
+        case DCM_SID_REQUEST_DOWNLOAD:
+        case DCM_SID_REQUEST_UPLOAD:
+        case DCM_SID_TRANSFER_DATA:
+        case DCM_SID_REQUEST_TRANSFER_EXIT:
+        case DCM_SID_TESTER_PRESENT:
+        case DCM_SID_CONTROL_DTC_SETTING:
+            isLocal = TRUE;
+            break;
+
+        default:
+            isLocal = FALSE;
+            break;
+    }
+
+    return isLocal;
+}
+
+static uint8 Dcm_IsExtendedAddressForwardSid(uint8 sid)
+{
+    if (Dcm_IsLocalServiceSid(sid) != FALSE)
+    {
+        return FALSE;
+    }
+
+    if ((sid >= 0x41u) && (sid <= 0xEFu))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static uint8 Dcm_FindRxConnection(Dcm_PduIdType rxPduId)
 {
     uint8 i;
@@ -1396,6 +1669,28 @@ static Dcm_ReturnType Dcm_Service_ForwardStandard(
         Dcm_PduLengthType* respLen)
 {
     return DcmAppl_StandardService(connIdx, opStatus, sid, req, len, resp, respLen);
+}
+
+static Dcm_ReturnType Dcm_Service_ExtendedAddressForward(
+        uint8 connIdx,
+        Dcm_OpStatusType opStatus,
+        const uint8* req,
+        Dcm_PduLengthType len,
+        uint8* resp,
+        Dcm_PduLengthType* respLen)
+{
+    uint8 extendedAddress;
+    Dcm_ReturnType result;
+
+    extendedAddress = Dcm_Conn[connIdx].sid;
+    Dcm_DebugExtForwardRequests++;
+    Dcm_DebugExtForwardLastExt = extendedAddress;
+    Dcm_DebugExtForwardLastSid = ((req != NULL_PTR) && (len > 0u)) ? req[0] : 0u;
+    Dcm_DebugExtForwardLastLen = (uint16)len;
+
+    result = ParallelFlashSwc_ForwardCodingRequest(extendedAddress, opStatus, req, len, resp, respLen);
+    Dcm_DebugExtForwardLastResult = result;
+    return result;
 }
 
 static void Dcm_ResetNvMWriteAllState(void)
@@ -1568,6 +1863,11 @@ static Dcm_ReturnType Dcm_Service_0x11(
     uint8 resetType;
     Dcm_ReturnType ret;
 
+    if (opStatus == DCM_CANCEL)
+    {
+        return DCM_E_NOT_OK;
+    }
+
     if (len != 1u)
     {
         return DCM_NRC_INCORRECT_LENGTH;
@@ -1580,14 +1880,10 @@ static Dcm_ReturnType Dcm_Service_0x11(
 
     if (ret == DCM_E_OK)
     {
-        ret = Dcm_PollNvMWriteAllBeforeDiagnosticReset(
-                connIdx,
-                DCM_SID_ECU_RESET,
-                opStatus);
-    }
-
-    if (ret == DCM_E_OK)
-    {
+        /* Coding writes are explicitly committed before the tester sends ECUReset.
+         * Do not hold hardReset behind a global NvM_WriteAll: if Fee/NvM remains
+         * busy, DCM exhausts its pending-response budget, sends 7F 11 10, then
+         * still resets on TX confirmation of that negative response. */
         Dcm_Conn[connIdx].pendingResetAfterResponse = TRUE;
         Dcm_Conn[connIdx].resetAfterResponse = resetType;
         resp[0] = resetType;
@@ -1657,6 +1953,8 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
         McuSm_FBL_CommInterface = Dcm_NormalizeFblInterface(McuSm_FBL_CommInterface);
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_ACTIVE;
         Dcm_ResetDelay();
+        SysMgr_ClearMcuSmSwErrorTriggerData();
+        McuSm_SaveRetainedStateToScr();
         IfxCpu_disableInterrupts();
         IfxScuRcu_performReset(
                 IfxScuRcu_ResetType_application,
@@ -1676,6 +1974,7 @@ static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
         Dcm_PendingHardReset = TRUE;
         Dcm_HardResetCountdown = DCM_HARD_RESET_DELAY_TICKS;
+        Dcm_HardResetNvMDrainCountdown = DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS;
     }
 }
 
@@ -1756,7 +2055,16 @@ static Dcm_ReturnType Dcm_ClearDiagnosticInformation(
         uint32 dtcGroup)
 {
     (void)connIdx;
-    (void)opStatus;
+
+    if (opStatus == DCM_CANCEL)
+    {
+        return DCM_E_NOT_OK;
+    }
+
+    if (opStatus != DCM_INITIAL)
+    {
+        return DCM_E_OK;
+    }
 
     if (Dem_ClearDTC(
             (Dem_DTCType)dtcGroup,
@@ -1832,7 +2140,7 @@ static Dcm_ReturnType Dcm_ReadDtcInformation(
                 ((Dem_DTCType)reqData[2u] << 8u) |
                 (Dem_DTCType)reqData[3u];
 
-        return Dcm_ReadDtcStoredDataByDtc(subFunction, dtc, reqData[4u], respData, respLen);
+        return Dcm_ReadDtcSnapshotDataByDtc(subFunction, dtc, reqData[4u], respData, respLen);
     }
 
     return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
@@ -1909,7 +2217,7 @@ static Dcm_ReturnType Dcm_ReadDtcByStatusMask(
     return DCM_E_OK;
 }
 
-static Dcm_ReturnType Dcm_ReadDtcStoredDataByDtc(
+static Dcm_ReturnType Dcm_ReadDtcSnapshotDataByDtc(
         uint8 subFunction,
         Dem_DTCType dtc,
         uint8 recordNumber,
@@ -1946,26 +2254,14 @@ static Dcm_ReturnType Dcm_ReadDtcStoredDataByDtc(
 
     dataLen = (uint16)(DCM_MAX_DTC_RESPONSE_LEN - 5u);
 
-    if (subFunction == 0x04u)
-    {
-        ret = Dem_GetFreezeFrameDataByDTC(
-                dtc,
-                DEM_DTC_FORMAT_UDS,
-                DEM_DTC_ORIGIN_PRIMARY_MEMORY,
-                recordNumber,
-                &respData[5u],
-                &dataLen);
-    }
-    else
-    {
-        ret = Dem_GetExtendedDataRecordByDTC(
-                dtc,
-                DEM_DTC_FORMAT_UDS,
-                DEM_DTC_ORIGIN_PRIMARY_MEMORY,
-                recordNumber,
-                &respData[5u],
-                &dataLen);
-    }
+    (void)subFunction;
+    ret = Dem_GetSnapshotDataByDTC(
+            dtc,
+            DEM_DTC_FORMAT_UDS,
+            DEM_DTC_ORIGIN_PRIMARY_MEMORY,
+            recordNumber,
+            &respData[5u],
+            &dataLen);
 
     if (ret != E_OK)
     {
@@ -2350,6 +2646,16 @@ static Dcm_ReturnType Dcm_Service_0x3E(
 
     Dcm_Conn[connIdx].suppressPositiveResponse = Dcm_IsSuppressPosRspBitSet(req[0]);
     Dcm_Conn[connIdx].s3Timer = DCM_S3_SERVER_TICKS;
+
+    /* A TesterPresent from the tester (DoIP) keeps the whole vehicle alive: forward it
+     * to every bus node so their diagnostic sessions do not time out either. The tester
+     * sends one every ~2 s, which paces this broadcast. */
+    if ((Dcm_ConfigPtr != NULL_PTR) &&
+            (connIdx < Dcm_ConfigPtr->numConnections) &&
+            (Dcm_ConfigPtr->connections[connIdx].busType == DCM_BUS_ETHERNET))
+    {
+        ParallelFlashSwc_BroadcastTesterPresent();
+    }
 
     resp[0] = 0x00u;
     *respLen = 1u;

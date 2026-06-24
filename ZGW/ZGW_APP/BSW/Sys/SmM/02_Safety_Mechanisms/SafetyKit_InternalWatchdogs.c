@@ -30,6 +30,7 @@
 #include "SafetyKit_InternalWatchdogs.h"
 #include "SafetyKit_Main.h"
 #include "SafetyKit_Cfg.h"
+#include "BSW/Sys/Wdg/Wdg_Cfg.h"
 #include "IfxScuWdt.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -69,23 +70,14 @@ void initSafetyWatchdog(void)
 
     IfxScuWdt_initConfig(&cfgSafetyWatchdog);
 
-    cfgSafetyWatchdog.inputFrequency = IfxScu_WDTCON1_IR_divBy16384;
-    cfgSafetyWatchdog.reload = 63974;
+    cfgSafetyWatchdog.inputFrequency = WDG_INPUT_FREQUENCY;
+    cfgSafetyWatchdog.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY;
+    cfgSafetyWatchdog.reload = WDG_RELOAD_VALUE;
 
     IfxScuWdt_initSafetyWatchdog(safetyWatchdog, &cfgSafetyWatchdog);
     SafetyKit_SafetyWdtInitCon0 = safetyWatchdog->CON0.U;
     SafetyKit_SafetyWdtInitCon1 = safetyWatchdog->CON1.U;
 
-    /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in
-     * use somewhere else */
-    if(IfxScuWdt_getSafetyWatchdogEndInit())
-    {
-        IfxScuWdt_serviceSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
-    }
-    else
-    {
-        /* Do nothing. */
-    }
 }
 /*
  * run safety watch dog
@@ -94,7 +86,8 @@ void serviceSafetyWatchdog(void)
 {
     /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in
      * use somewhere else */
-    if(IfxScuWdt_getSafetyWatchdogEndInit())
+    if((IfxCpu_getCoreIndex() == IfxCpu_ResourceCpu_0) &&
+            (IfxScuWdt_getSafetyWatchdogEndInit()))
     {
         SafetyKit_SafetyWdtServiceCount++;
         IfxScuWdt_setSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline());
@@ -140,8 +133,9 @@ void initCpuWatchdog(uint8 cpuIndex)
 
     IfxScuWdt_initConfig(&cpuXwdgCfg);
 
-    cpuXwdgCfg.inputFrequency = IfxScu_WDTCON1_IR_divBy16384;
-    cpuXwdgCfg.reload = 63974;
+    cpuXwdgCfg.inputFrequency = WDG_INPUT_FREQUENCY;
+    cpuXwdgCfg.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY;
+    cpuXwdgCfg.reload = WDG_RELOAD_VALUE;
     cpuXwdgCfg.disableWatchdog = FALSE;
 
     IfxScuWdt_initCpuWatchdog(ptrCpuXwatchdog, &cpuXwdgCfg);
@@ -150,15 +144,6 @@ void initCpuWatchdog(uint8 cpuIndex)
         SafetyKit_CpuWdtInitCount[cpuIndex]++;
         SafetyKit_CpuWdtInitCon0[cpuIndex] = ptrCpuXwatchdog->CON0.U;
         SafetyKit_CpuWdtInitCon1[cpuIndex] = ptrCpuXwatchdog->CON1.U;
-    }
-    else
-    {
-        /* Do nothing. */
-    }
-    /* Only service Cpu Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in used somewhere else */
-    if(IfxScuWdt_getCpuWatchdogEndInit())
-    {
-        IfxScuWdt_serviceCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
     }
     else
     {

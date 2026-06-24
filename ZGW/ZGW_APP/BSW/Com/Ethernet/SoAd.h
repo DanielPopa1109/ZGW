@@ -100,6 +100,8 @@ extern volatile uint32 SoAd_DebugPcHeartbeatAckCounter;
 extern volatile uint32 SoAd_DebugPcHeartbeatLastRemoteAddr;
 extern volatile uint16 SoAd_DebugPcHeartbeatLastRemotePort;
 extern volatile uint32 SoAd_DebugTcpStaleReplaceCounter;
+extern volatile uint32 SoAd_DebugSocketLossCounter;
+extern volatile SoAd_SoConIdType SoAd_DebugLastSocketLossSoConId;
 extern volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,

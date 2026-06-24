@@ -15,7 +15,6 @@
 #include "IfxPort.h"
 #include "IfxPort_reg.h"
 #include "Dem.h"
-#include "SafetyKit_InternalWatchdogs.h"
 #include "SafetyKit_Main.h"
 #include "IfxAsclin_Lin.h"
 #include "IfxGeth.h"
@@ -34,12 +33,18 @@
 #define SYSMGR_FAIL_DEM_CYCLE_END         3u
 #define SYSMGR_FAIL_DEM_SHUTDOWN          4u
 #define SYSMGR_FAIL_NVM_WRITEALL_REQ      5u
+#define SYSMGR_FAIL_NVM_DEM_WRITEALL      6u
 #define SYSMGR_SCR_FAULT_ECC_DBE          0x01u
 #define SYSMGR_SCR_FAULT_WDT              0x02u
 #define SYSMGR_MCUSM_SOURCE_RESET         0x01u
 #define SYSMGR_MCUSM_SOURCE_SCR_ECC_DBE   0x02u
 #define SYSMGR_MCUSM_SOURCE_SCR_WDT       0x04u
 #define SYSMGR_MCUSM_SOURCE_SAFETYKIT     0x08u
+#define SYSMGR_MCUSM_CAPTURE_VERSION      2u
+#define SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE 64u
+#define SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE 160u
+#define SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE \
+    (SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE + SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE)
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
@@ -71,12 +76,17 @@ static boolean SysMgr_IsFullComActive(void);
 static void SysMgr_KeepRunState(void);
 static void SysMgr_GoSleepFailure(uint32 FailureInformation);
 static uint8 SysMgr_ReadScrXramU8(uint16 offset);
+static void SysMgr_WriteScrXramU8(uint16 offset, uint8 value);
 static void SysMgr_CaptureScrFaultStatus(void);
 static void SysMgr_ClearScrFaultStatus(void);
+static void SysMgr_ClearScrFaultTriggerData(void);
 static boolean SysMgr_HasScrFaultError(void);
 static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value);
 static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value);
 static uint8 SysMgr_GetMcuSmFaultSource(void);
+static uint32 SysMgr_GetLastTrapRegister(uint32 trap4Value, uint32 trap7Value);
+static uint32 SysMgr_GetTrap7AgRaw(uint32 group);
+static uint32 SysMgr_GetTrap7AgMasked(uint32 group);
 
 void SysMgr_NotifyBusActivity(void)
 {
@@ -136,6 +146,13 @@ static uint8 SysMgr_ReadScrXramU8(uint16 offset)
     return xram[(uint16)(SCR_TIME_XRAM_BASE + offset)];
 }
 
+static void SysMgr_WriteScrXramU8(uint16 offset, uint8 value)
+{
+    volatile uint8 *xram = (volatile uint8 *)PMS_XRAM;
+
+    xram[(uint16)(SCR_TIME_XRAM_BASE + offset)] = value;
+}
+
 static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value)
 {
     buffer[offset] = (uint8)((value >> 8u) & 0xFFu);
@@ -148,6 +165,41 @@ static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value)
     buffer[(uint16)(offset + 1u)] = (uint8)((value >> 16u) & 0xFFu);
     buffer[(uint16)(offset + 2u)] = (uint8)((value >> 8u) & 0xFFu);
     buffer[(uint16)(offset + 3u)] = (uint8)(value & 0xFFu);
+}
+
+static uint32 SysMgr_GetLastTrapRegister(uint32 trap4Value, uint32 trap7Value)
+{
+    if (McuSm_LastTrapClass == 4u)
+    {
+        return trap4Value;
+    }
+
+    if (McuSm_LastTrapClass == 7u)
+    {
+        return trap7Value;
+    }
+
+    return 0u;
+}
+
+static uint32 SysMgr_GetTrap7AgRaw(uint32 group)
+{
+    if (group < 12u)
+    {
+        return McuSm_Trap7AgRaw[(uint8)group];
+    }
+
+    return 0u;
+}
+
+static uint32 SysMgr_GetTrap7AgMasked(uint32 group)
+{
+    if (group < 12u)
+    {
+        return McuSm_Trap7AgMasked[(uint8)group];
+    }
+
+    return 0u;
 }
 
 static void SysMgr_CaptureScrFaultStatus(void)
@@ -230,6 +282,60 @@ static void SysMgr_ClearScrFaultStatus(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
+static void SysMgr_ClearScrFaultTriggerData(void)
+{
+    uint16 safetyWdtPw;
+    Ifx_PMS_PMSWCR2 pmswcr2Clear;
+    Ifx_PMS_PMSWSTATCLR pmswstatClear;
+    uint8 wakeReason;
+
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+
+    pmswcr2Clear.U = 0u;
+    pmswcr2Clear.B.TCINT = PMS_PMSWCR2.B.TCINT;
+    pmswcr2Clear.B.SCRECC = 1u;
+    pmswcr2Clear.B.SCRWDT = 1u;
+    PMS_PMSWCR2.U = pmswcr2Clear.U;
+
+    pmswstatClear.U = 0u;
+    pmswstatClear.B.SCRWKPCLR = 1u;
+    pmswstatClear.B.SCROVRUNCLR = 1u;
+    PMS_PMSWSTATCLR.U = pmswstatClear.U;
+
+    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+
+    wakeReason = SysMgr_ReadScrXramU8(SCR_TIME_OFFSET_WAKE_REASON);
+    wakeReason &= (uint8)~(SCR_TIME_WAKE_REASON_ECC_DBE | SCR_TIME_WAKE_REASON_WDT);
+    SysMgr_WriteScrXramU8(SCR_TIME_OFFSET_WAKE_REASON, wakeReason);
+    SysMgr_WriteScrXramU8(SCR_TIME_OFFSET_SCR_FAULT_STATUS, 0u);
+    SysMgr_WriteScrXramU8(SCR_TIME_OFFSET_SCR_NMI_STATUS, 0u);
+    SysMgr_WriteScrXramU8(SCR_TIME_OFFSET_SCR_RST_STATUS, 0u);
+
+    SysMgr_LastPmsWcr2Status = 0u;
+    SysMgr_LastPmsWstat2Status = 0u;
+    SysMgr_LastScrWakeReason = wakeReason;
+    SysMgr_LastScrFaultStatus = 0u;
+    SysMgr_LastScrNmiStatus = 0u;
+    SysMgr_LastScrRstStatus = 0u;
+    SysMgr_ScrFaultPending = 0u;
+}
+
+void SysMgr_ClearMcuSmSwErrorTriggerData(void)
+{
+    McuSm_ClearResetDtcTriggerData();
+    SysMgr_ClearScrFaultTriggerData();
+}
+
+void SysMgr_OnDemEventCleared(Dem_EventIdType eventId)
+{
+    if (eventId == DEM_EVENT_ID_MCUSM_SW_ERROR)
+    {
+        SysMgr_ClearMcuSmSwErrorTriggerData();
+        McuSm_SaveRetainedStateToScr();
+    }
+}
+
 static uint8 SysMgr_GetMcuSmFaultSource(void)
 {
     uint8 source = 0u;
@@ -258,25 +364,26 @@ static uint8 SysMgr_GetMcuSmFaultSource(void)
     return source;
 }
 
-Std_ReturnType SysMgr_CaptureMcuSmFreezeFrame(
+Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(
     Dem_EventIdType eventId,
     uint8 *buffer,
     uint16 *length
 )
 {
     uint16 i;
+    uint8 *detail;
 
     if ((eventId != DEM_EVENT_ID_MCUSM_SW_ERROR) ||
             (buffer == NULL_PTR) ||
             (length == NULL_PTR) ||
-            (*length < 32u))
+            (*length < SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE))
     {
         return E_NOT_OK;
     }
 
     SysMgr_CaptureScrFaultStatus();
 
-    for (i = 0u; i < 32u; i++)
+    for (i = 0u; i < SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE; i++)
     {
         buffer[i] = 0u;
     }
@@ -302,44 +409,81 @@ Std_ReturnType SysMgr_CaptureMcuSmFreezeFrame(
     SysMgr_StoreU32(buffer, 24u, SysMgr_ScrFaultWakeCounter);
     SysMgr_StoreU32(buffer, 28u, SysMgr_GoSleepCounter);
 
-    *length = 32u;
-    return E_OK;
-}
+    buffer[32u] = SYSMGR_MCUSM_CAPTURE_VERSION;
+    buffer[33u] = (uint8)(McuSm_LastTrapClass & 0xFFu);
+    buffer[34u] = (uint8)(McuSm_LastTrapId & 0xFFu);
+    buffer[35u] = (uint8)(McuSm_LastTrapCoreId & 0xFFu);
+    SysMgr_StoreU32(buffer, 36u, McuSm_LastTrapTAddr);
+    SysMgr_StoreU32(buffer, 40u, McuSm_Trap4ErrorAddress);
+    SysMgr_StoreU32(buffer, 44u, McuSm_Trap7AgRstRsn);
+    SysMgr_StoreU32(buffer, 48u, McuSm_Trap7AgRstInfo);
+    SysMgr_StoreU32(buffer, 52u, McuSm_DFlashRecoveryRequest);
+    SysMgr_StoreU32(buffer, 56u, McuSm_DFlashRecoveryInfo);
+    SysMgr_StoreU32(buffer, 60u, McuSm_DFlashRecoveryLastFeePhysicalAddress);
 
-Std_ReturnType SysMgr_CaptureMcuSmExtendedData(
-    Dem_EventIdType eventId,
-    uint8 *buffer,
-    uint16 *length
-)
-{
-    uint16 i;
+    detail = &buffer[SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE];
+    SysMgr_StoreU16(detail, 0u, eventId);
+    detail[2] = SysMgr_GetMcuSmFaultSource();
+    detail[3] = SysMgr_LastScrWakeReason;
+    SysMgr_StoreU32(detail, 4u, SysMgr_LastPmsWcr2Status);
+    SysMgr_StoreU32(detail, 8u, SysMgr_LastPmsWstat2Status);
+    detail[12] = SysMgr_LastScrFaultStatus;
+    detail[13] = SysMgr_LastScrNmiStatus;
+    detail[14] = SysMgr_LastScrRstStatus;
+    detail[15] = SysMgr_ScrFaultPending;
 
-    if ((eventId != DEM_EVENT_ID_MCUSM_SW_ERROR) ||
-            (buffer == NULL_PTR) ||
-            (length == NULL_PTR) ||
-            (*length < 16u))
-    {
-        return E_NOT_OK;
-    }
+    detail[16u] = SYSMGR_MCUSM_CAPTURE_VERSION;
+    detail[17u] = McuSm_SafetyKitResetInhibit;
+    detail[18u] = McuSm_FBL_ResetCounter;
+    detail[19u] = McuSm_FBL_ProgrammingRequest;
+    SysMgr_StoreU32(detail, 20u, McuSm_LastResetReason);
+    SysMgr_StoreU32(detail, 24u, McuSm_LastResetInformation);
+    SysMgr_StoreU32(detail, 28u, McuSm_SafetyKitFailureMask);
+    SysMgr_StoreU32(detail, 32u, McuSm_SafetyKitFwCheckResultMask);
+    SysMgr_StoreU32(detail, 36u, McuSm_SswStatusData.resetType);
+    SysMgr_StoreU32(detail, 40u, McuSm_SswStatusData.resetTrigger);
+    SysMgr_StoreU32(detail, 44u, McuSm_SswStatusData.rstStat);
+    SysMgr_StoreU16(detail, 48u, McuSm_SswStatusData.resetReason);
+    detail[50u] = McuSm_SswStatusData.lbistAppSwReq;
+    detail[51u] = McuSm_SswStatusData.lbistRuns;
+    detail[52u] = McuSm_SswStatusData.mcuFwcheckRuns;
+    detail[53u] = McuSm_SswStatusData.lbistStatus;
+    detail[54u] = McuSm_SswStatusData.monbistStatus;
+    detail[55u] = McuSm_SswStatusData.mcuFwcheckStatus;
+    detail[56u] = McuSm_SswStatusData.mcuStartupStatus;
+    detail[57u] = McuSm_SswStatusData.aliveAlarmTestStatus;
+    detail[58u] = McuSm_SswStatusData.regMonitorTestStatus;
+    detail[59u] = McuSm_SswStatusData.mbistStatus;
+    detail[60u] = McuSm_SswStatusData.smuCoreKeysTestSts;
+    detail[61u] = McuSm_SswStatusData.smuCoreKeysTestClearSts;
+    detail[62u] = McuSm_SswStatusData.smuCoreInitSts;
+    detail[63u] = McuSm_SswStatusData.wakeupFromStandby;
+    SysMgr_StoreU32(detail, 64u, McuSm_SafetyKitFwCheckLastSshFail);
+    SysMgr_StoreU32(detail, 68u, McuSm_SafetyKitFwCheckSshActualEccd);
+    SysMgr_StoreU32(detail, 72u, McuSm_SafetyKitFwCheckSshActualFaultsts);
+    SysMgr_StoreU32(detail, 76u, McuSm_SafetyKitFwCheckSshActualErrinfo);
+    SysMgr_StoreU32(detail, 80u, McuSm_SafetyKitFwCheckSshExpectedEccd);
+    SysMgr_StoreU32(detail, 84u, McuSm_SafetyKitFwCheckSshExpectedFaultsts);
+    SysMgr_StoreU32(detail, 88u, McuSm_SafetyKitFwCheckSshExpectedErrinfo);
+    SysMgr_StoreU32(detail, 92u, McuSm_TrapCounter);
+    SysMgr_StoreU32(detail, 96u, SysMgr_GetLastTrapRegister(McuSm_Trap4Dstr, McuSm_Trap7Dstr));
+    SysMgr_StoreU32(detail, 100u, SysMgr_GetLastTrapRegister(McuSm_Trap4Datr, McuSm_Trap7Datr));
+    SysMgr_StoreU32(detail, 104u, SysMgr_GetLastTrapRegister(McuSm_Trap4Deadd, McuSm_Trap7Deadd));
+    SysMgr_StoreU32(detail, 108u, SysMgr_GetLastTrapRegister(McuSm_Trap4Diear, McuSm_Trap7Diear));
+    SysMgr_StoreU32(detail, 112u, SysMgr_GetLastTrapRegister(McuSm_Trap4Dietr, McuSm_Trap7Dietr));
+    SysMgr_StoreU32(detail, 116u, SysMgr_GetLastTrapRegister(McuSm_Trap4Piear, McuSm_Trap7Piear));
+    SysMgr_StoreU32(detail, 120u, SysMgr_GetLastTrapRegister(McuSm_Trap4Pietr, McuSm_Trap7Pietr));
+    SysMgr_StoreU32(detail, 124u, SysMgr_GetTrap7AgRaw(McuSm_Trap7AgRstRsn));
+    SysMgr_StoreU32(detail, 128u, SysMgr_GetTrap7AgMasked(McuSm_Trap7AgRstRsn));
+    SysMgr_StoreU32(detail, 132u, McuSm_DFlashRecoveryCounter);
+    SysMgr_StoreU32(detail, 136u, McuSm_DFlashRecoveryAttemptCounter);
+    SysMgr_StoreU32(detail, 140u, McuSm_DFlashRecoverySuppressCounter);
+    SysMgr_StoreU32(detail, 144u, McuSm_DFlashRecoveryLastFeeAccessKind);
+    SysMgr_StoreU32(detail, 148u, McuSm_DFlashRecoveryLastFeePhysicalAddress);
+    SysMgr_StoreU32(detail, 152u, McuSm_DFlashRecoveryRequest);
+    SysMgr_StoreU32(detail, 156u, McuSm_DFlashRecoveryInfo);
 
-    SysMgr_CaptureScrFaultStatus();
-
-    for (i = 0u; i < 16u; i++)
-    {
-        buffer[i] = 0u;
-    }
-
-    SysMgr_StoreU16(buffer, 0u, eventId);
-    buffer[2] = SysMgr_GetMcuSmFaultSource();
-    buffer[3] = SysMgr_LastScrWakeReason;
-    SysMgr_StoreU32(buffer, 4u, SysMgr_LastPmsWcr2Status);
-    SysMgr_StoreU32(buffer, 8u, SysMgr_LastPmsWstat2Status);
-    buffer[12] = SysMgr_LastScrFaultStatus;
-    buffer[13] = SysMgr_LastScrNmiStatus;
-    buffer[14] = SysMgr_LastScrRstStatus;
-    buffer[15] = SysMgr_ScrFaultPending;
-
-    *length = 16u;
+    *length = SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE;
     return E_OK;
 }
 
@@ -374,8 +518,6 @@ void SysMgr_GoSleep(void)
         Fee_MainFunction();
         NvM_MainFunction();
         Dem_MainFunction();
-        serviceCpuWatchdog();
-        serviceSafetyWatchdog();
 
         if (waitLoops >= SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT)
         {
@@ -383,7 +525,14 @@ void SysMgr_GoSleep(void)
         }
     }
 
+    SysMgr_ClearMcuSmSwErrorTriggerData();
     (void)TimeBase_PrepareStandbyRtc();
+    McuSm_SaveRetainedStateToScr();
+
+    if (Dem_Shutdown() != E_OK)
+    {
+        SysMgr_GoSleepFailure(SYSMGR_FAIL_DEM_SHUTDOWN);
+    }
 
     if (NvM_WriteAll() != E_OK)
     {
@@ -398,13 +547,18 @@ void SysMgr_GoSleep(void)
         Fls_MainFunction();
         Fee_MainFunction();
         NvM_MainFunction();
-        serviceCpuWatchdog();
-        serviceSafetyWatchdog();
 
         if (waitLoops >= SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT)
         {
             SysMgr_GoSleepFailure(SYSMGR_FAIL_NVM_POST_WRITEALL_IDLE);
         }
+    }
+
+    if ((NvM_WriteAllBlockPlanned[0u] != 0u) &&
+            ((NvM_WriteAllBlockWritten[0u] == 0u) ||
+             (NvM_WriteAllBlockResult[0u] != 2u)))
+    {
+        SysMgr_GoSleepFailure(SYSMGR_FAIL_NVM_DEM_WRITEALL);
     }
 
     IfxAsclin_disableModule((Ifx_ASCLIN *)(void *)&MODULE_ASCLIN1);
@@ -551,6 +705,7 @@ void SysMgr_GoSleep(void)
     IfxMtu_clearSram((IfxMtu_MbistSel)78);
     IfxScr_copyProgram();
     (void)TimeBase_RearmStandbyRtc();
+    McuSm_SaveRetainedStateToScr();
     IfxScr_init(1);
     IfxScr_enableSCR();
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
@@ -730,9 +885,6 @@ void SysMgr_EcuStateMachine(void)
 void SysMgr_MainFunction(void)
 {
     SysMgr_EcuStateMachine();
-
-    serviceCpuWatchdog();
-    serviceSafetyWatchdog();
 
     SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
     SysMgr_MainCounter++;

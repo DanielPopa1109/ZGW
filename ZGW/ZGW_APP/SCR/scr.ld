@@ -60,7 +60,10 @@ PROVIDE(bits_7 = 0x7);
 */
 MEMORY
 {
-  text   (rx)   : ORIGIN = 0, LENGTH = 7K
+  /* 0x1760..0x1BFF is retained SCR XRAM shared with TriCore; keep it out of
+     the SCR image so copyProgram() does not overwrite standby handoff records. */
+  text   (rx)   : ORIGIN = 0, LENGTH = 0x1760
+  retained_xram (rw!x) : ORIGIN = 0x1760, LENGTH = 0x4A0
   bit    (rw!x) : ORIGIN = 0, LENGTH = 0x80
   data   (rw!x) : ORIGIN = 0, LENGTH = 256
   pdata  (rw!x) : ORIGIN = 0, LENGTH = 256

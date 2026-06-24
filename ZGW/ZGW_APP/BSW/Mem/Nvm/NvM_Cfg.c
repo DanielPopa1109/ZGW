@@ -4,7 +4,7 @@ uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];
 uint8 NvM_TimeBase_Ram[NVM_BLOCK_TIMEBASE_LENGTH];
 
 const uint8 NvM_AppData_Rom[NVM_BLOCK_APP_DATA_LENGTH] = { 0u };
-const uint8 NvM_TimeBase_Rom[NVM_BLOCK_TIMEBASE_LENGTH] =
+const uint8 NvM_TimeBase_Rom[TIMEBASE_NVM_IMAGE_SIZE] =
 {
     0x54u, 0x49u, 0x4Du, 0x45u, /* magic: "TIME" */
     0x01u,                         /* version */
@@ -24,7 +24,7 @@ const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS] =
         NVM_BLOCK_DEM_PRIMARY_LENGTH,
         (uint8 *)&Dem_NvImage,
         NULL_PTR,
-        NVM_BLOCK_NATIVE,
+        NVM_BLOCK_REDUNDANT,
         TRUE,
         FALSE,
         FALSE

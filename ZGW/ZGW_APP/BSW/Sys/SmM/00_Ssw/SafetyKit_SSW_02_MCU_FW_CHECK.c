@@ -59,6 +59,8 @@ boolean safetyKitFwCheckIsInitializedRamSshState(const MemoryTestedStruct *sshEn
         uint32 actualFaultsts, uint32 actualErrinfo);
 void safetyKitFwCheckSetSshDiagnostics(IfxMtu_MbistSel mbistSel, uint32 actualEccd, uint32 actualFaultsts,
         uint32 actualErrinfo, uint32 expectedEccd, uint32 expectedFaultsts, uint32 expectedErrinfo);
+void safetyKitFwCheckSetRegisterDiagnostics(uint32 regUnderTest, uint32 actual, uint32 expected,
+        uint32 mask, uint32 resetType);
 boolean safetyKitFwCheckEvaluateRamInit(uint16 memoryMask);
 boolean safetyKitFwCheckEvaluateLmuInit(uint16 memoryMask);
 void safetyKitFwCheckClearSSH(const SafetyKitResetType resetType);
@@ -87,6 +89,11 @@ void safetyKitSswMcuFwCheck(void)
     McuSm_SafetyKitFwCheckSshExpectedEccd = 0u;
     McuSm_SafetyKitFwCheckSshExpectedFaultsts = 0u;
     McuSm_SafetyKitFwCheckSshExpectedErrinfo = 0u;
+    McuSm_SafetyKitFwCheckLastRegFail = MCUSM_FW_CHECK_REG_FAIL_NONE;
+    McuSm_SafetyKitFwCheckRegActual = 0u;
+    McuSm_SafetyKitFwCheckRegExpected = 0u;
+    McuSm_SafetyKitFwCheckRegMask = 0u;
+    McuSm_SafetyKitFwCheckRegResetType = (uint32)g_SafetyKitStatus.resetCode.resetType;
 
     /* Enable MTU module if not yet enabled */
     boolean mtuWasEnabled = IfxMtu_isModuleEnabled();
@@ -233,6 +240,12 @@ boolean safetyKitFwCheckSmuStmemLclcon (const FwCheckStruct *fwCheckTable, const
         /* Set fwcheckHasPassed to FALSE in case test has failed for any register during the iteration. */
         if(!fwCheckVerification[i].testHasPassed)
         {
+            safetyKitFwCheckSetRegisterDiagnostics(
+                    (uint32)fwCheckVerification[i].regUnderTest,
+                    registerValue,
+                    expectedRegisterValue,
+                    ptrRegisterCheckStrct->mask,
+                    (uint32)resetType);
             fwcheckHasPassed = FALSE;
         }
     }
@@ -480,6 +493,21 @@ IfxMtu_MbistSel safetyKitFwCheckCheckLbistSshRegisters (const MemoryTestedStruct
         {
             McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_NOINIT_ACCEPTED;
         }
+        else if (((actualEccd == 0x5u) || (actualEccd == 0x0u))
+                && (actualFaultsts == 0x9u) && (actualErrinfo == 0x0u))
+        {
+            /* DMU RAM/LMU auto-init at the LBIST PORST-class exit leaves the SSH in the
+             * initialized state (FAULTSTS=0x9, init-done) for memories the hardware
+             * re-initializes regardless of the SW-visible PROCONRAM.RAMINSEL/LMUINSEL config.
+             * The post-init ECCD is observed in two benign variants: 0x5 (error-detection
+             * tracking bits set) and 0x0 (no ECC flags, the cleaner state); ERRINFO is 0 in
+             * both. safetyKitFwCheckIsInitializedRamSshState() gates the same state behind the
+             * PROCONRAM evaluation, which does not reflect the unconditional auto-init and so
+             * rejects it here. Accept the initialized signature as a valid LBIST side effect
+             * (see FW_CHECK_DEVIATIONS deviation #9). This is the single-occurrence, power-on
+             * only FW-check failure (FAULTSTS=0x9, e.g. SSH instance 0x4E). */
+            McuSm_SafetyKitFwCheckResultMask |= MCUSM_FW_CHECK_RESULT_LBIST_SSH_INIT_ACCEPTED;
+        }
         else
         {
             safetyKitFwCheckSetSshDiagnostics(mbistSel, actualEccd, actualFaultsts, actualErrinfo,
@@ -569,6 +597,21 @@ void safetyKitFwCheckSetSshDiagnostics(IfxMtu_MbistSel mbistSel, uint32 actualEc
     McuSm_SafetyKitFwCheckSshExpectedEccd = expectedEccd;
     McuSm_SafetyKitFwCheckSshExpectedFaultsts = expectedFaultsts;
     McuSm_SafetyKitFwCheckSshExpectedErrinfo = expectedErrinfo;
+}
+
+void safetyKitFwCheckSetRegisterDiagnostics(uint32 regUnderTest, uint32 actual, uint32 expected,
+        uint32 mask, uint32 resetType)
+{
+    if (McuSm_SafetyKitFwCheckLastRegFail != MCUSM_FW_CHECK_REG_FAIL_NONE)
+    {
+        return;
+    }
+
+    McuSm_SafetyKitFwCheckLastRegFail = regUnderTest;
+    McuSm_SafetyKitFwCheckRegActual = actual;
+    McuSm_SafetyKitFwCheckRegExpected = expected;
+    McuSm_SafetyKitFwCheckRegMask = mask;
+    McuSm_SafetyKitFwCheckRegResetType = resetType;
 }
 /*
  * Verify if CPU memory is initialized

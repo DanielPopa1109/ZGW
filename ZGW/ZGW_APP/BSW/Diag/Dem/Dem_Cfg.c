@@ -2,7 +2,9 @@
 #include "SysMgr.h"
 #include <string.h>
 
-static Std_ReturnType Dem_DefaultFreezeFrameCapture(
+#define DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE 48u
+
+static Std_ReturnType Dem_DefaultSnapshotDataCapture(
     Dem_EventIdType eventId,
     uint8 *buffer,
     uint16 *length
@@ -17,9 +19,9 @@ static Std_ReturnType Dem_DefaultFreezeFrameCapture(
     }
 
     maxLen = *length;
-    if (maxLen > DEM_FREEZE_FRAME_SIZE)
+    if (maxLen > DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE)
     {
-        maxLen = DEM_FREEZE_FRAME_SIZE;
+        maxLen = DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE;
     }
 
     for (i = 0u; i < maxLen; i++)
@@ -35,41 +37,12 @@ static Std_ReturnType Dem_DefaultFreezeFrameCapture(
         buffer[3] = 0u;
     }
 
-    *length = maxLen;
-    return E_OK;
-}
-
-static Std_ReturnType Dem_DefaultExtendedDataCapture(
-    Dem_EventIdType eventId,
-    uint8 *buffer,
-    uint16 *length
-)
-{
-    uint16 i;
-    uint16 maxLen;
-
-    if ((buffer == NULL_PTR) || (length == NULL_PTR))
+    if (maxLen >= 36u)
     {
-        return E_NOT_OK;
-    }
-
-    maxLen = *length;
-    if (maxLen > DEM_EXTENDED_DATA_SIZE)
-    {
-        maxLen = DEM_EXTENDED_DATA_SIZE;
-    }
-
-    for (i = 0u; i < maxLen; i++)
-    {
-        buffer[i] = 0u;
-    }
-
-    if (maxLen >= 4u)
-    {
-        buffer[0] = (uint8)((eventId >> 8u) & 0xFFu);
-        buffer[1] = (uint8)(eventId & 0xFFu);
-        buffer[2] = 0u;
-        buffer[3] = 1u;
+        buffer[32] = (uint8)((eventId >> 8u) & 0xFFu);
+        buffer[33] = (uint8)(eventId & 0xFFu);
+        buffer[34] = 0u;
+        buffer[35] = 1u;
     }
 
     *length = maxLen;
@@ -106,14 +79,6 @@ static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType 
     {
         *dtc = (Dem_DTCType)(DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT +
                 (Dem_DTCType)(eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST));
-        return E_OK;
-    }
-
-    if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST) &&
-        (eventId <= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_LAST))
-    {
-        *dtc = (Dem_DTCType)(DEM_DTC_GATEWAY_RX_SIGNAL_INVALID +
-                (Dem_DTCType)(eventId - DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST));
         return E_OK;
     }
 
@@ -154,8 +119,7 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         TRUE,
         40u,
         TRUE,
-        SysMgr_CaptureMcuSmFreezeFrame,
-        SysMgr_CaptureMcuSmExtendedData,
+        SysMgr_CaptureMcuSmSnapshotData,
         NULL_PTR
     },
     {
@@ -171,8 +135,7 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         TRUE,
         40u,
         TRUE,
-        Dem_DefaultFreezeFrameCapture,
-        Dem_DefaultExtendedDataCapture,
+        Dem_DefaultSnapshotDataCapture,
         NULL_PTR
     },
     {
@@ -188,8 +151,7 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         TRUE,
         40u,
         TRUE,
-        Dem_DefaultFreezeFrameCapture,
-        Dem_DefaultExtendedDataCapture,
+        Dem_DefaultSnapshotDataCapture,
         NULL_PTR
     }
 };
@@ -212,8 +174,7 @@ static void Dem_FillGatewayEventConfig(
     eventConfig->AgingAllowed = TRUE;
     eventConfig->AgingThreshold = 40u;
     eventConfig->StorageEnabled = TRUE;
-    eventConfig->FreezeFrameCapture = GatewaySwc_CaptureRxDiagFreezeFrame;
-    eventConfig->ExtendedDataCapture = GatewaySwc_CaptureRxDiagExtendedData;
+    eventConfig->SnapshotDataCapture = GatewaySwc_CaptureRxDiagSnapshotData;
     eventConfig->StatusChangedCallback = NULL_PTR;
 }
 
@@ -252,18 +213,6 @@ Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *ev
                 eventConfig,
                 (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST + offset),
                 (Dem_DTCType)(DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + offset));
-        Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
-        return E_OK;
-    }
-
-    offset = (uint16)(offset - DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT);
-
-    if (offset < (uint16)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT)
-    {
-        Dem_FillGatewayEventConfig(
-                eventConfig,
-                (Dem_EventIdType)(DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST + offset),
-                (Dem_DTCType)(DEM_DTC_GATEWAY_RX_SIGNAL_INVALID + offset));
         Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
         return E_OK;
     }

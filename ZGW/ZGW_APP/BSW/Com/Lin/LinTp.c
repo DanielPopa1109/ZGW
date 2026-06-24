@@ -6,6 +6,7 @@
 #define LINTP_TIMER_N_CR 200u
 #define LINTP_TIMER_N_AS 200u
 #define LINTP_CONFIGURED_NODE_COUNT 4u
+#define LINTP_PENDING_TX_DEPTH 4u
 
 typedef enum
 {
@@ -44,10 +45,23 @@ typedef struct
     uint16 functionId;
 } LinTp_NodeType;
 
+typedef struct
+{
+    uint8 valid;
+    PduIdType txPduId;
+    uint8 targetNad;
+    PduLengthType len;
+    uint8 data[LINTP_MAX_PAYLOAD];
+} LinTp_PendingTxType;
+
 static LinTp_StateType LinTp_State;
 static LinTp_NodeType LinTp_ConfiguredNodes[LINTP_CONFIGURED_NODE_COUNT];
+static LinTp_PendingTxType LinTp_PendingTx[LINTP_PENDING_TX_DEPTH];
 
 long long LinTp_MainFunction_Counter = 0;
+
+static Std_ReturnType LinTp_StartTransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len);
+static void LinTp_StartNextPendingTx(void);
 
 static void LinTp_InitConfiguredNodes(uint8 configuredNad)
 {
@@ -104,6 +118,7 @@ uint8 LinTp_IsConfiguredNad(uint8 nad)
 void LinTp_Init(uint8 configuredNad)
 {
     memset(&LinTp_State, 0, sizeof(LinTp_State));
+    memset(LinTp_PendingTx, 0, sizeof(LinTp_PendingTx));
     LinTp_InitConfiguredNodes(configuredNad);
     LinTp_State.activeTargetNad = LinTp_ConfiguredNodes[0u].currentNad;
     LinTp_State.txNad = LinTp_State.activeTargetNad;
@@ -181,6 +196,106 @@ static Std_ReturnType LinTp_QueueFrame(const uint8 frame[8])
     return E_OK;
 }
 
+static uint8 LinTp_CanStartTransmitNow(void)
+{
+    LinIf_DiagStateType diagState;
+
+    if (LinTp_State.state != LINTP_IDLE)
+    {
+        return FALSE;
+    }
+
+    diagState = LinIf_GetDiagState();
+    if ((diagState != LINIF_DIAG_IDLE) &&
+        (diagState != LINIF_DIAG_DONE) &&
+        (diagState != LINIF_DIAG_ERROR))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad)
+{
+    uint8 idx;
+
+    if (LinTp_IsConfiguredNad(targetNad) == FALSE)
+    {
+        return FALSE;
+    }
+
+    if (LinTp_CanStartTransmitNow() != FALSE)
+    {
+        return TRUE;
+    }
+
+    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
+    {
+        if (LinTp_PendingTx[idx].valid == FALSE)
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static Std_ReturnType LinTp_StorePendingTx(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len)
+{
+    uint8 idx;
+
+    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
+    {
+        if (LinTp_PendingTx[idx].valid == FALSE)
+        {
+            LinTp_PendingTx[idx].txPduId = TxPduId;
+            LinTp_PendingTx[idx].targetNad = targetNad;
+            LinTp_PendingTx[idx].len = len;
+            memcpy(LinTp_PendingTx[idx].data, data, len);
+            LinTp_PendingTx[idx].valid = TRUE;
+            return E_OK;
+        }
+    }
+
+    return E_NOT_OK;
+}
+
+static void LinTp_StartNextPendingTx(void)
+{
+    uint8 idx;
+    PduIdType txPduId;
+    uint8 targetNad;
+    PduLengthType len;
+
+    if (LinTp_CanStartTransmitNow() == FALSE)
+    {
+        return;
+    }
+
+    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
+    {
+        if (LinTp_PendingTx[idx].valid != FALSE)
+        {
+            txPduId = LinTp_PendingTx[idx].txPduId;
+            targetNad = LinTp_PendingTx[idx].targetNad;
+            len = LinTp_PendingTx[idx].len;
+
+            if (LinTp_StartTransmitToNad(txPduId, targetNad, LinTp_PendingTx[idx].data, len) == E_OK)
+            {
+                LinTp_PendingTx[idx].valid = FALSE;
+            }
+            else
+            {
+                LinTp_PendingTx[idx].valid = FALSE;
+                PduR_LinTpTxConfirmation(txPduId, E_NOT_OK);
+            }
+
+            return;
+        }
+    }
+}
+
 static void LinTp_BuildNextCf(uint8 frame[8])
 {
     PduLengthType rem;
@@ -200,7 +315,7 @@ static void LinTp_BuildNextCf(uint8 frame[8])
     LinTp_State.txSn = (uint8)((LinTp_State.txSn + 1u) & 0x0Fu);
 }
 
-Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len)
+static Std_ReturnType LinTp_StartTransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len)
 {
     uint8 frame[8];
 
@@ -250,6 +365,26 @@ Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uin
     return LinTp_QueueFrame(frame);
 }
 
+Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len)
+{
+    if ((data == NULL_PTR) || (len == 0u) || (len > LINTP_MAX_PAYLOAD))
+    {
+        return E_NOT_OK;
+    }
+
+    if (LinTp_IsConfiguredNad(targetNad) == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    if (LinTp_CanStartTransmitNow() == FALSE)
+    {
+        return LinTp_StorePendingTx(TxPduId, targetNad, data, len);
+    }
+
+    return LinTp_StartTransmitToNad(TxPduId, targetNad, data, len);
+}
+
 Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len)
 {
     return LinTp_TransmitToNad(TxPduId, LinTp_State.activeTargetNad, data, len);
@@ -268,6 +403,7 @@ void LinTp_TxFrameConfirmation(uint8 success)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
+        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -275,6 +411,7 @@ void LinTp_TxFrameConfirmation(uint8 success)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_OK);
         LinTp_State.state = LINTP_IDLE;
+        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -284,6 +421,7 @@ void LinTp_TxFrameConfirmation(uint8 success)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
+        LinTp_StartNextPendingTx();
     }
 }
 
@@ -291,6 +429,7 @@ void LinTp_MainFunction(void)
 {
     if (LinTp_State.state == LINTP_IDLE)
     {
+        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -304,11 +443,13 @@ void LinTp_MainFunction(void)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
+        LinTp_StartNextPendingTx();
     }
     else if (LinTp_State.state == LINTP_RX_IN_PROGRESS)
     {
         PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
+        LinTp_StartNextPendingTx();
     }
 
     LinTp_MainFunction_Counter++;
@@ -368,6 +509,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         }
 
         PduR_LinTpRxIndication(pduRId, E_OK);
+        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -420,6 +562,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
+            LinTp_StartNextPendingTx();
             return;
         }
 
@@ -430,6 +573,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
+            LinTp_StartNextPendingTx();
             return;
         }
 
@@ -441,6 +585,7 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_OK);
             LinTp_State.state = LINTP_IDLE;
+            LinTp_StartNextPendingTx();
         }
     }
 }

@@ -40,13 +40,28 @@
 #define CODINGAPP_VALIDATION_BAD_VERSION        3u
 #define CODINGAPP_VALIDATION_BAD_LENGTH         4u
 #define CODINGAPP_VALIDATION_BAD_MESSAGE_COUNT  5u
-#define CODINGAPP_VALIDATION_BAD_CRC            6u
+#define CODINGAPP_VALIDATION_RESERVED_6         6u
 #define CODINGAPP_VALIDATION_NVM_ERROR          7u
 
 #define CODINGAPP_ROUTINE_STATUS_OK             0u
 #define CODINGAPP_ROUTINE_STATUS_PENDING        1u
 #define CODINGAPP_ROUTINE_STATUS_FAILED         2u
 #define CODINGAPP_ROUTINE_STATUS_NOT_CHANGED    3u
+
+typedef struct
+{
+    uint32 magic;
+    uint16 version;
+    uint16 length;
+    uint32 generation;
+    uint16 rxMessageCount;
+    uint16 txPduCount;
+    uint8 rxMessageExpected[CODINGAPP_RX_MESSAGE_EXPECTED_BYTES];
+    uint8 txPduEnabled[CODINGAPP_TX_PDU_ENABLED_BYTES];
+    uint32 reserved;
+} CodingApp_NvImageType;
+
+#define CODINGAPP_NVM_IMAGE_SIZE                ((uint32)sizeof(CodingApp_NvImageType))
 
 typedef struct
 {

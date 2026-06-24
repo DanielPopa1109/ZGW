@@ -5,10 +5,13 @@
 #include "TcpIpH.h"
 
 #define PDUR_MAX_TP_BUFFER             8192u
-#define PDUR_MAX_TP_RX_ROUTES          10u
+#define PDUR_MAX_TP_RX_ROUTES          16u
 #define PDUR_MAX_TP_RX_BUFFERS         4u
 #define PDUR_MAX_IF_ROUTE_DATA_LEN     64u
 #define PDUR_SOAD_INVALID_SOCON        0xFFu
+
+#define PDUR_INIT_FAIL_NONE            0u
+#define PDUR_INIT_FAIL_TP_RX_ROUTES    1u
 
 void PduR_Init(void);
 uint8 PduR_IsInitialized(void);
@@ -23,6 +26,14 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
                                 const uint8* data,
                                 PduLengthType len);
 void PduR_DcmReleaseNoResponse(PduIdType DcmTxPduId);
+
+/* Relay a forwarded slave UDS response back to the DoIP tester that issued the
+ * routed request. The payload is prefixed with the originating node's extended
+ * address so the tester can correlate it. Returns E_NOT_OK if no routed return path
+ * is currently captured or the DoIP TX mailbox is busy. */
+Std_ReturnType PduR_DoIPRelayForwardedResponse(uint8 extendedAddress,
+                                               const uint8* data,
+                                               uint16 len);
 
 /* Lower IF callbacks: CanIf/LinIf/SoAd -> PduR -> COM and/or raw IF gateway */
 void PduR_CanIfRxIndication(PduIdType CanIfRxPduId,
@@ -63,12 +74,19 @@ void PduR_LinTpTxConfirmation(PduIdType LinTpTxPduId,
                               Std_ReturnType result);
 
 /* DoIP full UDS payload callback: DoIP -> PduR -> DCM */
-void PduR_DoIPRxIndication(uint16 sourceAddress,
-                           uint16 targetAddress,
-                           const uint8* uds,
-                           uint16 udsLen);
+Std_ReturnType PduR_DoIPRxIndication(uint16 sourceAddress,
+                                     uint16 targetAddress,
+                                     const uint8* uds,
+                                     uint16 udsLen);
 void PduR_DoIPCore0MainFunction(void);
 void PduR_DoIPCore2MainFunction(void);
 void PduR_DoIPResetSession(void);
+
+extern volatile uint8 PduR_DebugInitialized;
+extern volatile uint8 PduR_DebugInitFailure;
+extern volatile uint8 PduR_DebugTpRxRouteCount;
+extern volatile uint8 PduR_DebugMaxTpRxRoutes;
+extern volatile uint32 PduR_DoIPSessionResetAgeTicks;
+extern volatile uint32 PduR_DoIPSessionResetStallCounter;
 
 #endif

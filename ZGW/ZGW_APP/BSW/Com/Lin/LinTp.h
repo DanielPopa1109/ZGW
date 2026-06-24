@@ -30,6 +30,7 @@ void LinTp_MainFunction(void);
 
 Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len);
 Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len);
+uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad);
 void LinTp_TxFrameConfirmation(uint8 success);
 
 void LinTp_RxMasterRequest(const uint8 frame[8]);

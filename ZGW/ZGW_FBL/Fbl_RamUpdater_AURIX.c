@@ -46,6 +46,10 @@
 
 #define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
 #define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
+#define DFLASH_REJECT_PREFIX_MASK        0xFFFF0000u
+#define DFLASH_REJECT_PREFIX_AF40        0xAF400000u
+#define DFLASH_REJECT_PREFIX_AF01        0xAF010000u
+#define DFLASH_REJECT_PREFIX_AF02        0xAF020000u
 
 #define FBL_IMAGE_RAM_ADDR               0xB0100000u
 #define FBL_IMAGE_RAM_SIZE               FBL_SIZE_BYTES
@@ -263,6 +267,7 @@ static uint32 Ram_FlushPage(void);
 static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data);
 static IfxFlash_FlashType Ram_Bank(uint32 addr);
 static uint32 Ram_Crc32(uint32 addr, uint32 len);
+static uint8 Ram_IsExplicitlyRejectedProgrammingAddress(uint32 addr);
 static uint8 Ram_FblRangeValid(uint32 addr, uint32 len);
 static uint32 Ram_Rd32(const uint8 *p);
 static uint16 Ram_Rd16(const uint8 *p);
@@ -1708,6 +1713,20 @@ static uint32 Ram_Crc32(uint32 addr, uint32 len)
     return crc ^ 0xFFFFFFFFu;
 }
 
+static uint8 Ram_IsExplicitlyRejectedProgrammingAddress(uint32 addr)
+{
+    uint32 prefix = addr & DFLASH_REJECT_PREFIX_MASK;
+
+    if((prefix == DFLASH_REJECT_PREFIX_AF40) ||
+       (prefix == DFLASH_REJECT_PREFIX_AF01) ||
+       (prefix == DFLASH_REJECT_PREFIX_AF02))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
 static uint8 Ram_FblRangeValid(uint32 addr, uint32 len)
 {
     uint32 end;
@@ -1715,6 +1734,8 @@ static uint8 Ram_FblRangeValid(uint32 addr, uint32 len)
     if(len == 0u) { return 0u; }
     if((addr + len) < addr) { return 0u; }
     end = addr + len - 1u;
+    if((Ram_IsExplicitlyRejectedProgrammingAddress(addr) != 0u) ||
+       (Ram_IsExplicitlyRejectedProgrammingAddress(end) != 0u)) { return 0u; }
     if((addr & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
     if((end & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
     if(addr < FBL_START_NCACHED) { return 0u; }

@@ -935,6 +935,13 @@ mem_malloc_adjust_lfree:
           lfree = cur;
           LWIP_ASSERT("mem_malloc: !lfree->used", ((lfree == ram_end) || (!lfree->used)));
         }
+        /* MEM_SANITY walks the whole heap. Keep it under mem_mutex so
+         * tcpip_thread cannot update adjacent links while the diagnostic scan
+         * is in progress. */
+#if MEM_OVERFLOW_CHECK
+        mem_overflow_init_element(mem, size_in);
+#endif
+        MEM_SANITY();
         LWIP_MEM_ALLOC_UNPROTECT();
         sys_mutex_unlock(&mem_mutex);
         LWIP_ASSERT("mem_malloc: allocated memory not above ram_end.",
@@ -943,11 +950,6 @@ mem_malloc_adjust_lfree:
                     ((mem_ptr_t)mem + SIZEOF_STRUCT_MEM) % MEM_ALIGNMENT == 0);
         LWIP_ASSERT("mem_malloc: sanity check alignment",
                     (((mem_ptr_t)mem) & (MEM_ALIGNMENT - 1)) == 0);
-
-#if MEM_OVERFLOW_CHECK
-        mem_overflow_init_element(mem, size_in);
-#endif
-        MEM_SANITY();
         return (u8_t *)mem + SIZEOF_STRUCT_MEM + MEM_SANITY_OFFSET;
       }
     }

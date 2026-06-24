@@ -77,8 +77,11 @@
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  100
 #define LWIP_GETH_OS_POLL_PERIOD_MS         (5U)
-#define LWIP_GETH_RX_POLL_BUDGET            (64U)
-#define LWIP_GETH_CREATE_RX_TASK            (1U)
+#define LWIP_GETH_RX_POLL_BUDGET            (192U)
+/* Use the 5 ms core2 poll path for RX. This keeps Ethernet active while
+ * removing the ISR -> FreeRTOS task-notify path from AG7/17 investigations.
+ */
+#define LWIP_GETH_CREATE_RX_TASK            (0U)
 #if LWIP_IPV4 && LWIP_ACD
 #define IFX_LWIP_ACD_PERIOD                 (ACD_TMR_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
 #endif

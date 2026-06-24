@@ -63,14 +63,14 @@ extern "C" {
 
 #define LWIP_HAVE_SLIPIF 0
 
-#define DEFAULT_TCP_RECVMBOX_SIZE           32
+#define DEFAULT_TCP_RECVMBOX_SIZE           48
 #define DEFAULT_UDP_RECVMBOX_SIZE           32
 #define DEFAULT_ACCEPTMBOX_SIZE             8
 #define DEFAULT_RAW_RECVMBOX_SIZE           8
-#define TCPIP_MBOX_SIZE                     64
+#define TCPIP_MBOX_SIZE                     96
 #define MEMP_NUM_NETCONN                    12
 #define MEMP_NUM_TCPIP_MSG_API              24
-#define MEMP_NUM_TCPIP_MSG_INPKT            64
+#define MEMP_NUM_TCPIP_MSG_INPKT            96
 #define MEMP_NUM_SYS_TIMEOUT                (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 8)
 
 /* FreeRTOS/lwIP thread sizing. Required when NO_SYS == 0.
@@ -89,10 +89,11 @@ extern "C" {
 #define LWIP_NETIF_TX_SINGLE_PBUF           1
 #define TCP_LISTEN_BACKLOG                  1
 #define LWIP_SO_RCVTIMEO                    1
+#define LWIP_SO_LINGER                      1
 #define MEM_SIZE                            16384
 #define PBUF_POOL_SIZE                      96
 #define PBUF_POOL_BUFSIZE                   512
-#define MEMP_NUM_PBUF                       48
+#define MEMP_NUM_PBUF                       64
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
@@ -131,19 +132,18 @@ extern "C" {
  * listener answered". Give the pool real headroom. */
 #define MEMP_NUM_TCP_PCB                    8
 #define MEMP_NUM_TCP_PCB_LISTEN             3
-#define MEMP_NUM_TCP_SEG                    24
+#define MEMP_NUM_TCP_SEG                    32
 #define TCP_MSS                             536
-#define TCP_WND                             2144
-#define TCP_SND_BUF                         2144
-#define TCP_SND_QUEUELEN                    16
+#define TCP_WND                             4288
+#define TCP_SND_BUF                         4288
+#define TCP_SND_QUEUELEN                    24
 /* Keep TIME-WAIT short so a closed connection frees its PCB within a couple of
  * seconds on this controlled point-to-point lab link, instead of the 60 s lwIP
  * default that keeps reconnect pressure on the PCB pool. */
 #define TCP_MSL                             3000
 /* Reap a tester that vanished without a TCP FIN/RST (cable pull, PC sleep,
  * killed tool) at the TCP layer. Without this a half-open ESTABLISHED PCB
- * lingers forever - DoIP alive-check and inactivity abort are both disabled in
- * this lab (see DoIP.h) - and permanently blocks the single DoIP connection.
+ * lingers forever while the lab DoIP application inactivity abort is disabled.
  * Keepalive timers are configured per accepted socket in TcpIpH.c. */
 #define LWIP_TCP_KEEPALIVE                  1
 

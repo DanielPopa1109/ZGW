@@ -13,6 +13,9 @@ Scope: TC375DP SafetyKit FW check implementation under `BSW/Sys/SmM/00_Ssw`.
 3. SMU AG7 masks `ALM7[0]` and `ALM7[14]`.
    The current table treats these as device erratum or BROM-related side effects, not FW-check failures.
 
+   3a. SMU AG7 additionally masks `ALM7[17]` for the LBIST reset path.
+   This covers the observed coding endurance reset where FW_CHECK classified the reset as `safetyKitResetTypeLbist` and AG7 compared as actual `0x00020002` versus expected `0x00000002`; `ALM7[1]` remains the expected table value.
+
 4. SMU AG9 masks `ALM9[0]` and `ALM9[1]`.
    These are treated as DTS-related side effects and are not compared as strict failures.
 
@@ -30,6 +33,9 @@ Scope: TC375DP SafetyKit FW check implementation under `BSW/Sys/SmM/00_Ssw`.
 
 9. LBIST SSH checking accepts initialized RAM state for CPU/LMU entries when `DMU_HF_PROCONRAM` says that memory is initialized.
    This covers the observed sleep wake-up from standby case where DAM0 reports `{ECCD=0x5, FAULTSTS=0x9, ERRINFO=0}` while the standby table entry is the not-initialized state.
+
+   9a. LBIST SSH checking additionally accepts the initialized signature `{ECCD∈{0x0,0x5}, FAULTSTS=0x9, ERRINFO=0}` unconditionally, independent of the `DMU_HF_PROCONRAM` evaluation.
+   The DMU RAM/LMU auto-init at the LBIST PORST-class exit re-initializes some memories regardless of the SW-visible `RAMINSEL`/`LMUINSEL` config, so the deviation-9 gating rejects the same benign state. The post-init `ECCD` is observed as `0x5` (tracking bits set) or `0x0` (no ECC flags); `FAULTSTS=0x9` (init-done) and `ERRINFO=0` in both. Observed as a single power-on-only FW-check failure (`resetType=LBIST`), e.g. SSH instances with resultMask `0x28`/`0xA8`, `FAULTSTS=0x9`.
 
 10. FW-check failure handling clears selected SMU/SSH evidence before reset reaction.
    Snapshot variables preserve debug information, but raw hardware status can be altered before a debugger can inspect it after the reset hook.

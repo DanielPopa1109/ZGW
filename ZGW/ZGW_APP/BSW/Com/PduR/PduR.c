@@ -8,8 +8,10 @@
 #include "Dcm_Cfg.h"
 #include "DoIP.h"
 #include "GatewaySwc.h"
+#include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 #include "LinIf.h"
 #include "LinTp.h"
+#include "McuSm.h"
 #include "SoAd.h"
 #include "../UdpNm/UdpNm.h"
 
@@ -29,6 +31,20 @@
 #define PDUR_DOIP_TX_STATE_PENDING      1u
 #define PDUR_DOIP_TX_STATE_CONFIRM      2u
 #define PDUR_DOIP_TX_RETRY_LIMIT        20u
+#define PDUR_DOIP_RX_SHORT_QUEUE_DEPTH  17u
+#define PDUR_DOIP_RX_SHORT_QUEUE_USABLE 16u
+#define PDUR_DOIP_RX_SHORT_BUFFER       64u
+#define PDUR_DOIP_RX_LARGE_QUEUE_DEPTH  49u
+#define PDUR_DOIP_RX_LARGE_QUEUE_USABLE 48u
+#define PDUR_DOIP_RX_LARGE_BUFFER       320u
+#define PDUR_DOIP_RX_DRAIN_BUDGET       (PDUR_DOIP_RX_SHORT_QUEUE_USABLE + PDUR_DOIP_RX_LARGE_QUEUE_USABLE)
+#define PDUR_DOIP_FORWARD_NOT_ROUTED    0u
+#define PDUR_DOIP_FORWARD_ACCEPTED      1u
+#define PDUR_DOIP_FORWARD_RETRY         2u
+#define PDUR_DOIP_FORWARD_DROPPED       3u
+/* Core2 runs this monitor every 5 ms; 400 ticks gives core0 about 2 seconds
+ * to consume a DoIP TCP reconnect/session-reset request before we reset. */
+#define PDUR_DOIP_SESSION_RESET_STALL_TICKS 400u
 
 
 /* ===================== Routing types ===================== */
@@ -110,11 +126,46 @@ typedef struct
 typedef struct
 {
     volatile uint8 valid;
+    uint32 sessionGeneration;
     uint16 sourceAddress;
     uint16 targetAddress;
     uint16 udsLen;
     uint8 data[PDUR_MAX_TP_BUFFER];
 } PduR_DoIPRxMailboxType;
+
+typedef struct
+{
+    volatile uint8 valid;
+    uint32 sessionGeneration;
+    uint16 sourceAddress;
+    uint16 targetAddress;
+    uint16 udsLen;
+    uint8 data[PDUR_DOIP_RX_SHORT_BUFFER];
+} PduR_DoIPRxQueueEntryType;
+
+typedef struct
+{
+    volatile uint8 head;
+    volatile uint8 tail;
+    PduR_DoIPRxQueueEntryType entries[PDUR_DOIP_RX_SHORT_QUEUE_DEPTH];
+} PduR_DoIPRxQueueType;
+
+typedef struct
+{
+    volatile uint8 valid;
+    uint32 sessionGeneration;
+    uint16 sourceAddress;
+    uint16 targetAddress;
+    uint16 udsLen;
+    uint8 data[PDUR_DOIP_RX_LARGE_BUFFER];
+} PduR_DoIPRxLargeQueueEntryType;
+
+typedef struct
+{
+    volatile uint8 head;
+    volatile uint8 tail;
+    PduR_DoIPRxLargeQueueEntryType entries[PDUR_DOIP_RX_LARGE_QUEUE_DEPTH];
+} PduR_DoIPRxLargeQueueType;
 
 typedef struct
 {
@@ -335,7 +386,13 @@ static const PduR_TpRxRouteType PduR_TpRxRoutes[] =
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_PHYS,        DCM_RX_CAN_PHYS        },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_PHYS,      DCM_RX_CANFD_PHYS      },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS,    DCM_RX_CAN_EXT_PHYS    },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS_2,  DCM_RX_CAN_EXT_PHYS_2  },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS_3,  DCM_RX_CAN_EXT_PHYS_3  },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS_4,  DCM_RX_CAN_EXT_PHYS_4  },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_EXT_PHYS,  DCM_RX_CANFD_EXT_PHYS  },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_EXT_PHYS_2, DCM_RX_CANFD_EXT_PHYS_2 },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_EXT_PHYS_3, DCM_RX_CANFD_EXT_PHYS_3 },
+    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_EXT_PHYS_4, DCM_RX_CANFD_EXT_PHYS_4 },
     { TRUE, PDUR_TP_LOWER_LINTP, DCM_RX_LIN_PHYS,        DCM_RX_LIN_PHYS        },
     { TRUE, PDUR_TP_LOWER_DOIP,  DCM_RX_ETH_PHYS,        DCM_RX_ETH_PHYS        }
 };
@@ -345,13 +402,21 @@ static const PduR_DcmTxRouteType PduR_DcmTxRoutes[] =
     { TRUE, DCM_TX_CAN_PHYS,        PDUR_TP_LOWER_CANTP, DCM_TX_CAN_PHYS        },
     { TRUE, DCM_TX_CANFD_PHYS,      PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_PHYS      },
     { TRUE, DCM_TX_CAN_EXT_PHYS,    PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS    },
+    { TRUE, DCM_TX_CAN_EXT_PHYS_2,  PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS_2  },
+    { TRUE, DCM_TX_CAN_EXT_PHYS_3,  PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS_3  },
+    { TRUE, DCM_TX_CAN_EXT_PHYS_4,  PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS_4  },
     { TRUE, DCM_TX_CANFD_EXT_PHYS,  PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_EXT_PHYS  },
+    { TRUE, DCM_TX_CANFD_EXT_PHYS_2, PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_EXT_PHYS_2 },
+    { TRUE, DCM_TX_CANFD_EXT_PHYS_3, PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_EXT_PHYS_3 },
+    { TRUE, DCM_TX_CANFD_EXT_PHYS_4, PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_EXT_PHYS_4 },
     { TRUE, DCM_TX_LIN_PHYS,        PDUR_TP_LOWER_LINTP, DCM_TX_LIN_PHYS        },
     { TRUE, DCM_TX_ETH_PHYS,        PDUR_TP_LOWER_DOIP,  DCM_TX_ETH_PHYS        }
 };
 
 static PduR_DoIPContextType PduR_DoIPCtx;
 static PduR_DoIPRxMailboxType PduR_DoIPRxMailbox;
+static PduR_DoIPRxQueueType PduR_DoIPRxQueue;
+static PduR_DoIPRxLargeQueueType PduR_DoIPRxLargeQueue;
 static PduR_DoIPTxMailboxType PduR_DoIPTxMailbox;
 static PduR_DoIPTxConfirmationMailboxType PduR_DoIPTxConfirmationMailbox;
 static uint8 PduR_Initialized;
@@ -362,6 +427,22 @@ static uint8 PduR_Initialized;
  * request, avoiding a cross-core write that could clobber an in-flight
  * transaction. */
 static volatile uint8 PduR_DoIPSessionResetPending;
+static volatile uint32 PduR_DoIPSessionGeneration;
+volatile uint32 PduR_DoIPSessionResetAgeTicks;
+volatile uint32 PduR_DoIPSessionResetStallCounter;
+
+/* Return path for relayed routed responses. A routed request (extended-address
+ * forward) is fire-and-forget and never sets up PduR_DoIPCtx, so the tester's DoIP
+ * addresses are captured here when a routed request is accepted. A slave reply that
+ * later arrives on a bus is relayed back to this tester via PduR_DoIPRelayForwardedResponse.
+ * One tester/connection at a time, so a single slot is sufficient. */
+static volatile uint8 PduR_RoutedReturnValid;
+static uint16 PduR_RoutedReturnZgwAddr;
+static uint16 PduR_RoutedReturnTesterAddr;
+
+volatile uint32 PduR_DoIPRoutedRelayPostedCounter;
+volatile uint32 PduR_DoIPRoutedRelayDroppedCounter;
+volatile uint32 PduR_DoIPRoutedForwardDroppedCounter;
 
 volatile uint32 PduR_DoIPRxMailboxFullCounter;
 volatile uint32 PduR_DoIPRxDroppedBusyCounter;
@@ -370,6 +451,366 @@ volatile uint32 PduR_DoIPTxConfirmFullCounter;
 volatile uint32 PduR_DoIPTxSentCounter;
 volatile uint32 PduR_DoIPTxFailCounter;
 volatile uint32 PduR_DoIPFastConfirmCounter;
+volatile uint8 PduR_DebugInitialized;
+volatile uint8 PduR_DebugInitFailure;
+volatile uint8 PduR_DebugTpRxRouteCount;
+volatile uint8 PduR_DebugMaxTpRxRoutes;
+
+static void PduR_DoIPRxQueueReset(void)
+{
+    uint8 idx;
+
+    PduR_DoIPRxQueue.head = 0u;
+    PduR_DoIPRxQueue.tail = 0u;
+
+    for (idx = 0u; idx < PDUR_DOIP_RX_SHORT_QUEUE_DEPTH; idx++)
+    {
+        PduR_DoIPRxQueue.entries[idx].valid = FALSE;
+        PduR_DoIPRxQueue.entries[idx].sessionGeneration = 0u;
+        PduR_DoIPRxQueue.entries[idx].sourceAddress = 0u;
+        PduR_DoIPRxQueue.entries[idx].targetAddress = 0u;
+        PduR_DoIPRxQueue.entries[idx].udsLen = 0u;
+    }
+
+    __dsync();
+}
+
+static uint8 PduR_DoIPRxQueueNextIndex(uint8 idx)
+{
+    idx++;
+    if (idx >= PDUR_DOIP_RX_SHORT_QUEUE_DEPTH)
+    {
+        idx = 0u;
+    }
+
+    return idx;
+}
+
+static void PduR_DoIPRxQueueDropStale(uint32 sessionGeneration)
+{
+    uint8 idx;
+
+    for (idx = 0u; idx < PDUR_DOIP_RX_SHORT_QUEUE_DEPTH; idx++)
+    {
+        if ((PduR_DoIPRxQueue.entries[idx].valid != FALSE) &&
+                (PduR_DoIPRxQueue.entries[idx].sessionGeneration != sessionGeneration))
+        {
+            PduR_DoIPRxQueue.entries[idx].valid = FALSE;
+            PduR_DoIPRxQueue.entries[idx].sessionGeneration = 0u;
+            PduR_DoIPRxQueue.entries[idx].sourceAddress = 0u;
+            PduR_DoIPRxQueue.entries[idx].targetAddress = 0u;
+            PduR_DoIPRxQueue.entries[idx].udsLen = 0u;
+        }
+    }
+
+    while ((PduR_DoIPRxQueue.head != PduR_DoIPRxQueue.tail) &&
+            (PduR_DoIPRxQueue.entries[PduR_DoIPRxQueue.head].valid == FALSE))
+    {
+        PduR_DoIPRxQueue.head = PduR_DoIPRxQueueNextIndex(PduR_DoIPRxQueue.head);
+    }
+
+    __dsync();
+}
+
+static Std_ReturnType PduR_DoIPRxQueuePush(uint16 sourceAddress,
+                                           uint16 targetAddress,
+                                           const uint8* uds,
+                                           uint16 udsLen,
+                                           uint32 sessionGeneration)
+{
+    PduR_DoIPRxQueueEntryType* entry;
+    uint8 tail;
+    uint8 nextTail;
+
+    if ((uds == NULL_PTR) ||
+        (udsLen == 0u) ||
+        (udsLen > PDUR_DOIP_RX_SHORT_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    tail = PduR_DoIPRxQueue.tail;
+    nextTail = PduR_DoIPRxQueueNextIndex(tail);
+
+    if (nextTail == PduR_DoIPRxQueue.head)
+    {
+        return E_NOT_OK;
+    }
+
+    entry = &PduR_DoIPRxQueue.entries[tail];
+
+    if (entry->valid != FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    entry->sessionGeneration = sessionGeneration;
+    entry->sourceAddress = sourceAddress;
+    entry->targetAddress = targetAddress;
+    entry->udsLen = udsLen;
+    memcpy(entry->data, uds, udsLen);
+    __dsync();
+    entry->valid = TRUE;
+
+    PduR_DoIPRxQueue.tail = nextTail;
+    __dsync();
+
+    return E_OK;
+}
+
+static PduR_DoIPRxQueueEntryType* PduR_DoIPRxQueuePeek(void)
+{
+    PduR_DoIPRxQueueEntryType* entry;
+
+    while (PduR_DoIPRxQueue.head != PduR_DoIPRxQueue.tail)
+    {
+        entry = &PduR_DoIPRxQueue.entries[PduR_DoIPRxQueue.head];
+
+        if (entry->valid != FALSE)
+        {
+            return entry;
+        }
+
+        PduR_DoIPRxQueue.head = PduR_DoIPRxQueueNextIndex(PduR_DoIPRxQueue.head);
+    }
+
+    return NULL_PTR;
+}
+
+static void PduR_DoIPRxQueuePop(void)
+{
+    PduR_DoIPRxQueueEntryType* entry;
+    uint8 head;
+    uint8 nextHead;
+
+    if (PduR_DoIPRxQueue.head == PduR_DoIPRxQueue.tail)
+    {
+        return;
+    }
+
+    head = PduR_DoIPRxQueue.head;
+    entry = &PduR_DoIPRxQueue.entries[head];
+    entry->valid = FALSE;
+    entry->sessionGeneration = 0u;
+    entry->sourceAddress = 0u;
+    entry->targetAddress = 0u;
+    entry->udsLen = 0u;
+
+    __dsync();
+    nextHead = PduR_DoIPRxQueueNextIndex(head);
+    PduR_DoIPRxQueue.head = nextHead;
+    __dsync();
+}
+
+static void PduR_DoIPRxLargeQueueReset(void)
+{
+    uint8 idx;
+
+    PduR_DoIPRxLargeQueue.head = 0u;
+    PduR_DoIPRxLargeQueue.tail = 0u;
+
+    for (idx = 0u; idx < PDUR_DOIP_RX_LARGE_QUEUE_DEPTH; idx++)
+    {
+        PduR_DoIPRxLargeQueue.entries[idx].valid = FALSE;
+        PduR_DoIPRxLargeQueue.entries[idx].sessionGeneration = 0u;
+        PduR_DoIPRxLargeQueue.entries[idx].sourceAddress = 0u;
+        PduR_DoIPRxLargeQueue.entries[idx].targetAddress = 0u;
+        PduR_DoIPRxLargeQueue.entries[idx].udsLen = 0u;
+    }
+
+    __dsync();
+}
+
+static uint8 PduR_DoIPRxLargeQueueNextIndex(uint8 idx)
+{
+    idx++;
+    if (idx >= PDUR_DOIP_RX_LARGE_QUEUE_DEPTH)
+    {
+        idx = 0u;
+    }
+
+    return idx;
+}
+
+static void PduR_DoIPRxLargeQueueDropStale(uint32 sessionGeneration)
+{
+    uint8 idx;
+
+    for (idx = 0u; idx < PDUR_DOIP_RX_LARGE_QUEUE_DEPTH; idx++)
+    {
+        if ((PduR_DoIPRxLargeQueue.entries[idx].valid != FALSE) &&
+                (PduR_DoIPRxLargeQueue.entries[idx].sessionGeneration != sessionGeneration))
+        {
+            PduR_DoIPRxLargeQueue.entries[idx].valid = FALSE;
+            PduR_DoIPRxLargeQueue.entries[idx].sessionGeneration = 0u;
+            PduR_DoIPRxLargeQueue.entries[idx].sourceAddress = 0u;
+            PduR_DoIPRxLargeQueue.entries[idx].targetAddress = 0u;
+            PduR_DoIPRxLargeQueue.entries[idx].udsLen = 0u;
+        }
+    }
+
+    while ((PduR_DoIPRxLargeQueue.head != PduR_DoIPRxLargeQueue.tail) &&
+            (PduR_DoIPRxLargeQueue.entries[PduR_DoIPRxLargeQueue.head].valid == FALSE))
+    {
+        PduR_DoIPRxLargeQueue.head = PduR_DoIPRxLargeQueueNextIndex(PduR_DoIPRxLargeQueue.head);
+    }
+
+    __dsync();
+}
+
+static Std_ReturnType PduR_DoIPRxLargeQueuePush(uint16 sourceAddress,
+                                                uint16 targetAddress,
+                                                const uint8* uds,
+                                                uint16 udsLen,
+                                                uint32 sessionGeneration)
+{
+    PduR_DoIPRxLargeQueueEntryType* entry;
+    uint8 tail;
+    uint8 nextTail;
+
+    if ((uds == NULL_PTR) ||
+        (udsLen == 0u) ||
+        (udsLen > PDUR_DOIP_RX_LARGE_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    tail = PduR_DoIPRxLargeQueue.tail;
+    nextTail = PduR_DoIPRxLargeQueueNextIndex(tail);
+
+    if (nextTail == PduR_DoIPRxLargeQueue.head)
+    {
+        return E_NOT_OK;
+    }
+
+    entry = &PduR_DoIPRxLargeQueue.entries[tail];
+
+    if (entry->valid != FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    entry->sessionGeneration = sessionGeneration;
+    entry->sourceAddress = sourceAddress;
+    entry->targetAddress = targetAddress;
+    entry->udsLen = udsLen;
+    memcpy(entry->data, uds, udsLen);
+    __dsync();
+    entry->valid = TRUE;
+
+    PduR_DoIPRxLargeQueue.tail = nextTail;
+    __dsync();
+
+    return E_OK;
+}
+
+static PduR_DoIPRxLargeQueueEntryType* PduR_DoIPRxLargeQueuePeek(void)
+{
+    PduR_DoIPRxLargeQueueEntryType* entry;
+
+    while (PduR_DoIPRxLargeQueue.head != PduR_DoIPRxLargeQueue.tail)
+    {
+        entry = &PduR_DoIPRxLargeQueue.entries[PduR_DoIPRxLargeQueue.head];
+
+        if (entry->valid != FALSE)
+        {
+            return entry;
+        }
+
+        PduR_DoIPRxLargeQueue.head = PduR_DoIPRxLargeQueueNextIndex(PduR_DoIPRxLargeQueue.head);
+    }
+
+    return NULL_PTR;
+}
+
+static void PduR_DoIPRxLargeQueuePop(void)
+{
+    PduR_DoIPRxLargeQueueEntryType* entry;
+    uint8 head;
+    uint8 nextHead;
+
+    if (PduR_DoIPRxLargeQueue.head == PduR_DoIPRxLargeQueue.tail)
+    {
+        return;
+    }
+
+    head = PduR_DoIPRxLargeQueue.head;
+    entry = &PduR_DoIPRxLargeQueue.entries[head];
+    entry->valid = FALSE;
+    entry->sessionGeneration = 0u;
+    entry->sourceAddress = 0u;
+    entry->targetAddress = 0u;
+    entry->udsLen = 0u;
+
+    __dsync();
+    nextHead = PduR_DoIPRxLargeQueueNextIndex(head);
+    PduR_DoIPRxLargeQueue.head = nextHead;
+    __dsync();
+}
+
+static uint8 PduR_DoIPIsRoutedExtendedAddress(uint8 firstByte)
+{
+    if ((firstByte >= 0x42u) && (firstByte <= 0x4Fu))
+    {
+        return TRUE;
+    }
+
+    if ((firstByte >= 0x50u) && (firstByte <= 0x52u))
+    {
+        return TRUE;
+    }
+
+    if ((firstByte >= 0x53u) && (firstByte <= 0x59u))
+    {
+        return TRUE;
+    }
+
+    if ((firstByte >= 0x60u) && (firstByte <= 0x7Fu))
+    {
+        return TRUE;
+    }
+
+    if ((firstByte >= 0x90u) && (firstByte <= 0xAFu))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static uint8 PduR_DoIPForwardRoutedRequest(const uint8* uds, uint16 udsLen)
+{
+    uint8 response[4u];
+    Dcm_PduLengthType responseLength;
+    Dcm_ReturnType forwardResult;
+
+    if ((uds == NULL_PTR) ||
+        (udsLen < 2u) ||
+        (PduR_DoIPIsRoutedExtendedAddress(uds[0u]) == FALSE))
+    {
+        return PDUR_DOIP_FORWARD_NOT_ROUTED;
+    }
+
+    responseLength = 0u;
+    forwardResult = ParallelFlashSwc_ForwardCodingRequest(uds[0u],
+                                                          DCM_INITIAL,
+                                                          &uds[1u],
+                                                          (Dcm_PduLengthType)(udsLen - 1u),
+                                                          response,
+                                                          &responseLength);
+    if ((forwardResult == DCM_E_OK) && (responseLength == 0u))
+    {
+        return PDUR_DOIP_FORWARD_ACCEPTED;
+    }
+
+    /* Routed external-node requests are fire-and-forget from DoIP's point of
+     * view. If forwarding rejects one while the target bus is saturated or the
+     * per-bus queue is full, do not keep it at the head of the DoIP queue:
+     * that stalls later local ZGW requests behind an external node that the
+     * tester is not waiting on. */
+    PduR_DoIPRoutedForwardDroppedCounter++;
+    return PDUR_DOIP_FORWARD_DROPPED;
+}
 
 /* ===================== Internal helpers ===================== */
 
@@ -557,7 +998,10 @@ static uint8 PduR_ComMChannelForDcmRoute(const PduR_DcmTxRouteType* route,
     if (route->lower == PDUR_TP_LOWER_CANTP)
     {
         if ((route->dcmTxPduId == DCM_TX_CANFD_PHYS) ||
-            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS))
+            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS) ||
+            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS_2) ||
+            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS_3) ||
+            (route->dcmTxPduId == DCM_TX_CANFD_EXT_PHYS_4))
         {
             *channel = COMM_CH_CANFD;
         }
@@ -771,14 +1215,21 @@ static void PduR_TpRxIndication(PduR_TpLowerType lower,
 void PduR_Init(void)
 {
     PduR_Initialized = FALSE;
+    PduR_DebugInitialized = FALSE;
+    PduR_DebugInitFailure = PDUR_INIT_FAIL_NONE;
+    PduR_DebugTpRxRouteCount = PduR_GetTpRxRouteCount();
+    PduR_DebugMaxTpRxRoutes = PDUR_MAX_TP_RX_ROUTES;
 
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
     PduR_DoIPCtx.targetAddress = 0u;
     PduR_DoIPRxMailbox.valid = FALSE;
+    PduR_DoIPRxMailbox.sessionGeneration = 0u;
     PduR_DoIPRxMailbox.sourceAddress = 0u;
     PduR_DoIPRxMailbox.targetAddress = 0u;
     PduR_DoIPRxMailbox.udsLen = 0u;
+    PduR_DoIPRxQueueReset();
+    PduR_DoIPRxLargeQueueReset();
     PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
     PduR_DoIPTxMailbox.keepContext = FALSE;
     PduR_DoIPTxMailbox.confirmDcm = FALSE;
@@ -793,13 +1244,25 @@ void PduR_Init(void)
     PduR_DoIPTxConfirmationMailbox.txPduId = 0u;
     PduR_DoIPTxConfirmationMailbox.result = E_NOT_OK;
     PduR_DoIPSessionResetPending = 0u;
+    PduR_DoIPSessionGeneration = 0u;
+    PduR_DoIPSessionResetAgeTicks = 0u;
+    PduR_DoIPSessionResetStallCounter = 0u;
 
-    if (PduR_GetTpRxRouteCount() > PDUR_MAX_TP_RX_ROUTES)
+    PduR_RoutedReturnValid = FALSE;
+    PduR_RoutedReturnZgwAddr = 0u;
+    PduR_RoutedReturnTesterAddr = 0u;
+    PduR_DoIPRoutedRelayPostedCounter = 0u;
+    PduR_DoIPRoutedRelayDroppedCounter = 0u;
+    PduR_DoIPRoutedForwardDroppedCounter = 0u;
+
+    if (PduR_DebugTpRxRouteCount > PDUR_MAX_TP_RX_ROUTES)
     {
+        PduR_DebugInitFailure = PDUR_INIT_FAIL_TP_RX_ROUTES;
         return;
     }
 
     PduR_Initialized = TRUE;
+    PduR_DebugInitialized = TRUE;
 }
 
 uint8 PduR_IsInitialized(void)
@@ -815,6 +1278,9 @@ void PduR_DoIPResetSession(void)
      * core0 perform the actual clear in PduR_DoIPCore0MainFunction. Writing the
      * core0-owned state directly from core2 could clobber a transaction that is
      * legitimately in flight on the freshly (re)established connection. */
+    PduR_DoIPSessionGeneration++;
+    PduR_DoIPSessionResetAgeTicks = 0u;
+    __dsync();
     PduR_DoIPSessionResetPending = 1u;
     __dsync();
 }
@@ -824,17 +1290,18 @@ static void PduR_DoIPApplySessionReset(void)
     PduIdType staleTxPduId;
     Std_ReturnType staleTxResult;
     uint8 confirmStaleTx;
+    uint32 sessionGeneration;
 
-    /* Runs on core0. Clears the DoIP TP request context and the TX/confirmation
+    /* Runs on core0. Clears the DoIP TP request context and TX/confirmation
      * mailboxes so a new (or re-established) DoIP TCP connection starts clean.
-     * Without this, a context left "valid" or a mailbox left non-EMPTY by a
-     * previous connection (e.g. a transaction whose terminal response never
-     * drained) permanently gates all later diagnostic RX at the RX drain
-     * (PduR_DoIPRxDroppedBusyCounter) and TX in PduR_DcmTransmit - so routing
-     * activation still answers but every UDS request is dropped. */
+     * RX entries are generation-tagged: stale entries from an older TCP session
+     * are dropped, while requests already received for the current session are
+     * kept. Otherwise a delayed reset can delete the first fresh UDS request
+     * (for example 0x10 0x03) before DCM ever sees it. */
     staleTxPduId = 0u;
     staleTxResult = E_NOT_OK;
     confirmStaleTx = FALSE;
+    sessionGeneration = PduR_DoIPSessionGeneration;
 
     if ((PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_EMPTY) &&
             (PduR_DoIPTxMailbox.confirmDcm != FALSE))
@@ -864,6 +1331,20 @@ static void PduR_DoIPApplySessionReset(void)
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
     PduR_DoIPCtx.targetAddress = 0u;
+    if ((PduR_DoIPRxMailbox.valid == FALSE) ||
+            (PduR_DoIPRxMailbox.sessionGeneration != sessionGeneration))
+    {
+        PduR_DoIPRxMailbox.valid = FALSE;
+        PduR_DoIPRxMailbox.sessionGeneration = 0u;
+        PduR_DoIPRxMailbox.sourceAddress = 0u;
+        PduR_DoIPRxMailbox.targetAddress = 0u;
+        PduR_DoIPRxMailbox.udsLen = 0u;
+    }
+    PduR_DoIPRxQueueDropStale(sessionGeneration);
+    PduR_DoIPRxLargeQueueDropStale(sessionGeneration);
+
+    /* A new/reset TCP session invalidates the captured routed-response return path. */
+    PduR_RoutedReturnValid = FALSE;
 
     if (confirmStaleTx != FALSE)
     {
@@ -871,7 +1352,28 @@ static void PduR_DoIPApplySessionReset(void)
     }
 
     Dcm_ResetDoIPSession();
+    PduR_DoIPSessionResetAgeTicks = 0u;
     __dsync();
+}
+
+static void PduR_DoIPMonitorSessionReset(void)
+{
+    if (PduR_DoIPSessionResetPending == 0u)
+    {
+        PduR_DoIPSessionResetAgeTicks = 0u;
+        return;
+    }
+
+    if (PduR_DoIPSessionResetAgeTicks < PDUR_DOIP_SESSION_RESET_STALL_TICKS)
+    {
+        PduR_DoIPSessionResetAgeTicks++;
+        return;
+    }
+
+    PduR_DoIPSessionResetStallCounter++;
+    McuSm_PerformResetHook(
+            MCUSM_RESET_REASON_DOIP_CORE0_STALL,
+            PduR_DoIPSessionResetAgeTicks);
 }
 
 Std_ReturnType PduR_ComTransmit(PduIdType TxPduId,
@@ -937,6 +1439,7 @@ Std_ReturnType PduR_DcmTransmit(PduIdType DcmTxPduId,
     }
 
     if ((route->lower != PDUR_TP_LOWER_CANTP) &&
+        (route->lower != PDUR_TP_LOWER_DOIP) &&
         (PduR_ComMChannelForDcmRoute(route, &channel) != FALSE) &&
         (ComM_IsTxAllowed(channel) == FALSE))
     {
@@ -1025,6 +1528,54 @@ void PduR_DcmReleaseNoResponse(PduIdType DcmTxPduId)
         PduR_DoIPCtx.valid = FALSE;
         __dsync();
     }
+}
+
+Std_ReturnType PduR_DoIPRelayForwardedResponse(uint8 extendedAddress,
+                                               const uint8* data,
+                                               uint16 len)
+{
+    /* Relay a slave's UDS response (received on a bus EXT connection) back to the
+     * DoIP tester that issued the routed request. The response is prefixed with the
+     * originating node's extended address so the tester can correlate it. This reuses
+     * the existing DoIP TX mailbox (drained on core2) but, unlike PduR_DcmTransmit, it
+     * is driven by the captured routed-return addresses rather than PduR_DoIPCtx and
+     * never confirms a Dcm TX transaction. */
+    if ((PduR_Initialized == FALSE) ||
+        (data == NULL_PTR) ||
+        (len == 0u) ||
+        (((uint32)len + 1u) > PDUR_MAX_TP_BUFFER))
+    {
+        return E_NOT_OK;
+    }
+
+    if (PduR_RoutedReturnValid == FALSE)
+    {
+        PduR_DoIPRoutedRelayDroppedCounter++;
+        return E_NOT_OK;
+    }
+
+    if (PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_EMPTY)
+    {
+        PduR_DoIPTxMailboxFullCounter++;
+        PduR_DoIPRoutedRelayDroppedCounter++;
+        return E_NOT_OK;
+    }
+
+    PduR_DoIPTxMailbox.txPduId = DCM_TX_ETH_PHYS;
+    PduR_DoIPTxMailbox.sourceAddress = PduR_RoutedReturnZgwAddr;
+    PduR_DoIPTxMailbox.targetAddress = PduR_RoutedReturnTesterAddr;
+    PduR_DoIPTxMailbox.udsLen = (uint16)(len + 1u);
+    PduR_DoIPTxMailbox.txRetries = 0u;
+    PduR_DoIPTxMailbox.keepContext = FALSE;
+    PduR_DoIPTxMailbox.confirmDcm = FALSE;
+    PduR_DoIPTxMailbox.data[0] = extendedAddress;
+    memcpy(&PduR_DoIPTxMailbox.data[1], data, len);
+    __dsync();
+    PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_PENDING;
+    __dsync();
+
+    PduR_DoIPRoutedRelayPostedCounter++;
+    return E_OK;
 }
 
 void PduR_CanIfRxIndication(PduIdType CanIfRxPduId,
@@ -1261,37 +1812,68 @@ void PduR_LinTpTxConfirmation(PduIdType LinTpTxPduId,
     }
 }
 
-void PduR_DoIPRxIndication(uint16 sourceAddress,
-                           uint16 targetAddress,
-                           const uint8* uds,
-                           uint16 udsLen)
+Std_ReturnType PduR_DoIPRxIndication(uint16 sourceAddress,
+                                     uint16 targetAddress,
+                                     const uint8* uds,
+                                     uint16 udsLen)
 {
     const PduR_TpRxRouteType* route;
     uint8 routeIdx;
+    uint32 sessionGeneration;
 
     if ((PduR_Initialized == FALSE) ||
         (uds == NULL_PTR) ||
         (udsLen == 0u) ||
         (udsLen > PDUR_MAX_TP_BUFFER))
     {
-        return;
+        return E_NOT_OK;
     }
 
     route = PduR_FindTpRxRoute(PDUR_TP_LOWER_DOIP, DCM_RX_ETH_PHYS, &routeIdx);
 
     if (route == NULL_PTR)
     {
-        return;
+        return E_NOT_OK;
     }
 
     (void)routeIdx;
+    sessionGeneration = PduR_DoIPSessionGeneration;
+
+    if (udsLen <= PDUR_DOIP_RX_SHORT_BUFFER)
+    {
+        if (PduR_DoIPRxQueuePush(sourceAddress,
+                targetAddress,
+                uds,
+                udsLen,
+                sessionGeneration) != E_OK)
+        {
+            PduR_DoIPRxMailboxFullCounter++;
+            return E_NOT_OK;
+        }
+        return E_OK;
+    }
+
+    if (udsLen <= PDUR_DOIP_RX_LARGE_BUFFER)
+    {
+        if (PduR_DoIPRxLargeQueuePush(sourceAddress,
+                targetAddress,
+                uds,
+                udsLen,
+                sessionGeneration) != E_OK)
+        {
+            PduR_DoIPRxMailboxFullCounter++;
+            return E_NOT_OK;
+        }
+        return E_OK;
+    }
 
     if (PduR_DoIPRxMailbox.valid != FALSE)
     {
         PduR_DoIPRxMailboxFullCounter++;
-        return;
+        return E_NOT_OK;
     }
 
+    PduR_DoIPRxMailbox.sessionGeneration = sessionGeneration;
     PduR_DoIPRxMailbox.sourceAddress = sourceAddress;
     PduR_DoIPRxMailbox.targetAddress = targetAddress;
     PduR_DoIPRxMailbox.udsLen = udsLen;
@@ -1299,6 +1881,8 @@ void PduR_DoIPRxIndication(uint16 sourceAddress,
     __dsync();
     PduR_DoIPRxMailbox.valid = TRUE;
     __dsync();
+
+    return E_OK;
 }
 
 void PduR_DoIPCore0MainFunction(void)
@@ -1309,7 +1893,14 @@ void PduR_DoIPCore0MainFunction(void)
     uint16 sourceAddress;
     uint16 targetAddress;
     uint16 udsLen;
+    const uint8* udsData;
+    PduR_DoIPRxQueueEntryType* rxQueueEntry;
+    PduR_DoIPRxLargeQueueEntryType* rxLargeQueueEntry;
+    uint8 rxFromShortQueue;
+    uint8 rxFromLargeQueue;
+    uint8 rxDrainCount;
     uint8 routeIdx;
+    uint8 forwardResult;
 
     if (PduR_Initialized == FALSE)
     {
@@ -1338,46 +1929,165 @@ void PduR_DoIPCore0MainFunction(void)
         PduR_DoIPApplySessionReset();
     }
 
-    if (PduR_DoIPRxMailbox.valid == FALSE)
+    for (rxDrainCount = 0u; rxDrainCount < PDUR_DOIP_RX_DRAIN_BUDGET; rxDrainCount++)
     {
-        return;
-    }
+        if (PduR_DoIPSessionResetPending != 0u)
+        {
+            PduR_DoIPSessionResetPending = 0u;
+            __dsync();
+            PduR_DoIPApplySessionReset();
+        }
 
-    __dsync();
+        if (PduR_DoIPCtx.valid != FALSE)
+        {
+            return;
+        }
 
-    if (PduR_DoIPCtx.valid != FALSE)
-    {
-        PduR_DoIPRxDroppedBusyCounter++;
-        PduR_DoIPRxMailbox.valid = FALSE;
         __dsync();
-        return;
-    }
 
-    route = PduR_FindTpRxRoute(PDUR_TP_LOWER_DOIP, DCM_RX_ETH_PHYS, &routeIdx);
+        rxQueueEntry = PduR_DoIPRxQueuePeek();
+        rxLargeQueueEntry = NULL_PTR;
+        rxFromShortQueue = FALSE;
+        rxFromLargeQueue = FALSE;
 
-    if (route == NULL_PTR)
-    {
-        PduR_DoIPRxMailbox.valid = FALSE;
+        if (rxQueueEntry != NULL_PTR)
+        {
+            sourceAddress = rxQueueEntry->sourceAddress;
+            targetAddress = rxQueueEntry->targetAddress;
+            udsLen = rxQueueEntry->udsLen;
+            udsData = rxQueueEntry->data;
+            rxFromShortQueue = TRUE;
+        }
+        else
+        {
+            rxLargeQueueEntry = PduR_DoIPRxLargeQueuePeek();
+
+            if (rxLargeQueueEntry != NULL_PTR)
+            {
+                sourceAddress = rxLargeQueueEntry->sourceAddress;
+                targetAddress = rxLargeQueueEntry->targetAddress;
+                udsLen = rxLargeQueueEntry->udsLen;
+                udsData = rxLargeQueueEntry->data;
+                rxFromLargeQueue = TRUE;
+            }
+            else if (PduR_DoIPRxMailbox.valid == FALSE)
+            {
+                return;
+            }
+            else
+            {
+                sourceAddress = PduR_DoIPRxMailbox.sourceAddress;
+                targetAddress = PduR_DoIPRxMailbox.targetAddress;
+                udsLen = PduR_DoIPRxMailbox.udsLen;
+                udsData = PduR_DoIPRxMailbox.data;
+            }
+        }
+
+        forwardResult = PduR_DoIPForwardRoutedRequest(udsData, udsLen);
+        if ((forwardResult == PDUR_DOIP_FORWARD_ACCEPTED) ||
+                (forwardResult == PDUR_DOIP_FORWARD_DROPPED))
+        {
+            if (forwardResult == PDUR_DOIP_FORWARD_ACCEPTED)
+            {
+                /* Remember where to relay the slave's reply. The forward itself is
+                 * fire-and-forget (no PduR_DoIPCtx), so capture the tester addresses here:
+                 * the response is sent from the ZGW (request target) to the tester
+                 * (request source). */
+                PduR_RoutedReturnZgwAddr = targetAddress;
+                PduR_RoutedReturnTesterAddr = sourceAddress;
+                PduR_RoutedReturnValid = TRUE;
+                __dsync();
+            }
+
+            if (rxFromShortQueue != FALSE)
+            {
+                PduR_DoIPRxQueuePop();
+            }
+            else if (rxFromLargeQueue != FALSE)
+            {
+                PduR_DoIPRxLargeQueuePop();
+            }
+            else
+            {
+                PduR_DoIPRxMailbox.valid = FALSE;
+                PduR_DoIPRxMailbox.sessionGeneration = 0u;
+                PduR_DoIPRxMailbox.sourceAddress = 0u;
+                PduR_DoIPRxMailbox.targetAddress = 0u;
+                PduR_DoIPRxMailbox.udsLen = 0u;
+            }
+            __dsync();
+            continue;
+        }
+        else if (forwardResult == PDUR_DOIP_FORWARD_RETRY)
+        {
+            return;
+        }
+
+        route = PduR_FindTpRxRoute(PDUR_TP_LOWER_DOIP, DCM_RX_ETH_PHYS, &routeIdx);
+
+        if (route == NULL_PTR)
+        {
+            if (rxFromShortQueue != FALSE)
+            {
+                PduR_DoIPRxQueuePop();
+            }
+            else if (rxFromLargeQueue != FALSE)
+            {
+                PduR_DoIPRxLargeQueuePop();
+            }
+            else
+            {
+                PduR_DoIPRxMailbox.valid = FALSE;
+                PduR_DoIPRxMailbox.sessionGeneration = 0u;
+                PduR_DoIPRxMailbox.sourceAddress = 0u;
+                PduR_DoIPRxMailbox.targetAddress = 0u;
+                PduR_DoIPRxMailbox.udsLen = 0u;
+            }
+            __dsync();
+            return;
+        }
+
+        (void)routeIdx;
+
+        PduR_DoIPCtx.sourceAddress = sourceAddress;
+        PduR_DoIPCtx.targetAddress = targetAddress;
         __dsync();
-        return;
+        PduR_DoIPCtx.valid = TRUE;
+        __dsync();
+
+        if (Dcm_RxIndication(route->dcmRxPduId, udsData, (PduLengthType)udsLen) != E_OK)
+        {
+            uint8 busyResponse[3];
+
+            busyResponse[0u] = 0x7Fu;
+            busyResponse[1u] = (udsLen > 0u) ? udsData[0u] : 0x00u;
+            busyResponse[2u] = DCM_NRC_BUSY_REPEAT_REQUEST;
+
+            if (PduR_DcmTransmit(DCM_TX_ETH_PHYS, busyResponse, (PduLengthType)sizeof(busyResponse)) != E_OK)
+            {
+                PduR_DoIPCtx.valid = FALSE;
+                __dsync();
+            }
+        }
+
+        if (rxFromShortQueue != FALSE)
+        {
+            PduR_DoIPRxQueuePop();
+        }
+        else if (rxFromLargeQueue != FALSE)
+        {
+            PduR_DoIPRxLargeQueuePop();
+        }
+        else
+        {
+            PduR_DoIPRxMailbox.valid = FALSE;
+            PduR_DoIPRxMailbox.sessionGeneration = 0u;
+            PduR_DoIPRxMailbox.sourceAddress = 0u;
+            PduR_DoIPRxMailbox.targetAddress = 0u;
+            PduR_DoIPRxMailbox.udsLen = 0u;
+        }
+        __dsync();
     }
-
-    (void)routeIdx;
-
-    sourceAddress = PduR_DoIPRxMailbox.sourceAddress;
-    targetAddress = PduR_DoIPRxMailbox.targetAddress;
-    udsLen = PduR_DoIPRxMailbox.udsLen;
-
-    PduR_DoIPCtx.sourceAddress = sourceAddress;
-    PduR_DoIPCtx.targetAddress = targetAddress;
-    __dsync();
-    PduR_DoIPCtx.valid = TRUE;
-    __dsync();
-
-    Dcm_RxIndication(route->dcmRxPduId, PduR_DoIPRxMailbox.data, (PduLengthType)udsLen);
-
-    PduR_DoIPRxMailbox.valid = FALSE;
-    __dsync();
 }
 
 void PduR_DoIPCore2MainFunction(void)
@@ -1388,6 +2098,8 @@ void PduR_DoIPCore2MainFunction(void)
     {
         return;
     }
+
+    PduR_DoIPMonitorSessionReset();
 
     if (PduR_DoIPTxMailbox.state == PDUR_DOIP_TX_STATE_PENDING)
     {

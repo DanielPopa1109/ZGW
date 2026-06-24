@@ -368,6 +368,7 @@
 "BSW/Com/CanIf/CanIf.o"
 "BSW/Com/Can/Can.o"
 "BSW/Com/Com.o"
+"APP/ParallelFlashSwc/ParallelFlashSwc.o"
 "APP/GatewaySwc/GatewaySwc.o"
 "APP/CodingApp/CodingApp.o"
 "Cpu0_Main.o"

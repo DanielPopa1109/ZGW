@@ -172,24 +172,6 @@ BO_ 665 Mileage: 8 DMU
 BO_ 512 Dmu_Alive: 1 DMU
  SG_ AliveIndication : 0|1@1+ (1,0) [0|1] ""  ZGW
 
-BO_ 1991 XcpResponse_7C7: 8 ELC
-
-BO_ 1989 XcpResponse_7C5: 8 DMU
-
-BO_ 1987 XcpResponse_7C3: 8 FRBE
-
-BO_ 1985 XcpResponse_7C1: 8 CBM
-
-BO_ 1992 XcpRequest_7C8: 8 ZGW
-
-BO_ 1990 XcpRequest_7C6: 8 ZGW
-
-BO_ 1988 XcpRequest_7C4: 8 ZGW
-
-BO_ 1986 XcpRequest_7C2: 8 ZGW
-
-BO_ 1984 XcpRequest_7C0: 8 ZGW
-
 BO_ 1775 VoltageCurrent: 8 ELC
  SG_ L1Voltage : 48|16@1+ (1,0) [0|65535] ""  ZGW
  SG_ T30Voltage : 32|16@1+ (1,0) [0|65535] ""  ZGW
@@ -238,24 +220,6 @@ BO_ 1873 Error_702: 4 FRBE
 
 BO_ 1872 Error_700: 4 CBM
  SG_ DtcID_700 : 0|32@1+ (1,0) [0|4294967295] ""  ZGW
-
-BO_ 1808 DiagRequest_710: 8 Tester
-
-BO_ 1799 DiagResponse_707: 8 ELC
-
-BO_ 1797 DiagResponse_705: 8 DMU
-
-BO_ 1795 DiagResponse_703: 8 FRBE
-
-BO_ 1793 DiagResponse_701: 8 CBM
-
-BO_ 1798 DiagRequest_706: 8 ZGW
-
-BO_ 1796 DiagRequest_704: 8 ZGW
-
-BO_ 1794 DiagRequest_702: 8 ZGW
-
-BO_ 1792 DiagRequest_700: 8 ZGW
 
 BO_ 1779 BattSoCSoH: 8 ELC
  SG_ Soh : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW

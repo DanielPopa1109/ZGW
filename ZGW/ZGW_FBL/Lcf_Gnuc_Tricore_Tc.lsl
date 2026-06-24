@@ -120,14 +120,14 @@ MEMORY
     
     ucb (rx!p): org = 0xaf400000, len = 24K
     
-    cpu0_dlmu (w!xp): org = 0x90000000, len = 64K
-    cpu0_dlmu_nc (w!xp): org = 0xb0000000, len = 64K
-    
-    cpu1_dlmu (w!xp): org = 0x90010000, len = 64K
-    cpu1_dlmu_nc (w!xp): org = 0xb0010000, len = 64K
-    
-    cpu2_dlmu (w!xp): org = 0x90020000, len = 64K
-    cpu2_dlmu_nc (w!xp): org = 0xb0020000, len = 64K
+    cpu0_dlmu (w!xp): org = 0xb0000000, len = 64K
+    cpu0_dlmu_nc (w!xp): org = 0x90000000, len = 64K
+
+    cpu1_dlmu (w!xp): org = 0xb0010000, len = 64K
+    cpu1_dlmu_nc (w!xp): org = 0x90010000, len = 64K
+
+    cpu2_dlmu (w!xp): org = 0xb0020000, len = 64K
+    cpu2_dlmu_nc (w!xp): org = 0x90020000, len = 64K
     
 }
 
@@ -1141,6 +1141,11 @@ REGION_ALIAS( default_ram , dsram2)
     SECTIONS
     {
         /*Cpu0_dlmu also is the segment start, all the near lmu data shll be located here*/
+        .app_ncr_reserved (NOLOAD) : FLAGS(aw)
+        {
+            . = . + 0x200;
+        } > cpu0_dlmu
+
         CORE_SEC(.lmuzdata) : FLAGS(awzl)
         {
             *(.zlmudata)
@@ -1331,6 +1336,18 @@ SECTIONS
     /*DLMU0 Sections*/
     CORE_SEC(.lmudata) : FLAGS(awl)
     {
+        *(.data.lmu_cached)
+        *(.data.lmu_cached.*)
+        *(.data.lmu_nc)
+        *(.data.lmu_nc.*)
+        *(.data.eth_dma_cached)
+        *(.data.eth_dma_cached.*)
+        *(.data.eth_dma_nc)
+        *(.data.eth_dma_nc.*)
+        *(.data.shared_cached)
+        *(.data.shared_cached.*)
+        *(.data.shared_nc)
+        *(.data.shared_nc.*)
         *(.lmudata_cpu0)
         *(.lmudata_cpu0.*)
         . = ALIGN(2);
@@ -1338,6 +1355,18 @@ SECTIONS
     
     CORE_SEC(.lmubss) : FLAGS(aw)
     {
+        *(.bss.lmu_cached)
+        *(.bss.lmu_cached.*)
+        *(.bss.lmu_nc)
+        *(.bss.lmu_nc.*)
+        *(.bss.eth_dma_cached)
+        *(.bss.eth_dma_cached.*)
+        *(.bss.eth_dma_nc)
+        *(.bss.eth_dma_nc.*)
+        *(.bss.shared_cached)
+        *(.bss.shared_cached.*)
+        *(.bss.shared_nc)
+        *(.bss.shared_nc.*)
         *(.lmubss_cpu0)
         *(.lmubss_cpu0.*)
     } > cpu0_dlmu

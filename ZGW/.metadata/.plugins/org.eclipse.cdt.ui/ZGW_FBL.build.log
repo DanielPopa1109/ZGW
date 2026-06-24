@@ -1,4 +1,4 @@
-16:12:26 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_FBL ****
+22:41:57 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_FBL ****
 amk -j12 clean 
 TASKING VX-toolset for AURIX Development Studio (non-commercial): program builder v1.1r8 Build 22011964
 rm -rf ./TIMER_STM/timer_stm.d ./TIMER_STM/timer_stm.o ./TIMER_STM/timer_stm.src ./TIMER_STM/timer_stm_conf.d ./TIMER_STM/timer_stm_conf.o ./TIMER_STM/timer_stm_conf.src
@@ -38,8 +38,10 @@ rm -rf ./LWIP_GETH/lwip_geth.d ./LWIP_GETH/lwip_geth.o ./LWIP_GETH/lwip_geth.src
 rm -rf ./Configurations/Debug/sync_on_halt.d ./Configurations/Debug/sync_on_halt.o ./Configurations/Debug/sync_on_halt.src
 rm -rf ./Configurations/Ifx_Cfg_Ssw.d ./Configurations/Ifx_Cfg_Ssw.o ./Configurations/Ifx_Cfg_Ssw.src ./Configurations/Ifx_Cfg_SswBmhd.d ./Configurations/Ifx_Cfg_SswBmhd.o ./Configurations/Ifx_Cfg_SswBmhd.src
 rm -rf ./Cpu0_Main.d ./Cpu0_Main.o ./Cpu0_Main.src ./Cpu1_Main.d ./Cpu1_Main.o ./Cpu1_Main.src ./Cpu2_Main.d ./Cpu2_Main.o ./Cpu2_Main.src ./FblEth_AurixLwip.d ./FblEth_AurixLwip.o ./FblEth_AurixLwip.src ./Fbl_RamUpdater_AURIX.d ./Fbl_RamUpdater_AURIX.o ./Fbl_RamUpdater_AURIX.src
+rm -rf ZGW_FBL_edited.hex
+ 
 rm -rf ZGW_FBL.siz ZGW_FBL.elf
  
 
-16:12:27 Build Finished. 0 errors, 0 warnings. (took 286ms)
+22:41:57 Build Finished. 0 errors, 0 warnings. (took 390ms)
 

@@ -1,0 +1,1713 @@
+{
+  "schema": "FCD_SETTINGS_v1",
+  "connection": {
+    "host": "192.168.1.10",
+    "port": "13400",
+    "source": "0x0710",
+    "target": "0x1001",
+    "timeout": "1.0",
+    "local_ip": "auto"
+  },
+  "data_editor": {
+    "output_folder": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Scripts\\FCD\\Generated",
+    "nodes": {
+      "PDM1": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x42"
+      },
+      "PDM2": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x43"
+      },
+      "PDM3": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x44"
+      },
+      "PDM4": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x45"
+      },
+      "AGS": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x53"
+      },
+      "CBM": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x54"
+      },
+      "DME": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x55"
+      },
+      "DMU": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x56"
+      },
+      "DSC": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x57"
+      },
+      "ELC": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x58"
+      },
+      "FRBE": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x59"
+      },
+      "ALT": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x50"
+      },
+      "HVDCDC": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x51"
+      },
+      "PCU48": {
+        "selected": true,
+        "node_kind": "Simulated",
+        "extended_diag_address": "0x52"
+      },
+      "ZGW": {
+        "selected": true,
+        "node_kind": "Real",
+        "extended_diag_address": "0x41"
+      }
+    },
+    "hex_rows": [
+      {
+        "ecu": "AGS_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4_APP",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4_FBL",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW_APP_EDITED",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW_FBL_EDITED",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_APP.hex"
+      },
+      {
+        "ecu": "AGS",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\AGS_FBL.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_APP.hex"
+      },
+      {
+        "ecu": "ALT",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ALT_FBL.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+      },
+      {
+        "ecu": "CBM",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_APP.hex"
+      },
+      {
+        "ecu": "DME",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DME_FBL.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+      },
+      {
+        "ecu": "DMU",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_APP.hex"
+      },
+      {
+        "ecu": "DSC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DSC_FBL.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+      },
+      {
+        "ecu": "ELC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+      },
+      {
+        "ecu": "FRBE",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+      },
+      {
+        "ecu": "HVDCDC",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_APP.hex"
+      },
+      {
+        "ecu": "PCU48",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PCU48_FBL.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+      },
+      {
+        "ecu": "PDM1",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_APP.hex"
+      },
+      {
+        "ecu": "PDM2",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM2_FBL.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_APP.hex"
+      },
+      {
+        "ecu": "PDM3",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM3_FBL.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_APP.hex"
+      },
+      {
+        "ecu": "PDM4",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0x08000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM4_FBL.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0030000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+      },
+      {
+        "ecu": "ZGW",
+        "target": "0x1001",
+        "req": "0x710",
+        "resp": "0x711",
+        "did": "0xF186",
+        "base": "0xA0000000",
+        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+      }
+    ]
+  }
+}

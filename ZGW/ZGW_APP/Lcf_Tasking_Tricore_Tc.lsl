@@ -232,7 +232,7 @@ derivative tc37
         size = 64k;
         type = ram;
         /* Cached DLMU for normal LMU data; private data should stay in DSPR where possible. */
-        map cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
+        map cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
     }
 
     memory cpu0_dlmu_nc
@@ -240,12 +240,8 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* WARNING: this is the non-cached alias of cpu0_dlmu, whose cached view (0x90000000) is
-         * fully populated (McuSm NCR + CAN-TP, ~33 KB). DO NOT place any section here - any object
-         * located in this alias physically overlaps that cached data and will be corrupted (this
-         * is exactly what broke Ethernet Tx). Coherent DMA/shared sections now live in
-         * cpu2_dlmu_nc, which has no active cached alias. Kept only for backward compatibility. */
-        map not_cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
+        /* Non-cached alias retained for address compatibility; normal DLMU sections are routed to cached aliases. */
+        map not_cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
     }
 
     memory cpu1_dlmu
@@ -254,7 +250,7 @@ derivative tc37
         size = 64k;
         type = ram;
         /* Cached DLMU for normal LMU data. */
-        map cached (dest=bus:sri, dest_offset=0x90010000, size=64k);
+        map cached (dest=bus:sri, dest_offset=0xb0010000, size=64k);
     }
 
     memory cpu1_dlmu_nc
@@ -262,18 +258,17 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Non-cached segment-B alias reserved for explicit coherent sections if needed. */
-        map not_cached (dest=bus:sri, dest_offset=0xb0010000, size=64k);
+        /* Non-cached alias retained for address compatibility; normal DLMU sections are routed to cached aliases. */
+        map not_cached (dest=bus:sri, dest_offset=0x90010000, size=64k);
     }
 
     memory cpu2_dlmu
     {
         mau = 8;
-        size = 32k;
+        size = 64k;
         type = ram;
-        /* Reserved cached alias of the upper CPU2 LMU half. Ethernet DMA now owns the full
-         * non-cached CPU2 DLMU alias below, so no normal cached data may be placed here. */
-        map cached (dest=bus:sri, dest_offset=0x90028000, size=32k);
+        /* Cached CPU2 DLMU for Ethernet/shared and explicit DLMU sections. */
+        map cached (dest=bus:sri, dest_offset=0xb0020000, size=64k);
     }
 
     memory cpu2_dlmu_nc
@@ -281,11 +276,8 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Full non-cached CPU2 DLMU alias (0xB0020000..0xB002FFFF), dedicated to coherent
-         * Ethernet GETH DMA descriptors/buffers and inter-core shared flags. The cached alias of
-         * this physical RAM is intentionally kept unused so cached writes cannot corrupt DMA
-         * descriptors or packet buffers. */
-        map not_cached (dest=bus:sri, dest_offset=0xb0020000, size=64k);
+        /* Non-cached CPU2 DLMU alias retained for address compatibility; no sections are routed here. */
+        map not_cached (dest=bus:sri, dest_offset=0x90020000, size=64k);
     }
 
 #if (__VERSION__ >= 6003)
@@ -706,9 +698,8 @@ derivative tc37
                     select "(.data.lmudata_cpu1|.data.lmudata_cpu1.*)";
                     select "(.bss.lmubss_cpu1|.bss.lmubss_cpu1.*)";
                 }
-                group (ordered, attributes=rw, run_addr = mem:dsram2)
+                group (ordered, attributes=rw, run_addr = mem:cpu2_dlmu)
                 {
-                    /* Keep CPU2 DLMU physically reserved for the non-cached Ethernet DMA alias. */
                     select "(.data.lmudata_cpu2|.data.lmudata_cpu2.*)";
                     select "(.bss.lmubss_cpu2|.bss.lmubss_cpu2.*)";
                 }
@@ -716,43 +707,42 @@ derivative tc37
         }
 
         /*
-         * Explicit non-cached DLMU/LMU sections.
-         * Use only for DMA/peripheral buffers, descriptors, and inter-core data that must be coherent without
-         * cache maintenance. Normal .data/.bss remains in DSPR or cached DLMU/LMU groups.
+         * Explicit cached DLMU/LMU sections.
+         * Legacy *_nc input section names are accepted for compatibility and are routed to cached DLMU too.
          */
-        group data_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group data_lmu_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Initialized coherent data in segment B; startup copytable initializes this group. */
+            select "(.data.lmu_cached|.data.lmu_cached.*)";
             select "(.data.lmu_nc|.data.lmu_nc.*)";
         }
 
-        group bss_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group bss_lmu_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Zero-init coherent data in segment B. */
+            select "(.bss.lmu_cached|.bss.lmu_cached.*)";
             select "(.bss.lmu_nc|.bss.lmu_nc.*)";
         }
 
-        group data_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group data_eth_dma_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Initialized Ethernet DMA data; prefer .bss.eth_dma_nc when possible. */
+            select "(.data.eth_dma_cached|.data.eth_dma_cached.*)";
             select "(.data.eth_dma_nc|.data.eth_dma_nc.*)";
         }
 
-        group bss_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group bss_eth_dma_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Ethernet DMA descriptors and RX/TX buffers in segment B. */
+            select "(.bss.eth_dma_cached|.bss.eth_dma_cached.*)";
             select "(.bss.eth_dma_nc|.bss.eth_dma_nc.*)";
         }
 
-        group data_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group data_shared_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Initialized inter-core shared data; startup copytable initializes this group. */
+            select "(.data.shared_cached|.data.shared_cached.*)";
             select "(.data.shared_nc|.data.shared_nc.*)";
         }
 
-        group bss_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu_nc)
+        group bss_shared_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
-            /* Zero-init inter-core shared flags/state in segment B. */
+            select "(.bss.shared_cached|.bss.shared_cached.*)";
             select "(.bss.shared_nc|.bss.shared_nc.*)";
         }
 
@@ -866,6 +856,12 @@ derivative tc37
             select ".bss.SomeIpSd.*";
         }
 
+        group gateway_swc_core0_ram (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
+        {
+            select ".data.GatewaySwc.*";
+            select ".bss.GatewaySwc.*";
+        }
+
         group bsw_com_misc_dsram2 (ordered, align = 4, attributes=rw, run_addr = mem:dsram2)
         {
             select ".data.Assert.*";
@@ -888,8 +884,6 @@ derivative tc37
             select ".bss.LinTp.*";
             select ".data.LinSM.*";
             select ".bss.LinSM.*";
-            select ".data.GatewaySwc.*";
-            select ".bss.GatewaySwc.*";
         }
 
         /**************************************************************************************************************
@@ -899,24 +893,24 @@ derivative tc37
 
         /**************************************************************************************************************
          * Large BSW RAM placement.
-         * Fee work buffers are ~32 KiB each and must not stay in CPU2 DSPR.
-         * CAN runtime no longer uses cpu2_dlmu, because that DLMU is already used by Ethernet/lwIP glue.
+         * Fee work buffers are large and must not stay in CPU2 DSPR.
+         * Keep CAN runtime outside CPU2 DLMU, which is used by the explicit cached DLMU groups.
          *************************************************************************************************************/
 
         /**************************************************************************************************************
          * Fee work-buffer placement.
-         * Fee_JobData and Fee_PendingData are ~32 KiB each. Do NOT keep them in one ordered group,
-         * because TASKING then needs one contiguous ~64 KiB gap. Keep them as separate DSRAM0
-         * groups so each buffer only needs its own ~32 KiB gap and DLMU0 remains available for
-         * NCR/transport runtime data.
+         * Fee_JobData and Fee_PendingData are large staging buffers. Do NOT keep them in one ordered
+         * group, because TASKING then needs one contiguous gap for both buffers. Keep them as separate
+         * DSRAM1 groups so each buffer only needs its own gap and CPU0 DSRAM remains available for
+         * GatewaySwc state.
          *************************************************************************************************************/
 
-        group bsw_mem_fee_jobdata_dsram0 (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
+        group bsw_mem_fee_jobdata_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".bss.Fee.Fee_JobData";
         }
 
-        group bsw_mem_fee_pendingdata_dsram0 (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
+        group bsw_mem_fee_pendingdata_dsram1 (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
         {
             select ".bss.Fee.Fee_PendingData";
         }
@@ -973,77 +967,6 @@ derivative tc37
             select ".bss.nvm_*";
 
         }
-        
-        group NCR (ordered, attributes = rws, run_addr = mem:cpu0_dlmu, align = 4)
-        {
-            select ".data.McuSm.McuSm_AGs";
-            select ".bss.McuSm.McuSm_AGs";
-            select ".data.McuSm.McuSm_LastResetReason";
-            select ".bss.McuSm.McuSm_LastResetReason";
-            select ".data.McuSm.McuSm_LastResetInformation";
-            select ".bss.McuSm.McuSm_LastResetInformation";
-            select ".data.McuSm.McuSm_DFlashRecoveryRequest";
-            select ".bss.McuSm.McuSm_DFlashRecoveryRequest";
-            select ".data.McuSm.McuSm_DFlashRecoveryInfo";
-            select ".bss.McuSm.McuSm_DFlashRecoveryInfo";
-            select ".data.McuSm.McuSm_DFlashRecoveryCounter";
-            select ".bss.McuSm.McuSm_DFlashRecoveryCounter";
-            select ".data.McuSm.McuSm_DFlashRecoveryLastFeeAccessKind";
-            select ".bss.McuSm.McuSm_DFlashRecoveryLastFeeAccessKind";
-            select ".data.McuSm.McuSm_DFlashRecoveryLastFeePhysicalAddress";
-            select ".bss.McuSm.McuSm_DFlashRecoveryLastFeePhysicalAddress";
-            select ".data.McuSm.McuSm_ResetHistory";
-            select ".bss.McuSm.McuSm_ResetHistory";
-            select ".data.McuSm.McuSm_IndexResetHistory";
-            select ".bss.McuSm.McuSm_IndexResetHistory";
-            select ".data.McuSm.DiagMaster_ActiveSessionState";
-            select ".bss.McuSm.DiagMaster_ActiveSessionState";  
-            select ".data.McuSm.DiagMaster_AliveTime";
-            select ".bss.McuSm.DiagMaster_AliveTime";
-            select ".data.McuSm.Iven_IcmLookupTable";
-            select ".bss.McuSm.Iven_IcmLookupTable";  
-            select ".data.McuSm.McuSm_FBL_ResetCounter";
-            select ".bss.McuSm.McuSm_FBL_ResetCounter";
-            select ".data.McuSm.McuSm_FBL_ProgrammingRequest";
-            select ".bss.McuSm.McuSm_FBL_ProgrammingRequest";
-            select ".data.McuSm.McuSm_FBL_CommInterface";
-            select ".bss.McuSm.McuSm_FBL_CommInterface";
-            select ".data.McuSm.McuSm_SswStartupCounter";
-            select ".bss.McuSm.McuSm_SswStartupCounter";
-            select ".data.McuSm.McuSm_SafetyKitFailureMask";
-            select ".bss.McuSm.McuSm_SafetyKitFailureMask";
-            select ".data.McuSm.McuSm_SafetyKitResetReactionCounter";
-            select ".bss.McuSm.McuSm_SafetyKitResetReactionCounter";
-            select ".data.McuSm.McuSm_SafetyKitResetInhibit";
-            select ".bss.McuSm.McuSm_SafetyKitResetInhibit";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckLastSshFail";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckLastSshFail";
-            select ".data.McuSm.McuSm_SswStatusData";
-            select ".bss.McuSm.McuSm_SswStatusData";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckResultMask";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckResultMask";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualEccd";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualEccd";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualFaultsts";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualFaultsts";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshActualErrinfo";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshActualErrinfo";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedEccd";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedEccd";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedFaultsts";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedFaultsts";
-            select ".data.McuSm.McuSm_SafetyKitFwCheckSshExpectedErrinfo";
-            select ".bss.McuSm.McuSm_SafetyKitFwCheckSshExpectedErrinfo";
-            select ".data.McuSm.McuSm_Trap4ScrRtcRecord";
-            select ".bss.McuSm.McuSm_Trap4ScrRtcRecord";
-            select ".data.McuSm.McuSm_Trap4ScrRtcRecordValid";
-            select ".bss.McuSm.McuSm_Trap4ScrRtcRecordValid";
-            select ".data.McuSm.McuSm_Trap4ScrRtcRecordCounter";
-            select ".bss.McuSm.McuSm_Trap4ScrRtcRecordCounter";
-        }
-        "__NCR_START" := "_lc_gb_NCR";
-        "__NCR_END"   := "_lc_ge_NCR";
-
         group bsw_com_cantp_dlmu0 (ordered, align = 4, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
             select ".data.CanTp.*";

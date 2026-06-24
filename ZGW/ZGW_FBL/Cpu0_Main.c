@@ -16,10 +16,10 @@
 #define FBL_RESET_INFO_ENTER_DOIP        0xFCD0u
 
 /* Mirrors the APP NCR group ordering in Lcf_Tasking_Tricore_Tc.lsl. */
-#define FBL_NCR_DIAG_SESSION_ADDR        0x900000DCu
-#define FBL_NCR_RESET_COUNTER_ADDR       0x900000E4u
-#define FBL_NCR_PROGRAMMING_REQ_ADDR     0x900000E5u
-#define FBL_NCR_COMM_INTERFACE_ADDR      0x900000E6u
+#define FBL_NCR_DIAG_SESSION_ADDR        0xB00000F0u
+#define FBL_NCR_RESET_COUNTER_ADDR       0xB00000F8u
+#define FBL_NCR_PROGRAMMING_REQ_ADDR     0xB00000FCu
+#define FBL_NCR_COMM_INTERFACE_ADDR      0xB0000100u
 #define FBL_PROGRAMMING_REQUEST_ACTIVE   1u
 #define FBL_DIAG_SESSION_PROGRAMMING     0x02u
 #define FBL_RESET_COUNTER_FORCE_MIN      49u
@@ -63,6 +63,10 @@
 /* DFLASH occupies segment-A too; reject it explicitly to catch PFLASH/DFLASH mixups. */
 #define DFLASH_START_NC                  0xAF000000u
 #define DFLASH_END_NC                    0xAFFFFFFFu
+#define DFLASH_REJECT_PREFIX_MASK        0xFFFF0000u
+#define DFLASH_REJECT_PREFIX_AF40        0xAF400000u
+#define DFLASH_REJECT_PREFIX_AF01        0xAF010000u
+#define DFLASH_REJECT_PREFIX_AF02        0xAF020000u
 
 typedef enum
 {
@@ -150,6 +154,7 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define DOIP_UDP_PORT                    13400u
 #define DOIP_PROTO_VER                   0x02u
 #define DOIP_INV_PROTO_VER               0xFDu
+#define DOIP_PT_GENERIC_NACK             0x0000u
 #define DOIP_PT_VID_REQ                  0x0001u
 #define DOIP_PT_VID_RES                  0x0004u
 #define DOIP_PT_ROUTING_ACT_REQ          0x0005u
@@ -170,10 +175,16 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define DOIP_RA_RES_DENIED_UNKNOWN_SRC   0x00u
 #define DOIP_RA_RES_UNSUPPORTED_ACT      0x05u
 #define DOIP_RA_RES_OK                   0x10u
+#define DOIP_GEN_NACK_INCORRECT_PATTERN  0x00u
+#define DOIP_GEN_NACK_UNKNOWN_PAYLOAD    0x01u
+#define DOIP_GEN_NACK_MESSAGE_TOO_LARGE  0x02u
+#define DOIP_GEN_NACK_INVALID_LENGTH     0x04u
 #define DOIP_NACK_INVALID_SOURCE_ADDR    0x02u
 #define DOIP_NACK_UNKNOWN_TARGET_ADDR    0x03u
 #define DOIP_NACK_DIAG_MSG_TOO_LARGE     0x04u
 #define DOIP_NACK_TRANSPORT_ERROR        0x08u
+#define DOIP_SEND_UDP                    0u
+#define DOIP_SEND_TCP                    1u
 
 #define FBL_FLASH_FUNC_BASE              0x70100000u
 #define FBL_FLASH_FUNC_LEN               192u
@@ -300,6 +311,8 @@ static void Fbl_DoIpMain(void);
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len);
 static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len);
 static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len);
+static void Fbl_DoIpResetTcpState(void);
+static void Fbl_DoIpSendGenericNack(uint8 viaTcp, uint8 code);
 static void Fbl_DoIpSendVehicleId(void);
 static void Fbl_DoIpSendRoutingActivationRes(uint16 testerAddr, uint8 code);
 static void Fbl_DoIpSendAliveRes(void);
@@ -313,6 +326,7 @@ static uint32 Fbl_FlashFlush(void);
 static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data);
 static IfxFlash_FlashType Fbl_FlashBank(uint32 addr);
 static uint32 Fbl_Crc32(uint32 addr, uint32 len);
+static uint8 Fbl_IsExplicitlyRejectedProgrammingAddress(uint32 addr);
 static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 length);
 static uint32 Fbl_Rd32(const uint8 *p);
 static uint16 Fbl_Rd16(const uint8 *p);
@@ -1384,6 +1398,42 @@ static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level)
     return key;
 }
 
+static void Fbl_DoIpResetTcpState(void)
+{
+    g_doipTcpStreamLen = 0u;
+    g_doipTesterAddr = 0u;
+    g_doipRoutingActive = 0u;
+
+    g_dl.active = 0u;
+    g_dl.logicalAddr = 0u;
+    g_dl.startAddr = 0u;
+    g_dl.curAddr = 0u;
+    g_dl.length = 0u;
+    g_dl.received = 0u;
+    g_dl.nextBlock = 1u;
+
+    g_secSeedValid = 0u;
+    g_pageAddr = 0xFFFFFFFFu;
+    g_pageFill = 0u;
+    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+}
+
+void Fbl_DoIpTcpConnected(void)
+{
+    Fbl_DoIpResetTcpState();
+}
+
+void Fbl_DoIpTcpDisconnected(void)
+{
+    Fbl_DoIpResetTcpState();
+}
+
+void Fbl_DoIpTcpRxOverflow(void)
+{
+    g_doipTcpStreamLen = 0u;
+    Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
+}
+
 static void Fbl_DoIpMain(void)
 {
     uint8 buf[1600];
@@ -1405,15 +1455,38 @@ static void Fbl_DoIpMain(void)
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len)
 {
     uint16 payloadType;
+    uint32 payloadLen;
 
-    if(len < DOIP_HEADER_LEN) { return; }
-    if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER)) { return; }
+    if(len < DOIP_HEADER_LEN)
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_UDP, DOIP_GEN_NACK_INCORRECT_PATTERN);
+        return;
+    }
+    if((buf[0u] != DOIP_PROTO_VER) || (buf[1u] != DOIP_INV_PROTO_VER))
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_UDP, DOIP_GEN_NACK_INCORRECT_PATTERN);
+        return;
+    }
 
     payloadType = Fbl_Rd16(&buf[2u]);
+    payloadLen = Fbl_Rd32(&buf[4u]);
+
+    if(payloadLen != ((uint32)len - DOIP_HEADER_LEN))
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_UDP, DOIP_GEN_NACK_INVALID_LENGTH);
+        return;
+    }
 
     if(payloadType == DOIP_PT_VID_REQ)
     {
-        Fbl_DoIpSendVehicleId();
+        if(payloadLen == 0u)
+        {
+            Fbl_DoIpSendVehicleId();
+        }
+    }
+    else
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_UDP, DOIP_GEN_NACK_UNKNOWN_PAYLOAD);
     }
 }
 
@@ -1428,6 +1501,7 @@ static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
     if(len > (uint16)(sizeof(g_doipTcpStream) - g_doipTcpStreamLen))
     {
         g_doipTcpStreamLen = 0u;
+        Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
         return;
     }
 
@@ -1440,6 +1514,7 @@ static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
            (g_doipTcpStream[1u] != DOIP_INV_PROTO_VER))
         {
             g_doipTcpStreamLen = 0u;
+            Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_INCORRECT_PATTERN);
             return;
         }
 
@@ -1448,6 +1523,7 @@ static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
         if(payloadLen > (uint32)(sizeof(g_doipTcpStream) - DOIP_HEADER_LEN))
         {
             g_doipTcpStreamLen = 0u;
+            Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
             return;
         }
 
@@ -1483,7 +1559,11 @@ static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len)
     payloadType = Fbl_Rd16(&buf[2u]);
     payloadLen = Fbl_Rd32(&buf[4u]);
 
-    if((payloadLen + DOIP_HEADER_LEN) != len) { return; }
+    if(payloadLen != ((uint32)len - DOIP_HEADER_LEN))
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_INVALID_LENGTH);
+        return;
+    }
 
     if(payloadType == DOIP_PT_ROUTING_ACT_REQ)
     {
@@ -1549,6 +1629,33 @@ static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len)
         udsLen = (uint16)(payloadLen - 4u);
         Fbl_DoIpSendDiagAck(testerAddr, ecuAddr);
         Fbl_UdsHandle(&buf[12u], udsLen, FBL_TRANSPORT_ETH);
+    }
+    else
+    {
+        Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_UNKNOWN_PAYLOAD);
+    }
+}
+
+static void Fbl_DoIpSendGenericNack(uint8 viaTcp, uint8 code)
+{
+    uint8 res[DOIP_HEADER_LEN + 1u];
+    uint16 idx;
+
+    res[0u] = DOIP_PROTO_VER;
+    res[1u] = DOIP_INV_PROTO_VER;
+    Fbl_Wr16(&res[2u], DOIP_PT_GENERIC_NACK);
+    Fbl_Wr32(&res[4u], 1u);
+
+    idx = DOIP_HEADER_LEN;
+    res[idx++] = code;
+
+    if(viaTcp != 0u)
+    {
+        FblEth_TcpSend(res, idx);
+    }
+    else
+    {
+        FblEth_UdpSend(res, idx);
     }
 }
 
@@ -1876,6 +1983,20 @@ static uint32 Fbl_Crc32(uint32 addr, uint32 len)
     return crc ^ 0xFFFFFFFFu;
 }
 
+static uint8 Fbl_IsExplicitlyRejectedProgrammingAddress(uint32 addr)
+{
+    uint32 prefix = addr & DFLASH_REJECT_PREFIX_MASK;
+
+    if((prefix == DFLASH_REJECT_PREFIX_AF40) ||
+       (prefix == DFLASH_REJECT_PREFIX_AF01) ||
+       (prefix == DFLASH_REJECT_PREFIX_AF02))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
 /* Validate a download/verify target supplied by the tester.
  * The address is a logical address and may be given in either the cached 0x8 or
  * the non-cached 0xA PFLASH alias; validation is performed on the physical offset
@@ -1893,6 +2014,12 @@ static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 le
 
     if(length == 0u)                            { return FBL_ADDR_ERR_OVERFLOW; }
     if((logicalAddr + length) < logicalAddr)    { return FBL_ADDR_ERR_OVERFLOW; }
+
+    if((Fbl_IsExplicitlyRejectedProgrammingAddress(logicalAddr) != 0u) ||
+       (Fbl_IsExplicitlyRejectedProgrammingAddress(logicalAddr + length - 1u) != 0u))
+    {
+        return FBL_ADDR_ERR_PROTECTED;
+    }
 
     /* Reject DFLASH and anything that is not a PFLASH cached/non-cached alias. */
     if((logicalAddr >= DFLASH_START_NC) && (logicalAddr <= DFLASH_END_NC))

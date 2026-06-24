@@ -21,7 +21,6 @@ void core1_main(void)
     while(OsInit_C0 == 0u)
     {
         Core1_WaitForCore0LoopCounter++;
-        serviceCpuWatchdog();
     }
     __dsync();
     Os_Init_C1();

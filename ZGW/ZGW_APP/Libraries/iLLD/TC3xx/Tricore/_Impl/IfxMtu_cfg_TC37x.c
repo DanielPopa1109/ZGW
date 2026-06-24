@@ -63,7 +63,7 @@ const IfxMtu_SramItem           IfxMtu_sramTable[IFXMTU_NUM_MBIST_TABLE_ITEMS] =
     {2 * 1, 19,  10, 0, 4}, /**< \brief IfxMtu_MbistSel_cpu0Dtag */
     {2 * 2, 64,  8,  0, 1}, /**< \brief IfxMtu_MbistSel_cpu0Pspr */
     {2 * 1, 19,  10, 0, 4}, /**< \brief IfxMtu_MbistSel_cpu0Ptag */
-    {2 * 1, 64,  8,  0, 1}, /**< \brief IfxMtu_MbistSel_cpu0Dlmu */
+    //{2 * 1, 64,  8,  0, 1}, /**< \brief IfxMtu_MbistSel_cpu0Dlmu */
     {2 * 4, 16,  6,  0, 1}, /**< \brief IfxMtu_MbistSel_cpu1Dspr0 */
     {2 * 1, 19,  10, 0, 4}, /**< \brief IfxMtu_MbistSel_cpu1Dtag */
     {2 * 2, 64,  8,  0, 1}, /**< \brief IfxMtu_MbistSel_cpu1Pspr */
@@ -153,13 +153,13 @@ const IfxMtu_MbistConfigPattern nonDestructiveTestPattern[] = {
 };
 
 const IfxMtu_MbistSshConfig     mbistSshConfigGang0[] = {
-    {
-        IfxMtu_MbistSel_cpu0Dlmu,                              /* sshSel          */
-        0x00,                                                    /* lowAddress      */
-        0x3F,                                                    /* highAddress     */
-        5,                                                       /* uncorrectableErrorThreshold*/
-        0                                                        /* preClearEnable  */
-    },
+//    {
+//        IfxMtu_MbistSel_cpu0Dlmu,                              /* sshSel          */
+//        0x00,                                                    /* lowAddress      */
+//        0x3F,                                                    /* highAddress     */
+//        5,                                                       /* uncorrectableErrorThreshold*/
+//        0                                                        /* preClearEnable  */
+//    },
     {
         IfxMtu_MbistSel_cpu0Dspr1,                              /* sshSel          */
         0x00,                                                    /* lowAddress      */

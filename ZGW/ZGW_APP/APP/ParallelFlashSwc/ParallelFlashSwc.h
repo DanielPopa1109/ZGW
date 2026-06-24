@@ -1,0 +1,160 @@
+#ifndef PARALLELFLASHSWC_H
+#define PARALLELFLASHSWC_H
+
+#include "Std_Types.h"
+#include "ComStack_Types.h"
+#include "Dcm.h"
+#include "GatewaySwc.h"
+
+#define PARALLELFLASHSWC_VERSION_MAJOR              1u
+#define PARALLELFLASHSWC_VERSION_MINOR              0u
+
+#define PARALLELFLASHSWC_MAX_TARGETS                16u
+#define PARALLELFLASHSWC_MAX_BLOCKS_PER_TARGET       8u
+#define PARALLELFLASHSWC_MAX_ACTIVE_PER_BUS          2u
+#define PARALLELFLASHSWC_NODE_NAME_LEN              24u
+#define PARALLELFLASHSWC_EXT_ADDR_LEN                8u
+
+typedef enum
+{
+    PARALLELFLASHSWC_JOB_IDLE = 0u,
+    PARALLELFLASHSWC_JOB_ACCEPTED,
+    PARALLELFLASHSWC_JOB_BUNDLE_VALIDATED,
+    PARALLELFLASHSWC_JOB_NODE_ROUTING_RESOLVED,
+    PARALLELFLASHSWC_JOB_SESSION_PREPARED,
+    PARALLELFLASHSWC_JOB_FLASH_ERASE,
+    PARALLELFLASHSWC_JOB_FLASH_DOWNLOAD,
+    PARALLELFLASHSWC_JOB_FLASH_TRANSFER,
+    PARALLELFLASHSWC_JOB_FLASH_TRANSFER_EXIT,
+    PARALLELFLASHSWC_JOB_FLASH_VERIFY,
+    PARALLELFLASHSWC_JOB_RESET_VALIDATE,
+    PARALLELFLASHSWC_JOB_CODING_PREPARE,
+    PARALLELFLASHSWC_JOB_CODING_WRITE,
+    PARALLELFLASHSWC_JOB_CODING_VALIDATE,
+    PARALLELFLASHSWC_JOB_COMPLETED,
+    PARALLELFLASHSWC_JOB_FAILED,
+    PARALLELFLASHSWC_JOB_CANCELLED,
+    PARALLELFLASHSWC_JOB_SKIPPED
+} ParallelFlashSwc_JobStateType;
+
+typedef enum
+{
+    PARALLELFLASHSWC_PHASE_FLASH = 0u,
+    PARALLELFLASHSWC_PHASE_CODING = 1u
+} ParallelFlashSwc_PhaseType;
+
+typedef struct
+{
+    uint32 address;
+    uint32 size;
+    uint32 crc32;
+    uint16 payloadRef;
+} ParallelFlashSwc_FlashBlockType;
+
+typedef struct
+{
+    uint16 descriptorId;
+    uint16 payloadRef;
+    uint16 payloadLength;
+} ParallelFlashSwc_CodingDescriptorType;
+
+typedef struct
+{
+    uint8 nodeName[PARALLELFLASHSWC_NODE_NAME_LEN];
+    GatewaySwc_BusType busType;
+    boolean simulationEnabled;
+    uint8 extendedDiagAddress[PARALLELFLASHSWC_EXT_ADDR_LEN];
+    uint8 extendedDiagAddressLength;
+    boolean isZgw;
+    uint8 flashBlockCount;
+    ParallelFlashSwc_FlashBlockType flashBlocks[PARALLELFLASHSWC_MAX_BLOCKS_PER_TARGET];
+    ParallelFlashSwc_CodingDescriptorType coding;
+} ParallelFlashSwc_TargetConfigType;
+
+typedef struct
+{
+    uint8 targetIndex;
+    ParallelFlashSwc_PhaseType phase;
+    ParallelFlashSwc_JobStateType state;
+    uint8 retryCount;
+    uint8 active;
+    uint16 activeBlock;
+    uint32 progressBytes;
+    uint32 resultCode;
+    uint32 lastActivityTicks;
+    uint32 testerPresentTicks;
+} ParallelFlashSwc_TargetContextType;
+
+typedef struct
+{
+    uint8 targetCount;
+    ParallelFlashSwc_TargetConfigType targets[PARALLELFLASHSWC_MAX_TARGETS];
+} ParallelFlashSwc_JobBundleType;
+
+typedef struct
+{
+    uint8 initialized;
+    uint8 acceptedJobs;
+    uint8 activeJobs;
+    uint8 completedJobs;
+    uint8 failedJobs;
+    uint8 skippedJobs;
+    uint8 cancelled;
+    uint8 currentPhase;
+    uint8 activeCan;
+    uint8 activeCanFd;
+    uint8 activeLin;
+    uint32 mainCycles;
+    uint32 lastError;
+} ParallelFlashSwc_StatusType;
+
+void ParallelFlashSwc_Init(void);
+void ParallelFlashSwc_MainFunction(void);
+Std_ReturnType ParallelFlashSwc_SubmitJob(const ParallelFlashSwc_JobBundleType *bundle);
+void ParallelFlashSwc_Cancel(void);
+Std_ReturnType ParallelFlashSwc_GetStatus(ParallelFlashSwc_StatusType *status);
+Std_ReturnType ParallelFlashSwc_GetTargetContext(uint8 index, ParallelFlashSwc_TargetContextType *context);
+Dcm_ReturnType ParallelFlashSwc_ForwardCodingRequest(uint8 extendedAddress,
+                                                     Dcm_OpStatusType opStatus,
+                                                     const uint8 *udsRequest,
+                                                     Dcm_PduLengthType udsRequestLength,
+                                                     uint8 *response,
+                                                     Dcm_PduLengthType *responseLength);
+
+/* Returns the node extended address last forwarded on the given diagnostic RX PDU id
+ * (E_OK), so a forwarded slave response can be tagged before relaying it to the
+ * tester. E_NOT_OK if no forward has been recorded for that PDU. */
+Std_ReturnType ParallelFlashSwc_GetForwardResponseExt(PduIdType rxPduId, uint8 *extendedAddress);
+
+/* Returns the most recently forwarded node extended address (E_OK), used as a fallback
+ * tag when a single-frame reply surfaces on a sibling CAN channel's PDU. E_NOT_OK if no
+ * routed request has been forwarded yet. */
+Std_ReturnType ParallelFlashSwc_GetLastForwardExt(uint8 *extendedAddress);
+
+/* Forwards a physical TesterPresent (3E 80) to every configured bus node, so a single
+ * TesterPresent from the tester keeps every node's diagnostic session alive. Call when
+ * the ZGW receives a TesterPresent from the tester. */
+void ParallelFlashSwc_BroadcastTesterPresent(void);
+
+extern volatile uint8 ParallelFlashSwc_DebugActiveCan;
+extern volatile uint8 ParallelFlashSwc_DebugActiveCanFd;
+extern volatile uint8 ParallelFlashSwc_DebugActiveLin;
+extern volatile uint8 ParallelFlashSwc_DebugCompletedJobs;
+extern volatile uint8 ParallelFlashSwc_DebugFailedJobs;
+extern volatile uint32 ParallelFlashSwc_DebugLastError;
+extern volatile uint32 ParallelFlashSwc_DebugForwardRequests;
+extern volatile uint32 ParallelFlashSwc_DebugForwardCanOk;
+extern volatile uint32 ParallelFlashSwc_DebugForwardCanFail;
+extern volatile uint8 ParallelFlashSwc_DebugForwardLastExt;
+extern volatile uint8 ParallelFlashSwc_DebugForwardLastSid;
+extern volatile uint16 ParallelFlashSwc_DebugForwardLastPdu;
+extern volatile uint8 ParallelFlashSwc_DebugForwardLastResult;
+extern volatile uint32 ParallelFlashSwc_DebugForwardQueued;
+extern volatile uint32 ParallelFlashSwc_DebugForwardQueueFull;
+extern volatile uint32 ParallelFlashSwc_DebugForwardDispatched;
+extern volatile uint32 ParallelFlashSwc_DebugForwardQueueDepth;
+extern volatile uint32 ParallelFlashSwc_DebugForwardQueueMaxDepth;
+extern volatile uint32 ParallelFlashSwc_DebugForwardLinBusy;
+extern volatile uint32 ParallelFlashSwc_DebugForwardLinDropped;
+
+#endif

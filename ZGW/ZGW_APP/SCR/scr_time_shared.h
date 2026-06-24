@@ -3,8 +3,8 @@
 
 /*
  * Retained SCR XRAM handoff record shared by TriCore TimeBase and SCR.
- * Existing debug bytes use 0x1760..0x1769; keep this record directly after
- * them and away from the SCR image copied at PMS_XRAM base.
+ * Existing debug bytes use 0x1760..0x1769; keep this record after them and
+ * away from the SCR image copied at PMS_XRAM base.
  */
 #define SCR_TIME_XRAM_BASE                  0x1790u
 #define SCR_TIME_MAGIC                      0x54534352u /* "TSCR" */
@@ -43,6 +43,24 @@
 #define SCR_TIME_OFFSET_ELAPSED_TICKS_HIGH  59u
 #define SCR_TIME_OFFSET_RTC_LAST_TICKS_HIGH 63u
 #define SCR_TIME_RECORD_LENGTH              67u
+
+/*
+ * Retained McuSm handoff record.  It is intentionally outside the SCR image
+ * copied at PMS_XRAM base and below the SCR linker xdata window at 0x1C00.
+ */
+#define SCR_MCUSM_XRAM_BASE                 0x1810u
+#define SCR_MCUSM_MAGIC                     0x4D435553u /* "MCUS" */
+#define SCR_MCUSM_VERSION                   1u
+#define SCR_MCUSM_VALID                     1u
+
+#define SCR_MCUSM_OFFSET_MAGIC              0u
+#define SCR_MCUSM_OFFSET_VERSION            4u
+#define SCR_MCUSM_OFFSET_VALID              5u
+#define SCR_MCUSM_OFFSET_PAYLOAD_LENGTH     6u
+#define SCR_MCUSM_OFFSET_CHECKSUM           8u
+#define SCR_MCUSM_OFFSET_PAYLOAD            12u
+#define SCR_MCUSM_PAYLOAD_LENGTH            768u
+#define SCR_MCUSM_RECORD_LENGTH             (SCR_MCUSM_OFFSET_PAYLOAD + SCR_MCUSM_PAYLOAD_LENGTH)
 
 #define BOOT_STAGE_RTC_INIT_ENTER      (0x60u)
 #define BOOT_STAGE_RTC_PMCON_DONE      (0x61u)

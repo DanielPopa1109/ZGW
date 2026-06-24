@@ -23,6 +23,7 @@
 #define MCUSM_RESET_REASON_C2_TCB_CORRUPT      386u
 #define MCUSM_RESET_REASON_C2_STACKPTR_CORRUPT 387u
 #define MCUSM_RESET_REASON_C2_LIST_CORRUPT     388u
+#define MCUSM_RESET_REASON_DOIP_CORE0_STALL    389u
 #define MCUSM_RESET_REASON_DFLASH_RECOVERY     390u
 
 #define MCUSM_DFLASH_RECOVERY_MAGIC            0xDFA17EC0u
@@ -38,6 +39,8 @@
 #define MCUSM_SAFETYKIT_FAIL_SMU_KEYS_CLEAR    (1u << 8u)
 #define MCUSM_SAFETYKIT_FAIL_SMU_INIT          (1u << 9u)
 
+#define MCUSM_SAFETYKIT_INFO_FW_CHECK_SHIFT    16u
+
 #define MCUSM_FW_CHECK_RESULT_SMU_FAILED               (1u << 0u)
 #define MCUSM_FW_CHECK_RESULT_STMEM_FAILED             (1u << 1u)
 #define MCUSM_FW_CHECK_RESULT_LCLCON_FAILED            (1u << 2u)
@@ -46,6 +49,7 @@
 #define MCUSM_FW_CHECK_RESULT_LBIST_SSH_TABLE_ACCEPTED (1u << 5u)
 #define MCUSM_FW_CHECK_RESULT_LBIST_SSH_NOINIT_ACCEPTED (1u << 6u)
 #define MCUSM_FW_CHECK_RESULT_LBIST_SSH_INIT_ACCEPTED  (1u << 7u)
+#define MCUSM_FW_CHECK_REG_FAIL_NONE                   0xFFFFFFFFu
 
 typedef struct
 {
@@ -95,6 +99,11 @@ extern volatile uint32 McuSm_SafetyKitFwCheckSshActualErrinfo;
 extern volatile uint32 McuSm_SafetyKitFwCheckSshExpectedEccd;
 extern volatile uint32 McuSm_SafetyKitFwCheckSshExpectedFaultsts;
 extern volatile uint32 McuSm_SafetyKitFwCheckSshExpectedErrinfo;
+extern volatile uint32 McuSm_SafetyKitFwCheckLastRegFail;
+extern volatile uint32 McuSm_SafetyKitFwCheckRegActual;
+extern volatile uint32 McuSm_SafetyKitFwCheckRegExpected;
+extern volatile uint32 McuSm_SafetyKitFwCheckRegMask;
+extern volatile uint32 McuSm_SafetyKitFwCheckRegResetType;
 extern volatile uint32 McuSm_LastTrapClass;
 extern volatile uint32 McuSm_LastTrapId;
 extern volatile uint32 McuSm_LastTrapCoreId;
@@ -116,24 +125,52 @@ extern volatile uint32 McuSm_Trap4Pietr;
 extern volatile uint32 McuSm_Trap4ErrorAddress;
 extern volatile uint32 McuSm_Trap4ZeroFillReaction;
 extern volatile uint32 McuSm_Trap4ZeroFillReactionCounter;
+extern volatile uint32 McuSm_Trap7Dstr;
+extern volatile uint32 McuSm_Trap7Datr;
+extern volatile uint32 McuSm_Trap7Deadd;
+extern volatile uint32 McuSm_Trap7Diear;
+extern volatile uint32 McuSm_Trap7Dietr;
+extern volatile uint32 McuSm_Trap7Piear;
+extern volatile uint32 McuSm_Trap7Pietr;
+extern volatile uint32 McuSm_Trap7AgRaw[12u];
+extern volatile uint32 McuSm_Trap7AgMasked[12u];
+extern volatile uint32 McuSm_Trap7AgRstRsn;
+extern volatile uint32 McuSm_Trap7AgRstInfo;
+extern volatile uint32 McuSm_Trap7DomErrAddr[16u];
+extern volatile uint32 McuSm_Trap7DomErr[16u];
+extern volatile uint32 McuSm_Trap7DomPestat;
+extern volatile uint32 McuSm_Trap7DomTidstat;
+extern volatile uint32 McuSm_Trap7DomActiveSci;
+extern volatile uint32 McuSm_Trap7DomActiveErrAddr;
+extern volatile uint32 McuSm_Trap7DomActiveErr;
 extern uint8 McuSm_Trap4ScrRtcRecord[SCR_TIME_RECORD_LENGTH];
 extern volatile uint8 McuSm_Trap4ScrRtcRecordValid;
 extern volatile uint32 McuSm_Trap4ScrRtcRecordCounter;
 extern volatile uint32 McuSm_BusMpuConfigured;
 extern volatile uint32 McuSm_BusMpuWriteAccessMaskA;
 extern volatile uint32 McuSm_BusMpuWriteAccessMaskB;
+extern volatile uint32 McuSm_ScrStateStoreCounter;
+extern volatile uint32 McuSm_ScrStateRestoreCounter;
+extern volatile uint32 McuSm_ScrStateInvalidCounter;
+extern volatile uint32 McuSm_ResetHookPerformCounter;
 extern volatile uint32 McuSm_DFlashRecoveryRequest;
 extern volatile uint32 McuSm_DFlashRecoveryInfo;
 extern volatile uint32 McuSm_DFlashRecoveryCounter;
+extern volatile uint32 McuSm_DFlashRecoveryAttemptCounter;
+extern volatile uint32 McuSm_DFlashRecoverySuppressCounter;
 extern volatile uint32 McuSm_DFlashRecoveryLastFeeAccessKind;
 extern volatile uint32 McuSm_DFlashRecoveryLastFeePhysicalAddress;
 
 extern void McuSm_InitializeBusMpu(void);
 extern void McuSm_RequestDFlashRecovery(uint32 recoveryInfo);
 extern boolean McuSm_IsDFlashRecoveryRequested(void);
+extern boolean McuSm_BeginDFlashRecoveryAttempt(void);
 extern void McuSm_ClearDFlashRecoveryRequest(void);
+extern void McuSm_ClearResetDtcTriggerData(void);
 extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
-extern void McuSm_CaptureTimeImageFromScr(void);
+extern void McuSm_CaptureWakeupImagesFromScr(void);
+extern void McuSm_SaveRetainedStateToScr(void);
+extern boolean McuSm_RestoreRetainedStateFromScr(void);
 extern void McuSm_TRAP1(IfxCpu_Trap trapInfo);
 extern void McuSm_TRAP2(IfxCpu_Trap trapInfo);
 extern void McuSm_TRAP3(IfxCpu_Trap trapInfo);

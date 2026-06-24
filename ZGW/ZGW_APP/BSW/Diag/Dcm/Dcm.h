@@ -31,11 +31,12 @@ typedef uint8 Dcm_OpStatusType;
 
 /* ===================== Limits ===================== */
 
-#define DCM_MAX_CONNECTIONS          10u
+#define DCM_MAX_CONNECTIONS          16u
 #define DCM_CLASSIC_ISOTP_MAX_LEN    4095u
 #define DCM_MAX_PDU_LEN              8192u
 #define DCM_MAX_RESPONSE_LEN         8192u
-#define DCM_RX_QUEUE_DEPTH           2u
+#define DCM_RX_QUEUE_DEPTH           8u
+#define DCM_RX_QUEUE_BUFFER_LEN      320u
 #define DCM_MAX_SERVICES             32u
 #define DCM_MAX_DID_RESPONSE_LEN     512u
 #define DCM_MAX_ROUTINE_RESPONSE_LEN 512u
@@ -47,7 +48,7 @@ typedef uint8 Dcm_OpStatusType;
 
 #define DCM_P2_SERVER_TICKS          50u
 #define DCM_P2STAR_SERVER_TICKS      5000u
-#define DCM_RESPONSE_PENDING_MAX     2u
+#define DCM_RESPONSE_PENDING_MAX     6u
 
 /* ===================== AUTOSAR-like TP ===================== */
 
@@ -188,7 +189,7 @@ typedef struct
 void Dcm_Init(const Dcm_ConfigType* ConfigPtr);
 void Dcm_ResetDoIPSession(void);
 void Dcm_MainFunction(void);
-void Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
+Std_ReturnType Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result);
 uint8 Dcm_GetActiveSession(uint8 connIdx);
 uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len);
@@ -229,6 +230,12 @@ Std_ReturnType Dcm_LoTransmit(
     Dcm_PduIdType txPduId,
     Dcm_PduLengthType len
 );
+
+extern volatile uint32 Dcm_DebugExtForwardRequests;
+extern volatile uint8 Dcm_DebugExtForwardLastExt;
+extern volatile uint8 Dcm_DebugExtForwardLastSid;
+extern volatile uint16 Dcm_DebugExtForwardLastLen;
+extern volatile uint8 Dcm_DebugExtForwardLastResult;
 
 /* ===================== Weak application hooks ===================== */
 

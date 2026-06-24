@@ -1,0 +1,25 @@
+################################################################################
+# User build hooks.
+################################################################################
+
+UCB_FILTER_SCRIPT := ../../../Scripts/Build/filter_ihex_ranges.ps1
+UCB_FILTER_RANGE := 0xAF400000-0xAF405FFF
+
+ifeq ($(BUILD_ARTIFACT_NAME),ZGW_APP)
+
+main-build: ZGW_APP_edited.hex
+
+ZGW_APP_edited.hex: ZGW_APP.elf $(UCB_FILTER_SCRIPT)
+	@echo 'Filtering UCB range from ZGW_APP.hex -> ZGW_APP_edited.hex'
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(UCB_FILTER_SCRIPT)" -InputPath "ZGW_APP.hex" -OutputPath "ZGW_APP_edited.hex" -ExcludeRange "$(UCB_FILTER_RANGE)"
+	@echo ' '
+
+clean: clean-edited-hex
+
+clean-edited-hex:
+	-$(RM) ZGW_APP_edited.hex
+	-@echo ' '
+
+.PHONY: clean-edited-hex
+
+endif

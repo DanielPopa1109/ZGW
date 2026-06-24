@@ -6,6 +6,7 @@
 #include "lwip/errno.h"
 #include "FreeRTOS_core2.h"
 #include "semphr_core2.h"
+#include "task_core2.h"
 
 #define TCPIP_MAX_SOCKETS 16u
 
@@ -32,6 +33,11 @@ volatile uint32 TcpIp_CreateFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockCreateFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockTakeFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockGiveFailCounter = 0u;
+/* Debug only: same recursive-mutex give-fail fingerprint as sys_arch.c. Holder
+ * is the task the kernel thinks owns TcpIp_ApiMutex; current is the task that
+ * tried to release it. A mismatch points at CB/TCB corruption, not lwIP logic. */
+volatile void *TcpIp_ApiLockGiveFailHolder = NULL;
+volatile void *TcpIp_ApiLockGiveFailCurrent = NULL;
 volatile sint32 TcpIp_LastSocketError = 0;
 volatile uint8 TcpIp_LastLinkUp = 0u;
 volatile uint8 TcpIp_LastNetifFlags = 0u;
@@ -51,6 +57,23 @@ volatile sint32 TcpIp_LastRecvFromResult = 0;
 volatile uint16 TcpIp_LastRxLength = 0u;
 volatile uint16 TcpIp_LastRxRemotePort = 0u;
 volatile uint32 TcpIp_LastRxRemoteAddr = 0u;
+volatile uint32 TcpIp_SendWouldBlockCounter = 0u;
+volatile uint32 TcpIp_SendPartialCloseCounter = 0u;
+volatile uint32 TcpIp_SendFatalCounter = 0u;
+
+static uint8 TcpIp_IsWouldBlockError(sint32 err)
+{
+#if defined(EWOULDBLOCK) && defined(EAGAIN)
+    return ((err == EWOULDBLOCK) || (err == EAGAIN)) ? 1u : 0u;
+#elif defined(EWOULDBLOCK)
+    return (err == EWOULDBLOCK) ? 1u : 0u;
+#elif defined(EAGAIN)
+    return (err == EAGAIN) ? 1u : 0u;
+#else
+    (void)err;
+    return 0u;
+#endif
+}
 
 static void TcpIp_InitLock(void)
 {
@@ -93,6 +116,8 @@ static void TcpIp_Unlock(void)
     {
         if (xSemaphoreGiveRecursive_core2(TcpIp_ApiMutex) != pdTRUE_core2)
         {
+            TcpIp_ApiLockGiveFailHolder = (void *)xSemaphoreGetMutexHolder_core2(TcpIp_ApiMutex);
+            TcpIp_ApiLockGiveFailCurrent = (void *)xTaskGetCurrentTaskHandle_core2();
             TcpIp_ApiLockGiveFailCounter++;
         }
     }
@@ -166,6 +191,9 @@ void TcpIp_Init(void)
     TcpIp_LastRxLength = 0u;
     TcpIp_LastRxRemotePort = 0u;
     TcpIp_LastRxRemoteAddr = 0u;
+    TcpIp_SendWouldBlockCounter = 0u;
+    TcpIp_SendPartialCloseCounter = 0u;
+    TcpIp_SendFatalCounter = 0u;
 }
 
 void TcpIp_MainFunction(void)
@@ -384,9 +412,21 @@ static void TcpIp_EnableKeepAlive(TcpIp_SocketIdType sock)
 static void TcpIp_EnableAcceptedTcpOptions(TcpIp_SocketIdType sock)
 {
     int optval;
+#if LWIP_SO_LINGER
+    struct linger lingerOpt;
+#endif
 
     optval = 1;
     (void)lwip_setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
+
+    /* Diagnostic reconnects are intentionally fast. If an accepted DoIP socket
+     * is closed with pending data, abort it instead of keeping scarce TCP PCBs
+     * in close/TIME-WAIT state across the next coding iteration. */
+#if LWIP_SO_LINGER
+    lingerOpt.l_onoff = 1;
+    lingerOpt.l_linger = 0;
+    (void)lwip_setsockopt(sock, SOL_SOCKET, SO_LINGER, &lingerOpt, sizeof(lingerOpt));
+#endif
 
     TcpIp_EnableKeepAlive(sock);
 }
@@ -429,6 +469,10 @@ TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *rem
             remoteAddr->port = ntohs(addr.sin_port);
         }
     }
+    else
+    {
+        TcpIp_LastSocketError = errno;
+    }
 
     TcpIp_Unlock();
     return (TcpIp_SocketIdType)newSock;
@@ -461,6 +505,7 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
     uint16 sent;
     uint8 attempts;
     int lastErr;
+    TcpIp_SocketType *slot;
 
     if ((data == 0) || (len == 0u) || (TcpIp_IsLinkUp() == 0u))
     {
@@ -477,7 +522,9 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         return -1;
     }
 
-    if (TcpIp_Find(sock) == 0)
+    slot = TcpIp_Find(sock);
+
+    if (slot == 0)
     {
         TcpIp_LastSendResult = -1;
         TcpIp_Unlock();
@@ -503,12 +550,43 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         if (ret < 0)
         {
             lastErr = errno;
+
+            if (TcpIp_IsWouldBlockError(lastErr) != 0u)
+            {
+                TcpIp_SendWouldBlockCounter++;
+                break;
+            }
         }
 
         attempts--;
     }
 
-    result = (sent > 0u) ? (sint32)sent : ret;
+    if (sent == len)
+    {
+        result = (sint32)len;
+    }
+    else
+    {
+        result = -1;
+
+        if (sent > 0u)
+        {
+            TcpIp_SendPartialCloseCounter++;
+            (void)lwip_close(sock);
+            slot->sock = TCPIP_INVALID_SOCKET;
+            slot->used = 0u;
+            slot->tcp = 0u;
+        }
+        else if ((lastErr != 0) && (TcpIp_IsWouldBlockError(lastErr) == 0u))
+        {
+            TcpIp_SendFatalCounter++;
+            (void)lwip_close(sock);
+            slot->sock = TCPIP_INVALID_SOCKET;
+            slot->used = 0u;
+            slot->tcp = 0u;
+        }
+    }
+
     TcpIp_LastSendResult = result;
 
     if ((sent < len) && (lastErr != 0))

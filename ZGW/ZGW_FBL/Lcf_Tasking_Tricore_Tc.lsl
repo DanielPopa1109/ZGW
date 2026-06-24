@@ -171,7 +171,7 @@ derivative tc37
         size = 64k;
         type = ram;
         /* Cached DLMU for normal LMU data; private data should stay in DSPR where possible. */
-        map cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
+        map cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
     }
 
     memory cpu0_dlmu_nc
@@ -179,24 +179,24 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Non-cached segment-B alias only for explicit coherent DMA/shared sections. */
-        map not_cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
+        /* Non-cached alias retained for address compatibility; normal DLMU sections are routed to cached aliases. */
+        map not_cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
     }    
     //memory cpu1_dlmu
     //{
     //    mau = 8;
     //    size = 64k;
     //    type = ram;
-    //    //map     cached (dest=bus:sri, dest_offset=0x90010000,           size=64k);
-    //    map not_cached (dest=bus:sri, dest_offset=0xb0010000, reserved, size=64k);
+    //    //map     cached (dest=bus:sri, dest_offset=0xb0010000,           size=64k);
+    //    map not_cached (dest=bus:sri, dest_offset=0x90010000, reserved, size=64k);
     //}    
     //memory cpu2_dlmu
     //{
     //    mau = 8;
     //    size = 64k;
     //    type = ram;
-    //    //map     cached (dest=bus:sri, dest_offset=0x90020000,           size=64k);
-    //    map not_cached (dest=bus:sri, dest_offset=0xb0020000, reserved, size=64k);
+    //    //map     cached (dest=bus:sri, dest_offset=0xb0020000,           size=64k);
+    //    map not_cached (dest=bus:sri, dest_offset=0x90020000, reserved, size=64k);
     //}
 #if (__VERSION__ >= 6003)    
     section_setup :vtc:linear
@@ -568,6 +568,11 @@ derivative tc37
         }
         "_LITERAL_DATA_" := sizeof(group:a1) > 0 ? addressof(group:a1) : addressof(group:a1) & 0xF0000000 + 32k;
         "__A1_MEM" = "_LITERAL_DATA_";        
+        group app_ncr_reserved (ordered, align = 32, attributes=rws, run_addr = mem:cpu0_dlmu)
+        {
+            reserved "app_ncr_reserved" (size = 512);
+        }
+
         /*Relative A9 Addressable Data, selectable with patterns and user defined sections*/
         group a9 (ordered, align = 4, run_addr=mem:cpu0_dlmu)
         {
@@ -653,43 +658,42 @@ derivative tc37
         }       
 
         /*
-         * Explicit non-cached DLMU/LMU sections.
-         * Use only for DMA/peripheral buffers, descriptors, and inter-core data that must be coherent without
-         * cache maintenance. Normal .data/.bss remains in DSPR or cached DLMU/LMU groups.
+         * Explicit cached DLMU/LMU sections.
+         * Legacy *_nc input section names are accepted for compatibility and are routed to cached DLMU too.
          */
-        group data_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group data_lmu_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Initialized coherent data in segment B; startup copytable initializes this group. */
+            select "(.data.lmu_cached|.data.lmu_cached.*)";
             select "(.data.lmu_nc|.data.lmu_nc.*)";
         }
 
-        group bss_lmu_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group bss_lmu_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Zero-init coherent data in segment B. */
+            select "(.bss.lmu_cached|.bss.lmu_cached.*)";
             select "(.bss.lmu_nc|.bss.lmu_nc.*)";
         }
 
-        group data_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group data_eth_dma_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Initialized Ethernet DMA data; prefer .bss.eth_dma_nc when possible. */
+            select "(.data.eth_dma_cached|.data.eth_dma_cached.*)";
             select "(.data.eth_dma_nc|.data.eth_dma_nc.*)";
         }
 
-        group bss_eth_dma_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group bss_eth_dma_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Ethernet DMA descriptors and RX/TX buffers in segment B. */
+            select "(.bss.eth_dma_cached|.bss.eth_dma_cached.*)";
             select "(.bss.eth_dma_nc|.bss.eth_dma_nc.*)";
         }
 
-        group data_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group data_shared_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Initialized inter-core shared data; startup copytable initializes this group. */
+            select "(.data.shared_cached|.data.shared_cached.*)";
             select "(.data.shared_nc|.data.shared_nc.*)";
         }
 
-        group bss_shared_nc (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu_nc)
+        group bss_shared_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu0_dlmu)
         {
-            /* Zero-init inter-core shared flags/state in segment B. */
+            select "(.bss.shared_cached|.bss.shared_cached.*)";
             select "(.bss.shared_nc|.bss.shared_nc.*)";
         }
 

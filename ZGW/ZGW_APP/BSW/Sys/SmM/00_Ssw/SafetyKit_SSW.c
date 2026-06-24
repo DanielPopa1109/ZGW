@@ -120,7 +120,7 @@ static uint32 safetyKitGetStartupFailureMask(boolean includeSmuStatus)
     return failureMask;
 }
 
-void safetyKitUpdateNcrStatusAndResetReaction(boolean includeSmuStatus)
+void safetyKitUpdateMcuSmStatusAndResetReaction(boolean includeSmuStatus)
 {
     uint32 failureMask;
 
@@ -163,7 +163,15 @@ void safetyKitUpdateNcrStatusAndResetReaction(boolean includeSmuStatus)
         {
             McuSm_SafetyKitResetInhibit = 1u;
             McuSm_SafetyKitResetReactionCounter++;
-            McuSm_PerformResetHook(MCUSM_RESET_REASON_SAFETYKIT_TEST, failureMask);
+            McuSm_PerformResetHook(
+                    MCUSM_RESET_REASON_SAFETYKIT_TEST,
+                    failureMask |
+                            ((McuSm_SafetyKitFwCheckResultMask &
+                                    (MCUSM_FW_CHECK_RESULT_SMU_FAILED |
+                                            MCUSM_FW_CHECK_RESULT_STMEM_FAILED |
+                                            MCUSM_FW_CHECK_RESULT_LCLCON_FAILED |
+                                            MCUSM_FW_CHECK_RESULT_SSH_FAILED)) <<
+                                    MCUSM_SAFETYKIT_INFO_FW_CHECK_SHIFT));
         }
     }
     else
@@ -200,11 +208,15 @@ void runSafeAppSwStartup(void)
 
     safetyKitSswSmuRegMonitorTest();
 
+    McuSm_SaveRetainedStateToScr();
     safetyKitSswMbist();
+    /* MBIST can include SCR XRAM; rewrite the handoff after the non-destructive test. */
+    McuSm_SaveRetainedStateToScr();
+    (void)McuSm_RestoreRetainedStateFromScr();
 
     safetyKitEnableAllSMUAlarms();
 
-    safetyKitUpdateNcrStatusAndResetReaction(FALSE);
+    safetyKitUpdateMcuSmStatusAndResetReaction(FALSE);
 }
 /*
  * This function Evaluate the Reset and returns reset code which contains Reset type, trigger and reason details.

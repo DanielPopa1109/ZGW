@@ -21,7 +21,8 @@ extern volatile uint32 SysMgr_GoSleepCounter;
 extern void SysMgr_MainFunction(void);
 extern void SysMgr_NotifyBusActivity(void);
 extern void SysMgr_CaptureScrFaultBeforeScrReset(void);
-extern Std_ReturnType SysMgr_CaptureMcuSmFreezeFrame(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
-extern Std_ReturnType SysMgr_CaptureMcuSmExtendedData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
+extern void SysMgr_ClearMcuSmSwErrorTriggerData(void);
+extern void SysMgr_OnDemEventCleared(Dem_EventIdType eventId);
+extern Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 
 #endif /* SYSMGR_H_ */

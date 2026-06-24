@@ -32,7 +32,6 @@
 #include "SafetyKit_RegMon.h"
 #include "SafetyKit_DieTemp.h"
 #include "SafetyKit_VoltMon.h"
-#include "SafetyKit_InternalWatchdogs.h"
 #include "SMU.h"
 #include "IfxSmu.h"
 #include "SafetyKit_SSW_02_MCU_FW_CHECK.h"
@@ -65,9 +64,7 @@ void initSafetyKit(void)
     /* Initialize the SMU to configure and map the alarms
      * SM:SMU:CONFIG and Enable the security Key test */
     initSMUModule();
-    safetyKitUpdateNcrStatusAndResetReaction(TRUE);
-    serviceCpuWatchdog();
-    serviceSafetyWatchdog();
+    safetyKitUpdateMcuSmStatusAndResetReaction(TRUE);
     /* Initialize die temperature sensors,
      * SM:DTS_CFG, SM:DTS:DTS_RESULT */
     initDieTemperatureSensors();

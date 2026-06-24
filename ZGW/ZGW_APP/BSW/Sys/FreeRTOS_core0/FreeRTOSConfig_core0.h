@@ -7,7 +7,7 @@
 #define configTICK_RATE_HZ_core0                         ( ( TickType_t_core0 ) 1000UL )
 #define configMAX_PRIORITIES_core0                       ( 31 )
 #define configMINIMAL_STACK_SIZE_core0                   ( ( unsigned short ) 256 )
-#define configTOTAL_HEAP_SIZE_core0                      ( ( size_t ) 17576 )
+#define configTOTAL_HEAP_SIZE_core0                      ( ( size_t ) 21672 )
 #define configMAX_TASK_NAME_LEN_core0                    ( 32 )
 #define configENABLE_BACKWARD_COMPATIBILITY_core0        0
 #define configUSE_TRACE_FACILITY_core0                   0
@@ -37,7 +37,9 @@
 #define INCLUDE_vTaskSuspend_core0                       1
 #define INCLUDE_vTaskDelayUntil_core0                    1
 #define INCLUDE_vTaskDelay_core0                         1
-/* Interrupt above priority 31 are not effected by critical sections, but cannot call interrupt safe FreeRTOS_core0 functions. */
+/* Interrupts above priority 31 are not affected by critical sections and must
+ * not call FreeRTOS APIs. Keep the FreeRTOS tick/context interrupts at or below
+ * this mask level so scheduler list updates are atomic. */
 #define configMAX_API_CALL_INTERRUPT_PRIORITY_core0      31
 #ifdef __TASKING__
 #define configASSERT_core0( x_core0 )    if( ( x_core0 ) == 0 ) {  }
@@ -48,8 +50,8 @@
 #define configASSERT_core0( x_core0 ) ((void)(x_core0)) /* Empty macro to remove compiler warning(s) about unused variables */
 #endif
 /* AURIX TCxxx definitions */
-#define configCONTEXT_INTERRUPT_PRIORITY_core0    254
-#define configTIMER_INTERRUPT_PRIORITY_core0      255 /* This value must not be bigger then context priority */
+#define configCONTEXT_INTERRUPT_PRIORITY_core0    30
+#define configTIMER_INTERRUPT_PRIORITY_core0      31
 #define configCPU_NR_core0                        0
 #define configPROVIDE_SYSCALL_TRAP_core0          0
 #define configSYSCALL_CALL_DEPTH_core0            2

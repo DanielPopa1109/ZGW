@@ -4,6 +4,8 @@
 #include "PduR.h"
 #include <string.h>
 
+#define CANTP_TX_CF_BURST_BUDGET 16u
+
 typedef enum
 {
     CANTP_DIR_NONE = 0u,
@@ -40,6 +42,7 @@ typedef struct
     uint8 txStMinTicks;
     uint8 txStTimer;
     uint8 txWaitFrameCounter;
+    uint8 txAssumeFlowControl;
     uint8 txBusy;
     CanTp_TxFrameType pendingTxFrame;
 
@@ -48,10 +51,16 @@ typedef struct
 
 static const CanTp_ChannelConfigType CanTp_ChannelConfig[] =
 {
-    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, DCM_RX_CAN_PHYS,        DCM_TX_CAN_PHYS,        CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_NORMAL,   0u,                    0u,                  CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
-    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      DCM_RX_CANFD_PHYS,      DCM_TX_CANFD_PHYS,      CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_NORMAL,   0u,                    0u,                  CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
-    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX, DCM_RX_CAN_EXT_PHYS,    DCM_TX_CAN_EXT_PHYS,    CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
-    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,      DCM_RX_CANFD_EXT_PHYS,  DCM_TX_CANFD_EXT_PHYS,  CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS }
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_PHYS_TX,      DCM_RX_CAN_PHYS,        DCM_TX_CAN_PHYS,        CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_NORMAL,   0u,                    0u,                  CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_PHYS_TX,           DCM_RX_CANFD_PHYS,      DCM_TX_CANFD_PHYS,      CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_NORMAL,   0u,                    0u,                  CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_EXT_PHYS_TX0, DCM_RX_CAN_EXT_PHYS,    DCM_TX_CAN_EXT_PHYS,    CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_EXT_PHYS_TX1, DCM_RX_CAN_EXT_PHYS_2,  DCM_TX_CAN_EXT_PHYS_2,  CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_EXT_PHYS_TX2, DCM_RX_CAN_EXT_PHYS_3,  DCM_TX_CAN_EXT_PHYS_3,  CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_CLASSIC_PHYS_RX, CANIF_PDU_CLASSIC_EXT_PHYS_TX3, DCM_RX_CAN_EXT_PHYS_4,  DCM_TX_CAN_EXT_PHYS_4,  CANTP_ADDR_PHYSICAL,   8u,  8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_EXT_PHYS_TX0,      DCM_RX_CANFD_EXT_PHYS,  DCM_TX_CANFD_EXT_PHYS,  CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_EXT_PHYS_TX1,      DCM_RX_CANFD_EXT_PHYS_2, DCM_TX_CANFD_EXT_PHYS_2, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_EXT_PHYS_TX2,      DCM_RX_CANFD_EXT_PHYS_3, DCM_TX_CANFD_EXT_PHYS_3, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS },
+    { CANIF_PDU_FD_PHYS_RX,      CANIF_PDU_FD_EXT_PHYS_TX3,      DCM_RX_CANFD_EXT_PHYS_4, DCM_TX_CANFD_EXT_PHYS_4, CANTP_ADDR_PHYSICAL,   64u, 8u, 0u, 0x00u, CANTP_FORMAT_EXTENDED, DCM_EXT_ADDR_ZGW,          DCM_EXT_ADDR_TESTER,   CANTP_PADDING_ON, CANTP_N_AS_TICKS, CANTP_N_AR_TICKS, CANTP_N_BS_TICKS, CANTP_N_BR_TICKS, CANTP_N_CS_TICKS, CANTP_N_CR_TICKS }
 };
 
 const CanTp_ConfigType CanTp_Config =
@@ -65,6 +74,18 @@ static CanTp_ChannelStateType CanTp_Channel[CANTP_MAX_CHANNELS];
 static uint8 CanTp_TxPayloadBuffer[CANTP_MAX_TX_BUFFERS][CANTP_MAX_PAYLOAD_LEN];
 static uint8 CanTp_TxPayloadBufferInUse[CANTP_MAX_TX_BUFFERS];
 static uint8 CanTp_TxPayloadBufferOwner[CANTP_MAX_TX_BUFFERS];
+static uint8 CanTp_TxAddressOverrideValid[CANTP_MAX_CHANNELS];
+static uint8 CanTp_TxAddressOverride[CANTP_MAX_CHANNELS];
+
+volatile uint32 CanTp_DebugExtendedTxRequests = 0u;
+volatile uint32 CanTp_DebugExtendedTxOk = 0u;
+volatile uint32 CanTp_DebugExtendedTxFail = 0u;
+volatile uint16 CanTp_DebugExtendedLastUpperTxPdu = 0u;
+volatile uint16 CanTp_DebugExtendedLastLen = 0u;
+volatile uint8 CanTp_DebugExtendedLastTarget = 0u;
+volatile uint8 CanTp_DebugExtendedLastChannel = 0xFFu;
+volatile uint8 CanTp_DebugExtendedLastState = 0xFFu;
+volatile uint8 CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BAD_CONFIG;
 
 static uint8 CanTp_IsConfigValid(void);
 
@@ -323,11 +344,11 @@ static uint8 CanTp_GetRxPciIndex(const CanTp_ChannelConfigType* cfg)
     return CanTp_GetAddrOffset(cfg);
 }
 
-static void CanTp_SetTxAddress(const CanTp_ChannelConfigType* cfg, uint8* frame)
+static void CanTp_SetTxAddress(uint8 ch, const CanTp_ChannelConfigType* cfg, uint8* frame)
 {
     if ((frame != NULL_PTR) && (CanTp_UsesAddressByte(cfg) != FALSE))
     {
-        frame[0] = cfg->txNta;
+        frame[0] = (CanTp_TxAddressOverrideValid[ch] != FALSE) ? CanTp_TxAddressOverride[ch] : cfg->txNta;
     }
 }
 
@@ -383,9 +404,49 @@ static uint8 CanTp_IsConfigValid(void)
     return TRUE;
 }
 
+static uint8 CanTp_ChannelCanConsumeRx(uint8 ch,
+                                       const CanTp_ChannelConfigType* cfg,
+                                       const uint8* data,
+                                       PduLengthType len)
+{
+    uint8 pciIndex;
+    uint8 pci;
+
+    if ((cfg == NULL_PTR) || (data == NULL_PTR) || (ch >= CANTP_MAX_CHANNELS))
+    {
+        return FALSE;
+    }
+
+    pciIndex = CanTp_GetRxPciIndex(cfg);
+    if (len <= pciIndex)
+    {
+        return FALSE;
+    }
+
+    pci = data[pciIndex] & 0xF0u;
+
+    if ((pci == CANTP_NPCI_SF) || (pci == CANTP_NPCI_FF))
+    {
+        return (CanTp_Channel[ch].state == CANTP_IDLE) ? TRUE : FALSE;
+    }
+
+    if (pci == CANTP_NPCI_CF)
+    {
+        return (CanTp_Channel[ch].state == CANTP_RX_IN_PROGRESS) ? TRUE : FALSE;
+    }
+
+    if (pci == CANTP_NPCI_FC)
+    {
+        return (CanTp_Channel[ch].state == CANTP_TX_WAIT_FC) ? TRUE : FALSE;
+    }
+
+    return FALSE;
+}
+
 static uint8 CanTp_FindRxChannel(PduIdType rxPduId, const uint8* data, PduLengthType len)
 {
     uint8 i;
+    uint8 fallback = 0xFFu;
     const CanTp_ChannelConfigType* cfg;
 
     if (CanTp_IsConfigValid() == FALSE)
@@ -401,8 +462,21 @@ static uint8 CanTp_FindRxChannel(PduIdType rxPduId, const uint8* data, PduLength
             (CanTp_UsesAddressByte(cfg) != FALSE) &&
             (CanTp_CheckRxAddress(cfg, data, len) != FALSE))
         {
-            return i;
+            if (fallback == 0xFFu)
+            {
+                fallback = i;
+            }
+
+            if (CanTp_ChannelCanConsumeRx(i, cfg, data, len) != FALSE)
+            {
+                return i;
+            }
         }
+    }
+
+    if (fallback != 0xFFu)
+    {
+        return fallback;
     }
 
     for (i = 0u; i < CanTp_ConfigPtr->numChannels; i++)
@@ -412,11 +486,19 @@ static uint8 CanTp_FindRxChannel(PduIdType rxPduId, const uint8* data, PduLength
         if ((cfg->rxPduId == rxPduId) &&
             (CanTp_UsesAddressByte(cfg) == FALSE))
         {
-            return i;
+            if (fallback == 0xFFu)
+            {
+                fallback = i;
+            }
+
+            if (CanTp_ChannelCanConsumeRx(i, cfg, data, len) != FALSE)
+            {
+                return i;
+            }
         }
     }
 
-    return 0xFFu;
+    return fallback;
 }
 
 static uint8 CanTp_FindTxChannelByUpper(PduIdType upperTxPduId)
@@ -437,6 +519,35 @@ static uint8 CanTp_FindTxChannelByUpper(PduIdType upperTxPduId)
     }
 
     return 0xFFu;
+}
+
+static uint8 CanTp_FindIdleTxChannelByUpper(PduIdType upperTxPduId)
+{
+    uint8 i;
+    uint8 firstMatch = 0xFFu;
+
+    if (CanTp_IsConfigValid() == FALSE)
+    {
+        return 0xFFu;
+    }
+
+    for (i = 0u; i < CanTp_ConfigPtr->numChannels; i++)
+    {
+        if (CanTp_ConfigPtr->channels[i].upperTxPduId == upperTxPduId)
+        {
+            if (firstMatch == 0xFFu)
+            {
+                firstMatch = i;
+            }
+
+            if (CanTp_Channel[i].state == CANTP_IDLE)
+            {
+                return i;
+            }
+        }
+    }
+
+    return firstMatch;
 }
 
 static uint8 CanTp_FindChannelByCanIfTx(PduIdType txPduId)
@@ -522,6 +633,8 @@ static void CanTp_ResetChannel(uint8 ch)
         CanTp_Channel[ch].direction = CANTP_DIR_NONE;
         CanTp_Channel[ch].timerType = CANTP_TIMER_NONE;
         CanTp_Channel[ch].pendingTxFrame = CANTP_TXFRAME_NONE;
+        CanTp_TxAddressOverrideValid[ch] = FALSE;
+        CanTp_TxAddressOverride[ch] = 0u;
     }
 }
 
@@ -567,7 +680,7 @@ static Std_ReturnType CanTp_SendFc(uint8 ch, uint8 fs)
     }
 
     CanTp_ClearFrame(frame, frameLen, cfg->padding);
-    CanTp_SetTxAddress(cfg, frame);
+    CanTp_SetTxAddress(ch, cfg, frame);
 
     frame[pci + 0u] = (uint8)(CANTP_NPCI_FC | fs);
     frame[pci + 1u] = cfg->blockSize;
@@ -614,7 +727,7 @@ static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
     frameLen = CanTp_GetTxFrameLenForBytes(cfg, bytesNeeded);
 
     CanTp_ClearFrame(frame, frameLen, cfg->padding);
-    CanTp_SetTxAddress(cfg, frame);
+    CanTp_SetTxAddress(ch, cfg, frame);
 
     if ((len > CanTp_GetSfMaxPayload(cfg)) || (frameLen < bytesNeeded))
     {
@@ -643,13 +756,6 @@ static Std_ReturnType CanTp_SendSingleFrame(uint8 ch)
     {
         CanTp_ResetChannel(ch);
         return E_NOT_OK;
-    }
-
-    if ((CanTp_Channel[ch].state == CANTP_TX_WAIT_CONFIRM) &&
-        (CanTp_Channel[ch].pendingTxFrame == CANTP_TXFRAME_SF))
-    {
-        PduR_CanTpTxConfirmation(cfg->upperTxPduId, E_OK);
-        CanTp_ResetChannel(ch);
     }
 
     return E_OK;
@@ -693,7 +799,7 @@ static Std_ReturnType CanTp_SendFirstFrame(uint8 ch)
     }
 
     CanTp_ClearFrame(frame, cfg->canDl, cfg->padding);
-    CanTp_SetTxAddress(cfg, frame);
+    CanTp_SetTxAddress(ch, cfg, frame);
 
     if (useExtendedLength == FALSE)
     {
@@ -773,7 +879,7 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
     }
 
     CanTp_ClearFrame(frame, frameLen, cfg->padding);
-    CanTp_SetTxAddress(cfg, frame);
+    CanTp_SetTxAddress(ch, cfg, frame);
 
     frame[pci] = (uint8)(CANTP_NPCI_CF | (oldSn & 0x0Fu));
 
@@ -811,9 +917,8 @@ static Std_ReturnType CanTp_SendConsecutiveFrame(uint8 ch)
     return E_OK;
 }
 
-Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLengthType len)
+static Std_ReturnType CanTp_TransmitOnChannel(uint8 ch, const uint8* data, PduLengthType len)
 {
-    uint8 ch;
     uint8 sfMax;
     uint8* txBuffer;
     Std_ReturnType ret;
@@ -825,8 +930,6 @@ Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLeng
     {
         return E_NOT_OK;
     }
-
-    ch = CanTp_FindTxChannelByUpper(CanTpTxSduId);
 
     if ((ch >= CanTp_ConfigPtr->numChannels) || (CanTp_Channel[ch].state != CANTP_IDLE))
     {
@@ -875,6 +978,141 @@ Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLeng
     }
 
     return ret;
+}
+
+Std_ReturnType CanTp_Transmit(PduIdType CanTpTxSduId, const uint8* data, PduLengthType len)
+{
+    return CanTp_TransmitOnChannel(CanTp_FindTxChannelByUpper(CanTpTxSduId), data, len);
+}
+
+static Std_ReturnType CanTp_TransmitExtendedAddressInternal(PduIdType CanTpTxSduId,
+                                                            uint8 targetAddress,
+                                                            const uint8* data,
+                                                            PduLengthType len,
+                                                            uint8 assumeFlowControl)
+{
+    uint8 ch;
+    Std_ReturnType ret;
+
+    CanTp_DebugExtendedTxRequests++;
+    CanTp_DebugExtendedLastUpperTxPdu = (uint16)CanTpTxSduId;
+    CanTp_DebugExtendedLastTarget = targetAddress;
+    CanTp_DebugExtendedLastLen = (uint16)len;
+    CanTp_DebugExtendedLastChannel = 0xFFu;
+    CanTp_DebugExtendedLastState = 0xFFu;
+    CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BAD_CONFIG;
+
+    if ((CanTp_IsConfigValid() == FALSE) || (data == NULL_PTR) || (len == 0u))
+    {
+        CanTp_DebugExtendedTxFail++;
+        return E_NOT_OK;
+    }
+
+    ch = CanTp_FindIdleTxChannelByUpper(CanTpTxSduId);
+    CanTp_DebugExtendedLastChannel = ch;
+
+    if (ch >= CanTp_ConfigPtr->numChannels)
+    {
+        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_NO_CHANNEL;
+        CanTp_DebugExtendedTxFail++;
+        return E_NOT_OK;
+    }
+
+    CanTp_DebugExtendedLastState = (uint8)CanTp_Channel[ch].state;
+
+    if (CanTp_UsesAddressByte(&CanTp_ConfigPtr->channels[ch]) == FALSE)
+    {
+        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_NOT_EXTENDED;
+        CanTp_DebugExtendedTxFail++;
+        return E_NOT_OK;
+    }
+
+    if (CanTp_Channel[ch].state != CANTP_IDLE)
+    {
+        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BUSY;
+        CanTp_DebugExtendedTxFail++;
+        return E_NOT_OK;
+    }
+
+    CanTp_TxAddressOverride[ch] = targetAddress;
+    CanTp_TxAddressOverrideValid[ch] = TRUE;
+    CanTp_Channel[ch].txAssumeFlowControl = assumeFlowControl;
+    ret = CanTp_TransmitOnChannel(ch, data, len);
+
+    if (ret == E_OK)
+    {
+        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_OK;
+        CanTp_DebugExtendedTxOk++;
+    }
+    else
+    {
+        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_TRANSMIT_FAIL;
+        CanTp_DebugExtendedTxFail++;
+        CanTp_TxAddressOverrideValid[ch] = FALSE;
+        CanTp_TxAddressOverride[ch] = 0u;
+        CanTp_Channel[ch].txAssumeFlowControl = FALSE;
+    }
+
+    return ret;
+}
+
+Std_ReturnType CanTp_TransmitExtendedAddress(PduIdType CanTpTxSduId,
+                                             uint8 targetAddress,
+                                             const uint8* data,
+                                             PduLengthType len)
+{
+    return CanTp_TransmitExtendedAddressInternal(CanTpTxSduId, targetAddress, data, len, FALSE);
+}
+
+Std_ReturnType CanTp_TransmitExtendedAddressAssumeFlowControl(PduIdType CanTpTxSduId,
+                                                              uint8 targetAddress,
+                                                              const uint8* data,
+                                                              PduLengthType len)
+{
+    return CanTp_TransmitExtendedAddressInternal(CanTpTxSduId, targetAddress, data, len, TRUE);
+}
+
+uint8 CanTp_IsExtendedAddressTxActive(uint8 targetAddress)
+{
+    uint8 i;
+
+    if (CanTp_IsConfigValid() == FALSE)
+    {
+        return FALSE;
+    }
+
+    for (i = 0u; i < CanTp_ConfigPtr->numChannels; i++)
+    {
+        if ((CanTp_Channel[i].state != CANTP_IDLE) &&
+            (CanTp_UsesAddressByte(&CanTp_ConfigPtr->channels[i]) != FALSE) &&
+            (CanTp_TxAddressOverrideValid[i] != FALSE) &&
+            (CanTp_TxAddressOverride[i] == targetAddress))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+uint8 CanTp_IsTxSduIdle(PduIdType CanTpTxSduId)
+{
+    uint8 ch;
+
+    if (CanTp_IsConfigValid() == FALSE)
+    {
+        return FALSE;
+    }
+
+    ch = CanTp_FindIdleTxChannelByUpper(CanTpTxSduId);
+    if ((ch < CanTp_ConfigPtr->numChannels) &&
+        (CanTp_ConfigPtr->channels[ch].upperTxPduId == CanTpTxSduId) &&
+        (CanTp_Channel[ch].state == CANTP_IDLE))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 static void CanTp_HandleSingleFrame(uint8 ch, const uint8* data, PduLengthType len)
@@ -1274,9 +1512,22 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
     }
     else if (confirmedFrame == CANTP_TXFRAME_FF)
     {
-        CanTp_Channel[ch].state = CANTP_TX_WAIT_FC;
-        CanTp_Channel[ch].direction = CANTP_DIR_TX;
-        CanTp_StartTimer(ch, CANTP_TIMER_N_BS);
+        if (CanTp_Channel[ch].txAssumeFlowControl != FALSE)
+        {
+            CanTp_Channel[ch].txBlockSize = 0u;
+            CanTp_Channel[ch].txStMinTicks = 0u;
+            CanTp_Channel[ch].txBlockCounter = 0u;
+            CanTp_Channel[ch].txStTimer = 0u;
+            CanTp_Channel[ch].state = CANTP_TX_CF;
+            CanTp_Channel[ch].direction = CANTP_DIR_TX;
+            CanTp_StartTimer(ch, CANTP_TIMER_N_CS);
+        }
+        else
+        {
+            CanTp_Channel[ch].state = CANTP_TX_WAIT_FC;
+            CanTp_Channel[ch].direction = CANTP_DIR_TX;
+            CanTp_StartTimer(ch, CANTP_TIMER_N_BS);
+        }
     }
     else if (confirmedFrame == CANTP_TXFRAME_CF)
     {
@@ -1303,6 +1554,7 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
 void CanTp_MainFunction(void)
 {
     uint8 ch;
+    uint8 cfBurstCount;
     const CanTp_ChannelConfigType* cfg;
 
     if (CanTp_IsConfigValid() == FALSE)
@@ -1345,7 +1597,20 @@ void CanTp_MainFunction(void)
 
         if (CanTp_Channel[ch].state == CANTP_TX_CF)
         {
-            (void)CanTp_SendConsecutiveFrame(ch);
+            cfBurstCount = 0u;
+
+            while ((CanTp_Channel[ch].state == CANTP_TX_CF) &&
+                   (CanTp_Channel[ch].txBusy == FALSE) &&
+                   (CanTp_Channel[ch].txStTimer == 0u) &&
+                   (cfBurstCount < CANTP_TX_CF_BURST_BUDGET))
+            {
+                if (CanTp_SendConsecutiveFrame(ch) != E_OK)
+                {
+                    break;
+                }
+
+                cfBurstCount++;
+            }
         }
     }
 }

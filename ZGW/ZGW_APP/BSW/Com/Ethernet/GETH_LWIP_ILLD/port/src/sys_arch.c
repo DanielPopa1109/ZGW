@@ -114,6 +114,22 @@ static SemaphoreHandle_t_core2  sys_arch_protect_mutex;
 static sys_prot_t sys_arch_protect_nesting;
 #endif
 
+#if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
+/* Debug only: forensic snapshot for the "sys_arch_unprotect failed to give the
+ * mutex" assert (sys_arch.c). A FreeRTOS recursive-mutex give fails for exactly
+ * one reason: the calling task is not the current holder. In correct, balanced
+ * lwIP code that is impossible, so a failure here means the mutex control block
+ * or a TCB was corrupted (e.g. a stray write / cache-alias overrun), or the
+ * mutex was given from an illegal context. These globals capture who was
+ * running vs. who the kernel thinks holds the mutex, so the next occurrence is
+ * self-diagnosing on a post-mortem dump. The assert below is intentionally
+ * kept armed - this only records, it does not mask the fault. */
+volatile uint32 sys_arch_unprotect_give_fail_count = 0u;
+volatile void  *sys_arch_unprotect_fail_holder     = NULL;
+volatile void  *sys_arch_unprotect_fail_current    = NULL;
+volatile char   sys_arch_unprotect_fail_taskname[16] = { 0 };
+#endif
+
 /* Initialize this module (see description in sys.h) */
 void
 sys_init(void)
@@ -187,6 +203,32 @@ sys_arch_unprotect(sys_prot_t pval)
     LWIP_ASSERT("sys_arch_protect_mutex != NULL", sys_arch_protect_mutex != NULL);
 
     ret = xSemaphoreGiveRecursive_core2(sys_arch_protect_mutex);
+    if (ret != pdTRUE_core2)
+    {
+        /* Capture the offending context before asserting. The holder is the task
+         * the kernel believes owns the mutex; current is the task that actually
+         * tried to release it. If they differ (or holder is NULL/garbage), that
+         * is the corruption fingerprint to chase with a watchpoint. */
+        const char *name;
+        uint8 i;
+
+        sys_arch_unprotect_fail_holder  = (void *)xSemaphoreGetMutexHolder_core2(sys_arch_protect_mutex);
+        sys_arch_unprotect_fail_current = (void *)xTaskGetCurrentTaskHandle_core2();
+        name = pcTaskGetName_core2(NULL);
+        if (name != NULL)
+        {
+            for (i = 0u; i < (sizeof(sys_arch_unprotect_fail_taskname) - 1u); i++)
+            {
+                sys_arch_unprotect_fail_taskname[i] = name[i];
+                if (name[i] == '\0')
+                {
+                    break;
+                }
+            }
+        }
+        sys_arch_unprotect_fail_taskname[sizeof(sys_arch_unprotect_fail_taskname) - 1u] = '\0';
+        sys_arch_unprotect_give_fail_count++;
+    }
     LWIP_ASSERT("sys_arch_unprotect failed to give the mutex", ret == pdTRUE_core2);
 #else /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
     taskEXIT_CRITICAL();

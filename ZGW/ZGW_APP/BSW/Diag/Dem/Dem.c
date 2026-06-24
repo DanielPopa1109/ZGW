@@ -2,9 +2,9 @@
 #include "Dem_Int.h"
 #include "Dem_NvM.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "SysMgr.h"
 #include "IfxCpu.h"
 #include <string.h>
-#include <stddef.h>
 
 #define DEM_CRITICAL_SPIN_TIMEOUT 100000u
 #define DEM_CRITICAL_CORE_COUNT   6u
@@ -90,48 +90,6 @@ void Dem_ExitCritical(void)
     }
 
     IfxCpu_restoreInterrupts(Dem_CriticalIrqState[coreIndex]);
-}
-
-static uint32 Dem_Crc32(const uint8 *data, uint32 length)
-{
-    uint32 crc = DEM_CRC32_INITIAL_VALUE;
-    uint32 i;
-    uint8 bit;
-
-    for (i = 0u; i < length; i++)
-    {
-        crc ^= (uint32)data[i];
-
-        for (bit = 0u; bit < 8u; bit++)
-        {
-            if ((crc & 1u) != 0u)
-            {
-                crc = (crc >> 1u) ^ 0xEDB88320u;
-            }
-            else
-            {
-                crc >>= 1u;
-            }
-        }
-    }
-
-    return ~crc;
-}
-
-static uint32 Dem_GetImageCrc(const Dem_NvImageType *image)
-{
-    return Dem_Crc32(
-        (const uint8 *)image,
-        (uint32)offsetof(Dem_NvImageType, crc32)
-    );
-}
-
-static boolean Dem_TestFailedChanged(
-    Dem_UdsStatusByteType oldStatus,
-    Dem_UdsStatusByteType newStatus
-)
-{
-    return (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) != 0u) ? TRUE : FALSE;
 }
 
 static boolean Dem_IsValidDtcFormatAndOrigin(
@@ -289,13 +247,6 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
                     (eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST));
         }
 
-        if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST) &&
-                (eventId <= DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_LAST))
-        {
-            return (uint16)(DEM_STATIC_EVENT_COUNT +
-                    DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT +
-                    (eventId - DEM_EVENT_ID_GATEWAY_RX_SIGNAL_INVALID_FIRST));
-        }
     }
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
@@ -338,14 +289,6 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
             return (uint16)(DEM_STATIC_EVENT_COUNT + (udsDtc - baseDtc));
         }
 
-        baseDtc = DEM_DTC_GATEWAY_RX_SIGNAL_INVALID & 0x00FFFFFFu;
-        if ((udsDtc >= baseDtc) &&
-                (udsDtc < (baseDtc + (uint32)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT)))
-        {
-            return (uint16)(DEM_STATIC_EVENT_COUNT +
-                    DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT +
-                    (udsDtc - baseDtc));
-        }
     }
 
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
@@ -396,7 +339,6 @@ static uint16 Dem_FindPrimaryEntryByDTC(Dem_DTCType dtc)
 
 static Std_ReturnType Dem_CaptureLiveDataByDTC(
     Dem_DTCType dtc,
-    boolean extendedData,
     uint8 *buffer,
     uint16 *length
 )
@@ -422,9 +364,7 @@ static Std_ReturnType Dem_CaptureLiveDataByDTC(
         return E_NOT_OK;
     }
 
-    capture = (extendedData != FALSE) ?
-            eventConfig.ExtendedDataCapture :
-            eventConfig.FreezeFrameCapture;
+    capture = eventConfig.SnapshotDataCapture;
 
     if (capture == NULL_PTR)
     {
@@ -571,10 +511,6 @@ static void Dem_SetStatusByte(uint16 eventIndex, Dem_UdsStatusByteType newStatus
             eventConfig.EventId,
             newStatus
         );
-        if (Dem_TestFailedChanged(oldStatus, newStatus) != FALSE)
-        {
-            Dem_Dirty = TRUE;
-        }
         DEM_EXIT_CRITICAL();
 
         Dem_InvokeStatusChanged(eventIndex, oldStatus, newStatus);
@@ -643,14 +579,40 @@ static void Dem_BuildNvImage(void)
     {
         Dem_NvImage.primaryEntries[i] = Dem_PrimaryMemory[i];
     }
+}
 
-    Dem_NvImage.crc32 = Dem_GetImageCrc(&Dem_NvImage);
+static Std_ReturnType Dem_StartNvMWriteIfIdle(void)
+{
+#if (DEM_NVM_ENABLED == 1u)
+    if ((Dem_ConfigPtr == NULL_PTR) ||
+            (Dem_NvMState != DEM_NVM_STATE_IDLE))
+    {
+        return E_NOT_OK;
+    }
+
+    if (Dem_NvM_IsIdle() == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
+    Dem_BuildNvImage();
+
+    if (Dem_NvM_StartWrite(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    Dem_Dirty = FALSE;
+    Dem_NvMState = DEM_NVM_STATE_WRITE_PENDING;
+    return E_OK;
+#else
+    Dem_Dirty = FALSE;
+    return E_OK;
+#endif
 }
 
 static boolean Dem_IsNvImageValid(const Dem_NvImageType *image)
 {
-    uint32 crc;
-
     if (image == NULL_PTR)
     {
         return FALSE;
@@ -672,13 +634,6 @@ static boolean Dem_IsNvImageValid(const Dem_NvImageType *image)
     }
 
     if (image->primaryEntryCount > DEM_PRIMARY_MEMORY_SIZE)
-    {
-        return FALSE;
-    }
-
-    crc = Dem_GetImageCrc(image);
-
-    if (crc != image->crc32)
     {
         return FALSE;
     }
@@ -753,41 +708,22 @@ static void Dem_CaptureSnapshot(uint16 eventIndex, uint16 entryIndex)
         return;
     }
 
-    len = DEM_FREEZE_FRAME_SIZE;
-    Dem_PrimaryMemory[entryIndex].freezeFrameLength = 0u;
+    len = DEM_SNAPSHOT_DATA_SIZE;
+    Dem_PrimaryMemory[entryIndex].snapshotDataLength = 0u;
 
-    if (eventConfig.FreezeFrameCapture != NULL_PTR)
+    if (eventConfig.SnapshotDataCapture != NULL_PTR)
     {
-        if (eventConfig.FreezeFrameCapture(
+        if (eventConfig.SnapshotDataCapture(
                 eventConfig.EventId,
-                Dem_PrimaryMemory[entryIndex].freezeFrame,
+                Dem_PrimaryMemory[entryIndex].snapshotData,
                 &len) == E_OK)
         {
-            if (len > DEM_FREEZE_FRAME_SIZE)
+            if (len > DEM_SNAPSHOT_DATA_SIZE)
             {
-                len = DEM_FREEZE_FRAME_SIZE;
+                len = DEM_SNAPSHOT_DATA_SIZE;
             }
 
-            Dem_PrimaryMemory[entryIndex].freezeFrameLength = len;
-        }
-    }
-
-    len = DEM_EXTENDED_DATA_SIZE;
-    Dem_PrimaryMemory[entryIndex].extendedDataLength = 0u;
-
-    if (eventConfig.ExtendedDataCapture != NULL_PTR)
-    {
-        if (eventConfig.ExtendedDataCapture(
-                eventConfig.EventId,
-                Dem_PrimaryMemory[entryIndex].extendedData,
-                &len) == E_OK)
-        {
-            if (len > DEM_EXTENDED_DATA_SIZE)
-            {
-                len = DEM_EXTENDED_DATA_SIZE;
-            }
-
-            Dem_PrimaryMemory[entryIndex].extendedDataLength = len;
+            Dem_PrimaryMemory[entryIndex].snapshotDataLength = len;
         }
     }
 }
@@ -918,6 +854,7 @@ static void Dem_ProcessFailed(uint16 eventIndex)
     {
         Dem_StoreOrUpdatePrimaryEntry(eventIndex);
         Dem_Dirty = TRUE;
+        (void)Dem_StartNvMWriteIfIdle();
     }
 }
 
@@ -940,6 +877,7 @@ static void Dem_ProcessPassed(uint16 eventIndex)
     if (testPassedTransition != FALSE)
     {
         Dem_Dirty = TRUE;
+        (void)Dem_StartNvMWriteIfIdle();
     }
 }
 
@@ -1028,14 +966,6 @@ static boolean Dem_IsGeneratedUniqueDtc(Dem_DTCType dtc)
         return TRUE;
     }
 
-    if (Dem_DtcInGeneratedRange(
-            dtc,
-            DEM_DTC_GATEWAY_RX_SIGNAL_INVALID,
-            (uint16)DEM_GATEWAY_RX_SIGNAL_EVENT_COUNT) != FALSE)
-    {
-        return TRUE;
-    }
-
     return FALSE;
 }
 
@@ -1044,7 +974,7 @@ static boolean Dem_DtcAlreadySeen(uint16 currentIndex, Dem_DTCType dtc)
     uint16 i;
     Dem_EventConfigType eventConfig;
 
-    /* Gateway message/signal DTCs are generated from monotonically increasing bases. */
+    /* Gateway message DTCs are generated from a monotonically increasing base. */
     if (Dem_IsGeneratedUniqueDtc(dtc) != FALSE)
     {
         return FALSE;
@@ -1162,6 +1092,7 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
 
     GatewaySwc_OnDemEventCleared(eventConfig.EventId);
     CodingApp_OnDemEventCleared(eventConfig.EventId);
+    SysMgr_OnDemEventCleared(eventConfig.EventId);
     Dem_DebugUpdateEvent(eventIndex);
 }
 
@@ -1234,22 +1165,19 @@ Std_ReturnType Dem_Shutdown(void)
     }
 
 #if (DEM_NVM_ENABLED == 1u)
-    if (Dem_Dirty != FALSE)
+    Dem_BuildNvImage();
+
+    if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
     {
-        Dem_BuildNvImage();
-
-        if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
+        Dem_Dirty = FALSE;
+        if (Dem_ClearStatus == DEM_CLEAR_PENDING)
         {
-            Dem_Dirty = FALSE;
-            if (Dem_ClearStatus == DEM_CLEAR_PENDING)
-            {
-                Dem_ClearStatus = DEM_CLEAR_OK;
-            }
-            return E_OK;
+            Dem_ClearStatus = DEM_CLEAR_OK;
         }
-
-        return E_NOT_OK;
+        return E_OK;
     }
+
+    return E_NOT_OK;
 #endif
 
     return E_OK;
@@ -1345,16 +1273,7 @@ void Dem_MainFunction(void)
 
     if ((Dem_NvMState == DEM_NVM_STATE_IDLE) && (Dem_Dirty != FALSE))
     {
-        Dem_BuildNvImage();
-
-        if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
-        {
-            Dem_Dirty = FALSE;
-            if (Dem_ClearStatus == DEM_CLEAR_PENDING)
-            {
-                Dem_ClearStatus = DEM_CLEAR_OK;
-            }
-        }
+        (void)Dem_StartNvMWriteIfIdle();
     }
 #else
     if (Dem_ClearStatus == DEM_CLEAR_PENDING)
@@ -1674,6 +1593,8 @@ Std_ReturnType Dem_SetOperationCycleState(
 
     if (CycleState == DEM_CYCLE_STATE_END)
     {
+        boolean persistentChanged = FALSE;
+
         Dem_OperationCycleActive = FALSE;
 
         for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
@@ -1701,16 +1622,24 @@ Std_ReturnType Dem_SetOperationCycleState(
                 if (Dem_RuntimeEvents[i].agingCounter < 255u)
                 {
                     Dem_RuntimeEvents[i].agingCounter++;
+                    persistentChanged = TRUE;
                 }
 
                 if (Dem_RuntimeEvents[i].agingCounter >= eventConfig.AgingThreshold)
                 {
                     status &= (uint8)~DEM_UDS_STATUS_CDTC;
                     Dem_RemovePrimaryEntryByEvent(eventConfig.EventId);
+                    persistentChanged = TRUE;
                 }
             }
 
             Dem_SetStatusByte(i, status);
+        }
+
+        if (persistentChanged != FALSE)
+        {
+            Dem_Dirty = TRUE;
+            (void)Dem_StartNvMWriteIfIdle();
         }
 
         return E_OK;
@@ -1806,6 +1735,10 @@ Std_ReturnType Dem_ClearDTC(
 
 #if (DEM_NVM_ENABLED == 1u)
     Dem_ClearStatus = DEM_CLEAR_PENDING;
+    if (Dem_StartNvMWriteIfIdle() != E_OK)
+    {
+        Dem_Dirty = TRUE;
+    }
 #else
     Dem_ClearStatus = DEM_CLEAR_OK;
 #endif
@@ -1922,7 +1855,7 @@ Std_ReturnType Dem_GetNextFilteredDTC(
     return E_NOT_OK;
 }
 
-Std_ReturnType Dem_GetFreezeFrameDataByDTC(
+Std_ReturnType Dem_GetSnapshotDataByDTC(
     Dem_DTCType DTC,
     Dem_DTCFormatType DTCFormat,
     Dem_DTCOriginType DTCOrigin,
@@ -1955,66 +1888,17 @@ Std_ReturnType Dem_GetFreezeFrameDataByDTC(
 
     if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
     {
-        return Dem_CaptureLiveDataByDTC(DTC, FALSE, DestBuffer, BufSize);
+        return Dem_CaptureLiveDataByDTC(DTC, DestBuffer, BufSize);
     }
 
-    copyLen = Dem_PrimaryMemory[entryIndex].freezeFrameLength;
+    copyLen = Dem_PrimaryMemory[entryIndex].snapshotDataLength;
 
     if (*BufSize < copyLen)
     {
         return E_NOT_OK;
     }
 
-    memcpy(DestBuffer, Dem_PrimaryMemory[entryIndex].freezeFrame, copyLen);
-    *BufSize = copyLen;
-
-    return E_OK;
-}
-
-Std_ReturnType Dem_GetExtendedDataRecordByDTC(
-    Dem_DTCType DTC,
-    Dem_DTCFormatType DTCFormat,
-    Dem_DTCOriginType DTCOrigin,
-    uint8 RecordNumber,
-    uint8 *DestBuffer,
-    uint16 *BufSize
-)
-{
-    uint16 entryIndex;
-    uint16 copyLen;
-
-    if ((Dem_InitState != DEM_INITIALIZED) ||
-        (DestBuffer == NULL_PTR) ||
-        (BufSize == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    if (Dem_IsValidDtcFormatAndOrigin(DTCFormat, DTCOrigin) == FALSE)
-    {
-        return E_NOT_OK;
-    }
-
-    if ((RecordNumber != 0x01u) && (RecordNumber != 0xFFu))
-    {
-        return E_NOT_OK;
-    }
-
-    entryIndex = Dem_FindPrimaryEntryByDTC(DTC);
-
-    if (entryIndex >= DEM_PRIMARY_MEMORY_SIZE)
-    {
-        return Dem_CaptureLiveDataByDTC(DTC, TRUE, DestBuffer, BufSize);
-    }
-
-    copyLen = Dem_PrimaryMemory[entryIndex].extendedDataLength;
-
-    if (*BufSize < copyLen)
-    {
-        return E_NOT_OK;
-    }
-
-    memcpy(DestBuffer, Dem_PrimaryMemory[entryIndex].extendedData, copyLen);
+    memcpy(DestBuffer, Dem_PrimaryMemory[entryIndex].snapshotData, copyLen);
     *BufSize = copyLen;
 
     return E_OK;

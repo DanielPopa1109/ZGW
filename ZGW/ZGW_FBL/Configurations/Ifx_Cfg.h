@@ -30,14 +30,19 @@
 #define IFX_CFG_H 1
 
 /*********************************************************************************************************************/
-/*------------------------------------Explicit cached/non-cached placement-------------------------------------------*/
+/*------------------------------------------Explicit DLMU placement--------------------------------------------------*/
 /*********************************************************************************************************************/
-/* Use these only for coherency-sensitive data. Normal code stays in cached PFLASH and normal private data stays in
- * core-local DSPR unless a DMA/peripheral/inter-core owner requires non-cached access. */
-#define AURIX_LMU_NC_BSS                __attribute__((section(".bss.lmu_nc")))
-#define AURIX_LMU_NC_DATA               __attribute__((section(".data.lmu_nc")))
-#define AURIX_ETH_DMA_NC                __attribute__((section(".bss.eth_dma_nc")))
-#define AURIX_SHARED_NC                 __attribute__((section(".bss.shared_nc")))
+/* The legacy *_NC macro names are kept so generated/vendor code does not need to change, but they now select cached
+ * DLMU sections. */
+#define AURIX_LMU_CACHED_BSS            __attribute__((section(".bss.lmu_cached")))
+#define AURIX_LMU_CACHED_DATA           __attribute__((section(".data.lmu_cached")))
+#define AURIX_ETH_DMA_CACHED            __attribute__((section(".bss.eth_dma_cached")))
+#define AURIX_SHARED_CACHED             __attribute__((section(".bss.shared_cached")))
+
+#define AURIX_LMU_NC_BSS                AURIX_LMU_CACHED_BSS
+#define AURIX_LMU_NC_DATA               AURIX_LMU_CACHED_DATA
+#define AURIX_ETH_DMA_NC                AURIX_ETH_DMA_CACHED
+#define AURIX_SHARED_NC                 AURIX_SHARED_CACHED
 
 #if defined(__TASKING__) && !defined(Ifx__dsync)
 #define Ifx__dsync()                    __dsync()

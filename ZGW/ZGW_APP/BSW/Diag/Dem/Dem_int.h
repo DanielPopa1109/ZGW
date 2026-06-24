@@ -28,11 +28,8 @@ typedef struct
     uint32 lastFailedCycle;
     uint32 lastChangedCounter;
 
-    uint16 freezeFrameLength;
-    uint8 freezeFrame[DEM_FREEZE_FRAME_SIZE];
-
-    uint16 extendedDataLength;
-    uint8 extendedData[DEM_EXTENDED_DATA_SIZE];
+    uint16 snapshotDataLength;
+    uint8 snapshotData[DEM_SNAPSHOT_DATA_SIZE];
 } Dem_PrimaryEntryType;
 
 typedef struct
@@ -56,7 +53,7 @@ typedef struct
     Dem_NvEventRecordType eventRecords[DEM_MAX_EVENTS];
     Dem_PrimaryEntryType primaryEntries[DEM_PRIMARY_MEMORY_SIZE];
 
-    uint32 crc32;
+    uint32 trailerReserved;
 } Dem_NvImageType;
 
 extern Dem_NvImageType Dem_NvImage;

@@ -2,6 +2,7 @@
 #define DOIP_H_
 
 #include "Ifx_Types.h"
+#include "Std_Types.h"
 #include "SoAd.h"
 
 #define DOIP_TCP_PORT                         13400u
@@ -15,10 +16,10 @@
 #define DOIP_MAX_GID_LEN                      6u
 #define DOIP_MAX_UDS_PAYLOAD_LEN              4095u
 #define DOIP_HEADER_LEN                       8u
-#define DOIP_TCP_RX_STREAM_LEN                8192u
+#define DOIP_TCP_RX_STREAM_LEN                12288u
 
 #define DOIP_ALIVE_TIMEOUT_MS                 5000u
-#define DOIP_INACTIVITY_TIMEOUT_MS            300000u
+#define DOIP_INACTIVITY_TIMEOUT_MS            60000u
 #define DOIP_LAB_DISABLE_TCP_INACTIVITY_ABORT STD_ON
 #define DOIP_LAB_DISABLE_SERVER_ALIVE_REQ     STD_ON
 #define DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS     1000u
@@ -87,10 +88,10 @@ typedef struct
     SoAd_SoConIdType tcpSoConId;
 } DoIP_ConfigType;
 
-typedef void (*DoIP_DcmRxIndicationFct)(uint16 sourceAddress,
-                                        uint16 targetAddress,
-                                        const uint8 *uds,
-                                        uint16 udsLen);
+typedef Std_ReturnType (*DoIP_DcmRxIndicationFct)(uint16 sourceAddress,
+                                                  uint16 targetAddress,
+                                                  const uint8 *uds,
+                                                  uint16 udsLen);
 
 typedef void (*DoIP_SessionResetFct)(void);
 

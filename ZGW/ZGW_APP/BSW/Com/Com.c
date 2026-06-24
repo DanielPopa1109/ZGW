@@ -2,6 +2,7 @@
 #include "PduR.h"
 #include "ComM/ComM.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "SysMgr.h"
 #include <string.h>
 
 #define COM_TRUE  1u
@@ -1553,6 +1554,18 @@ volatile uint16 Com_DebugFindSignalIndex = 0u;
 volatile uint16 Com_DebugFindSignalCount = (uint16)COM_SIGNAL_COUNT;
 volatile uint16 Com_DebugFindSignalEntryId = 0u;
 volatile uint8 Com_DebugFindSignalHit = 0u;
+volatile uint32 Com_DebugFindSignalTableBase = 0u;
+volatile uint32 Com_DebugFindSignalTableEnd = 0u;
+volatile uint32 Com_DebugFindSignalEntryAddress = 0u;
+volatile uint32 Com_DebugFindSignalMatchAddress = 0u;
+volatile uint16 Com_DebugFindSignalEntryPduId = 0u;
+volatile uint8 Com_DebugFindSignalEntryIsTx = 0u;
+volatile uint16 Com_DebugSendSignalLastId = 0u;
+volatile uint16 Com_DebugSendSignalLastPduId = 0u;
+volatile uint8 Com_DebugSendSignalLastTxIdx = 0xFFu;
+volatile uint8 Com_DebugSendSignalLastRet = E_NOT_OK;
+volatile uint32 Com_DebugSendSignalLastValue = 0u;
+volatile uint32 Com_DebugSendSignalLastSigAddress = 0u;
 volatile uint16 Com_DebugReceiveSignalLastId = 0u;
 volatile uint16 Com_DebugReceiveSignalLastPduId = 0u;
 volatile uint8 Com_DebugReceiveSignalLastRxIdx = 0xFFu;
@@ -1604,20 +1617,32 @@ static uint8 Com_FindRxIpdu(PduIdType pduId)
 
 static const Com_SignalConfigType* Com_FindSignal(Com_SignalIdType signalId)
 {
+    const Com_SignalConfigType* entry;
+    uint16 entrySignalId;
     uint16 i;
 
     Com_DebugFindSignalLastId = signalId;
     Com_DebugFindSignalCount = (uint16)COM_SIGNAL_COUNT;
     Com_DebugFindSignalHit = 0u;
+    Com_DebugFindSignalTableBase = (uint32)(const void *)&Com_SignalCfg[0u];
+    Com_DebugFindSignalTableEnd = (uint32)(const void *)&Com_SignalCfg[COM_SIGNAL_COUNT];
+    Com_DebugFindSignalEntryAddress = Com_DebugFindSignalTableBase;
+    Com_DebugFindSignalMatchAddress = 0u;
 
     for (i = 0u; i < (uint16)COM_SIGNAL_COUNT; i++)
     {
+        entry = &Com_SignalCfg[i];
         Com_DebugFindSignalIndex = i;
-        Com_DebugFindSignalEntryId = Com_SignalCfg[i].signalId;
-        if (Com_SignalCfg[i].signalId == signalId)
+        Com_DebugFindSignalEntryAddress = (uint32)(const void *)entry;
+        entrySignalId = entry->signalId;
+        Com_DebugFindSignalEntryId = entrySignalId;
+        Com_DebugFindSignalEntryPduId = entry->pduId;
+        Com_DebugFindSignalEntryIsTx = entry->isTx;
+        if (entrySignalId == signalId)
         {
             Com_DebugFindSignalHit = 1u;
-            return &Com_SignalCfg[i];
+            Com_DebugFindSignalMatchAddress = (uint32)(const void *)entry;
+            return entry;
         }
     }
 
@@ -2133,6 +2158,13 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     uint8 pduChanged = COM_FALSE;
     uint8 triggerOnChange = COM_FALSE;
 
+    Com_DebugSendSignalLastId = SignalId;
+    Com_DebugSendSignalLastPduId = 0u;
+    Com_DebugSendSignalLastTxIdx = 0xFFu;
+    Com_DebugSendSignalLastRet = E_NOT_OK;
+    Com_DebugSendSignalLastValue = 0u;
+    Com_DebugSendSignalLastSigAddress = 0u;
+
     if (SignalDataPtr == NULL_PTR)
     {
         return E_NOT_OK;
@@ -2145,7 +2177,11 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
         return E_NOT_OK;
     }
 
+    Com_DebugSendSignalLastSigAddress = (uint32)(const void *)sig;
+    Com_DebugSendSignalLastPduId = sig->pduId;
+
     txIdx = Com_FindTxIpdu(sig->pduId);
+    Com_DebugSendSignalLastTxIdx = txIdx;
 
     if ((txIdx == 0xFFu) || (Com_TxRt[txIdx].active == COM_FALSE))
     {
@@ -2162,6 +2198,7 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     {
         value &= (uint32)((1UL << sig->bitSize) - 1UL);
     }
+    Com_DebugSendSignalLastValue = value;
 
     previousValue = Com_ReadBits(Com_TxRt[txIdx].buffer, sig->bitPosition, sig->bitSize);
     if (previousValue != value)
@@ -2202,6 +2239,7 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
         (void)Com_TriggerTransmit(txIdx);
     }
 
+    Com_DebugSendSignalLastRet = E_OK;
     return E_OK;
 }
 

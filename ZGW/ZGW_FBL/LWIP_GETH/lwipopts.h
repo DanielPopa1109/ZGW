@@ -54,32 +54,42 @@ extern "C" {
 #define LWIP_SOCKET                         0
 #define LWIP_NETCONN                        0
 #define SYS_LIGHTWEIGHT_PROT                0
-#define SO_REUSE                            0
+#define SO_REUSE                            1
 
 #define LWIP_NETIF_HOSTNAME                 0
 #define LWIP_NETIF_STATUS_CALLBACK          0
 #define LWIP_NETIF_LINK_CALLBACK            1
 #define ETH_PAD_SIZE                        2
+#define LWIP_NETIF_TX_SINGLE_PBUF           1
 #define TCP_LISTEN_BACKLOG                  1
 #define LWIP_SO_RCVTIMEO                    1
-#define MEM_SIZE                            1600
-#define PBUF_POOL_SIZE                      16
-#define PBUF_POOL_BUFSIZE                   256
-#define MEMP_NUM_PBUF                       16
+#define MEM_SIZE                            16384
+#define PBUF_POOL_SIZE                      96
+#define PBUF_POOL_BUFSIZE                   512
+#define MEMP_NUM_PBUF                       48
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
 #define LWIP_UDP                            1
-#define MEMP_NUM_UDP_PCB                    4
+#define MEMP_NUM_UDP_PCB                    8
+
+#define IP_SOF_BROADCAST                    1
+#define IP_SOF_BROADCAST_RECV               1
+#define SO_REUSE_RXTOALL                    1
 
 #define LWIP_TCP                            1
-#define MEMP_NUM_TCP_PCB                    5
-#define MEMP_NUM_TCP_PCB_LISTEN             5
-#define MEMP_NUM_TCP_SEG                    8
+/* Keep the bootloader DoIP listener tolerant of repeated tester reconnects and
+ * segmented programming traffic, matching the APP-side Ethernet fixes. */
+#define MEMP_NUM_TCP_PCB                    8
+#define MEMP_NUM_TCP_PCB_LISTEN             3
+#define MEMP_NUM_TCP_SEG                    24
 #define TCP_MSS                             536
 #define TCP_WND                             2144
-#define TCP_SND_BUF                         1072
-#define TCP_SND_QUEUELEN                    8
+#define TCP_SND_BUF                         2144
+#define TCP_SND_QUEUELEN                    16
+/* DoIP is a controlled point-to-point programming link; avoid keeping closed
+ * tester sessions in TIME_WAIT long enough to starve the small FBL PCB pool. */
+#define TCP_MSL                             3000
 /* Reap a tester that vanished without a TCP FIN/RST so the bootloader's single
  * DoIP connection slot frees itself instead of staying wedged until a power
  * cycle. Keepalive fields are set on the accepted PCB in FblEth_AurixLwip.c. */
@@ -130,4 +140,3 @@ extern "C" {
 #endif /* __LWIPOPTS_H__ */
 
 /* CODE_BLOCK_END */
-

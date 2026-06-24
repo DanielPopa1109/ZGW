@@ -14,6 +14,7 @@
 #define TIMEBASE_SYNC_STATUS_NVM_RESTORED      (1u << 4u)
 #define TIMEBASE_SYNC_STATUS_SCR_RTC_ELAPSED   (1u << 5u)
 #define TIMEBASE_SYNC_STATUS_SCR_RTC_CALIBRATED (1u << 6u)
+#define TIMEBASE_NVM_IMAGE_SIZE                 32u
 
 typedef enum
 {

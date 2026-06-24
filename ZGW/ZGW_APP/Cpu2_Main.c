@@ -8,7 +8,6 @@
 #include "McuSm.h"
 #include "aurix_pin_mappings.h"
 #include "SysMgr.h"
-#include "GatewaySwc.h"
 #include "EthStack.h"
 #include "Cpu/Std/IfxCpu_Intrinsics.h"
 #include "UdpNm.h"
@@ -31,7 +30,6 @@ void core2_main(void)
     while(OsInit_C1 == 0u)
     {
         Core2_WaitForCore1LoopCounter++;
-        serviceCpuWatchdog();
     }
     __dsync();
     rmii0_init_pins();

@@ -17,6 +17,7 @@
 #define NVM_API_INVALIDATE              (0x0Bu)
 #define NVM_API_ERASE                   (0x09u)
 #define NVM_API_MAIN                    (0x0Eu)
+#define NVM_API_START_DEFERRED_DEFAULT  (0x80u)
 
 #define NVM_E_NOT_INITIALIZED           (0x01u)
 #define NVM_E_BLOCK_PENDING             (0x02u)
@@ -24,6 +25,7 @@
 #define NVM_E_PARAM_ADDRESS             (0x04u)
 #define NVM_E_QUEUE_FULL                (0x05u)
 #define NVM_E_LOWER_LAYER               (0x06u)
+#define NVM_MAIN_STEP_BUDGET            (16u)
 
 typedef enum
 {
@@ -35,6 +37,7 @@ typedef enum
     NVM_SERVICE_WRITE_ALL,
     NVM_SERVICE_INVALIDATE_BLOCK,
     NVM_SERVICE_ERASE_BLOCK,
+    NVM_SERVICE_DEFERRED_DEFAULT_IMAGE,
     NVM_SERVICE_INIT_WAIT
 } NvM_ServiceType;
 
@@ -53,7 +56,9 @@ typedef enum
     NVM_STATE_WRITEALL_NEXT,
     NVM_STATE_WRITEALL_WAIT,
     NVM_STATE_INVALIDATE_START,
-    NVM_STATE_INVALIDATE_WAIT
+    NVM_STATE_INVALIDATE_WAIT,
+    NVM_STATE_DEFERRED_FORMAT_START,
+    NVM_STATE_DEFERRED_FORMAT_WAIT
 } NvM_InternalStateType;
 
 typedef struct
@@ -89,6 +94,7 @@ static NvM_StateType NvM_State =
 };
 
 static NvM_BlockAdminType NvM_Admin[NVM_TOTAL_BLOCKS];
+static boolean NvM_DeferredDefaultImagePending = FALSE;
 
 volatile uint32 NvM_WriteAllRequestCounter = 0u;
 volatile uint32 NvM_WriteAllPlannedBytes = 0u;
@@ -287,6 +293,13 @@ static void NvM_SetBusy(NvM_ServiceType service, NvM_InternalStateType state)
     NvM_State.state = state;
 }
 
+static void NvM_SetBusyInternal(NvM_ServiceType service, NvM_InternalStateType state)
+{
+    NvM_State.status = NVM_BUSY_INTERNAL;
+    NvM_State.service = service;
+    NvM_State.state = state;
+}
+
 static void NvM_Report(uint8 api, uint8 error, uint32 detail)
 {
     MemStack_ReportError(MEMSTACK_MODULE_ID_NVM, api, error, detail);
@@ -345,6 +358,7 @@ void NvM_Init(const NvM_ConfigType *ConfigPtr)
     NvM_ResetWriteAllDebug();
 
     Fee_Init(NULL_PTR);
+    NvM_DeferredDefaultImagePending = Fee_IsDeferredFormatPending();
     NvM_State.status = NVM_BUSY_INTERNAL;
     NvM_State.state = NVM_STATE_INIT_WAIT;
     NvM_State.service = NVM_SERVICE_INIT_WAIT;
@@ -527,6 +541,31 @@ Std_ReturnType NvM_WriteAll(void)
     return E_OK;
 }
 
+Std_ReturnType NvM_StartDeferredDefaultImage(void)
+{
+    if (NvM_State.status == NVM_UNINIT)
+    {
+        NvM_Report(NVM_API_START_DEFERRED_DEFAULT, NVM_E_NOT_INITIALIZED, 0u);
+        return E_NOT_OK;
+    }
+
+    if ((NvM_DeferredDefaultImagePending == FALSE) ||
+            (Fee_IsDeferredFormatPending() == FALSE))
+    {
+        NvM_DeferredDefaultImagePending = FALSE;
+        return E_OK;
+    }
+
+    if (NvM_State.status != NVM_IDLE)
+    {
+        return E_NOT_OK;
+    }
+
+    NvM_DeferredDefaultImagePending = FALSE;
+    NvM_SetBusyInternal(NVM_SERVICE_DEFERRED_DEFAULT_IMAGE, NVM_STATE_DEFERRED_FORMAT_START);
+    return E_OK;
+}
+
 Std_ReturnType NvM_CancelJobs(void)
 {
     if (NvM_State.status == NVM_UNINIT)
@@ -542,6 +581,8 @@ Std_ReturnType NvM_CancelJobs(void)
 Std_ReturnType NvM_SetRamBlockStatus(NvM_BlockIdType BlockId, boolean BlockChanged)
 {
     sint16 idx;
+    uint16 blockIdx;
+    uint32 ramCrc;
 
     if (NvM_State.status == NVM_UNINIT)
     {
@@ -556,20 +597,67 @@ Std_ReturnType NvM_SetRamBlockStatus(NvM_BlockIdType BlockId, boolean BlockChang
         return E_NOT_OK;
     }
 
-    NvM_Admin[(uint16)idx].ramChanged = BlockChanged;
+    blockIdx = (uint16)idx;
+
     if (BlockChanged == TRUE)
     {
-        NvM_Admin[(uint16)idx].ramValid = TRUE;
+        NvM_Admin[blockIdx].ramValid = TRUE;
+
+        /* Do not let the CRC mirror demote an already-dirty block.  Callers
+         * such as Dem_ClearDTC can intentionally force a later WriteAll even
+         * when a subsequent normal status update sees the same RAM CRC. */
+        if ((NvM_Admin[blockIdx].ramChanged == FALSE) &&
+                (NvM_Admin[blockIdx].ramMirrorCrcValid != FALSE) &&
+                (NvM_GetRamPtr(blockIdx) != NULL_PTR))
+        {
+            ramCrc = NvM_CalculateRamMirrorCrc(blockIdx);
+            if (ramCrc == NvM_Admin[blockIdx].ramMirrorCrc)
+            {
+                BlockChanged = FALSE;
+            }
+        }
     }
     else
     {
-        NvM_UpdateRamMirrorCrc((uint16)idx);
+        NvM_UpdateRamMirrorCrc(blockIdx);
     }
 
-    if ((BlockChanged == TRUE) && (NvM_BlockDescriptor[(uint16)idx].immediateData == TRUE))
+    NvM_Admin[blockIdx].ramChanged = BlockChanged;
+
+    if ((BlockChanged == TRUE) && (NvM_BlockDescriptor[blockIdx].immediateData == TRUE))
     {
         return NvM_WriteBlock(BlockId, NULL_PTR);
     }
+    return E_OK;
+}
+
+Std_ReturnType NvM_ForceRamBlockChanged(NvM_BlockIdType BlockId)
+{
+    sint16 idx;
+    uint16 blockIdx;
+
+    if (NvM_State.status == NVM_UNINIT)
+    {
+        NvM_Report(NVM_API_SET_RAM_STATUS, NVM_E_NOT_INITIALIZED, BlockId);
+        return E_NOT_OK;
+    }
+
+    idx = NvM_FindBlockIndex(BlockId);
+    if (idx < 0)
+    {
+        NvM_Report(NVM_API_SET_RAM_STATUS, NVM_E_PARAM_BLOCK_ID, BlockId);
+        return E_NOT_OK;
+    }
+
+    blockIdx = (uint16)idx;
+    NvM_Admin[blockIdx].ramValid = TRUE;
+    NvM_Admin[blockIdx].ramChanged = TRUE;
+
+    if (NvM_BlockDescriptor[blockIdx].immediateData == TRUE)
+    {
+        return NvM_WriteBlock(BlockId, NULL_PTR);
+    }
+
     return E_OK;
 }
 
@@ -642,7 +730,7 @@ static void NvM_HandleReadCompletion(uint16 idx)
 
 long long NvM_MainFunction_Counter = 0;
 
-void NvM_MainFunction(void)
+static void NvM_MainFunctionStep(void)
 {
     uint16 idx;
 
@@ -664,6 +752,36 @@ void NvM_MainFunction(void)
                     NvM_Report(NVM_API_INIT, NVM_E_LOWER_LAYER, Fee_GetJobResult());
                     NvM_State.status = NVM_IDLE;
                     NvM_State.state = NVM_STATE_IDLE;
+                }
+            }
+            break;
+
+        case NVM_STATE_DEFERRED_FORMAT_START:
+            if (Fee_StartDeferredFormat() != E_OK)
+            {
+                NvM_Report(NVM_API_START_DEFERRED_DEFAULT, NVM_E_LOWER_LAYER, 0u);
+                NvM_SetIdle();
+            }
+            else
+            {
+                NvM_State.state = NVM_STATE_DEFERRED_FORMAT_WAIT;
+            }
+            break;
+
+        case NVM_STATE_DEFERRED_FORMAT_WAIT:
+            if (Fee_GetStatus() == MEMIF_IDLE)
+            {
+                if (Fee_GetJobResult() == MEMIF_JOB_OK)
+                {
+                    NvM_State.currentIndex = 0u;
+                    NvM_WriteAllRequestCounter++;
+                    NvM_ResetWriteAllDebug();
+                    NvM_SetBusy(NVM_SERVICE_WRITE_ALL, NVM_STATE_WRITEALL_NEXT);
+                }
+                else
+                {
+                    NvM_Report(NVM_API_START_DEFERRED_DEFAULT, NVM_E_LOWER_LAYER, Fee_GetJobResult());
+                    NvM_SetIdle();
                 }
             }
             break;
@@ -903,6 +1021,44 @@ void NvM_MainFunction(void)
             NvM_SetIdle();
             break;
     }
+
+}
+
+void NvM_MainFunction(void)
+{
+    uint8 stepBudget = NVM_MAIN_STEP_BUDGET;
+    NvM_StatusType statusBefore;
+    NvM_InternalStateType stateBefore;
+    NvM_ServiceType serviceBefore;
+    uint16 currentIndexBefore;
+    uint16 activeIndexBefore;
+
+    do
+    {
+        statusBefore = NvM_State.status;
+        stateBefore = NvM_State.state;
+        serviceBefore = NvM_State.service;
+        currentIndexBefore = NvM_State.currentIndex;
+        activeIndexBefore = NvM_State.activeIndex;
+
+        NvM_MainFunctionStep();
+
+        if ((NvM_State.state == NVM_STATE_IDLE) || (NvM_State.state == NVM_STATE_UNINIT))
+        {
+            break;
+        }
+
+        if ((statusBefore == NvM_State.status) &&
+                (stateBefore == NvM_State.state) &&
+                (serviceBefore == NvM_State.service) &&
+                (currentIndexBefore == NvM_State.currentIndex) &&
+                (activeIndexBefore == NvM_State.activeIndex))
+        {
+            break;
+        }
+
+        stepBudget--;
+    } while (stepBudget > 0u);
 
     NvM_MainFunction_Counter++;
 }
