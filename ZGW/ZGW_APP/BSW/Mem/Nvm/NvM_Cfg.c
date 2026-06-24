@@ -50,3 +50,38 @@ const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS] =
         FALSE
     }
 };
+
+/*
+ * Compile-time consistency guards.
+ *
+ * Every layer that records a block's size must agree, so each block occupies
+ * exactly the size of the data it stores and a layout change made in one image
+ * is reflected everywhere - the NvM length, the Fee block size, and the RAM
+ * mirror / ROM default can never silently diverge (no mismatch).
+ */
+#define NVM_ASSERT_CONCAT_(a, b) a##b
+#define NVM_ASSERT_CONCAT(a, b)  NVM_ASSERT_CONCAT_(a, b)
+#define NVM_STATIC_ASSERT(cond) \
+    typedef char NVM_ASSERT_CONCAT(NvM_StaticAssert_, __LINE__)[(cond) ? 1 : -1]
+
+/* NvM block length == exact size of the data image it stores. */
+NVM_STATIC_ASSERT(NVM_BLOCK_DEM_PRIMARY_LENGTH == sizeof(Dem_NvImageType));
+NVM_STATIC_ASSERT(NVM_BLOCK_APP_DATA_LENGTH == sizeof(CodingApp_NvImageType));
+NVM_STATIC_ASSERT(NVM_BLOCK_TIMEBASE_LENGTH == TIMEBASE_NVM_IMAGE_SIZE);
+
+/* NvM length == the Fee block size handed to the lower layer. */
+NVM_STATIC_ASSERT(NVM_BLOCK_DEM_PRIMARY_LENGTH == FEE_BLOCK_DEM_PRIMARY_SIZE);
+NVM_STATIC_ASSERT(NVM_BLOCK_APP_DATA_LENGTH == FEE_BLOCK_APP_DATA_SIZE);
+NVM_STATIC_ASSERT(NVM_BLOCK_TIMEBASE_LENGTH == FEE_BLOCK_TIMEBASE_SIZE);
+
+/* RAM mirror and ROM default occupy exactly the block length. */
+NVM_STATIC_ASSERT(sizeof(NvM_AppData_Ram) == NVM_BLOCK_APP_DATA_LENGTH);
+NVM_STATIC_ASSERT(sizeof(NvM_AppData_Rom) == NVM_BLOCK_APP_DATA_LENGTH);
+NVM_STATIC_ASSERT(sizeof(NvM_TimeBase_Ram) == NVM_BLOCK_TIMEBASE_LENGTH);
+NVM_STATIC_ASSERT(sizeof(NvM_TimeBase_Rom) == NVM_BLOCK_TIMEBASE_LENGTH);
+
+/* Every block fits the shared maximum used to size the Fee/NvM buffers. */
+NVM_STATIC_ASSERT(NVM_BLOCK_DEM_PRIMARY_LENGTH <= FEE_MAX_BLOCK_SIZE);
+NVM_STATIC_ASSERT(NVM_BLOCK_APP_DATA_LENGTH <= FEE_MAX_BLOCK_SIZE);
+NVM_STATIC_ASSERT(NVM_BLOCK_TIMEBASE_LENGTH <= FEE_MAX_BLOCK_SIZE);
+NVM_STATIC_ASSERT(NVM_MAX_BLOCK_LENGTH == FEE_MAX_BLOCK_SIZE);

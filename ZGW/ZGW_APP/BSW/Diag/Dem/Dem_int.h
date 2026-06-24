@@ -53,6 +53,15 @@ typedef struct
     Dem_NvEventRecordType eventRecords[DEM_MAX_EVENTS];
     Dem_PrimaryEntryType primaryEntries[DEM_PRIMARY_MEMORY_SIZE];
 
+    /*
+     * Do NOT remove this field to "save space".  sizeof(Dem_NvImageType) sets
+     * NVM_BLOCK_DEM_PRIMARY_LENGTH and (as the largest block) FEE_MAX_BLOCK_SIZE.
+     * Shrinking it makes the previously stored, larger DEM record exceed
+     * FEE_MAX_BLOCK_SIZE on the next boot; Fee_ScanSector then rejects that
+     * record as invalid, aborts before scanComplete, and the whole Fee is
+     * reformatted - which also erases the persisted TimeBase (and App_Data)
+     * blocks.  Keeping the on-flash DEM size stable preserves the time block.
+     */
     uint32 trailerReserved;
 } Dem_NvImageType;
 

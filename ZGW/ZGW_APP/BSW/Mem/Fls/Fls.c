@@ -28,6 +28,27 @@
 #define FLS_MAIN_STEP_BUDGET       (32u)
 #define FLS_DFLASH_SMU_CLEAR_RETRIES (8u)
 
+/*
+ * Compile-time guards binding the hand-written DFlash geometry to the
+ * authoritative iLLD device configuration (IfxFlash_cfg_TC37x.h for
+ * DEVICE_TC37X).  These ensure the Fls config cannot silently drift from the
+ * real TC375 DF0 layout, so the stack always spans the full data flash from its
+ * true start address to its true end address.  For the TC375: DF0 =
+ * 64 logical sectors x 4 KiB = 256 KiB at 0xAF000000..0xAF03FFFF, page = 8 B.
+ */
+#define FLS_ASSERT_CONCAT_(a, b) a##b
+#define FLS_ASSERT_CONCAT(a, b)  FLS_ASSERT_CONCAT_(a, b)
+#define FLS_STATIC_ASSERT(cond) \
+    typedef char FLS_ASSERT_CONCAT(Fls_StaticAssert_, __LINE__)[(cond) ? 1 : -1]
+
+FLS_STATIC_ASSERT(FLS_DFLASH0_BASE_ADDRESS == IFXFLASH_DFLASH_START);
+FLS_STATIC_ASSERT(FLS_DFLASH0_TOTAL_SIZE == IFXFLASH_DFLASH_SIZE);
+FLS_STATIC_ASSERT(FLS_DFLASH0_PAGE_SIZE == IFXFLASH_DFLASH_PAGE_LENGTH);
+FLS_STATIC_ASSERT(FLS_DFLASH0_SECTOR_SIZE ==
+        (IFXFLASH_DFLASH_SIZE / IFXFLASH_DFLASH_NUM_LOG_SECTORS));
+FLS_STATIC_ASSERT((FLS_DFLASH0_BASE_ADDRESS + FLS_DFLASH0_TOTAL_SIZE - 1u) ==
+        IFXFLASH_DFLASH_END);
+
 typedef enum
 {
     FLS_JOB_NONE = 0,
@@ -39,7 +60,6 @@ typedef enum
 typedef enum
 {
     FLS_PHASE_IDLE = 0,
-    FLS_PHASE_WRITE_ENTER_WAIT,
     FLS_PHASE_WRITE_WAIT,
     FLS_PHASE_ERASE_WAIT,
     FLS_PHASE_ERASE_VERIFY_WAIT
@@ -555,9 +575,28 @@ static void Fls_FinishJob(MemIf_JobResultType result)
     Fls_DmuWaitConsecutiveBusyCounter = 0u;
 }
 
-static Std_ReturnType Fls_StartProgramEnterPage(Fls_AddressType address)
+/*
+ * Issue a complete DFlash page program (enter page mode + load assembly buffer
+ * + write command) in a SINGLE protected critical section.
+ *
+ * The previous implementation split this across two async phases with a DMU
+ * poll in between (FLS_PHASE_WRITE_ENTER_WAIT).  enterPageMode for DFlash only
+ * writes the 0x5D page-mode command to the command buffer - it does NOT start
+ * an asynchronous DMU program (the long DMU-busy window only opens after
+ * writePage), so that intermediate poll was a wasted round-trip per page.
+ * Collapsing enter+load+write removes one main-function pass and one
+ * endinit/interrupt toggle per 8-byte page, so a block is programmed in the
+ * fewest possible steps (req: write DFlash ASAP, no unnecessary steps).
+ *
+ * enterPageMode -> loadPage2X32 -> writePage are sequenced by the __dsync()
+ * inside each iLLD primitive, so no DMU wait is required between them; only the
+ * post-writePage completion is asynchronous and is polled by the caller.
+ */
+static Std_ReturnType Fls_StartProgramPage(Fls_AddressType address, const uint8 *data)
 {
     uint32 physicalAddress = Fls_GetPhysicalAddress(address);
+    uint32 word0;
+    uint32 word1;
     uint16 cpuPassword;
     uint16 safetyPassword;
     uint8 enterResult;
@@ -570,41 +609,11 @@ static Std_ReturnType Fls_StartProgramEnterPage(Fls_AddressType address)
         return E_NOT_OK;
     }
 
-    Fls_SuppressDFlashSmuTrap();
-    Fls_ClearDFlashSmuBusError();
-    Fls_ClearDmuStatus();
-
-#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
-    interruptState = IfxCpu_disableInterrupts();
-#endif
-
-    Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    enterResult = IfxFlash_enterPageMode(physicalAddress);
-    Fls_SetDmuEndinit(cpuPassword, safetyPassword);
-
-#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
-    IfxCpu_restoreInterrupts(interruptState);
-#endif
-
-    Fls_RestoreDFlashSmuTrap();
-
-    return (enterResult == 0u) ? E_OK : E_NOT_OK;
-}
-
-static void Fls_StartProgramWritePage(Fls_AddressType address, const uint8 *data)
-{
-    uint32 physicalAddress = Fls_GetPhysicalAddress(address);
-    uint32 word0;
-    uint32 word1;
-    uint16 cpuPassword;
-    uint16 safetyPassword;
-#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
-    boolean interruptState;
-#endif
-
     /* Suppress before the source memcpy too: during Fee GC the source pointer
      * points directly into DFlash, so even reading it could raise ALM7. */
     Fls_SuppressDFlashSmuTrap();
+    Fls_ClearDFlashSmuBusError();
+    Fls_ClearDmuStatus();
 
     memcpy(&word0, &data[0], sizeof(word0));
     memcpy(&word1, &data[4], sizeof(word1));
@@ -614,19 +623,12 @@ static void Fls_StartProgramWritePage(Fls_AddressType address, const uint8 *data
 #endif
 
     Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    IfxFlash_loadPage2X32(physicalAddress, word0, word1);
-    Fls_SetDmuEndinit(cpuPassword, safetyPassword);
-
-#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
-    IfxCpu_restoreInterrupts(interruptState);
-#endif
-
-#if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
-    interruptState = IfxCpu_disableInterrupts();
-#endif
-
-    Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    IfxFlash_writePage(physicalAddress);
+    enterResult = IfxFlash_enterPageMode(physicalAddress);
+    if (enterResult == 0u)
+    {
+        IfxFlash_loadPage2X32(physicalAddress, word0, word1);
+        IfxFlash_writePage(physicalAddress);
+    }
     Fls_SetDmuEndinit(cpuPassword, safetyPassword);
 
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
@@ -634,6 +636,8 @@ static void Fls_StartProgramWritePage(Fls_AddressType address, const uint8 *data
 #endif
 
     Fls_RestoreDFlashSmuTrap();
+
+    return (enterResult == 0u) ? E_OK : E_NOT_OK;
 }
 
 static Std_ReturnType Fls_StartEraseOneSector(Fls_AddressType address)
@@ -958,7 +962,8 @@ static void Fls_MainFunctionStep(void)
             switch (Fls_State.phase)
             {
                 case FLS_PHASE_IDLE:
-                    result = Fls_StartProgramEnterPage(current);
+                    src = &Fls_State.src[Fls_State.progress];
+                    result = Fls_StartProgramPage(current, src);
                     if (result != E_OK)
                     {
                         MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_MAIN, FLS_E_VERIFY, current);
@@ -966,34 +971,25 @@ static void Fls_MainFunctionStep(void)
                     }
                     else
                     {
-                        Fls_State.phase = FLS_PHASE_WRITE_ENTER_WAIT;
+                        Fls_State.phase = FLS_PHASE_WRITE_WAIT;
                     }
-                    break;
-
-                case FLS_PHASE_WRITE_ENTER_WAIT:
-                    pollResult = Fls_PollDmuReady();
-                    if (pollResult == FLS_DMU_POLL_BUSY)
-                    {
-                        break;
-                    }
-                    if (pollResult == FLS_DMU_POLL_ERROR)
-                    {
-                        MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_MAIN, FLS_E_VERIFY, current);
-                        Fls_FinishJob(MEMIF_JOB_FAILED);
-                        break;
-                    }
-
-                    src = &Fls_State.src[Fls_State.progress];
-                    Fls_StartProgramWritePage(current, src);
-                    Fls_State.phase = FLS_PHASE_WRITE_WAIT;
                     break;
 
                 case FLS_PHASE_WRITE_WAIT:
-                    pollResult = Fls_PollDmuReady();
-                    if (pollResult == FLS_DMU_POLL_BUSY)
+                    /* A page program is short (tens of microseconds), so poll it
+                     * to completion in this call instead of yielding once per
+                     * poll: the whole multi-page block is committed in the fewest
+                     * main-function passes (req: 100% CPU is acceptable to finish
+                     * ASAP).  The consecutive-busy guard inside Fls_PollDmuReady
+                     * still bounds the spin and turns a stuck DMU into
+                     * FLS_DMU_POLL_ERROR.  Sector erase keeps its single-poll /
+                     * yield model below, where the much longer DMU-busy window
+                     * must accumulate across calls. */
+                    do
                     {
-                        break;
-                    }
+                        pollResult = Fls_PollDmuReady();
+                    } while (pollResult == FLS_DMU_POLL_BUSY);
+
                     if (pollResult == FLS_DMU_POLL_ERROR)
                     {
                         MemStack_ReportError(MEMSTACK_MODULE_ID_FLS, FLS_API_MAIN, FLS_E_VERIFY, current);

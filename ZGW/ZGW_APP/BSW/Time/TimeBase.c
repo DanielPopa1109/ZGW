@@ -34,6 +34,16 @@
 #define TIMEBASE_NVM_OFFSET_STORE_COUNTER      28u
 #define TIMEBASE_NVM_UPDATE_PERIOD_NS          ((uint64)TIMESYNC_NVM_RAM_UPDATE_PERIOD_MS * TIMEBASE_NS_PER_MS)
 
+/*
+ * The serialized NvM image is a raw byte layout, so NvM/Fee only know its size
+ * (TIMEBASE_NVM_IMAGE_SIZE), not its fields.  Lock the highest field (the 4-byte
+ * store counter) to end exactly at the advertised block size, so the block holds
+ * the exact amount of data it is sized for and a new field added without growing
+ * the block size can never silently overflow it.
+ */
+typedef char TimeBase_NvmImageSize_StaticAssert[
+        ((TIMEBASE_NVM_OFFSET_STORE_COUNTER + 4u) == TIMEBASE_NVM_IMAGE_SIZE) ? 1 : -1];
+
 typedef struct
 {
     uint64 vehicle_time_at_utc_set_ns;

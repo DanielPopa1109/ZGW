@@ -13,7 +13,7 @@
 extern const IfxAsclin_Lin_Pins Lin_Pins;
 
 #define LIN_TX_PORT             (&MODULE_P15)
-#define LIN_TX_PIN_INDEX        0u
+#define LIN_TX_PIN_INDEX        4u
 #define LIN_WAKEUP_DELAY_TICKS  4000u
 #define LIN_LDF_TIME_BASE_MS     10u
 #define LIN_LDF_JITTER_MS        5u

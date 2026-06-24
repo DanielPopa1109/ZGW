@@ -96,7 +96,22 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_PRIO_CORE2_QM_BSW      29u
 #define OS_TASK_PRIO_CORE2_APPL        28u
 #define OS_CORE2_MAIN_PERIOD_TICKS     pdMS_TO_TICKS_core2(5u)
-#define OS_NVM_MAIN_CYCLES_PER_ACTIVATION 1u
+/*
+ * Max Fls/Fee/NvM stack cycles the (lowest-priority) ASIL_NVM task runs per 5ms
+ * activation.  It was 1, which capped the whole NvM stack to ONE cycle every
+ * 5ms (200 cycles/s) and forced the task to sleep for 5ms between cycles even
+ * when the core was otherwise idle.  A single WriteAll of the redundant 16 KiB
+ * Dem block (plus a possible garbage collection that re-copies it and erases two
+ * 128 KiB sectors) needs hundreds-to-thousands of cycles, so NvM stayed busy for
+ * 10+ seconds.  The do/while loop already exits as soon as
+ * Os_NvMStackHasPendingJobs() is FALSE, so this value is just a safety cap: NvM
+ * now drains its active job using idle CPU instead of trickling one cycle per
+ * tick (req: 100% CPU is acceptable to finish as soon as possible).  This cannot
+ * starve the watchdog or comms - ASIL_NVM is the lowest-priority core0 task
+ * (prio 20 vs ASIL_BSW/watchdog 28, comms 21-26) and yields every cycle, so any
+ * higher-priority task preempts it immediately.
+ */
+#define OS_NVM_MAIN_CYCLES_PER_ACTIVATION 20000u
 #define OS_CPU_LOAD_MAX_PERCENT        100u
 #define OS_CPU_LOAD_MAX_PERMILLE       1000u
 #define OS_CPU_LOAD_SAMPLE_TICKS       ((uint32)configTICK_RATE_HZ_core0)
@@ -821,7 +836,7 @@ void ASIL_BSW_Task_C0(void *pvParameters)
 
 void ASIL_NVM_Task_C0(void *pvParameters)
 {
-    uint8 nvmCycleBudget;
+    uint32 nvmCycleBudget;
 
     while(1)
     {

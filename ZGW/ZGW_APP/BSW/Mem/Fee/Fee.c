@@ -174,6 +174,37 @@ static Fee_RecordHeaderType Fee_RecordHeader;
 static Fee_RecordTrailerType Fee_RecordTrailer;
 static Fee_SectorHeaderType Fee_SectorHeader;
 static uint8 Fee_MarkerBuffer[sizeof(Fee_RecordHeaderType) + sizeof(Fee_RecordTrailerType)];
+
+/*
+ * Compile-time guards for the "big sector" layout and full data-flash usage.
+ *
+ *  - The two virtual sectors must tile the entire DF0 (start..end) with nothing
+ *    left over (req: all of the data flash is used).
+ *  - Each virtual sector must be a whole number of physically erasable 4 KiB
+ *    logical sectors and start sector 1 immediately after sector 0.
+ *  - Even the largest block, written redundantly (two records), must fit in a
+ *    freshly formatted virtual sector together with the sector header and the
+ *    reserved sector-valid marker slot - otherwise garbage collection could not
+ *    relocate it and the sector switch would dead-end.
+ *  - The job buffer must cover the largest record payload.
+ */
+#define FEE_ASSERT_CONCAT_(a, b) a##b
+#define FEE_ASSERT_CONCAT(a, b)  FEE_ASSERT_CONCAT_(a, b)
+#define FEE_STATIC_ASSERT(cond) \
+    typedef char FEE_ASSERT_CONCAT(Fee_StaticAssert_, __LINE__)[(cond) ? 1 : -1]
+
+FEE_STATIC_ASSERT((FEE_VIRTUAL_SECTOR_COUNT * FEE_VIRTUAL_SECTOR_SIZE) == FLS_DFLASH0_TOTAL_SIZE);
+FEE_STATIC_ASSERT(FEE_DATAFLASH_SIZE == FLS_DFLASH0_TOTAL_SIZE);
+FEE_STATIC_ASSERT((FEE_VIRTUAL_SECTOR_SIZE % FLS_DFLASH0_SECTOR_SIZE) == 0u);
+FEE_STATIC_ASSERT(FEE_VIRTUAL_SECTOR0_OFFSET == 0u);
+FEE_STATIC_ASSERT(FEE_VIRTUAL_SECTOR1_OFFSET == FEE_VIRTUAL_SECTOR_SIZE);
+FEE_STATIC_ASSERT((FEE_MAX_BLOCK_SIZE % FLS_DFLASH0_PAGE_SIZE) == 0u);
+FEE_STATIC_ASSERT(sizeof(Fee_JobData) >= FEE_MAX_BLOCK_SIZE);
+FEE_STATIC_ASSERT(
+        ((uint32)sizeof(Fee_SectorHeaderType) +
+         (uint32)sizeof(Fee_RecordHeaderType) + (uint32)sizeof(Fee_RecordTrailerType) +
+         (2u * ((uint32)sizeof(Fee_RecordHeaderType) + FEE_MAX_BLOCK_SIZE +
+                (uint32)sizeof(Fee_RecordTrailerType)))) <= FEE_VIRTUAL_SECTOR_SIZE);
 static uint32 Fee_RecordStartOffset;
 static uint32 Fee_RecordTotalLength;
 static uint32 Fee_RecordPaddedLength;

@@ -51,28 +51,21 @@
   <v1:configSetting configurationId="pms.hwcfg6.bind" altId="pms.hwcfg6.bind.hwcfg6">
     <v1:connectionSetting altId="p14_4.in.bind.in"/>
   </v1:configSetting>
-  <v1:configSetting configurationId="asclin1.rxd.bind" altId="asclin1.rxd.bind.rxd0">
-    <v1:connectionSetting altId="p15_1.in.bind.in"/>
+  <v1:configSetting configurationId="asclin1.rxd.bind" altId="asclin1.rxd.bind.rxd1">
+    <v1:connectionSetting altId="p15_5.in.bind.in"/>
   </v1:configSetting>
   <v1:configSetting configurationId="can0_node0.txd.bind" altId="can0_node0.txd.bind.out">
     <v1:connectionSetting altId="p20_8.out.bind.alt5"/>
   </v1:configSetting>
   <v1:configSetting configurationId="asclin1.txd.bind" altId="asclin1.txd.bind.out">
-    <v1:connectionSetting altId="p15_0.out.bind.alt2.mutex1"/>
+    <v1:connectionSetting altId="p15_4.out.bind.alt2.mutex1"/>
   </v1:configSetting>
   <v1:configSetting configurationId="can0_node0.rxd.bind" altId="can0_node0.rxd.bind.rxd1">
     <v1:connectionSetting altId="p20_7.in.bind.in"/>
   </v1:configSetting>
   <v1:configSetting configurationId="p20_8.dir" altId="p20_8.dir.out"/>
-  <v1:configSetting configurationId="p15_1.in.bind" altId="p15_1.in.bind.in">
-    <v1:connectionSetting altId="asclin1.rxd.bind.rxd0"/>
-  </v1:configSetting>
   <v1:configSetting configurationId="p20_8.out.bind" altId="p20_8.out.bind.alt5">
     <v1:connectionSetting altId="can0_node0.txd.bind.out"/>
-  </v1:configSetting>
-  <v1:configSetting configurationId="p15_0.dir" altId="p15_0.dir.out"/>
-  <v1:configSetting configurationId="p15_0.out.bind" altId="p15_0.out.bind.alt2.mutex1">
-    <v1:connectionSetting altId="asclin1.txd.bind.out"/>
   </v1:configSetting>
   <v1:configSetting configurationId="p20_7.in.bind" altId="p20_7.in.bind.in">
     <v1:connectionSetting altId="can0_node0.rxd.bind.rxd1"/>
@@ -80,8 +73,6 @@
   <v1:configSetting configurationId="can0_node1.txd.bind" altId="can0_node1.txd.bind.none"/>
   <v1:configSetting configurationId="can0_node1.rxd.bind" altId="can0_node1.rxd.bind.none"/>
   <v1:propertySetting propertyId="p20_7.symbolicname" value="CAN0_NODE0_RXD"/>
-  <v1:propertySetting propertyId="p15_1.symbolicname" value="ASCLIN1_RXD"/>
-  <v1:propertySetting propertyId="p15_0.symbolicname" value="ASCLIN1_TXD"/>
   <v1:propertySetting propertyId="p20_8.symbolicname" value="CAN0_NODE0_TXD"/>
   <v1:configSetting configurationId="p20_6.dir" altId="p20_6.dir.out"/>
   <v1:configSetting configurationId="p20_6.out.bind" altId="p20_6.out.bind.gpio"/>
@@ -190,4 +181,13 @@
   </v1:configSetting>
   <v1:propertySetting propertyId="p33_4.symbolicname" value="CAN1_NODE3_TXD"/>
   <v1:propertySetting propertyId="p33_5.symbolicname" value="CAN1_NODE3_RXD"/>
+  <v1:configSetting configurationId="p15_4.out.bind" altId="p15_4.out.bind.alt2.mutex1">
+    <v1:connectionSetting altId="asclin1.txd.bind.out"/>
+  </v1:configSetting>
+  <v1:configSetting configurationId="p15_5.in.bind" altId="p15_5.in.bind.in">
+    <v1:connectionSetting altId="asclin1.rxd.bind.rxd1"/>
+  </v1:configSetting>
+  <v1:configSetting configurationId="p15_4.dir" altId="p15_4.dir.out"/>
+  <v1:propertySetting propertyId="p15_4.symbolicname" value="ASCLIN1_TXD"/>
+  <v1:propertySetting propertyId="p15_5.symbolicname" value="ASCLIN1_RXD"/>
 </v1:pinSettings>
