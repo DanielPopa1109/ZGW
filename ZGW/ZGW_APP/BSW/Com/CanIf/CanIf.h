@@ -18,11 +18,8 @@
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX0 2u
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX1 3u
 #define CANIF_PDU_FD_EXT_PHYS_TX0      4u
-#define CANIF_PDU_FD_EXT_PHYS_TX1      5u
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX2 6u
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX3 7u
-#define CANIF_PDU_FD_EXT_PHYS_TX2      8u
-#define CANIF_PDU_FD_EXT_PHYS_TX3      9u
 #define CANIF_DIAGREQUEST_TESTER_CAN_ID 0x710u
 #define CANIF_DIAGREQUEST_CLASSIC_CAN_ID CANIF_DIAGREQUEST_TESTER_CAN_ID
 #define CANIF_DIAGREQUEST_CANFD_CAN_ID   CANIF_DIAGREQUEST_TESTER_CAN_ID
@@ -89,9 +86,6 @@
 
 
 /* DBC generated CAN-FD COM I-PDU IDs. Existing CAN Classic IDs above are untouched. */
-#define CANIF_RX_PDU_CANFD_PDM4_LOADSTATUS                                    100u
-#define CANIF_RX_PDU_CANFD_PDM3_LOADSTATUS                                    101u
-#define CANIF_RX_PDU_CANFD_PDM2_LOADSTATUS                                    102u
 #define CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS                                    103u
 #define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                             104u
 #define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                             105u
@@ -110,61 +104,7 @@
 #define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                         118u
 #define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                         119u
 #define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                         120u
-#define CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_1                             121u
-#define CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_2                             122u
-#define CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_3                             123u
-#define CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_4                             124u
-#define CANIF_RX_PDU_CANFD_PDM2_VOLTAGEFEEDBACK_5                             125u
-#define CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_1                             126u
-#define CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_2                             127u
-#define CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_3                             128u
-#define CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_4                             129u
-#define CANIF_RX_PDU_CANFD_PDM2_CURRENTFEEDBACK_5                             130u
-#define CANIF_RX_PDU_CANFD_PDM2_STUCKATONEVENT                                131u
-#define CANIF_RX_PDU_CANFD_PDM2_STUCKATOFFEVENT                               132u
-#define CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_1                         133u
-#define CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_2                         134u
-#define CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_3                         135u
-#define CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_4                         136u
-#define CANIF_RX_PDU_CANFD_PDM2_TEMPERATUREFEEDBACK_5                         137u
-#define CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_1                             138u
-#define CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_2                             139u
-#define CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_3                             140u
-#define CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_4                             141u
-#define CANIF_RX_PDU_CANFD_PDM3_VOLTAGEFEEDBACK_5                             142u
-#define CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_1                             143u
-#define CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_2                             144u
-#define CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_3                             145u
-#define CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_4                             146u
-#define CANIF_RX_PDU_CANFD_PDM3_CURRENTFEEDBACK_5                             147u
-#define CANIF_RX_PDU_CANFD_PDM3_STUCKATONEVENT                                148u
-#define CANIF_RX_PDU_CANFD_PDM3_STUCKATOFFEVENT                               149u
-#define CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_1                         150u
-#define CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_2                         151u
-#define CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_3                         152u
-#define CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_4                         153u
-#define CANIF_RX_PDU_CANFD_PDM3_TEMPERATUREFEEDBACK_5                         154u
-#define CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_1                             155u
-#define CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_2                             156u
-#define CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_3                             157u
-#define CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_4                             158u
-#define CANIF_RX_PDU_CANFD_PDM4_VOLTAGEFEEDBACK_5                             159u
-#define CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_1                             160u
-#define CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_2                             161u
-#define CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_3                             162u
-#define CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_4                             163u
-#define CANIF_RX_PDU_CANFD_PDM4_CURRENTFEEDBACK_5                             164u
-#define CANIF_RX_PDU_CANFD_PDM4_STUCKATONEVENT                                165u
-#define CANIF_RX_PDU_CANFD_PDM4_STUCKATOFFEVENT                               166u
-#define CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_1                         167u
-#define CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_2                         168u
-#define CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_3                         169u
-#define CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_4                         170u
-#define CANIF_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_5                         171u
 #define CANIF_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                  172u
-#define CANIF_RX_PDU_CANFD_PDM2_DIAGRESPONSE                                  173u
-#define CANIF_RX_PDU_CANFD_PDM3_DIAGRESPONSE                                  174u
-#define CANIF_RX_PDU_CANFD_PDM4_DIAGRESPONSE                                  175u
 #define CANIF_TX_PDU_CANFD_INFOTAINMENTDATA1                                  100u
 #define CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                              101u
 #define CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1                              102u
@@ -176,13 +116,7 @@
 #define CANIF_TX_PDU_CANFD_POWERTRAINDATA1                                    108u
 #define CANIF_TX_PDU_CANFD_BODYDATA1                                          109u
 #define CANIF_TX_PDU_CANFD_PDM1_DIAGREQUEST                                   110u
-#define CANIF_TX_PDU_CANFD_PDM2_DIAGREQUEST                                   111u
-#define CANIF_TX_PDU_CANFD_PDM3_DIAGREQUEST                                   112u
-#define CANIF_TX_PDU_CANFD_PDM4_DIAGREQUEST                                   113u
 #define CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM1                                   114u
-#define CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM2                                   115u
-#define CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM3                                   116u
-#define CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM4                                   117u
 #define CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                              118u
 
 typedef enum

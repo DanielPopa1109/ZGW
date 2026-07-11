@@ -62,6 +62,36 @@
 #define SCR_MCUSM_PAYLOAD_LENGTH            768u
 #define SCR_MCUSM_RECORD_LENGTH             (SCR_MCUSM_OFFSET_PAYLOAD + SCR_MCUSM_PAYLOAD_LENGTH)
 
+/*
+ * Retained FBL programming handoff mailbox.
+ *
+ * The application arms this record (McuSm_ArmFblProgrammingRequest) immediately
+ * before the reset that enters the bootloader; the FBL reads it at boot to learn
+ * the requested programming transport, then invalidates it once consumed.
+ *
+ * It lives in the free gap between the TimeBase record (ends 0x17D3) and the
+ * McuSm record (0x1810), and survives the application reset.  This replaces the
+ * old LMU "NCR" mailbox at 0xB00000F0, which LBIST clears on every reset.
+ *
+ * Header fields are stored big-endian (matching the McuSm record convention).
+ * The checksum is FNV-1a over the three payload bytes {prog, comm, resetCounter}
+ * and deliberately excludes the VALID byte so the writer can clear/set VALID
+ * without recomputing it.
+ */
+#define SCR_FBL_XRAM_BASE                   0x17E0u
+#define SCR_FBL_MAGIC                       0x46424C31u /* "FBL1" */
+#define SCR_FBL_VERSION                     1u
+#define SCR_FBL_VALID                       1u
+
+#define SCR_FBL_OFFSET_MAGIC                0u
+#define SCR_FBL_OFFSET_VERSION              4u
+#define SCR_FBL_OFFSET_VALID                5u
+#define SCR_FBL_OFFSET_PROG_REQUEST         6u
+#define SCR_FBL_OFFSET_COMM_INTERFACE       7u
+#define SCR_FBL_OFFSET_RESET_COUNTER        8u
+#define SCR_FBL_OFFSET_CHECKSUM             12u
+#define SCR_FBL_RECORD_LENGTH               16u
+
 #define BOOT_STAGE_RTC_INIT_ENTER      (0x60u)
 #define BOOT_STAGE_RTC_PMCON_DONE      (0x61u)
 #define BOOT_STAGE_RTC_STOP_DONE       (0x62u)

@@ -10,6 +10,7 @@
 #include "task_core0.h"
 #include "FreeRTOSConfig_core0.h"
 #include "Wdg.h"
+#include "SafetyKit_InternalWatchdogs.h"
 #include "IfxPmsPm.h"
 #include "IfxStm.h"
 #include "IfxPort.h"
@@ -27,7 +28,23 @@
 
 #define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 200u
 #define SYSMGR_KEEP_AWAKE_WHILE_FULL_COM  1u
-#define SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT   1000000u
+/*
+ * Backstop iteration cap for the GoSleep NvM drain loops.  GoSleep runs with
+ * interrupts disabled, so the normal ASIL_BSW watchdog service never runs while
+ * these loops pump the mem stack - the loops now feed both watchdogs themselves
+ * (see below).  The cap must be comfortably ABOVE a healthy worst-case WriteAll:
+ * a WriteAll can trigger a Fee garbage collection = two 128 KiB virtual-sector
+ * erases (64 x 4 KiB logical-sector erases) plus the record copies.  A single
+ * stuck DFlash erase is already bounded by the Fls per-erase DMU poll limit
+ * (FLS_DMU_ERASE_BUSY_POLL_LIMIT = 1e6 consecutive busy polls -> job FAILED ->
+ * Fls/Fee/NvM return to IDLE and the loop exits), so 64 erases can legitimately
+ * absorb up to ~64e6 pump iterations before the lower layer itself declares a
+ * stall.  The old 1e6 cap was BELOW even a single healthy GC, so a sector switch
+ * at sleep hit SYSMGR_FAIL_NVM_POST_WRITEALL_IDLE and reset the ECU mid-write.
+ * 1e8 sits above the lower-layer guarantee and only fires on a genuine
+ * lower-layer fault (double failure), as a true last resort.
+ */
+#define SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT   100000000u
 #define SYSMGR_FAIL_NVM_PRE_WRITEALL_IDLE 1u
 #define SYSMGR_FAIL_NVM_POST_WRITEALL_IDLE 2u
 #define SYSMGR_FAIL_DEM_CYCLE_END         3u
@@ -519,6 +536,16 @@ void SysMgr_GoSleep(void)
         NvM_MainFunction();
         Dem_MainFunction();
 
+        /* Interrupts are disabled for the whole GoSleep sequence, so the
+         * periodic ASIL_BSW watchdog service never runs. A WriteAll that
+         * garbage-collects (two 128 KiB erases) can take hundreds of ms - well
+         * past the 1 s watchdog window - so feed both watchdogs here or the ECU
+         * resets mid-write (torn record / failed sleep). The watchdogs stay
+         * armed; they are only kept fed across this bounded, known-long flash
+         * operation. */
+        serviceCpuWatchdog();
+        serviceSafetyWatchdog();
+
         if (waitLoops >= SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT)
         {
             SysMgr_GoSleepFailure(SYSMGR_FAIL_NVM_PRE_WRITEALL_IDLE);
@@ -547,6 +574,12 @@ void SysMgr_GoSleep(void)
         Fls_MainFunction();
         Fee_MainFunction();
         NvM_MainFunction();
+
+        /* Same as the pre-WriteAll drain: interrupts are off, and this is the
+         * loop that actually carries the WriteAll (and any GC sector switch) to
+         * completion, so it must keep both watchdogs fed across the erases. */
+        serviceCpuWatchdog();
+        serviceSafetyWatchdog();
 
         if (waitLoops >= SYSMGR_NVM_IDLE_WAIT_LOOP_LIMIT)
         {

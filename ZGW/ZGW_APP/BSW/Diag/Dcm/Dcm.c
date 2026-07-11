@@ -36,6 +36,8 @@ typedef enum
 #define DCM_ROUTINE_SELECT_FBL_INTERFACE 0x0205u
 /* UDS has no dedicated server-side operation timeout NRC. */
 #define DCM_PENDING_TIMEOUT_NRC        DCM_NRC_GENERAL_REJECT
+#define DCM_TX_CONFIRM_TIMEOUT_TICKS   400u
+#define DCM_RX_IN_PROGRESS_TIMEOUT_TICKS 400u
 
 typedef struct
 {
@@ -53,6 +55,7 @@ typedef struct
         Dcm_PduLengthType rxExpectedLen;
         Dcm_PduLengthType rxCopiedLen;
         uint8 rxInProgress;
+        uint16 rxInProgressTimer;
 
         Dcm_RxRequestType queue[DCM_RX_QUEUE_DEPTH];
         uint8 qHead;
@@ -73,6 +76,7 @@ typedef struct
 
         uint16 p2Timer;
         uint16 p2StarTimer;
+        uint16 txConfirmTimer;
         uint8 pendingStarted;
         uint8 pendingResponseCount;
         uint32 lastTimerTick;
@@ -232,6 +236,7 @@ static void Dcm_StartProcessing(
     c->service = NULL_PTR;
     c->p2Timer = DCM_P2_SERVER_TICKS;
     c->p2StarTimer = DCM_P2STAR_SERVER_TICKS;
+    c->txConfirmTimer = 0u;
     c->pendingStarted = FALSE;
     c->pendingResponseCount = 0u;
     c->lastTimerTick = Dcm_GetTick();
@@ -783,6 +788,34 @@ void Dcm_MainFunction(void)
             }
         }
 
+        if ((Dcm_Conn[i].state == DCM_CONN_TX_READY) ||
+                (Dcm_Conn[i].state == DCM_CONN_TX_BUSY))
+        {
+            if (Dcm_Conn[i].txConfirmTimer > 0u)
+            {
+                Dcm_Conn[i].txConfirmTimer--;
+            }
+            else
+            {
+                Dcm_ClearProcessing(i);
+                continue;
+            }
+        }
+
+        if (Dcm_Conn[i].rxInProgress != FALSE)
+        {
+            if (Dcm_Conn[i].rxInProgressTimer > 0u)
+            {
+                Dcm_Conn[i].rxInProgressTimer--;
+            }
+            else
+            {
+                Dcm_Conn[i].rxInProgress = FALSE;
+                Dcm_Conn[i].rxExpectedLen = 0u;
+                Dcm_Conn[i].rxCopiedLen = 0u;
+            }
+        }
+
         Dcm_ProcessConnection(i);
     }
 
@@ -923,6 +956,7 @@ BufReq_ReturnType Dcm_StartOfReception(
     }
 
     c->rxInProgress = TRUE;
+    c->rxInProgressTimer = DCM_RX_IN_PROGRESS_TIMEOUT_TICKS;
     c->rxExpectedLen = TpSduLength;
     c->rxCopiedLen = 0u;
 
@@ -982,7 +1016,9 @@ static uint8 Dcm_IsBusForwardRxPdu(Dcm_PduIdType rxPduId)
     /* The CAN/CAN-FD extended-physical connections are used exclusively to reach bus
      * nodes, so any inbound message on them is a forwarded slave response - never a
      * request the ZGW should service. */
-    if ((rxPduId >= DCM_RX_CAN_EXT_PHYS) && (rxPduId <= DCM_RX_CANFD_EXT_PHYS_4))
+    if (((rxPduId >= DCM_RX_CAN_EXT_PHYS) && (rxPduId <= DCM_RX_CANFD_EXT_PHYS)) ||
+        (rxPduId == DCM_RX_CAN_EXT_PHYS_3) ||
+        (rxPduId == DCM_RX_CAN_EXT_PHYS_4))
     {
         return TRUE;
     }
@@ -1067,6 +1103,7 @@ void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
     }
 
     c->rxInProgress = FALSE;
+    c->rxInProgressTimer = 0u;
 
     if ((result != NTFRSLT_OK) || (c->rxCopiedLen != c->rxExpectedLen) || (c->rxCopiedLen == 0u))
     {
@@ -1199,6 +1236,7 @@ void Dcm_TpTxConfirmation(Dcm_PduIdType id, Dcm_NotifResultType result)
 
     c->txLen = 0u;
     c->txOffset = 0u;
+    c->txConfirmTimer = 0u;
 
     if (result != NTFRSLT_OK)
     {
@@ -1489,6 +1527,7 @@ static void Dcm_ClearProcessing(uint8 connIdx)
     c->pendingResetAfterResponse = FALSE;
     c->resetAfterResponse = 0u;
     c->rxInProgress = FALSE;
+    c->rxInProgressTimer = 0u;
     c->rxExpectedLen = 0u;
     c->rxCopiedLen = 0u;
 
@@ -1510,6 +1549,7 @@ static Std_ReturnType Dcm_StartTx(uint8 connIdx)
 
     c->txOffset = 0u;
     c->state = DCM_CONN_TX_BUSY;
+    c->txConfirmTimer = DCM_TX_CONFIRM_TIMEOUT_TICKS;
 
     ret = PduR_DcmTransmit(Dcm_ConfigPtr->connections[connIdx].txPduId,
             c->txBuffer,
@@ -1955,6 +1995,10 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
         Dcm_ResetDelay();
         SysMgr_ClearMcuSmSwErrorTriggerData();
         McuSm_SaveRetainedStateToScr();
+        /* Publish the requested transport to the SCR XRAM mailbox the FBL reads.
+         * The LMU "NCR" handoff was dropped because LBIST clears it on every reset;
+         * SCR XRAM survives this application reset. */
+        McuSm_ArmFblProgrammingRequest();
         IfxCpu_disableInterrupts();
         IfxScuRcu_performReset(
                 IfxScuRcu_ResetType_application,

@@ -23,7 +23,9 @@
 #define FLS_E_VERIFY               (0x06u)
 #define FLS_DMU_ERR_MASK           (0x7Fu)
 #define FLS_DMU_WAIT_ERROR         (0x80000000u)
-#define FLS_DMU_BUSY_POLL_LIMIT    (16000u)
+/* Page programs are spun to completion; sector erases need a larger bounded window under fast NVM draining. */
+#define FLS_DMU_WRITE_BUSY_POLL_LIMIT    (16000u)
+#define FLS_DMU_ERASE_BUSY_POLL_LIMIT    (1000000u)
 #define FLS_DMU_D0_BUSY_MASK       (0x00000001u)
 #define FLS_MAIN_STEP_BUDGET       (32u)
 #define FLS_DFLASH_SMU_CLEAR_RETRIES (8u)
@@ -130,7 +132,6 @@ volatile uint32 Fls_DmuWaitEndinitCloseCounter = 0u;
 volatile uint32 Fls_DmuWaitLastLoops = 0u;
 volatile uint32 Fls_DmuWaitLastStatus = 0u;
 volatile uint32 Fls_DmuWaitConsecutiveBusyCounter = 0u;
-volatile uint32 Fls_DmuRecoveryRequired = 0u;
 volatile uint32 Fls_DmuBusyRejectCounter = 0u;
 volatile uint32 Fls_DmuTimeoutJob = 0u;
 volatile uint32 Fls_DmuTimeoutPhase = 0u;
@@ -139,6 +140,16 @@ volatile uint32 Fls_DmuTimeoutProgress = 0u;
 volatile uint32 Fls_DmuRejectAddress = 0u;
 
 static Std_ReturnType Fls_CopyReadableRange(Fls_AddressType address, uint8 *target, Fls_LengthType length);
+
+static uint32 Fls_GetDmuBusyPollLimit(void)
+{
+    if (Fls_State.job == FLS_JOB_ERASE)
+    {
+        return FLS_DMU_ERASE_BUSY_POLL_LIMIT;
+    }
+
+    return FLS_DMU_WRITE_BUSY_POLL_LIMIT;
+}
 
 static boolean Fls_IsRangeValid(Fls_AddressType address, Fls_LengthType length)
 {
@@ -195,35 +206,26 @@ void Fls_ClearDmuStatus(void)
     Fls_LastDmuError = 0u;
 }
 
+/*
+ * DMU_HF_ERRSR / DMU_HF_STATUS are read-only flash status registers.  EndInit
+ * (CPU + safety) protects WRITES to safety-critical registers; it has no bearing
+ * on reads.  The old code cleared and re-set both EndInits around every status
+ * read - including inside the page-program busy spin, thousands of times per
+ * block - which was pure overhead (and repeatedly opened the safety-EndInit
+ * window).  Reading the registers directly is correct and removes that cost.
+ */
 static uint32 Fls_ReadDmuErrorStatus(void)
 {
-    uint16 cpuPassword;
-    uint16 safetyPassword;
-    uint32 status;
-
-    Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    status = DMU_HF_ERRSR.U;
-    Fls_SetDmuEndinit(cpuPassword, safetyPassword);
-
-    return status;
+    return DMU_HF_ERRSR.U;
 }
 
 static uint32 Fls_ReadDmuStatus(void)
 {
-    uint16 cpuPassword;
-    uint16 safetyPassword;
-    uint32 status;
-
-    Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    status = DMU_HF_STATUS.U;
-    Fls_SetDmuEndinit(cpuPassword, safetyPassword);
-
-    return status;
+    return DMU_HF_STATUS.U;
 }
 
 static void Fls_RecordDmuStuck(uint32 status)
 {
-    Fls_DmuRecoveryRequired = 1u;
     Fls_DmuWaitLastStatus = status;
     Fls_DmuTimeoutJob = (uint32)Fls_State.job;
     Fls_DmuTimeoutPhase = (uint32)Fls_State.phase;
@@ -239,12 +241,16 @@ static Std_ReturnType Fls_CheckDmuReadyForCommand(Fls_AddressType address)
     status = Fls_ReadDmuStatus();
     Fls_DmuWaitLastStatus = status;
 
-    if ((Fls_DmuRecoveryRequired != 0u) ||
-            ((status & FLS_DMU_D0_BUSY_MASK) != 0u))
+    /* Reject only if the DMU is busy RIGHT NOW (a command cannot be issued mid-
+     * operation - a true hardware constraint). This is transient: the command
+     * fails, the caller retries, and the next attempt succeeds once the DMU
+     * drains. There is deliberately no persistent "recovery required" latch - a
+     * single transient busy must not block all future DFlash access until the
+     * next reset (that was a self-inflicted blocked-in-busy deadlock). */
+    if ((status & FLS_DMU_D0_BUSY_MASK) != 0u)
     {
         Fls_DmuBusyRejectCounter++;
         Fls_DmuRejectAddress = address;
-        Fls_RecordDmuStuck(status);
         return E_NOT_OK;
     }
 
@@ -424,8 +430,6 @@ static void Fls_ForceReleaseDFlashSmuTrap(void)
 
 static Fls_DmuPollResultType Fls_PollDmuReady(void)
 {
-    uint16 cpuPassword;
-    uint16 safetyPassword;
     uint32 status;
     Fls_DmuPollResultType result = FLS_DMU_POLL_READY;
 
@@ -435,15 +439,10 @@ static Fls_DmuPollResultType Fls_PollDmuReady(void)
         return FLS_DMU_POLL_ERROR;
     }
 
-    if (Fls_DmuRecoveryRequired != 0u)
-    {
-        return FLS_DMU_POLL_ERROR;
-    }
-
     Fls_DmuWaitCounter++;
-    Fls_ClearDmuEndinit(&cpuPassword, &safetyPassword);
-    Fls_DmuWaitEndinitOpenCounter++;
 
+    /* Poll the read-only DMU status directly - no EndInit window (see
+     * Fls_ReadDmuStatus). This is the hot path of the page-program busy spin. */
     status = DMU_HF_STATUS.U;
     Fls_DmuWaitLastStatus = status;
     Fls_DmuWaitLastLoops = 0u;
@@ -456,7 +455,7 @@ static Fls_DmuPollResultType Fls_PollDmuReady(void)
         }
         result = FLS_DMU_POLL_BUSY;
 
-        if (Fls_DmuWaitConsecutiveBusyCounter >= FLS_DMU_BUSY_POLL_LIMIT)
+        if (Fls_DmuWaitConsecutiveBusyCounter >= Fls_GetDmuBusyPollLimit())
         {
             Fls_DmuWaitTimeoutCounter++;
             Fls_RecordDmuStuck(status);
@@ -479,9 +478,6 @@ static Fls_DmuPollResultType Fls_PollDmuReady(void)
     {
         Fls_DmuWaitConsecutiveBusyCounter = 0u;
     }
-
-    Fls_SetDmuEndinit(cpuPassword, safetyPassword);
-    Fls_DmuWaitEndinitCloseCounter++;
 
     return result;
 }
@@ -698,7 +694,6 @@ void Fls_Init(const Fls_ConfigType *ConfigPtr)
     Fls_State.dst = NULL_PTR;
     Fls_State.mode = MEMIF_MODE_SLOW;
     Fls_DmuWaitConsecutiveBusyCounter = 0u;
-    Fls_DmuRecoveryRequired = 0u;
 }
 
 Std_ReturnType Fls_Erase(Fls_AddressType TargetAddress, Fls_LengthType Length)

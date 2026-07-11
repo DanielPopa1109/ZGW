@@ -170,6 +170,8 @@ extern void McuSm_ClearResetDtcTriggerData(void);
 extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
 extern void McuSm_CaptureWakeupImagesFromScr(void);
 extern void McuSm_SaveRetainedStateToScr(void);
+extern void McuSm_ArmFblProgrammingRequest(void);
+extern void McuSm_PublishFblResetCounter(void);
 extern boolean McuSm_RestoreRetainedStateFromScr(void);
 extern void McuSm_TRAP1(IfxCpu_Trap trapInfo);
 extern void McuSm_TRAP2(IfxCpu_Trap trapInfo);

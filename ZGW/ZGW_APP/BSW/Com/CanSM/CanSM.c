@@ -223,13 +223,16 @@ static void CanSM_HandleBusOff(uint8 ControllerId)
         if (CanSM_Channel[ControllerId].requestedMode == CANSM_COMM_FULL_COMMUNICATION)
         {
             (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_ONLINE);
+            CanIf_ControllerRecovered(ControllerId);
             CanSM_Channel[ControllerId].currentMode = CANSM_COMM_FULL_COMMUNICATION;
             CanSM_Channel[ControllerId].state = CANSM_BSM_FULL_COMMUNICATION;
+            CanSM_Channel[ControllerId].busOffCounter = 0u;
             CanSM_ModeChangeNotification(ControllerId, CANSM_COMM_FULL_COMMUNICATION);
         }
         else if (CanSM_Channel[ControllerId].requestedMode == CANSM_COMM_SILENT_COMMUNICATION)
         {
             (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_RX_ONLINE);
+            CanIf_ControllerRecovered(ControllerId);
             CanSM_Channel[ControllerId].currentMode = CANSM_COMM_SILENT_COMMUNICATION;
             CanSM_Channel[ControllerId].state = CANSM_BSM_SILENT_COMMUNICATION;
             CanSM_ModeChangeNotification(ControllerId, CANSM_COMM_SILENT_COMMUNICATION);
@@ -238,6 +241,7 @@ static void CanSM_HandleBusOff(uint8 ControllerId)
         {
             (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_OFFLINE);
             (void)Can_SetControllerMode(ControllerId, CAN_SLEEP);
+            CanIf_ControllerRecovered(ControllerId);
             CanSM_Channel[ControllerId].currentMode = CANSM_COMM_NO_COMMUNICATION;
             CanSM_Channel[ControllerId].state = CANSM_BSM_NO_COMMUNICATION;
             CanSM_ModeChangeNotification(ControllerId, CANSM_COMM_NO_COMMUNICATION);

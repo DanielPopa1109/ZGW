@@ -71,6 +71,16 @@ static void Core0_ServiceMemoryStack(void)
     Fee_MainFunction();
 
     NvM_MainFunction();
+
+    /* These boot NvM drains (Core0_WaitForNvMIdle / Core0_ServiceDemNvM) run
+     * before the scheduler, so the periodic ASIL_BSW watchdog service is not yet
+     * active even though Core0_InitWatchdog already armed both watchdogs (1 s
+     * window). A long NvM/Fee operation here would otherwise trip the watchdog
+     * mid-drain and reset the ECU at boot. Keep both watchdogs fed across the
+     * bounded wait; they stay armed. */
+    serviceCpuWatchdog();
+
+    serviceSafetyWatchdog();
 }
 
 static void Core0_WaitForNvMIdle(uint32 FailureReason)

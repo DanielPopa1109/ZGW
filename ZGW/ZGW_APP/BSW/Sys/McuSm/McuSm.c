@@ -318,7 +318,16 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
     }
 
     McuSm_SaveRetainedStateToScr();
+    /* Publish the incremented error-reset counter to the SCR XRAM mailbox so the
+     * FBL can detect a sustained boot loop and force a recovery programming
+     * session once it reaches the [49,52] window. */
+    McuSm_PublishFblResetCounter();
     McuSm_ResetHookPerformCounter++;
+
+    while(1)
+    {
+        __debug();
+    }
 
     IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
 
@@ -508,6 +517,59 @@ static uint32 McuSm_CalculateChecksum(const uint8 *data, uint16 length)
     }
 
     return checksum;
+}
+
+static void McuSm_ScrWriteFblHandoff(uint8 progRequest, uint8 commInterface, uint8 resetCounter)
+{
+    volatile uint8 *record = &((volatile uint8 *)PMS_XRAM)[SCR_FBL_XRAM_BASE];
+    uint8 framed[3];
+    uint32 checksum;
+
+    framed[0] = progRequest;
+    framed[1] = commInterface;
+    framed[2] = resetCounter;
+    checksum = McuSm_CalculateChecksum(framed, 3u);
+
+    /* Clear VALID first so a reset mid-update cannot publish a torn record. */
+    record[SCR_FBL_OFFSET_VALID] = 0u;
+
+    record[SCR_FBL_OFFSET_MAGIC + 0u] = (uint8)(SCR_FBL_MAGIC >> 24u);
+    record[SCR_FBL_OFFSET_MAGIC + 1u] = (uint8)(SCR_FBL_MAGIC >> 16u);
+    record[SCR_FBL_OFFSET_MAGIC + 2u] = (uint8)(SCR_FBL_MAGIC >> 8u);
+    record[SCR_FBL_OFFSET_MAGIC + 3u] = (uint8)(SCR_FBL_MAGIC);
+    record[SCR_FBL_OFFSET_VERSION] = SCR_FBL_VERSION;
+    record[SCR_FBL_OFFSET_PROG_REQUEST] = framed[0];
+    record[SCR_FBL_OFFSET_COMM_INTERFACE] = framed[1];
+    record[SCR_FBL_OFFSET_RESET_COUNTER] = framed[2];
+    record[9u] = 0u;
+    record[10u] = 0u;
+    record[11u] = 0u;
+    record[SCR_FBL_OFFSET_CHECKSUM + 0u] = (uint8)(checksum >> 24u);
+    record[SCR_FBL_OFFSET_CHECKSUM + 1u] = (uint8)(checksum >> 16u);
+    record[SCR_FBL_OFFSET_CHECKSUM + 2u] = (uint8)(checksum >> 8u);
+    record[SCR_FBL_OFFSET_CHECKSUM + 3u] = (uint8)(checksum);
+
+    __dsync();
+    record[SCR_FBL_OFFSET_VALID] = SCR_FBL_VALID;
+}
+
+/* Arm an explicit, tester-requested programming session (single-shot: the FBL
+ * invalidates the mailbox once it has entered programming mode). */
+void McuSm_ArmFblProgrammingRequest(void)
+{
+    McuSm_ScrWriteFblHandoff(MCUSM_FBL_PROGRAMMING_REQUEST_ACTIVE,
+                             McuSm_FBL_CommInterface,
+                             McuSm_FBL_ResetCounter);
+}
+
+/* Publish the running error-reset counter (without an explicit programming
+ * request) so the FBL boot-loop recovery window [49,52] can observe it. Forced
+ * recovery always uses Ethernet, so the interface byte is fixed here. */
+void McuSm_PublishFblResetCounter(void)
+{
+    McuSm_ScrWriteFblHandoff(MCUSM_FBL_PROGRAMMING_REQUEST_NONE,
+                             MCUSM_FBL_COMM_ETHERNET,
+                             McuSm_FBL_ResetCounter);
 }
 
 static void McuSm_CaptureRetainedState(McuSm_RetainedStateType *state)

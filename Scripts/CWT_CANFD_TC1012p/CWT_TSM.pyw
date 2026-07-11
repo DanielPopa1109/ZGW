@@ -1,4 +1,100 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# Force 32-bit Python on Windows when this .pyw is double-clicked.
+# This does not modify PATH or file associations. A 64-bit Python instance only
+# acts as a launcher, then exits after starting the same script with py -3.11-32.
+# -----------------------------------------------------------------------------
+def _restart_with_32bit_python_if_needed() -> None:
+    import os as _os
+    import struct as _struct
+    import subprocess as _subprocess
+    import sys as _sys
+
+    if _os.name != "nt":
+        return
+
+    if (_struct.calcsize("P") * 8) == 32:
+        return
+
+    _script = _os.path.abspath(__file__)
+    _args = _sys.argv[1:]
+
+    _creationflags = 0
+    if hasattr(_subprocess, "CREATE_NO_WINDOW"):
+        _creationflags |= _subprocess.CREATE_NO_WINDOW
+    if hasattr(_subprocess, "DETACHED_PROCESS"):
+        _creationflags |= _subprocess.DETACHED_PROCESS
+
+    _candidates = ["-3.11-32", "-3.12-32", "-3.10-32", "-3-32"]
+    _check_code = "import struct; raise SystemExit(0 if struct.calcsize('P') * 8 == 32 else 1)"
+
+    _selected = None
+    _last_error = ""
+
+    for _candidate in _candidates:
+        try:
+            _result = _subprocess.run(
+                ["py", _candidate, "-c", _check_code],
+                stdout=_subprocess.DEVNULL,
+                stderr=_subprocess.DEVNULL,
+                timeout=10,
+                creationflags=_creationflags,
+            )
+            if _result.returncode == 0:
+                _selected = ["py", _candidate]
+                break
+        except Exception as _exc:
+            _last_error = str(_exc)
+
+    if _selected is None:
+        try:
+            import tkinter as _tk
+            from tkinter import messagebox as _messagebox
+
+            _root = _tk.Tk()
+            _root.withdraw()
+            _messagebox.showerror(
+                "32-bit Python required",
+                "This tool must run with 32-bit Python because the TSMaster API is WIN32.\n\n"
+                "Install 32-bit Python, for example:\n\n"
+                "winget install -e --id Python.Python.3.11 --architecture x86\n\n"
+                "Then install the required packages:\n\n"
+                "py -3.11-32 -m pip install tsmasterapi pyserial cantools\n\n"
+                f"Last launcher error: {_last_error or 'no 32-bit runtime found'}",
+            )
+            _root.destroy()
+        finally:
+            _sys.exit(1)
+
+    try:
+        _subprocess.Popen(
+            _selected + [_script] + _args,
+            cwd=_os.path.dirname(_script) or None,
+            stdout=_subprocess.DEVNULL,
+            stderr=_subprocess.DEVNULL,
+            stdin=_subprocess.DEVNULL,
+            creationflags=_creationflags,
+        )
+    except Exception as _exc:
+        try:
+            import tkinter as _tk
+            from tkinter import messagebox as _messagebox
+
+            _root = _tk.Tk()
+            _root.withdraw()
+            _messagebox.showerror(
+                "32-bit Python launch failed",
+                f"Failed to start this script with {' '.join(_selected)}.\n\n{_exc}",
+            )
+            _root.destroy()
+        finally:
+            _sys.exit(1)
+
+    _sys.exit(0)
+
+
+_restart_with_32bit_python_if_needed()
+# -----------------------------------------------------------------------------
 """
 TSMaster TC1012P CAN FD tDelay sender.
 

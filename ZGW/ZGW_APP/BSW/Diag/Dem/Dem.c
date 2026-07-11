@@ -12,8 +12,7 @@
 typedef enum
 {
     DEM_NVM_STATE_IDLE = 0,
-    DEM_NVM_STATE_READ_PENDING,
-    DEM_NVM_STATE_WRITE_PENDING
+    DEM_NVM_STATE_READ_PENDING
 } Dem_InternalNvMStateType;
 
 static const Dem_ConfigType *Dem_ConfigPtr = NULL_PTR;
@@ -32,7 +31,6 @@ static boolean Dem_OperationCycleActive = FALSE;
 static uint32 Dem_OperationCycleCounter = 0u;
 
 static Dem_ClearDTCStatusType Dem_ClearStatus = DEM_CLEAR_IDLE;
-static uint8 Dem_NvMWriteRetry = 0u;
 static IfxCpu_spinLock Dem_CriticalSpinLock;
 static boolean Dem_CriticalIrqState[DEM_CRITICAL_CORE_COUNT];
 static volatile uint8 Dem_CriticalOwnedByCore[DEM_CRITICAL_CORE_COUNT];
@@ -45,6 +43,17 @@ volatile uint32 Dem_SetEventStatusCounter[DEM_MAX_EVENTS][DEM_EVENT_STATUS_DEBUG
 volatile uint32 Dem_EventStatusChangeCounter[DEM_MAX_EVENTS];
 
 long long Dem_MainFunction_Counter = 0;
+
+#define DEM_UDS_STATUS_OPERATION_CYCLE_MASK \
+    ((uint8)(DEM_UDS_STATUS_TFTOC | DEM_UDS_STATUS_TNCTOC))
+#define DEM_UDS_STATUS_PERSISTENT_MASK \
+    ((uint8)(DEM_UDS_STATUS_AVAILABILITY_MASK & \
+             ((uint8)(~DEM_UDS_STATUS_OPERATION_CYCLE_MASK))))
+
+static Dem_UdsStatusByteType Dem_GetPersistentStatus(Dem_UdsStatusByteType status)
+{
+    return (Dem_UdsStatusByteType)(status & DEM_UDS_STATUS_PERSISTENT_MASK);
+}
 
 void Dem_EnterCritical(void)
 {
@@ -482,11 +491,18 @@ static void Dem_InvokeStatusChanged(
 static void Dem_UpdatePrimaryEntryStatus(Dem_EventIdType eventId, Dem_UdsStatusByteType status)
 {
     uint16 entryIndex = Dem_FindPrimaryEntryByEvent(eventId);
+    Dem_UdsStatusByteType persistentStatus;
 
     if (entryIndex < DEM_PRIMARY_MEMORY_SIZE)
     {
-        Dem_PrimaryMemory[entryIndex].udsStatus = status;
-        Dem_PrimaryMemory[entryIndex].lastChangedCounter = ++Dem_ChangeCounter;
+        persistentStatus = Dem_GetPersistentStatus(status);
+
+        if (Dem_GetPersistentStatus(Dem_PrimaryMemory[entryIndex].udsStatus) !=
+                persistentStatus)
+        {
+            Dem_PrimaryMemory[entryIndex].udsStatus = persistentStatus;
+            Dem_PrimaryMemory[entryIndex].lastChangedCounter = ++Dem_ChangeCounter;
+        }
     }
 }
 
@@ -568,7 +584,8 @@ static void Dem_BuildNvImage(void)
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
         Dem_NvImage.eventRecords[i].eventId = Dem_RuntimeEvents[i].eventId;
-        Dem_NvImage.eventRecords[i].udsStatus = Dem_RuntimeEvents[i].udsStatus;
+        Dem_NvImage.eventRecords[i].udsStatus =
+            Dem_GetPersistentStatus(Dem_RuntimeEvents[i].udsStatus);
         Dem_NvImage.eventRecords[i].debounceCounter = Dem_RuntimeEvents[i].debounceCounter;
         Dem_NvImage.eventRecords[i].confirmationCounter = Dem_RuntimeEvents[i].confirmationCounter;
         Dem_NvImage.eventRecords[i].occurrenceCounter = Dem_RuntimeEvents[i].occurrenceCounter;
@@ -578,10 +595,12 @@ static void Dem_BuildNvImage(void)
     for (i = 0u; i < DEM_PRIMARY_MEMORY_SIZE; i++)
     {
         Dem_NvImage.primaryEntries[i] = Dem_PrimaryMemory[i];
+        Dem_NvImage.primaryEntries[i].udsStatus =
+            Dem_GetPersistentStatus(Dem_PrimaryMemory[i].udsStatus);
     }
 }
 
-static Std_ReturnType Dem_StartNvMWriteIfIdle(void)
+static Std_ReturnType Dem_UpdateNvMRamImageIfIdle(void)
 {
 #if (DEM_NVM_ENABLED == 1u)
     if ((Dem_ConfigPtr == NULL_PTR) ||
@@ -597,13 +616,12 @@ static Std_ReturnType Dem_StartNvMWriteIfIdle(void)
 
     Dem_BuildNvImage();
 
-    if (Dem_NvM_StartWrite(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) != E_OK)
+    if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) != E_OK)
     {
         return E_NOT_OK;
     }
 
     Dem_Dirty = FALSE;
-    Dem_NvMState = DEM_NVM_STATE_WRITE_PENDING;
     return E_OK;
 #else
     Dem_Dirty = FALSE;
@@ -660,7 +678,10 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
         if (eventIndex < DEM_MAX_EVENTS)
         {
             Dem_RuntimeEvents[eventIndex].udsStatus =
-                image->eventRecords[i].udsStatus & DEM_UDS_STATUS_AVAILABILITY_MASK;
+                (Dem_UdsStatusByteType)
+                    ((Dem_RuntimeEvents[eventIndex].udsStatus &
+                      DEM_UDS_STATUS_OPERATION_CYCLE_MASK) |
+                     Dem_GetPersistentStatus(image->eventRecords[i].udsStatus));
             Dem_RuntimeEvents[eventIndex].debounceCounter =
                 image->eventRecords[i].debounceCounter;
             Dem_RuntimeEvents[eventIndex].confirmationCounter =
@@ -682,6 +703,8 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
             (Dem_IsStoredDataAllowed(eventIndex) != FALSE))
         {
             Dem_PrimaryMemory[i] = image->primaryEntries[i];
+            Dem_PrimaryMemory[i].udsStatus =
+                Dem_GetPersistentStatus(Dem_PrimaryMemory[i].udsStatus);
         }
     }
 
@@ -774,7 +797,8 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
         Dem_CaptureSnapshot(eventIndex, entryIndex);
     }
 
-    Dem_PrimaryMemory[entryIndex].udsStatus = Dem_RuntimeEvents[eventIndex].udsStatus;
+    Dem_PrimaryMemory[entryIndex].udsStatus =
+        Dem_GetPersistentStatus(Dem_RuntimeEvents[eventIndex].udsStatus);
     Dem_PrimaryMemory[entryIndex].occurrenceCounter = Dem_RuntimeEvents[eventIndex].occurrenceCounter;
     Dem_PrimaryMemory[entryIndex].agingCounter = Dem_RuntimeEvents[eventIndex].agingCounter;
     Dem_PrimaryMemory[entryIndex].lastFailedCycle = Dem_OperationCycleCounter;
@@ -854,7 +878,7 @@ static void Dem_ProcessFailed(uint16 eventIndex)
     {
         Dem_StoreOrUpdatePrimaryEntry(eventIndex);
         Dem_Dirty = TRUE;
-        (void)Dem_StartNvMWriteIfIdle();
+        (void)Dem_UpdateNvMRamImageIfIdle();
     }
 }
 
@@ -877,7 +901,7 @@ static void Dem_ProcessPassed(uint16 eventIndex)
     if (testPassedTransition != FALSE)
     {
         Dem_Dirty = TRUE;
-        (void)Dem_StartNvMWriteIfIdle();
+        (void)Dem_UpdateNvMRamImageIfIdle();
     }
 }
 
@@ -1106,7 +1130,6 @@ void Dem_PreInit(void)
     Dem_OperationCycleCounter = 0u;
     Dem_ChangeCounter = 0u;
     Dem_ClearStatus = DEM_CLEAR_IDLE;
-    Dem_NvMWriteRetry = 0u;
 
     memset(Dem_RuntimeEvents, 0, sizeof(Dem_RuntimeEvents));
     memset(Dem_PrimaryMemory, 0, sizeof(Dem_PrimaryMemory));
@@ -1231,49 +1254,9 @@ void Dem_MainFunction(void)
         return;
     }
 
-    if (Dem_NvMState == DEM_NVM_STATE_WRITE_PENDING)
-    {
-        result = Dem_NvM_GetResult(Dem_ConfigPtr->NvMBlockId);
-
-        if (result == DEM_NVM_REQ_PENDING)
-        {
-            return;
-        }
-
-        if (result == DEM_NVM_REQ_OK)
-        {
-            Dem_NvMState = DEM_NVM_STATE_IDLE;
-            Dem_NvMWriteRetry = 0u;
-
-            if (Dem_ClearStatus == DEM_CLEAR_PENDING)
-            {
-                Dem_ClearStatus = DEM_CLEAR_OK;
-            }
-        }
-        else
-        {
-            Dem_NvMState = DEM_NVM_STATE_IDLE;
-
-            if (Dem_NvMWriteRetry < DEM_NVM_WRITE_RETRY_LIMIT)
-            {
-                Dem_NvMWriteRetry++;
-                Dem_Dirty = TRUE;
-            }
-            else
-            {
-                Dem_NvMWriteRetry = 0u;
-
-                if (Dem_ClearStatus == DEM_CLEAR_PENDING)
-                {
-                    Dem_ClearStatus = DEM_CLEAR_FAILED;
-                }
-            }
-        }
-    }
-
     if ((Dem_NvMState == DEM_NVM_STATE_IDLE) && (Dem_Dirty != FALSE))
     {
-        (void)Dem_StartNvMWriteIfIdle();
+        (void)Dem_UpdateNvMRamImageIfIdle();
     }
 #else
     if (Dem_ClearStatus == DEM_CLEAR_PENDING)
@@ -1639,7 +1622,7 @@ Std_ReturnType Dem_SetOperationCycleState(
         if (persistentChanged != FALSE)
         {
             Dem_Dirty = TRUE;
-            (void)Dem_StartNvMWriteIfIdle();
+            (void)Dem_UpdateNvMRamImageIfIdle();
         }
 
         return E_OK;
@@ -1734,11 +1717,12 @@ Std_ReturnType Dem_ClearDTC(
     Dem_Dirty = TRUE;
 
 #if (DEM_NVM_ENABLED == 1u)
-    Dem_ClearStatus = DEM_CLEAR_PENDING;
-    if (Dem_StartNvMWriteIfIdle() != E_OK)
+    if (Dem_UpdateNvMRamImageIfIdle() != E_OK)
     {
         Dem_Dirty = TRUE;
     }
+
+    Dem_ClearStatus = DEM_CLEAR_OK;
 #else
     Dem_ClearStatus = DEM_CLEAR_OK;
 #endif

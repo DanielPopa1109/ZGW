@@ -4,7 +4,7 @@
 #include "Std_Types.h"
 
 #define LIN_PID_MASTER_REQUEST 0x3Cu
-#define LIN_PID_SLAVE_RESPONSE 0x3Du
+#define LIN_PID_SLAVE_RESPONSE 0x7Du
 
 typedef enum
 {

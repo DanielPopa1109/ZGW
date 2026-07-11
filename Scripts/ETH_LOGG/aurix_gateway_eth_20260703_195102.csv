@@ -1,0 +1,1 @@
+timestamp,protocol,src_ip,src_port,frame_type,main_cycles,entry_index,bus,frame_id,message,signal,com_signal_id_dec,com_signal_id_hex,raw_value,decoded_value,macro

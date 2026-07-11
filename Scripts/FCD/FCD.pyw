@@ -181,10 +181,9 @@ def _build_coding_parameter_names():
         # CAN: COM_RX_PDU_BATTSOCSOH .. COM_RX_PDU_BATTCAPRES
         "BATTSOCSOH", "BATTSOC", "BATTDIAGNOSIS", "BATTCURRENT", "BATTCAPDISCHARGE", "BATTCAPRES",
     ]
-    # CAN-FD: COM_RX_PDU_CANFD_PDM4_LOADSTATUS .. COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_5
-    rx_names += ["CANFD_PDM4_LOADSTATUS", "CANFD_PDM3_LOADSTATUS",
-                 "CANFD_PDM2_LOADSTATUS", "CANFD_PDM1_LOADSTATUS"]
-    for pdm in (1, 2, 3, 4):
+    # CAN-FD: COM_RX_PDU_CANFD_PDM1_LOADSTATUS .. COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5
+    rx_names += ["CANFD_PDM1_LOADSTATUS"]
+    for pdm in (1,):
         rx_names += [f"CANFD_PDM{pdm}_VOLTAGEFEEDBACK_{i}" for i in range(1, 6)]
         rx_names += [f"CANFD_PDM{pdm}_CURRENTFEEDBACK_{i}" for i in range(1, 6)]
         rx_names += [f"CANFD_PDM{pdm}_STUCKATONEVENT", f"CANFD_PDM{pdm}_STUCKATOFFEVENT"]
@@ -211,9 +210,6 @@ def _build_coding_parameter_names():
         108: "TX_CANFD_POWERTRAINDATA1",
         109: "TX_CANFD_BODYDATA1",
         114: "TX_CANFD_COMMANDLOAD_PDM1",
-        115: "TX_CANFD_COMMANDLOAD_PDM2",
-        116: "TX_CANFD_COMMANDLOAD_PDM3",
-        117: "TX_CANFD_COMMANDLOAD_PDM4",
         118: "TX_CANFD_ENERGYMANAGEMENTDATA3",
         200: "TX_LIN_ZGW_NM3",
         201: "TX_LIN_ZGW_REQUEST_ALT",
@@ -493,9 +489,6 @@ def int_hex(value, width=4):
 DEFAULT_EXTENDED_DIAG_ADDRESSES = {
     "ZGW": 0x41,
     "PDM1": 0x42,
-    "PDM2": 0x43,
-    "PDM3": 0x44,
-    "PDM4": 0x45,
     "ALT": 0x50,
     "HVDCDC": 0x51,
     "PCU48": 0x52,

@@ -78,7 +78,7 @@ static uint8_t DoIP_IsRoutedExtendedUds(const uint8_t *uds, uint16_t udsLen)
 
     firstByte = uds[0u];
 
-    if ((firstByte >= 0x42u) && (firstByte <= 0x4Fu))
+    if (firstByte == 0x42u)
     {
         return 1u;
     }
@@ -230,6 +230,14 @@ static void DoIP_ResetVehicleAnnouncement(void)
 {
     DoIP_Rt.vehicleAnnouncementTimerMs = DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS;
     DoIP_Rt.vehicleAnnouncementRemaining = DOIP_VEHICLE_ANNOUNCE_COUNT;
+}
+
+static void DoIP_EnsureTcpListenerOpen(void)
+{
+    if ((DoIP_Rt.cfg != 0) && (DoIP_Rt.cfg->tcpSoConId != 0xFFu))
+    {
+        (void)SoAd_OpenSoCon(DoIP_Rt.cfg->tcpSoConId);
+    }
 }
 
 static void DoIP_SendVehicleAnnouncement(void)
@@ -618,9 +626,18 @@ void DoIP_MainFunction(uint32 elapsedMs)
         DoIP_Rt.testerLogicalAddress = 0u;
         DoIP_ResetTcpActivityTimers();
 
+        /* Clear the upper-layer DoIP transaction state immediately so a timeout
+         * cannot leave a stale PduR/DCM context behind until the disconnect
+         * callback arrives. */
+        if (DoIP_Rt.sessionReset != 0)
+        {
+            DoIP_Rt.sessionReset();
+        }
+
         if (DoIP_Rt.cfg != 0)
         {
             SoAd_AbortTcpConnection(DoIP_Rt.cfg->tcpSoConId);
+            DoIP_EnsureTcpListenerOpen();
         }
     }
 #endif
@@ -736,6 +753,8 @@ void DoIP_SoAdTcpConnected(SoAd_SoConIdType soConId)
     {
         DoIP_Rt.sessionReset();
     }
+
+    DoIP_EnsureTcpListenerOpen();
 }
 
 void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
@@ -758,6 +777,8 @@ void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
     {
         DoIP_Rt.sessionReset();
     }
+
+    DoIP_EnsureTcpListenerOpen();
 }
 
 DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,

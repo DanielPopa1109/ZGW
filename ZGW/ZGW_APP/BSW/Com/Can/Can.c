@@ -28,7 +28,6 @@ typedef struct
 {
         Can_ErrorStateType errorState;
         uint8 busOffPending;
-        uint16 busOffRecoveryTicks;
         uint32 busOffCounter;
         uint32 recoveredCounter;
         uint32 rxOverflowCounter;
@@ -58,9 +57,6 @@ typedef struct
 
 static const Can_StdIdFilterConfigType Can_FdStdIdFilters[] =
 {
-    { 0x093u, "PDM4_LoadStatus" }, /* PDM4_LoadStatus, sender PDM4 */
-    { 0x092u, "PDM3_LoadStatus" }, /* PDM3_LoadStatus, sender PDM3 */
-    { 0x091u, "PDM2_LoadStatus" }, /* PDM2_LoadStatus, sender PDM2 */
     { 0x090u, "PDM1_LoadStatus" }, /* PDM1_LoadStatus, sender PDM1 */
     { 0x300u, "PDM1_VoltageFeedback_1" }, /* PDM1_VoltageFeedback_1, sender PDM1 */
     { 0x301u, "PDM1_VoltageFeedback_2" }, /* PDM1_VoltageFeedback_2, sender PDM1 */
@@ -79,61 +75,7 @@ static const Can_StdIdFilterConfigType Can_FdStdIdFilters[] =
     { 0x30Eu, "PDM1_TemperatureFeedback_3" }, /* PDM1_TemperatureFeedback_3, sender PDM1 */
     { 0x30Fu, "PDM1_TemperatureFeedback_4" }, /* PDM1_TemperatureFeedback_4, sender PDM1 */
     { 0x310u, "PDM1_TemperatureFeedback_5" }, /* PDM1_TemperatureFeedback_5, sender PDM1 */
-    { 0x311u, "PDM2_VoltageFeedback_1" }, /* PDM2_VoltageFeedback_1, sender PDM2 */
-    { 0x312u, "PDM2_VoltageFeedback_2" }, /* PDM2_VoltageFeedback_2, sender PDM2 */
-    { 0x313u, "PDM2_VoltageFeedback_3" }, /* PDM2_VoltageFeedback_3, sender PDM2 */
-    { 0x314u, "PDM2_VoltageFeedback_4" }, /* PDM2_VoltageFeedback_4, sender PDM2 */
-    { 0x315u, "PDM2_VoltageFeedback_5" }, /* PDM2_VoltageFeedback_5, sender PDM2 */
-    { 0x316u, "PDM2_CurrentFeedback_1" }, /* PDM2_CurrentFeedback_1, sender PDM2 */
-    { 0x317u, "PDM2_CurrentFeedback_2" }, /* PDM2_CurrentFeedback_2, sender PDM2 */
-    { 0x318u, "PDM2_CurrentFeedback_3" }, /* PDM2_CurrentFeedback_3, sender PDM2 */
-    { 0x319u, "PDM2_CurrentFeedback_4" }, /* PDM2_CurrentFeedback_4, sender PDM2 */
-    { 0x31Au, "PDM2_CurrentFeedback_5" }, /* PDM2_CurrentFeedback_5, sender PDM2 */
-    { 0x31Bu, "PDM2_StuckAtOnEvent" }, /* PDM2_StuckAtOnEvent, sender PDM2 */
-    { 0x31Cu, "PDM2_StuckAtOffEvent" }, /* PDM2_StuckAtOffEvent, sender PDM2 */
-    { 0x31Du, "PDM2_TemperatureFeedback_1" }, /* PDM2_TemperatureFeedback_1, sender PDM2 */
-    { 0x31Eu, "PDM2_TemperatureFeedback_2" }, /* PDM2_TemperatureFeedback_2, sender PDM2 */
-    { 0x31Fu, "PDM2_TemperatureFeedback_3" }, /* PDM2_TemperatureFeedback_3, sender PDM2 */
-    { 0x320u, "PDM2_TemperatureFeedback_4" }, /* PDM2_TemperatureFeedback_4, sender PDM2 */
-    { 0x321u, "PDM2_TemperatureFeedback_5" }, /* PDM2_TemperatureFeedback_5, sender PDM2 */
-    { 0x322u, "PDM3_VoltageFeedback_1" }, /* PDM3_VoltageFeedback_1, sender PDM3 */
-    { 0x323u, "PDM3_VoltageFeedback_2" }, /* PDM3_VoltageFeedback_2, sender PDM3 */
-    { 0x324u, "PDM3_VoltageFeedback_3" }, /* PDM3_VoltageFeedback_3, sender PDM3 */
-    { 0x325u, "PDM3_VoltageFeedback_4" }, /* PDM3_VoltageFeedback_4, sender PDM3 */
-    { 0x326u, "PDM3_VoltageFeedback_5" }, /* PDM3_VoltageFeedback_5, sender PDM3 */
-    { 0x327u, "PDM3_CurrentFeedback_1" }, /* PDM3_CurrentFeedback_1, sender PDM3 */
-    { 0x328u, "PDM3_CurrentFeedback_2" }, /* PDM3_CurrentFeedback_2, sender PDM3 */
-    { 0x329u, "PDM3_CurrentFeedback_3" }, /* PDM3_CurrentFeedback_3, sender PDM3 */
-    { 0x32Au, "PDM3_CurrentFeedback_4" }, /* PDM3_CurrentFeedback_4, sender PDM3 */
-    { 0x32Bu, "PDM3_CurrentFeedback_5" }, /* PDM3_CurrentFeedback_5, sender PDM3 */
-    { 0x32Cu, "PDM3_StuckAtOnEvent" }, /* PDM3_StuckAtOnEvent, sender PDM3 */
-    { 0x32Du, "PDM3_StuckAtOffEvent" }, /* PDM3_StuckAtOffEvent, sender PDM3 */
-    { 0x32Eu, "PDM3_TemperatureFeedback_1" }, /* PDM3_TemperatureFeedback_1, sender PDM3 */
-    { 0x32Fu, "PDM3_TemperatureFeedback_2" }, /* PDM3_TemperatureFeedback_2, sender PDM3 */
-    { 0x330u, "PDM3_TemperatureFeedback_3" }, /* PDM3_TemperatureFeedback_3, sender PDM3 */
-    { 0x331u, "PDM3_TemperatureFeedback_4" }, /* PDM3_TemperatureFeedback_4, sender PDM3 */
-    { 0x332u, "PDM3_TemperatureFeedback_5" }, /* PDM3_TemperatureFeedback_5, sender PDM3 */
-    { 0x333u, "PDM4_VoltageFeedback_1" }, /* PDM4_VoltageFeedback_1, sender PDM4 */
-    { 0x334u, "PDM4_VoltageFeedback_2" }, /* PDM4_VoltageFeedback_2, sender PDM4 */
-    { 0x335u, "PDM4_VoltageFeedback_3" }, /* PDM4_VoltageFeedback_3, sender PDM4 */
-    { 0x336u, "PDM4_VoltageFeedback_4" }, /* PDM4_VoltageFeedback_4, sender PDM4 */
-    { 0x337u, "PDM4_VoltageFeedback_5" }, /* PDM4_VoltageFeedback_5, sender PDM4 */
-    { 0x338u, "PDM4_CurrentFeedback_1" }, /* PDM4_CurrentFeedback_1, sender PDM4 */
-    { 0x339u, "PDM4_CurrentFeedback_2" }, /* PDM4_CurrentFeedback_2, sender PDM4 */
-    { 0x33Au, "PDM4_CurrentFeedback_3" }, /* PDM4_CurrentFeedback_3, sender PDM4 */
-    { 0x33Bu, "PDM4_CurrentFeedback_4" }, /* PDM4_CurrentFeedback_4, sender PDM4 */
-    { 0x33Cu, "PDM4_CurrentFeedback_5" }, /* PDM4_CurrentFeedback_5, sender PDM4 */
-    { 0x33Du, "PDM4_StuckAtOnEvent" }, /* PDM4_StuckAtOnEvent, sender PDM4 */
-    { 0x33Eu, "PDM4_StuckAtOffEvent" }, /* PDM4_StuckAtOffEvent, sender PDM4 */
-    { 0x33Fu, "PDM4_TemperatureFeedback_1" }, /* PDM4_TemperatureFeedback_1, sender PDM4 */
-    { 0x340u, "PDM4_TemperatureFeedback_2" }, /* PDM4_TemperatureFeedback_2, sender PDM4 */
-    { 0x341u, "PDM4_TemperatureFeedback_3" }, /* PDM4_TemperatureFeedback_3, sender PDM4 */
-    { 0x342u, "PDM4_TemperatureFeedback_4" }, /* PDM4_TemperatureFeedback_4, sender PDM4 */
-    { 0x343u, "PDM4_TemperatureFeedback_5" }, /* PDM4_TemperatureFeedback_5, sender PDM4 */
     { 0x721u, "PDM1_DiagResponse" }, /* PDM1_DiagResponse, sender PDM1 */
-    { 0x723u, "PDM2_DiagResponse" }, /* PDM2_DiagResponse, sender PDM2 */
-    { 0x725u, "PDM3_DiagResponse" }, /* PDM3_DiagResponse, sender PDM3 */
-    { 0x727u, "PDM4_DiagResponse" }, /* PDM4_DiagResponse, sender PDM4 */
     { 0x710u, "DiagRequest_710" } /* DiagRequest_710, sender Tester */
 };
 
@@ -1092,7 +1034,6 @@ static void Can_EnterBusOff(uint8 controllerId)
     Can_RequeuePendingTx(controllerId);
     Can_Runtime[controllerId].errorState = CAN_ERROR_BUS_OFF;
     Can_Runtime[controllerId].busOffPending = TRUE;
-    Can_Runtime[controllerId].busOffRecoveryTicks = CAN_BUSOFF_RECOVERY_TICKS;
     Can_Runtime[controllerId].busOffCounter++;
 
     CanIf_ControllerBusOff(controllerId);
@@ -1535,29 +1476,7 @@ void Can_MainFunction_BusOff(void)
 
 void Can_MainFunction_Mode(void)
 {
-    uint8 controller;
-
-    for (controller = 0u; controller < CAN_NUM_CONTROLLERS; controller++)
-    {
-        if ((Can_ControllerState[controller] == CAN_BUS_OFF) &&
-                (Can_Runtime[controller].busOffPending != FALSE))
-        {
-            if (Can_Runtime[controller].busOffRecoveryTicks > 0u)
-            {
-                Can_Runtime[controller].busOffRecoveryTicks--;
-            }
-            else
-            {
-                if (Can_SetControllerMode(controller, CAN_READY) == E_OK)
-                {
-                    Can_Runtime[controller].busOffPending = FALSE;
-                    Can_Runtime[controller].errorState = CAN_ERROR_ACTIVE;
-                    Can_Runtime[controller].recoveredCounter++;
-                    CanIf_ControllerRecovered(controller);
-                }
-            }
-        }
-    }
+    /* Bus-off recovery timing and mode restoration are owned by CanSM. */
 }
 
 void Can_MainFunction_Read(void)
@@ -1672,6 +1591,8 @@ Can_ControllerStateType Can_GetControllerState(uint8 controllerId)
 
 Std_ReturnType Can_SetControllerMode(uint8 Controller, Can_ControllerStateType Transition)
 {
+    boolean wasBusOff;
+
     if (Controller >= CAN_NUM_CONTROLLERS)
     {
         return E_NOT_OK;
@@ -1680,6 +1601,8 @@ Std_ReturnType Can_SetControllerMode(uint8 Controller, Can_ControllerStateType T
     switch (Transition)
     {
         case CAN_READY:
+            wasBusOff = (Can_ControllerState[Controller] == CAN_BUS_OFF) ? TRUE : FALSE;
+
             if (Can_ControllerState[Controller] != CAN_READY)
             {
                 if (Controller == CAN_CONTROLLER_CLASSIC)
@@ -1698,6 +1621,14 @@ Std_ReturnType Can_SetControllerMode(uint8 Controller, Can_ControllerStateType T
 
             Can_RequeuePendingTx(Controller);
             Can_ControllerState[Controller] = CAN_READY;
+
+            if (wasBusOff != FALSE)
+            {
+                Can_Runtime[Controller].busOffPending = FALSE;
+                Can_Runtime[Controller].errorState = CAN_ERROR_ACTIVE;
+                Can_Runtime[Controller].recoveredCounter++;
+            }
+
             return E_OK;
 
         case CAN_SLEEP:

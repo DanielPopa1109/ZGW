@@ -62,23 +62,76 @@ Std_ReturnType Lin_SendFrame(uint8 Channel, const Lin_PduType* PduInfoPtr)
 
     memcpy(&Lin_Ch.activePdu, PduInfoPtr, sizeof(Lin_PduType));
 
-    Lin_LowLevel_SetResponseLength((uint8)(PduInfoPtr->dlc + 1u));
+    Lin_LowLevel_SetResponseLength(PduInfoPtr->dlc);
+    Lin_LowLevel_SetChecksumType(PduInfoPtr->checksumType);
 
     Lin_Ch.rxCnt = 0u;
     Lin_Ch.txCnt = 0u;
     Lin_Ch.timeout = Lin_Ch.configuredTimeout;
     Lin_Ch.result = LIN_RES_NO_RESPONSE;
-    Lin_Ch.state = LIN_TX_BREAK;
+    if (PduInfoPtr->direction == LIN_SLAVE_RESPONSE)
+    {
+        Lin_Ch.state = LIN_RX_RESPONSE;
+    }
+    else if (PduInfoPtr->direction == LIN_MASTER_RESPONSE)
+    {
+        Lin_Ch.state = LIN_TX_RESPONSE;
+    }
+    else
+    {
+        Lin_Ch.state = LIN_TX_PID;
+    }
 
-    Lin_LowLevel_SendBreak(Channel);
+    Lin_Ch.result = Lin_LowLevel_TransferFrame(Channel,
+                                               PduInfoPtr->pid,
+                                               PduInfoPtr->dlc,
+                                               (uint8)PduInfoPtr->direction,
+                                               PduInfoPtr->checksumType,
+                                               PduInfoPtr->data,
+                                               Lin_Ch.rxBuf);
+
+    if (Lin_Ch.result == LIN_RES_OK)
+    {
+        if (PduInfoPtr->direction == LIN_MASTER_RESPONSE)
+        {
+            Lin_Ch.txCnt = PduInfoPtr->dlc;
+        }
+        else if (PduInfoPtr->direction == LIN_SLAVE_RESPONSE)
+        {
+            Lin_Ch.rxCnt = PduInfoPtr->dlc;
+        }
+
+        if (Lin_Ch.sleepAfterTx != FALSE)
+        {
+            Lin_Ch.sleepAfterTx = FALSE;
+            Lin_Ch.sleepCounter++;
+            Lin_Ch.state = LIN_SLEEP;
+        }
+        else
+        {
+            Lin_Ch.state = LIN_IDLE;
+        }
+    }
+    else
+    {
+        if (Lin_Ch.result == LIN_RES_CHECKSUM_ERROR)
+        {
+            Lin_Ch.checksumErrorCounter++;
+        }
+        else if (Lin_Ch.result == LIN_RES_FRAMING_ERROR)
+        {
+            Lin_Ch.framingErrorCounter++;
+        }
+
+        Lin_Ch.sleepAfterTx = FALSE;
+        Lin_Ch.state = LIN_IDLE;
+    }
 
     return E_OK;
 }
 
 void Lin_IsrTxDone(uint8 Channel)
 {
-    uint8 checksum;
-
     if (Lin_Ch.state == LIN_TX_BREAK)
     {
         Lin_Ch.state = LIN_TX_SYNC;
@@ -98,9 +151,8 @@ void Lin_IsrTxDone(uint8 Channel)
         if (Lin_Ch.activePdu.direction == LIN_MASTER_RESPONSE)
         {
             Lin_Ch.state = LIN_TX_RESPONSE;
-            Lin_Ch.txCnt = 0u;
-            Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.data[0]);
             Lin_Ch.txCnt = 1u;
+            Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.data[0]);
         }
         else if (Lin_Ch.activePdu.direction == LIN_SLAVE_RESPONSE)
         {
@@ -121,18 +173,10 @@ void Lin_IsrTxDone(uint8 Channel)
     {
         if (Lin_Ch.txCnt < Lin_Ch.activePdu.dlc)
         {
-            Lin_LowLevel_SendByte(Channel, Lin_Ch.activePdu.data[Lin_Ch.txCnt]);
-            Lin_Ch.txCnt++;
-        }
-        else if (Lin_Ch.txCnt == Lin_Ch.activePdu.dlc)
-        {
-            checksum = Lin_CalcChecksum(Lin_Ch.activePdu.pid,
-                                        Lin_Ch.activePdu.data,
-                                        Lin_Ch.activePdu.dlc,
-                                        Lin_Ch.activePdu.checksumType);
+            uint8 txByte = Lin_Ch.activePdu.data[Lin_Ch.txCnt];
 
-            Lin_LowLevel_SendByte(Channel, checksum);
             Lin_Ch.txCnt++;
+            Lin_LowLevel_SendByte(Channel, txByte);
         }
         else
         {
@@ -154,8 +198,6 @@ void Lin_IsrTxDone(uint8 Channel)
 
 void Lin_IsrRxByte(uint8 Channel, uint8 byte)
 {
-    uint8 checksum;
-
     (void)Channel;
 
     if (Lin_Ch.state != LIN_RX_RESPONSE)
@@ -163,29 +205,15 @@ void Lin_IsrRxByte(uint8 Channel, uint8 byte)
         return;
     }
 
-    if (Lin_Ch.rxCnt < (uint8)(Lin_Ch.activePdu.dlc + 1u))
+    if (Lin_Ch.rxCnt < Lin_Ch.activePdu.dlc)
     {
         Lin_Ch.rxBuf[Lin_Ch.rxCnt] = byte;
         Lin_Ch.rxCnt++;
     }
 
-    if (Lin_Ch.rxCnt >= (uint8)(Lin_Ch.activePdu.dlc + 1u))
+    if (Lin_Ch.rxCnt >= Lin_Ch.activePdu.dlc)
     {
-        checksum = Lin_CalcChecksum(Lin_Ch.activePdu.pid,
-                                    Lin_Ch.rxBuf,
-                                    Lin_Ch.activePdu.dlc,
-                                    Lin_Ch.activePdu.checksumType);
-
-        if (checksum == Lin_Ch.rxBuf[Lin_Ch.activePdu.dlc])
-        {
-            Lin_Ch.result = LIN_RES_OK;
-        }
-        else
-        {
-            Lin_Ch.result = LIN_RES_CHECKSUM_ERROR;
-            Lin_Ch.checksumErrorCounter++;
-        }
-
+        Lin_Ch.result = LIN_RES_OK;
         Lin_LowLevel_DisableRx(Channel);
         Lin_Ch.state = LIN_IDLE;
     }
@@ -197,7 +225,11 @@ void Lin_IsrError(uint8 Channel, Lin_ResultType error)
 
     Lin_Ch.result = error;
 
-    if (error == LIN_RES_FRAMING_ERROR)
+    if (error == LIN_RES_CHECKSUM_ERROR)
+    {
+        Lin_Ch.checksumErrorCounter++;
+    }
+    else if (error == LIN_RES_FRAMING_ERROR)
     {
         Lin_Ch.framingErrorCounter++;
     }

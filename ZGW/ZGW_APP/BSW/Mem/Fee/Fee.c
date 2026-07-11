@@ -169,6 +169,7 @@ typedef struct
 static Fee_StateType Fee_State;
 static Fee_BlockRuntimeType Fee_Runtime[FEE_CONFIGURED_BLOCKS];
 static uint8 Fee_JobData[FEE_MAX_BLOCK_SIZE + FLS_DFLASH0_PAGE_SIZE];
+static uint8 Fee_PendingData[FEE_MAX_BLOCK_SIZE + FLS_DFLASH0_PAGE_SIZE];
 static const uint8 *Fee_RecordDataPtr;
 static Fee_RecordHeaderType Fee_RecordHeader;
 static Fee_RecordTrailerType Fee_RecordTrailer;
@@ -192,6 +193,19 @@ static uint8 Fee_MarkerBuffer[sizeof(Fee_RecordHeaderType) + sizeof(Fee_RecordTr
 #define FEE_ASSERT_CONCAT(a, b)  FEE_ASSERT_CONCAT_(a, b)
 #define FEE_STATIC_ASSERT(cond) \
     typedef char FEE_ASSERT_CONCAT(Fee_StaticAssert_, __LINE__)[(cond) ? 1 : -1]
+#define FEE_RECORD_STORAGE_SIZE(length) \
+    ((uint32)sizeof(Fee_RecordHeaderType) + FEE_ALIGN8_SIZE(length) + (uint32)sizeof(Fee_RecordTrailerType))
+#define FEE_REDUNDANT_RECORD_STORAGE_SIZE(length) \
+    (2u * FEE_RECORD_STORAGE_SIZE(length))
+#define FEE_SECTOR_SEAL_STORAGE_SIZE \
+    ((uint32)sizeof(Fee_SectorHeaderType) + (uint32)sizeof(Fee_RecordHeaderType) + \
+     (uint32)sizeof(Fee_RecordTrailerType))
+#define FEE_ALL_LIVE_RECORD_STORAGE_SIZE \
+    (FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_DEM_PRIMARY_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_APP_DATA_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_TIMEBASE_SIZE))
+#define FEE_MAX_PENDING_WRITE_STORAGE_SIZE \
+    FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_MAX_BLOCK_SIZE)
 
 FEE_STATIC_ASSERT((FEE_VIRTUAL_SECTOR_COUNT * FEE_VIRTUAL_SECTOR_SIZE) == FLS_DFLASH0_TOTAL_SIZE);
 FEE_STATIC_ASSERT(FEE_DATAFLASH_SIZE == FLS_DFLASH0_TOTAL_SIZE);
@@ -200,11 +214,15 @@ FEE_STATIC_ASSERT(FEE_VIRTUAL_SECTOR0_OFFSET == 0u);
 FEE_STATIC_ASSERT(FEE_VIRTUAL_SECTOR1_OFFSET == FEE_VIRTUAL_SECTOR_SIZE);
 FEE_STATIC_ASSERT((FEE_MAX_BLOCK_SIZE % FLS_DFLASH0_PAGE_SIZE) == 0u);
 FEE_STATIC_ASSERT(sizeof(Fee_JobData) >= FEE_MAX_BLOCK_SIZE);
+FEE_STATIC_ASSERT(sizeof(Fee_PendingData) >= FEE_MAX_BLOCK_SIZE);
 FEE_STATIC_ASSERT(
         ((uint32)sizeof(Fee_SectorHeaderType) +
          (uint32)sizeof(Fee_RecordHeaderType) + (uint32)sizeof(Fee_RecordTrailerType) +
          (2u * ((uint32)sizeof(Fee_RecordHeaderType) + FEE_MAX_BLOCK_SIZE +
                 (uint32)sizeof(Fee_RecordTrailerType)))) <= FEE_VIRTUAL_SECTOR_SIZE);
+FEE_STATIC_ASSERT((FEE_SECTOR_SEAL_STORAGE_SIZE +
+        FEE_ALL_LIVE_RECORD_STORAGE_SIZE +
+        FEE_MAX_PENDING_WRITE_STORAGE_SIZE) <= FEE_VIRTUAL_SECTOR_SIZE);
 static uint32 Fee_RecordStartOffset;
 static uint32 Fee_RecordTotalLength;
 static uint32 Fee_RecordPaddedLength;
@@ -525,7 +543,34 @@ static boolean Fee_IsRecordHeaderValid(const Fee_RecordHeaderType *header)
     return (boolean)(Fee_CalcHeaderCrc(&temp) == header->headerCrc);
 }
 
-static boolean Fee_IsRecordValidAt(uint32 recordOffset, uint32 sectorEnd, Fee_RecordHeaderType *header)
+/*
+ * Classify one slot in the append log during a sector scan.
+ *
+ *  FEE_RECORD_VALID     - a fully written, committed record whose data CRC
+ *                         matches; apply it and continue.
+ *  FEE_RECORD_SKIP      - a committed record whose header CRC is good (so its
+ *                         length is trustworthy and the next record boundary is
+ *                         known) but whose data is unreadable or fails its CRC.
+ *                         The slot is skipped yet the scan continues, so a good
+ *                         redundant copy written later in the same sector is
+ *                         still found instead of being thrown away with it.
+ *  FEE_RECORD_TORN_TAIL - an interrupted (torn) append: the header is missing or
+ *                         garbled, or the commit trailer was never written. This
+ *                         is the logical end of the log. The caller keeps every
+ *                         committed record applied so far and the sector stays
+ *                         usable. It MUST NOT reject the whole sector: in steady
+ *                         state the other virtual sector is erased, so rejecting
+ *                         this one forces a full reformat and loses ALL persisted
+ *                         data after any reset that interrupts a write.
+ */
+typedef enum
+{
+    FEE_RECORD_TORN_TAIL = 0,
+    FEE_RECORD_VALID,
+    FEE_RECORD_SKIP
+} Fee_RecordScanResultType;
+
+static Fee_RecordScanResultType Fee_ClassifyRecordAt(uint32 recordOffset, uint32 sectorEnd, Fee_RecordHeaderType *header)
 {
     uint32 totalLength;
     uint32 dataOffset;
@@ -533,27 +578,27 @@ static boolean Fee_IsRecordValidAt(uint32 recordOffset, uint32 sectorEnd, Fee_Re
 
     if ((recordOffset + sizeof(Fee_RecordHeaderType) + sizeof(Fee_RecordTrailerType)) > sectorEnd)
     {
-        return FALSE;
+        return FEE_RECORD_TORN_TAIL;
     }
 
     if (Fee_CopyFromFlash(recordOffset, header, sizeof(Fee_RecordHeaderType)) != E_OK)
     {
-        return FALSE;
+        return FEE_RECORD_TORN_TAIL;
     }
     if (Fee_IsRecordHeaderValid(header) == FALSE)
     {
-        return FALSE;
+        return FEE_RECORD_TORN_TAIL;
     }
 
     totalLength = (uint32)sizeof(Fee_RecordHeaderType) + Fee_Align8(header->length) + (uint32)sizeof(Fee_RecordTrailerType);
     if ((recordOffset + totalLength) > sectorEnd)
     {
-        return FALSE;
+        return FEE_RECORD_TORN_TAIL;
     }
 
     if (Fee_IsRecordCommitted(recordOffset, header) == FALSE)
     {
-        return FALSE;
+        return FEE_RECORD_TORN_TAIL;
     }
 
     if (((header->flags & FEE_FLAG_INVALID) == 0u) && ((header->flags & FEE_FLAG_SECTOR_VALID) == 0u))
@@ -561,16 +606,16 @@ static boolean Fee_IsRecordValidAt(uint32 recordOffset, uint32 sectorEnd, Fee_Re
         dataOffset = recordOffset + (uint32)sizeof(Fee_RecordHeaderType);
         if (Fee_CopyFromFlash(dataOffset, Fee_JobData, header->length) != E_OK)
         {
-            return FALSE;
+            return FEE_RECORD_SKIP;
         }
         crc = Crc_CalculateCRC32(Fee_JobData, header->length, 0u, TRUE);
         if (crc != header->dataCrc)
         {
-            return FALSE;
+            return FEE_RECORD_SKIP;
         }
     }
 
-    return TRUE;
+    return FEE_RECORD_VALID;
 }
 
 static boolean Fee_IsSectorMarkerValidAt(uint32 recordOffset, uint32 sectorEnd, Fee_RecordHeaderType *header)
@@ -724,6 +769,8 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
     while ((cursor + (uint32)sizeof(Fee_RecordHeaderType) +
             (uint32)sizeof(Fee_RecordTrailerType)) <= end)
     {
+        Fee_RecordScanResultType recordState;
+
         Fee_DebugLastScanSector = sector;
         Fee_DebugLastScanCursor = cursor;
         Fee_DebugLastScanEnd = end;
@@ -736,12 +783,30 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
             return;
         }
 
-        if (Fee_IsRecordValidAt(cursor, end, &header) == FALSE)
+        recordState = Fee_ClassifyRecordAt(cursor, end, &header);
+        if (recordState == FEE_RECORD_TORN_TAIL)
         {
+            /* Interrupted append at the log tail. Keep every committed record
+             * already applied and keep this sector usable. Park the append cursor
+             * past the end of the sector so the next write/invalidate garbage-
+             * collects into the clean sector (leaving the torn bytes behind)
+             * rather than trying to program over a partially written slot. This
+             * replaces the old behaviour of rejecting the whole sector, which -
+             * because the other virtual sector is erased in steady state - made
+             * Fee_ChooseActiveSector see "both invalid", reformat the data flash
+             * and lose every persisted block after any reset during a write. */
+            result->appendOffset = Fee_SectorEnd(sector);
+            result->scanComplete = TRUE;
             return;
         }
 
-        Fee_ApplyRecord(result->block, cursor, &header);
+        if (recordState == FEE_RECORD_VALID)
+        {
+            Fee_ApplyRecord(result->block, cursor, &header);
+        }
+        /* FEE_RECORD_SKIP: header (hence length) is trusted, so advance to the
+         * next record boundary without applying the corrupt copy and keep
+         * scanning for a good redundant copy further down the log. */
         cursor += (uint32)sizeof(Fee_RecordHeaderType) +
                 Fee_Align8(header.length) +
                 (uint32)sizeof(Fee_RecordTrailerType);
@@ -835,6 +900,26 @@ static uint32 Fee_MinimumRequiredForCurrentJob(void)
 static boolean Fee_HasSpaceForCurrentJob(void)
 {
     return (boolean)(Fee_FreeBytesInActiveSector() >= Fee_MinimumRequiredForCurrentJob());
+}
+
+static void Fee_SavePendingWriteData(void)
+{
+    if (Fee_State.userJob == FEE_USER_JOB_WRITE)
+    {
+        memcpy(Fee_PendingData,
+               Fee_JobData,
+               Fee_BlockConfig[Fee_State.jobBlockIndex].blockSize);
+    }
+}
+
+static void Fee_RestorePendingWriteData(void)
+{
+    if (Fee_State.userJob == FEE_USER_JOB_WRITE)
+    {
+        memcpy(Fee_JobData,
+               Fee_PendingData,
+               Fee_BlockConfig[Fee_State.jobBlockIndex].blockSize);
+    }
 }
 
 static void Fee_SetIdle(MemIf_JobResultType result)
@@ -963,6 +1048,8 @@ static boolean Fee_SelectReadCopy(uint16 blockIndex, uint8 attempt, uint32 *addr
 
 static void Fee_StartGc(void)
 {
+    Fee_SavePendingWriteData();
+
     Fee_State.pendingAfterGc = TRUE;
     Fee_State.pendingJob = Fee_State.userJob;
     Fee_State.pendingBlockNumber = Fee_State.jobBlockNumber;
@@ -989,6 +1076,7 @@ static void Fee_RestorePendingJobAfterGc(void)
     }
 
     Fee_State.jobBlockIndex = (uint16)idx;
+    Fee_RestorePendingWriteData();
 
     Fee_State.jobSequence = Fee_NextSequence++;
     Fee_State.copiesToWrite = (Fee_BlockConfig[Fee_State.jobBlockIndex].managementType == FEE_BLOCK_REDUNDANT) ? 2u : 1u;

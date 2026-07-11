@@ -4,6 +4,7 @@
 #include "CanTp.h"
 #include "Dcm_Cfg.h"
 #include "Ifx_Cfg.h"
+#include "LinIf.h"
 #include "LinTp.h"
 
 #include <string.h>
@@ -51,7 +52,7 @@ static uint8 ParallelFlashSwc_ForwardQueueProcessing = FALSE;
  * slave response that later arrives on DCM_RX_..._EXT_PHYS / DCM_RX_LIN_PHYS can be
  * tagged with the originating node's extended address before the Dcm relays it back
  * to the DoIP tester. */
-#define PARALLELFLASHSWC_RESP_EXT_PDU_COUNT 14u
+#define PARALLELFLASHSWC_RESP_EXT_PDU_COUNT 12u
 static uint8 ParallelFlashSwc_RespExtByPdu[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 static uint8 ParallelFlashSwc_RespExtValid[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 
@@ -72,8 +73,7 @@ static const PduIdType ParallelFlashSwc_CanExtTxPdus[] =
 
 static const PduIdType ParallelFlashSwc_CanFdExtTxPdus[] =
 {
-    DCM_TX_CANFD_EXT_PHYS,
-    DCM_TX_CANFD_EXT_PHYS_2
+    DCM_TX_CANFD_EXT_PHYS
 };
 
 volatile uint8 ParallelFlashSwc_DebugActiveCan = 0u;
@@ -130,6 +130,8 @@ static Std_ReturnType ParallelFlashSwc_SendForwardOnBus(GatewaySwc_BusType busTy
                                                         Dcm_PduLengthType udsRequestLength);
 static uint8 ParallelFlashSwc_BusCanAcceptForward(GatewaySwc_BusType busType,
                                                   uint8 extendedAddress);
+static Std_ReturnType ParallelFlashSwc_MapLinExtendedAddressToNad(uint8 extendedAddress,
+                                                                  uint8 *nad);
 static uint8 ParallelFlashSwc_FindDispatchableForwardEntry(void);
 static uint8 ParallelFlashSwc_HasQueuedForwardEntryForAddress(uint8 extendedAddress);
 static uint8 ParallelFlashSwc_HasOlderForwardEntryForAddress(uint8 entryIndex);
@@ -321,7 +323,7 @@ void ParallelFlashSwc_BroadcastTesterPresent(void)
      * forwarded to each node individually - the same path every routed request uses. */
     static const uint8 nodes[] =
     {
-        0x42u, 0x43u, 0x44u, 0x45u,                            /* CAN-FD: PDM1..PDM4        */
+        0x42u,                                                  /* CAN-FD: PDM1              */
         0x50u, 0x51u, 0x52u,                                   /* LIN:    ALT, HVDCDC, PCU48 */
         0x53u, 0x54u, 0x55u, 0x56u, 0x57u, 0x58u, 0x59u        /* CAN:    AGS..FRBE          */
     };
@@ -707,6 +709,7 @@ static Std_ReturnType ParallelFlashSwc_TransportForwardCodingRequest(uint8 exten
                                                                     Dcm_PduLengthType udsRequestLength)
 {
     GatewaySwc_BusType busType;
+    uint8 linNad;
     Std_ReturnType result;
 
     if ((udsRequest == NULL_PTR) ||
@@ -721,11 +724,14 @@ static Std_ReturnType ParallelFlashSwc_TransportForwardCodingRequest(uint8 exten
         return E_NOT_OK;
     }
 
-    if ((busType == GATEWAYSWC_BUS_LIN) &&
-        (LinTp_CanAcceptTransmitToNad(extendedAddress) == FALSE))
+    if (busType == GATEWAYSWC_BUS_LIN)
     {
-        ParallelFlashSwc_DebugForwardLinBusy++;
-        return E_OK;
+        if ((ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK) ||
+            (LinTp_CanAcceptTransmitToNad(linNad) == FALSE))
+        {
+            ParallelFlashSwc_DebugForwardLinBusy++;
+            return E_OK;
+        }
     }
 
     if ((busType != GATEWAYSWC_BUS_LIN) &&
@@ -754,6 +760,8 @@ static Std_ReturnType ParallelFlashSwc_SendForwardOnBus(GatewaySwc_BusType busTy
                                                         const uint8 *udsRequest,
                                                         Dcm_PduLengthType udsRequestLength)
 {
+    uint8 linNad;
+
     if ((udsRequest == NULL_PTR) ||
         (udsRequestLength == 0u) ||
         (udsRequestLength > PARALLELFLASHSWC_FORWARD_MAX_REQUEST))
@@ -781,10 +789,17 @@ static Std_ReturnType ParallelFlashSwc_SendForwardOnBus(GatewaySwc_BusType busTy
 
         case GATEWAYSWC_BUS_LIN:
         {
-            Std_ReturnType linResult = LinTp_TransmitToNad(DCM_TX_LIN_PHYS,
-                                                           extendedAddress,
-                                                           udsRequest,
-                                                           (PduLengthType)udsRequestLength);
+            Std_ReturnType linResult;
+
+            if (ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK)
+            {
+                return E_NOT_OK;
+            }
+
+            linResult = LinTp_TransmitToNad(DCM_TX_LIN_PHYS,
+                                            linNad,
+                                            udsRequest,
+                                            (PduLengthType)udsRequestLength);
             if (linResult == E_OK)
             {
                 /* LIN slave responses are reassembled by the master onto
@@ -901,6 +916,7 @@ static uint8 ParallelFlashSwc_BusCanAcceptForward(GatewaySwc_BusType busType,
                                                   uint8 extendedAddress)
 {
     uint8 i;
+    uint8 linNad;
 
     if ((busType == GATEWAYSWC_BUS_CAN) || (busType == GATEWAYSWC_BUS_CANFD))
     {
@@ -938,10 +954,50 @@ static uint8 ParallelFlashSwc_BusCanAcceptForward(GatewaySwc_BusType busType,
 
     if (busType == GATEWAYSWC_BUS_LIN)
     {
-        return LinTp_CanAcceptTransmitToNad(extendedAddress);
+        if (ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK)
+        {
+            return FALSE;
+        }
+
+        return LinTp_CanAcceptTransmitToNad(linNad);
     }
 
     return TRUE;
+}
+
+static Std_ReturnType ParallelFlashSwc_MapLinExtendedAddressToNad(uint8 extendedAddress,
+                                                                  uint8 *nad)
+{
+    if (nad == NULL_PTR)
+    {
+        return E_NOT_OK;
+    }
+
+    switch (extendedAddress)
+    {
+        case 0x50u:
+            *nad = LINIF_NAD_ALT;
+            return E_OK;
+
+        case 0x51u:
+            *nad = LINIF_NAD_HVDCDC;
+            return E_OK;
+
+        case 0x52u:
+            *nad = LINIF_NAD_PCU48;
+            return E_OK;
+
+        case LINIF_NAD_ALT:
+        case LINIF_NAD_HVDCDC:
+        case LINIF_NAD_PCU48:
+            *nad = extendedAddress;
+            return E_OK;
+
+        default:
+            break;
+    }
+
+    return E_NOT_OK;
 }
 
 static uint8 ParallelFlashSwc_FindDispatchableForwardEntry(void)
@@ -1038,6 +1094,7 @@ static Std_ReturnType ParallelFlashSwc_FindForwardBus(uint8 extendedAddress,
                                                       GatewaySwc_BusType *busType)
 {
     uint8 i;
+    uint8 linNad;
     const ParallelFlashSwc_TargetConfigType *target;
 
     if (busType == NULL_PTR)
@@ -1057,7 +1114,7 @@ static Std_ReturnType ParallelFlashSwc_FindForwardBus(uint8 extendedAddress,
         }
     }
 
-    if ((extendedAddress >= 0x42u) && (extendedAddress <= 0x45u))
+    if (extendedAddress == 0x42u)
     {
         *busType = GATEWAYSWC_BUS_CANFD;
         return E_OK;
@@ -1069,7 +1126,7 @@ static Std_ReturnType ParallelFlashSwc_FindForwardBus(uint8 extendedAddress,
         return E_OK;
     }
 
-    if ((extendedAddress >= 0x50u) && (extendedAddress <= 0x52u))
+    if (ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) == E_OK)
     {
         *busType = GATEWAYSWC_BUS_LIN;
         return E_OK;

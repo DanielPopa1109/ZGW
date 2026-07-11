@@ -3,7 +3,6 @@
 #include "Lin_Cfg.h"
 
 #include "IfxPort.h"
-#include <string.h>
 
 static IfxAsclin_Lin Lin_Ild;
 static uint8 Lin_LastPid;
@@ -11,6 +10,50 @@ static uint8 Lin_ResponseLen;
 static uint8 Lin_RxEnabled;
 
 #define LIN_PIN_OUTPUT_IDX   IfxPort_OutputIdx_general
+
+static IfxAsclin_Checksum Lin_LowLevel_ToHwChecksum(Lin_ChecksumType checksumType)
+{
+    if (checksumType == LIN_CS_CLASSIC)
+    {
+        return IfxAsclin_Checksum_classic;
+    }
+
+    return IfxAsclin_Checksum_enhanced;
+}
+
+static Lin_ResultType Lin_LowLevel_GetErrorResult(void)
+{
+    if (Lin_Ild.errorFlagsStatus.linChecksumError != 0u)
+    {
+        return LIN_RES_CHECKSUM_ERROR;
+    }
+
+    if (Lin_Ild.errorFlagsStatus.frameError != 0u)
+    {
+        return LIN_RES_FRAMING_ERROR;
+    }
+
+    if (Lin_Ild.errorFlagsStatus.linParityError != 0u)
+    {
+        return LIN_RES_PID_ERROR;
+    }
+
+    if ((Lin_Ild.errorFlagsStatus.responseTimeout != 0u) ||
+        (Lin_Ild.errorFlagsStatus.headerTimeout != 0u))
+    {
+        return LIN_RES_TIMEOUT;
+    }
+
+    if ((Lin_Ild.errorFlagsStatus.breakDetected != 0u) ||
+        (Lin_Ild.errorFlagsStatus.collisionDetectionError != 0u) ||
+        (Lin_Ild.errorFlagsStatus.rxFifoOverflow != 0u) ||
+        (Lin_Ild.errorFlagsStatus.txFifoOverflow != 0u))
+    {
+        return LIN_RES_NOT_OK;
+    }
+
+    return LIN_RES_OK;
+}
 
 void Lin_LowLevel_Init(void)
 {
@@ -23,6 +66,8 @@ void Lin_LowLevel_Init(void)
     cfg.lin.breakLength = 13u;
     cfg.data.checksum = IfxAsclin_Checksum_enhanced;
     cfg.data.responseTimeout = 255u;
+    cfg.lin.csEnable = TRUE;
+    cfg.lin.csi = IfxAsclin_ChecksumInjection_notWritten;
     cfg.isInterruptMode = FALSE;
     cfg.pins = &LIN_PINS;
 
@@ -33,54 +78,184 @@ void Lin_LowLevel_Init(void)
     Lin_ResponseLen = 0u;
 }
 
-void Lin_LowLevel_SendBreak(uint8 Channel)
+Lin_ResultType Lin_LowLevel_TransferFrame(uint8 Channel,
+                                          uint8 pid,
+                                          uint8 len,
+                                          uint8 direction,
+                                          Lin_ChecksumType checksumType,
+                                          const uint8* txData,
+                                          uint8* rxData)
 {
-    uint8 id;
+    IfxAsclin_Lin_PduType pdu;
+    Lin_ResultType error;
+    boolean waitError;
 
     (void)Channel;
 
+    if ((len == 0u) || (len > LIN_MAX_DATA_LEN))
+    {
+        return LIN_RES_NOT_OK;
+    }
+
+    if ((direction == LIN_MASTER_RESPONSE) && (txData == NULL_PTR))
+    {
+        return LIN_RES_NOT_OK;
+    }
+
+    if ((direction == LIN_SLAVE_RESPONSE) && (rxData == NULL_PTR))
+    {
+        return LIN_RES_NOT_OK;
+    }
+
+    pdu.pid = pid;
+    pdu.dataLength = len;
+    pdu.dataPtr = (uint8*)txData;
+    pdu.checksumMode = Lin_LowLevel_ToHwChecksum(checksumType);
+
+    if (direction == LIN_MASTER_RESPONSE)
+    {
+        pdu.direction = IfxAsclin_Lin_Direction_TransmitHeaderAndResponse;
+        IfxAsclin_Lin_sendFrame(&Lin_Ild, &pdu);
+
+        waitError = IfxAsclin_Lin_waitForTransmittedHeader(&Lin_Ild);
+        error = Lin_LowLevel_GetErrorResult();
+
+        if ((waitError != FALSE) && (error == LIN_RES_OK))
+        {
+            error = LIN_RES_TIMEOUT;
+        }
+
+        if (error != LIN_RES_OK)
+        {
+            return error;
+        }
+
+        waitError = IfxAsclin_Lin_waitForTransmittedResponse(&Lin_Ild);
+        error = Lin_LowLevel_GetErrorResult();
+
+        if ((waitError != FALSE) && (error == LIN_RES_OK))
+        {
+            error = LIN_RES_TIMEOUT;
+        }
+
+        return error;
+    }
+
+    if (direction == LIN_SLAVE_RESPONSE)
+    {
+        pdu.direction = IfxAsclin_Lin_Direction_TransmitHeaderAndReceiveResponse;
+        pdu.dataPtr = NULL_PTR;
+
+        IfxAsclin_Lin_sendFrame(&Lin_Ild, &pdu);
+
+        waitError = IfxAsclin_Lin_waitForTransmittedHeader(&Lin_Ild);
+        error = Lin_LowLevel_GetErrorResult();
+
+        if ((waitError != FALSE) && (error == LIN_RES_OK))
+        {
+            error = LIN_RES_TIMEOUT;
+        }
+
+        if (error != LIN_RES_OK)
+        {
+            return error;
+        }
+
+        waitError = IfxAsclin_Lin_waitForReceivedResponse(&Lin_Ild);
+        error = Lin_LowLevel_GetErrorResult();
+
+        if ((waitError != FALSE) && (error == LIN_RES_OK))
+        {
+            error = LIN_RES_TIMEOUT;
+        }
+
+        if (error == LIN_RES_OK)
+        {
+            IfxAsclin_Lin_readResponse(&Lin_Ild, rxData, len);
+        }
+
+        return error;
+    }
+
+    {
+        uint8 headerPid = pid;
+
+        /*
+         * In polling mode sendHeader() already waits for THE. Calling the
+         * wait helper again would clear the software flag and report a
+         * timeout even though the header was transmitted.
+         */
+        IfxAsclin_Lin_sendHeader(&Lin_Ild, &headerPid);
+    }
+
+    error = Lin_LowLevel_GetErrorResult();
+
+    if ((error == LIN_RES_OK) &&
+        (Lin_Ild.acknowledgmentFlags.txHeaderEnd == 0u))
+    {
+        error = LIN_RES_TIMEOUT;
+    }
+
+    return error;
+}
+
+void Lin_LowLevel_SendBreak(uint8 Channel)
+{
     /*
      * iLLD LIN API sends break+sync+PID through sendHeader().
      * Upper Lin state machine still models BREAK/SYNC/PID logically.
      */
-    id = 0u;
-    (void)id;
-
-    Lin_IsrTxDone(LIN_CHANNEL_0);
+    Lin_IsrTxDone(Channel);
 }
 
 void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
 {
-    static uint8 headerPhase = 0u;
     static uint8 txData[8u];
     static uint8 txLen = 0u;
+    Lin_StateType state;
 
-    (void)Channel;
+    state = Lin_GetState(Channel);
 
-    if (byte == 0x55u)
+    if ((state == LIN_TX_SYNC) && (byte == 0x55u))
     {
-        headerPhase = 1u;
+        txLen = 0u;
+        Lin_IsrTxDone(Channel);
         return;
     }
 
-    if (headerPhase == 1u)
+    if (state == LIN_TX_PID)
     {
         Lin_LastPid = byte;
-        headerPhase = 0u;
+        txLen = 0u;
 
         {
-            uint8 id = (uint8)(Lin_LastPid & 0x3Fu);
-            IfxAsclin_Lin_sendHeader(&Lin_Ild, &id);
+            Lin_ResultType error;
+            uint8 pid = Lin_LastPid;
+
+            IfxAsclin_Lin_sendHeader(&Lin_Ild, &pid);
+            error = Lin_LowLevel_GetErrorResult();
+
+            if ((error == LIN_RES_OK) &&
+                (Lin_Ild.acknowledgmentFlags.txHeaderEnd == 0u))
+            {
+                error = LIN_RES_TIMEOUT;
+            }
+
+            if (error != LIN_RES_OK)
+            {
+                Lin_IsrError(Channel, error);
+                return;
+            }
         }
 
-        Lin_IsrTxDone(LIN_CHANNEL_0);
+        Lin_IsrTxDone(Channel);
         return;
     }
 
     if (txLen >= sizeof(txData))
     {
         txLen = 0u;
-        Lin_IsrError(LIN_CHANNEL_0, LIN_RES_NOT_OK);
+        Lin_IsrError(Channel, LIN_RES_NOT_OK);
         return;
     }
 
@@ -89,18 +264,37 @@ void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
 
     if (txLen >= Lin_ResponseLen)
     {
+        Lin_ResultType error;
+
         IfxAsclin_Lin_sendResponse(&Lin_Ild, txData, txLen);
         txLen = 0u;
-        Lin_IsrTxDone(LIN_CHANNEL_0);
+
+        error = Lin_LowLevel_GetErrorResult();
+
+        if ((error == LIN_RES_OK) &&
+            (Lin_Ild.acknowledgmentFlags.txResponseEnd == 0u))
+        {
+            error = LIN_RES_TIMEOUT;
+        }
+
+        if (error != LIN_RES_OK)
+        {
+            Lin_IsrError(Channel, error);
+            return;
+        }
+
+        Lin_IsrTxDone(Channel);
+        return;
     }
+
+    Lin_IsrTxDone(Channel);
 }
 
 void Lin_LowLevel_EnableRx(uint8 Channel)
 {
     uint8 rx[LIN_MAX_DATA_LEN + 1u];
     uint32 i;
-
-    (void)Channel;
+    Lin_ResultType error;
 
     Lin_RxEnabled = TRUE;
 
@@ -110,12 +304,26 @@ void Lin_LowLevel_EnableRx(uint8 Channel)
     }
 
     IfxAsclin_Lin_receiveResponse(&Lin_Ild, rx, Lin_ResponseLen);
+    error = Lin_LowLevel_GetErrorResult();
+
+    if ((error == LIN_RES_OK) &&
+        (Lin_Ild.acknowledgmentFlags.rxResponseEnd == 0u))
+    {
+        error = LIN_RES_TIMEOUT;
+    }
+
+    if (error != LIN_RES_OK)
+    {
+        Lin_RxEnabled = FALSE;
+        Lin_IsrError(Channel, error);
+        return;
+    }
 
     if (Lin_RxEnabled != FALSE)
     {
         for (i = 0u; i < Lin_ResponseLen; i++)
         {
-            Lin_IsrRxByte(LIN_CHANNEL_0, rx[i]);
+            Lin_IsrRxByte(Channel, rx[i]);
         }
     }
 }
@@ -150,4 +358,10 @@ void Lin_LowLevel_WakeupPulse(uint8 Channel)
 void Lin_LowLevel_SetResponseLength(uint8 len)
 {
     Lin_ResponseLen = len;
+}
+
+void Lin_LowLevel_SetChecksumType(Lin_ChecksumType checksumType)
+{
+    IfxAsclin_setChecksumMode(Lin_Ild.asclin,
+                              Lin_LowLevel_ToHwChecksum(checksumType));
 }

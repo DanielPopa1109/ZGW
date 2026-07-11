@@ -260,13 +260,14 @@ static void Ram_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
 static uint32 Ram_SecCalcKey(uint32 seed, uint8 level);
 
 RAM_CODE  static void Ram_FlashInit(void);
-static uint32 Ram_CommitFblImage(void);
+RAM_CODE  static void Ram_CommitFblImage(void);
 RAM_CODE  static uint32 Ram_EraseRange(uint32 addr, uint32 len);
 RAM_CODE  static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len);
-static uint32 Ram_FlushPage(void);
-static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data);
-static IfxFlash_FlashType Ram_Bank(uint32 addr);
-static uint32 Ram_Crc32(uint32 addr, uint32 len);
+RAM_CODE  static uint32 Ram_FlushPage(void);
+RAM_CODE  static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data);
+RAM_CODE  static IfxFlash_FlashType Ram_Bank(uint32 addr);
+RAM_CODE  static uint32 Ram_Crc32(uint32 addr, uint32 len);
+RAM_CODE  static void Ram_FillByte(void *dst, uint8 value, uint32 len);
 static uint8 Ram_IsExplicitlyRejectedProgrammingAddress(uint32 addr);
 static uint8 Ram_FblRangeValid(uint32 addr, uint32 len);
 static uint32 Ram_Rd32(const uint8 *p);
@@ -1328,10 +1329,10 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
 
             for(volatile uint32 i = 0u; i < 200000u; i++) {}
 
-            if(Ram_CommitFblImage() != 0u)
-            {
-                Ram_Reset();
-            }
+            /* Never returns: erases and reprograms the FBL PFLASH from RAM, then
+             * resets. After the erase begins there is no valid flash to return to,
+             * so it resets internally on both success and failure. */
+            Ram_CommitFblImage();
 
             Ram_Reset();
         }
@@ -1481,45 +1482,50 @@ static void Ram_FlashInit(void)
     g_pageFill = 0u;
 }
 
-static uint32 Ram_CommitFblImage(void)
+static void Ram_CommitFblImage(void)
 {
     uint32 crc;
     const uint8 *src;
 
     src = (const uint8 *)(FBL_IMAGE_RAM_ADDR + (g_dl.targetAddr - FBL_START_NCACHED));
 
+    /* Pre-erase verification: the FBL PFLASH is still intact, so a mismatch can
+     * abort with a clean reset without having modified anything. */
     if(g_dl.expectedCrcValid != 0u)
     {
         crc = Ram_Crc32((uint32)src, g_dl.length);
 
         if(crc != g_dl.expectedCrc)
         {
-            return 1u;
+            Ram_Reset();
         }
     }
 
     IfxCpu_disableInterrupts();
 
+    /* From here on the FBL PFLASH (the bank holding this very code) is erased and
+     * reprogrammed. Everything below is RAM-resident and must never return into
+     * flash, so each failure resets internally instead of returning. */
     if(Ram_EraseRange(FBL_START_NCACHED, FBL_SIZE_BYTES) != 0u)
     {
-        return 1u;
+        Ram_Reset();
     }
 
     if(Ram_Program(g_dl.targetAddr, src, g_dl.length) != 0u)
     {
-        return 1u;
+        Ram_Reset();
     }
 
     if(Ram_FlushPage() != 0u)
     {
-        return 1u;
+        Ram_Reset();
     }
 
     if(g_dl.length < FBL_SIZE_BYTES)
     {
         uint32 padStart = g_dl.targetAddr + g_dl.length;
         uint32 padLen = FBL_SIZE_BYTES - (padStart - FBL_START_NCACHED);
-        memset((void *)FBL_IMAGE_RAM_ADDR, 0x36, PFLASH_PAGE_SIZE);
+        Ram_FillByte((void *)FBL_IMAGE_RAM_ADDR, 0x36, PFLASH_PAGE_SIZE);
 
         while(padLen != 0u)
         {
@@ -1527,7 +1533,7 @@ static uint32 Ram_CommitFblImage(void)
 
             if(Ram_Program(padStart, (const uint8 *)FBL_IMAGE_RAM_ADDR, chunk) != 0u)
             {
-                return 1u;
+                Ram_Reset();
             }
 
             padStart += chunk;
@@ -1536,7 +1542,7 @@ static uint32 Ram_CommitFblImage(void)
 
         if(Ram_FlushPage() != 0u)
         {
-            return 1u;
+            Ram_Reset();
         }
     }
 
@@ -1546,11 +1552,22 @@ static uint32 Ram_CommitFblImage(void)
 
         if(crc != g_dl.expectedCrc)
         {
-            return 1u;
+            Ram_Reset();
         }
     }
 
-    return 0u;
+    Ram_Reset();
+}
+
+static void Ram_FillByte(void *dst, uint8 value, uint32 len)
+{
+    volatile uint8 *p = (volatile uint8 *)dst;
+    uint32 i;
+
+    for(i = 0u; i < len; i++)
+    {
+        p[i] = value;
+    }
 }
 
 static uint32 Ram_EraseRange(uint32 addr, uint32 len)
@@ -1602,7 +1619,7 @@ static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len)
         if(g_pageAddr == 0xFFFFFFFFu)
         {
             g_pageAddr = page;
-            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
             g_pageFill = 0u;
         }
         else if(g_pageAddr != page)
@@ -1610,7 +1627,7 @@ static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len)
             if(Ram_FlushPage() != 0u) { return 1u; }
 
             g_pageAddr = page;
-            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
             g_pageFill = 0u;
         }
 
@@ -1639,7 +1656,7 @@ static uint32 Ram_FlushPage(void)
         ret = Ram_ProgramPage(g_pageAddr, g_pageBuf);
         g_pageAddr = 0xFFFFFFFFu;
         g_pageFill = 0u;
-        memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+        Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
     }
 
     return ret;

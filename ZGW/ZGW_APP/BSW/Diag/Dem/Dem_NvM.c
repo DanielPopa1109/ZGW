@@ -52,16 +52,6 @@ Std_ReturnType Dem_NvM_StartRead(uint16 blockId, void *dstPtr)
     return NvM_ReadBlock(blockId, dstPtr);
 }
 
-Std_ReturnType Dem_NvM_StartWrite(uint16 blockId, const void *srcPtr)
-{
-    if (Dem_NvM_CopyToRamBlock(blockId, srcPtr) != E_OK)
-    {
-        return E_NOT_OK;
-    }
-
-    return NvM_WriteBlock(blockId, NULL_PTR);
-}
-
 boolean Dem_NvM_IsIdle(void)
 {
     return (NvM_GetStatus() == NVM_IDLE) ? TRUE : FALSE;

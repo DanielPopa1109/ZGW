@@ -128,14 +128,28 @@ derivative tc37
         map (dest=bus:tc0:fpi_bus, dest_offset=0xd0000000, size=240k, priority=8);
         map (dest=bus:sri, dest_offset=0x70000000, size=240k);
     }   
+    /* Lower 32K of CPU0 PSPR. The FBL and the RAM updater copy the iLLD flash
+     * primitives here at runtime (FBL_FLASH_FUNC_BASE / RAM_FLASH_FUNC_BASE =
+     * 0x70100000), so nothing is linked into it. */
     memory psram0 // Program Scratch Pad Ram
     {
         mau = 8;
-        size = 64k;
+        size = 32k;
         type = ram;
-        map (dest=bus:tc0:fpi_bus, dest_offset=0xc0000000, size=64k, priority=8);
-        map (dest=bus:sri, dest_offset=0x70100000, size=64k);
-    }    
+        map (dest=bus:tc0:fpi_bus, dest_offset=0xc0000000, size=32k, priority=8);
+        map (dest=bus:sri, dest_offset=0x70100000, size=32k);
+    }
+    /* Upper 32K of CPU0 PSPR. Holds the RAM-updater .ram_code, copied from flash
+     * at startup, so the self-update path keeps executing after it erases the FBL
+     * PFLASH. Kept clear of the runtime primitive area in the lower 32K. */
+    memory psram0_ramcode
+    {
+        mau = 8;
+        size = 32k;
+        type = ram;
+        map (dest=bus:tc0:fpi_bus, dest_offset=0xc0008000, size=32k, priority=8);
+        map (dest=bus:sri, dest_offset=0x70108000, size=32k);
+    }
     /*
      * Normal FBL code/const use the cached segment-8 PFLASH alias for performance. The segment-A alias is present
      * in the same memory object only so absolute reset/vector/startup sections can be located without creating a
@@ -802,12 +816,20 @@ derivative tc37
                 {
                     select "(.text.cpu0_psram|.text.cpu0_psram.*)";
                     select "(.text.psram_text_cpu0|.text.psram_text_cpu0.*)";
-
-                    //select ".text.FblRamUpdater_Entry";
-                    //select ".text.FblRam_*";
-                    //select ".text.Ram_*";
-                    //select ".text.Fbl_RamUpdater_AURIX";
-                    //select ".text.Fbl_RamUpdater_AURIX.*";
+                }
+                /* RAM-updater destructive-phase code. Loaded in flash, run from
+                 * the upper PSPR window, copied there by the startup copy table.
+                 * It must not live in the FBL PFLASH it erases. */
+                group code_ramupdater
+                (
+                    ordered,
+                    attributes=rwx,
+                    run_addr=mem:psram0_ramcode,
+                    copy
+                )
+                {
+                    select "(.ram_code|.ram_code.*)";
+                    select "(.ram_data|.ram_data.*)";
                 }
                 //group code_psram1 (ordered, attributes=rwx, copy, run_addr=mem:psram1)
                 //{

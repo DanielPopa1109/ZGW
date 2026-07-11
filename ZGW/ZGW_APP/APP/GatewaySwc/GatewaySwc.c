@@ -87,9 +87,6 @@
 #define GATEWAYSWC_ROUTE_PHASE_SENT                   4u
 
 #define GATEWAYSWC_PDM_CMD_IDX_PDM1                   0u
-#define GATEWAYSWC_PDM_CMD_IDX_PDM2                   1u
-#define GATEWAYSWC_PDM_CMD_IDX_PDM3                   2u
-#define GATEWAYSWC_PDM_CMD_IDX_PDM4                   3u
 
 typedef struct
 {
@@ -453,7 +450,7 @@ static const GatewaySwc_PduRangeType GatewaySwc_RxMessageDiagRanges[] =
         { COM_RX_PDU_CENTRALLOCKDATA,        COM_RX_PDU_DMU_ALIVE,                       GATEWAYSWC_BUS_CAN },
         { COM_RX_PDU_VOLTAGECURRENT,         COM_RX_PDU_L1_I2T_COUNTER,                  GATEWAYSWC_BUS_CAN },
         { COM_RX_PDU_BATTSOCSOH,             COM_RX_PDU_BATTCAPRES,                      GATEWAYSWC_BUS_CAN },
-        { COM_RX_PDU_CANFD_PDM4_LOADSTATUS,  COM_RX_PDU_CANFD_PDM4_TEMPERATUREFEEDBACK_5, GATEWAYSWC_BUS_CANFD },
+        { COM_RX_PDU_CANFD_PDM1_LOADSTATUS,  COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5, GATEWAYSWC_BUS_CANFD },
         { COM_RX_PDU_LIN_ALT_STATUS,         COM_RX_PDU_LIN_PCU48_STATUS,                GATEWAYSWC_BUS_LIN }
 };
 
@@ -919,7 +916,7 @@ static void GatewaySwc_HandleEthRxMessage(uint8 soConId,
 
         (void)GatewaySwc_SendU32((Com_SignalIdType)signalId, value);
     }
-    else if ((data[3] == GATEWAYSWC_FRAME_COMMAND_BLOCK) && (len >= 88u))
+    else if ((data[3] == GATEWAYSWC_FRAME_COMMAND_BLOCK) && (len >= 52u))
     {
         uint16 idx = 4u;
         uint8 p;
@@ -927,7 +924,7 @@ static void GatewaySwc_HandleEthRxMessage(uint8 soConId,
 
         cmd = GatewaySwc_Command;
 
-        for (p = 0u; p < 4u; p++)
+        for (p = 0u; p < (uint8)(sizeof(cmd.pdmCommandLoad) / sizeof(cmd.pdmCommandLoad[0])); p++)
         {
             for (l = 0u; l < GATEWAYSWC_PDM_LOADS_PER_PDM; l++)
             {
@@ -1048,7 +1045,7 @@ static void GatewaySwc_LoadDefaultCommands(void)
     uint8 p;
     uint8 l;
 
-    for (p = 0u; p < 4u; p++)
+    for (p = 0u; p < (uint8)(sizeof(GatewaySwc_Command.pdmCommandLoad) / sizeof(GatewaySwc_Command.pdmCommandLoad[0])); p++)
     {
         for (l = 0u; l < GATEWAYSWC_PDM_LOADS_PER_PDM; l++)
         {
@@ -1308,18 +1305,6 @@ static void GatewaySwc_GenerateCanFdOutputs(void)
     (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_01, GatewaySwc_Command.pdmCommandLoad[0u][0u]);
     (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_02, GatewaySwc_Command.pdmCommandLoad[0u][1u]);
     (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_03, GatewaySwc_Command.pdmCommandLoad[0u][2u]);
-
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM2_PDM2_COMMANDLOAD_01, GatewaySwc_Command.pdmCommandLoad[1u][0u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM2_PDM2_COMMANDLOAD_02, GatewaySwc_Command.pdmCommandLoad[1u][1u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM2_PDM2_COMMANDLOAD_03, GatewaySwc_Command.pdmCommandLoad[1u][2u]);
-
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM3_PDM3_COMMANDLOAD_01, GatewaySwc_Command.pdmCommandLoad[2u][0u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM3_PDM3_COMMANDLOAD_02, GatewaySwc_Command.pdmCommandLoad[2u][1u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM3_PDM3_COMMANDLOAD_03, GatewaySwc_Command.pdmCommandLoad[2u][2u]);
-
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM4_PDM4_COMMANDLOAD_01, GatewaySwc_Command.pdmCommandLoad[3u][0u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM4_PDM4_COMMANDLOAD_02, GatewaySwc_Command.pdmCommandLoad[3u][1u]);
-    (void)GatewaySwc_SendU32(COM_SIG_TX_CANFD_COMMANDLOAD_PDM4_PDM4_COMMANDLOAD_03, GatewaySwc_Command.pdmCommandLoad[3u][2u]);
 }
 
 static void GatewaySwc_GenerateLinOutputs(void)

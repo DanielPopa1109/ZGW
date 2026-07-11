@@ -15,11 +15,29 @@
 
 #define FBL_RESET_INFO_ENTER_DOIP        0xFCD0u
 
-/* Mirrors the APP NCR group ordering in Lcf_Tasking_Tricore_Tc.lsl. */
+/* Application -> FBL programming handoff.
+ *
+ * The handoff used to live in the LMU "NCR" region (0xB00000F0...), but LBIST
+ * clears that on every reset, so it was dropped.  The application now publishes
+ * the request in the SCR XRAM mailbox (PMS standby RAM at 0xF0240000), which
+ * survives the application reset that enters the FBL.  Layout mirrors the
+ * SCR_FBL_* record in ZGW_APP/SCR/scr_time_shared.h and the writer
+ * McuSm_ArmFblProgrammingRequest() in ZGW_APP/BSW/Sys/McuSm/McuSm.c. */
+#define FBL_SCR_XRAM_ADDR                0xF0240000u   /* PMS_XRAM base (TC375) */
+#define FBL_SCR_FBL_BASE                 0x17E0u
+#define FBL_SCR_FBL_MAGIC                0x46424C31u   /* "FBL1" */
+#define FBL_SCR_FBL_VERSION              1u
+#define FBL_SCR_FBL_VALID                1u
+#define FBL_SCR_OFF_MAGIC                0u
+#define FBL_SCR_OFF_VERSION              4u
+#define FBL_SCR_OFF_VALID                5u
+#define FBL_SCR_OFF_PROG_REQUEST         6u
+#define FBL_SCR_OFF_COMM_INTERFACE       7u
+#define FBL_SCR_OFF_RESET_COUNTER        8u
+#define FBL_SCR_OFF_CHECKSUM             12u
+
+/* Retained NCR diag-session marker (write-only breadcrumb; nothing reads it). */
 #define FBL_NCR_DIAG_SESSION_ADDR        0xB00000F0u
-#define FBL_NCR_RESET_COUNTER_ADDR       0xB00000F8u
-#define FBL_NCR_PROGRAMMING_REQ_ADDR     0xB00000FCu
-#define FBL_NCR_COMM_INTERFACE_ADDR      0xB0000100u
 #define FBL_PROGRAMMING_REQUEST_ACTIVE   1u
 #define FBL_DIAG_SESSION_PROGRAMMING     0x02u
 #define FBL_RESET_COUNTER_FORCE_MIN      49u
@@ -30,7 +48,10 @@
 #define FBL_SIZE_BYTES                   0x00030000u
 
 #define APP_START_NCACHED                0xA0030000u
-#define APP_END_NCACHED                  0xA07FFFFFu
+/* TC375DP has 6 MB PFLASH (0xA0000000..0xA05FFFFF). The APP window must end at
+ * the last physical byte; using 0xA07FFFFF erased/accepted 2 MB of non-existent
+ * bank-B sectors. */
+#define APP_END_NCACHED                  0xA05FFFFFu
 
 #define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
 #define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
@@ -52,10 +73,10 @@
 #define FBL_PFLASH_END_CACHED            0x8002FFFFu
 
 #define APP_PFLASH_START_CACHED          0x80030000u
-#define APP_PFLASH_END_CACHED            0x807FFFFFu
+#define APP_PFLASH_END_CACHED            0x805FFFFFu
 
 #define APP_PFLASH_START_NC              0xA0030000u
-#define APP_PFLASH_END_NC                0xA07FFFFFu
+#define APP_PFLASH_END_NC                0xA05FFFFFu
 
 /* APP reset/start execution address (cached alias). The FBL jumps here. */
 #define APP_START_CACHED                 APP_PFLASH_START_CACHED
@@ -135,6 +156,12 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define UDS_NRC_INVALID_KEY              0x35u
 #define UDS_NRC_TRANSFER_FAIL            0x70u
 #define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
+#define UDS_NRC_RESPONSE_PENDING         0x78u
+
+/* The whole-application erase blocks for seconds. Erase it in sector batches and
+ * emit a 7F xx 78 (responsePending) between batches so the tester's P2* timer is
+ * refreshed and (over DoIP) the TCP connection stays serviced. */
+#define FBL_ERASE_BATCH_SECTORS          8u
 
 #define UDS_RID_ERASE_APP                0x0001u
 #define UDS_RID_CRC_CHECK                0x0002u
@@ -282,8 +309,10 @@ static const uint8 Fbl_DoIpGid[6] = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
 
 IFX_INTERRUPT(Fbl_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
-static uint8 Fbl_ReadNcrU8(uint32 addr);
 static void Fbl_WriteNcrU8(uint32 addr, uint8 value);
+static uint32 Fbl_ScrFblChecksum(uint8 progRequest, uint8 commInterface, uint8 resetCounter);
+static uint8 Fbl_ScrReadFblHandoff(uint8 *progRequest, uint8 *commInterface, uint8 *resetCounter);
+static void Fbl_ScrInvalidateFblHandoff(void);
 static uint8 Fbl_NormalizeTransport(uint8 transport);
 static uint8 Fbl_ResetCounterForcesProgramming(uint8 resetCounter);
 static uint8 Fbl_IsAppValid(void);
@@ -305,6 +334,7 @@ static void Fbl_IsoTpDelayStMin(uint8 stMin);
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
 static void Fbl_UdsSend(const uint8 *res, uint16 len, uint8 transport);
 static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
+static void Fbl_UdsKeepAlive(uint8 sid, uint8 transport);
 static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport);
 static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level);
 static void Fbl_DoIpMain(void);
@@ -335,14 +365,75 @@ static void Fbl_Wr32(uint8 *p, uint32 v);
 static void Fbl_JumpToApp(void);
 static void Fbl_CopyAndJumpRamUpdater(void);
 
-static uint8 Fbl_ReadNcrU8(uint32 addr)
-{
-    return *((volatile uint8 *)addr);
-}
-
 static void Fbl_WriteNcrU8(uint32 addr, uint8 value)
 {
     *((volatile uint8 *)addr) = value;
+}
+
+/* FNV-1a over the three payload bytes. Must match McuSm_ArmFblProgrammingRequest
+ * (McuSm_CalculateChecksum) on the application side. */
+static uint32 Fbl_ScrFblChecksum(uint8 progRequest, uint8 commInterface, uint8 resetCounter)
+{
+    uint32 checksum = 0x811C9DC5u;
+
+    checksum = (checksum ^ (uint32)progRequest) * 16777619u;
+    checksum = (checksum ^ (uint32)commInterface) * 16777619u;
+    checksum = (checksum ^ (uint32)resetCounter) * 16777619u;
+
+    return checksum;
+}
+
+/* Read the application's programming handoff from the SCR XRAM mailbox.
+ * Returns 1 and fills the outputs only for a valid, checksum-matched record. */
+static uint8 Fbl_ScrReadFblHandoff(uint8 *progRequest, uint8 *commInterface, uint8 *resetCounter)
+{
+    volatile const uint8 *rec = &((volatile const uint8 *)FBL_SCR_XRAM_ADDR)[FBL_SCR_FBL_BASE];
+    uint32 magic;
+    uint32 stored;
+    uint8 prog;
+    uint8 comm;
+    uint8 rstc;
+
+    magic = ((uint32)rec[FBL_SCR_OFF_MAGIC] << 24u) |
+            ((uint32)rec[FBL_SCR_OFF_MAGIC + 1u] << 16u) |
+            ((uint32)rec[FBL_SCR_OFF_MAGIC + 2u] << 8u) |
+            ((uint32)rec[FBL_SCR_OFF_MAGIC + 3u]);
+
+    if((magic != FBL_SCR_FBL_MAGIC) ||
+       (rec[FBL_SCR_OFF_VERSION] != FBL_SCR_FBL_VERSION) ||
+       (rec[FBL_SCR_OFF_VALID] != FBL_SCR_FBL_VALID))
+    {
+        return 0u;
+    }
+
+    prog = rec[FBL_SCR_OFF_PROG_REQUEST];
+    comm = rec[FBL_SCR_OFF_COMM_INTERFACE];
+    rstc = rec[FBL_SCR_OFF_RESET_COUNTER];
+
+    stored = ((uint32)rec[FBL_SCR_OFF_CHECKSUM] << 24u) |
+             ((uint32)rec[FBL_SCR_OFF_CHECKSUM + 1u] << 16u) |
+             ((uint32)rec[FBL_SCR_OFF_CHECKSUM + 2u] << 8u) |
+             ((uint32)rec[FBL_SCR_OFF_CHECKSUM + 3u]);
+
+    if(stored != Fbl_ScrFblChecksum(prog, comm, rstc))
+    {
+        return 0u;
+    }
+
+    *progRequest = prog;
+    *commInterface = comm;
+    *resetCounter = rstc;
+
+    return 1u;
+}
+
+/* Consume the mailbox: clearing VALID makes the programming request single-shot
+ * so the FBL cannot re-enter programming on the next (non-diagnostic) reset. */
+static void Fbl_ScrInvalidateFblHandoff(void)
+{
+    volatile uint8 *rec = &((volatile uint8 *)FBL_SCR_XRAM_ADDR)[FBL_SCR_FBL_BASE];
+
+    rec[FBL_SCR_OFF_VALID] = 0u;
 }
 
 static uint8 Fbl_NormalizeTransport(uint8 transport)
@@ -391,13 +482,32 @@ void core0_main(void)
     resetInfo = MODULE_SCU.RSTCON2.B.USRINFO;
     g_FblLastResetReason = resetInfo;
 
-    programmingRequest = Fbl_ReadNcrU8(FBL_NCR_PROGRAMMING_REQ_ADDR);
-    requestedTransport = Fbl_NormalizeTransport(Fbl_ReadNcrU8(FBL_NCR_COMM_INTERFACE_ADDR));
-    resetCounter = Fbl_ReadNcrU8(FBL_NCR_RESET_COUNTER_ADDR);
+    {
+        uint8 scrProg = 0u;
+        uint8 scrComm = 0u;
+        uint8 scrResetCounter = 0u;
+
+        if(Fbl_ScrReadFblHandoff(&scrProg, &scrComm, &scrResetCounter) != 0u)
+        {
+            programmingRequest = scrProg;
+            requestedTransport = Fbl_NormalizeTransport(scrComm);
+            resetCounter = scrResetCounter;
+        }
+        else
+        {
+            programmingRequest = 0u;
+            requestedTransport = FBL_TRANSPORT_ETH;
+            resetCounter = 0u;
+        }
+    }
 
     if(Fbl_ResetCounterForcesProgramming(resetCounter) != 0u)
     {
-        Fbl_WriteNcrU8(FBL_NCR_COMM_INTERFACE_ADDR, FBL_TRANSPORT_ETH);
+        /* Consume the mailbox so a freshly recovered application can boot: without
+         * this the same in-window counter would force the loader again after the
+         * recovery flash + reset. The application republishes a higher counter on
+         * its next error reset, keeping the [49,52] window alive while it loops. */
+        Fbl_ScrInvalidateFblHandoff();
         Fbl_WriteNcrU8(FBL_NCR_DIAG_SESSION_ADDR, FBL_DIAG_SESSION_PROGRAMMING);
         g_FblTransportSelect = FBL_TRANSPORT_ETH;
         g_FblStayInBoot = 0u;
@@ -419,7 +529,7 @@ void core0_main(void)
 
     if(programmingRequest == FBL_PROGRAMMING_REQUEST_ACTIVE)
     {
-        Fbl_WriteNcrU8(FBL_NCR_PROGRAMMING_REQ_ADDR, 0u);
+        Fbl_ScrInvalidateFblHandoff();
     }
 
     Fbl_PlatformInit();
@@ -1102,7 +1212,35 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         }
         else if((req[1u] == 0x01u) && (rid == UDS_RID_ERASE_APP))
         {
-            if(Fbl_FlashEraseRange(APP_START_NCACHED, (APP_END_NCACHED - APP_START_NCACHED) + 1u) != 0u)
+            uint32 eraseAddr = APP_START_NCACHED;
+            uint32 eraseEnd = APP_END_NCACHED + 1u;
+            uint32 batch = (uint32)FBL_ERASE_BATCH_SECTORS * PFLASH_SECTOR_SIZE;
+            uint8 eraseOk = 1u;
+
+            /* Tell the tester to wait before the first (already multi-ms) batch so
+             * the initial P2 window is not missed. */
+            Fbl_UdsKeepAlive(sid, transport);
+
+            while(eraseAddr < eraseEnd)
+            {
+                uint32 chunk = eraseEnd - eraseAddr;
+                if(chunk > batch) { chunk = batch; }
+
+                if(Fbl_FlashEraseRange(eraseAddr, chunk) != 0u)
+                {
+                    eraseOk = 0u;
+                    break;
+                }
+
+                eraseAddr += chunk;
+
+                if(eraseAddr < eraseEnd)
+                {
+                    Fbl_UdsKeepAlive(sid, transport);
+                }
+            }
+
+            if(eraseOk == 0u)
             {
                 Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
                 return;
@@ -1314,6 +1452,20 @@ static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
     res[2u] = nrc;
 
     Fbl_UdsSend(res, 3u, transport);
+}
+
+/* Emit a responsePending (7F sid 78) during a long-running service and, over
+ * Ethernet, run the lwIP main function so the segment is actually transmitted
+ * and the DoIP/TCP connection is kept serviced while flash is busy. */
+static void Fbl_UdsKeepAlive(uint8 sid, uint8 transport)
+{
+    Fbl_UdsNeg(sid, UDS_NRC_RESPONSE_PENDING, transport);
+
+    if(transport == FBL_TRANSPORT_ETH)
+    {
+        FblEth_MainFunction();
+        FblEth_MainFunction();
+    }
 }
 
 static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)

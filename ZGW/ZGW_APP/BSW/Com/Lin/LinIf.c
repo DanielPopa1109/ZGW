@@ -1,10 +1,16 @@
 #include "LinIf.h"
+#include "Lin_Cfg.h"
 #include "LinTp.h"
 #include "PduR.h"
 #include <string.h>
 #include "SysMgr.h"
 
 long long LinIf_MainFunction_Counter = 0;
+
+#define LINIF_MAIN_FUNCTION_PERIOD_MS 5u
+#define LINIF_MS_TO_TICKS(delayMs) \
+    ((uint16)(((delayMs) + LINIF_MAIN_FUNCTION_PERIOD_MS - 1u) / LINIF_MAIN_FUNCTION_PERIOD_MS))
+#define LINIF_LDF_SLOT_TICKS LINIF_MS_TO_TICKS(LIN_LDF_TIME_BASE_MS)
 
 static const Lin_FrameConfigType LinIf_Frame_MRF =
 {
@@ -52,24 +58,24 @@ static const Lin_FrameConfigType LinIf_Frame_PCU48_STATUS =
 };
 static const LinIf_ScheduleEntryType LinIf_NormalEntries[] =
 {
-    { &LinIf_Frame_ZGW_NM3, 10u, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_ZGW_REQUEST_PCU48, 10u, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_ZGW_REQUEST_HVDCDC, 10u, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_ZGW_REQUEST_ALT, 10u, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_PCU48_STATUS, 10u, LIN_SLAVE_RESPONSE },
-    { &LinIf_Frame_HVDCDC_STATUS, 10u, LIN_SLAVE_RESPONSE },
-    { &LinIf_Frame_ALT_STATUS, 10u, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_ZGW_NM3, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_PCU48, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_HVDCDC, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_ZGW_REQUEST_ALT, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
+    { &LinIf_Frame_PCU48_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_HVDCDC_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_ALT_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
 };
 
 
 static const LinIf_ScheduleEntryType LinIf_DiagReqEntries[] =
 {
-    { &LinIf_Frame_MRF, 10u, LIN_MASTER_RESPONSE }
+    { &LinIf_Frame_MRF, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE }
 };
 
 static const LinIf_ScheduleEntryType LinIf_DiagRespEntries[] =
 {
-    { &LinIf_Frame_SRF, 10u, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_SRF, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
 };
 
 static const LinIf_ScheduleTableType LinIf_Schedules[] =
@@ -308,7 +314,7 @@ static Std_ReturnType LinIf_TransmitFrame(const LinIf_ScheduleEntryType* entry)
     pdu.dlc = entry->frame->dlc;
     pdu.checksumType = entry->frame->checksumType;
 
-    if ((pdu.pid == 0u) && (entry->frame->id <= 0x3Fu))
+    if (entry->frame->id <= 0x3Fu)
     {
         pdu.pid = Lin_MakePid(entry->frame->id);
     }
@@ -357,6 +363,8 @@ void LinIf_MainFunction(void)
     uint8 len;
     uint8 rxIdx;
     uint8 txIdx;
+    uint8 completedSchedule;
+    uint8 completedIndex;
     Lin_ResultType res;
 
     Lin_MainFunction();
@@ -380,65 +388,52 @@ void LinIf_MainFunction(void)
         }
     }
 
+    if (LinIf_State.timer > 0u)
+    {
+        LinIf_State.timer--;
+    }
+
     if (LinIf_State.busy == TRUE)
     {
-        if (Lin_GetState(LIN_CHANNEL_0) == LIN_IDLE)
+        if (Lin_GetState(LIN_CHANNEL_0) != LIN_IDLE)
         {
-            entry = &LinIf_Schedules[LinIf_State.activeSchedule].entries[LinIf_State.index];
-            res = Lin_GetStatus(LIN_CHANNEL_0, rx, &len);
+            return;
+        }
 
-            if (res == LIN_RES_OK)
+        completedSchedule = LinIf_State.activeSchedule;
+        completedIndex = LinIf_State.index;
+        entry = &LinIf_Schedules[completedSchedule].entries[completedIndex];
+        res = Lin_GetStatus(LIN_CHANNEL_0, rx, &len);
+
+        if (res == LIN_RES_OK)
+        {
+            if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
             {
-                if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
-                {
-                    LinTp_TxFrameConfirmation(TRUE);
-                    LinIf_DiagFrameDone(TRUE);
-                }
-                else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
-                {
-                    memcpy(LinIf_State.diagResp, rx, 8u);
-                    LinIf_State.diagRespValid = TRUE;
-
-                    LinTp_RxSlaveResponse(rx);
-                    LinIf_DiagFrameDone(TRUE);
-                    SysMgr_NotifyBusActivity();
-                }
-                else if (entry->frame->frameClass == LIN_FRM_UNCONDITIONAL)
-                {
-                    if (entry->direction == LIN_SLAVE_RESPONSE)
-                    {
-                        rxIdx = LinIf_FindRxPduByFrameId(entry->frame->id);
-
-                        if (rxIdx != 0xFFu)
-                        {
-                            PduR_LinIfRxIndication(LinIf_AppRxPduCfg[rxIdx].pduId, rx, (PduLengthType)len);
-                            SysMgr_NotifyBusActivity();
-                        }
-                    }
-                    else if (entry->direction == LIN_MASTER_RESPONSE)
-                    {
-                        txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
-
-                        if (txIdx != 0xFFu)
-                        {
-                            PduR_LinIfTxConfirmation(LinIf_AppTxPduCfg[txIdx].pduId);
-                        }
-                    }
-                }
+                LinTp_TxFrameConfirmation(TRUE);
+                LinIf_DiagFrameDone(TRUE);
             }
-            else
+            else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
             {
-                if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
+                memcpy(LinIf_State.diagResp, rx, 8u);
+                LinIf_State.diagRespValid = TRUE;
+
+                LinTp_RxSlaveResponse(rx);
+                LinIf_DiagFrameDone(TRUE);
+                SysMgr_NotifyBusActivity();
+            }
+            else if (entry->frame->frameClass == LIN_FRM_UNCONDITIONAL)
+            {
+                if (entry->direction == LIN_SLAVE_RESPONSE)
                 {
-                    LinTp_TxFrameConfirmation(FALSE);
-                    LinIf_DiagFrameDone(FALSE);
+                    rxIdx = LinIf_FindRxPduByFrameId(entry->frame->id);
+
+                    if (rxIdx != 0xFFu)
+                    {
+                        PduR_LinIfRxIndication(LinIf_AppRxPduCfg[rxIdx].pduId, rx, (PduLengthType)len);
+                        SysMgr_NotifyBusActivity();
+                    }
                 }
-                else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
-                {
-                    LinIf_DiagFrameDone(FALSE);
-                }
-                else if ((entry->frame->frameClass == LIN_FRM_UNCONDITIONAL) &&
-                         (entry->direction == LIN_MASTER_RESPONSE))
+                else if (entry->direction == LIN_MASTER_RESPONSE)
                 {
                     txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
 
@@ -448,9 +443,36 @@ void LinIf_MainFunction(void)
                     }
                 }
             }
+        }
+        else
+        {
+            if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_MRF)
+            {
+                LinTp_TxFrameConfirmation(FALSE);
+                LinIf_DiagFrameDone(FALSE);
+            }
+            else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
+            {
+                LinIf_DiagFrameDone(FALSE);
+            }
+            else if ((entry->frame->frameClass == LIN_FRM_UNCONDITIONAL) &&
+                     (entry->direction == LIN_MASTER_RESPONSE))
+            {
+                txIdx = LinIf_FindTxPduByFrameId(entry->frame->id);
 
-            LinIf_State.busy = FALSE;
-            LinIf_State.channelState = LINIF_CHANNEL_IDLE;
+                if (txIdx != 0xFFu)
+                {
+                    PduR_LinIfTxConfirmation(LinIf_AppTxPduCfg[txIdx].pduId);
+                }
+            }
+        }
+
+        LinIf_State.busy = FALSE;
+        LinIf_State.channelState = LINIF_CHANNEL_IDLE;
+
+        if ((LinIf_State.activeSchedule == completedSchedule) &&
+            (LinIf_State.index == completedIndex))
+        {
             LinIf_State.index++;
 
             sched = &LinIf_Schedules[LinIf_State.activeSchedule];
@@ -471,13 +493,10 @@ void LinIf_MainFunction(void)
                 }
             }
         }
-
-        return;
     }
 
     if (LinIf_State.timer > 0u)
     {
-        LinIf_State.timer--;
         return;
     }
 

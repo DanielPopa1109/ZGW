@@ -11,7 +11,8 @@
 #define CODINGAPP_UNUSED(x)                  ((void)(x))
 
 #define CODINGAPP_DEM_STATE_UNKNOWN          0xFFu
-#define CODINGAPP_NVM_PENDING_POLL_LIMIT     0xFFu
+#define CODINGAPP_NVM_PENDING_POLL_LIMIT     0x20u
+#define CODINGAPP_NVM_PUMP_CYCLE_BUDGET      4096u
 
 typedef enum
 {
@@ -63,6 +64,9 @@ static Std_ReturnType CodingApp_ApplyValidImage(const CodingApp_NvImageType *ima
 static void CodingApp_LoadFromNvRam(void);
 static Dcm_ReturnType CodingApp_StartWriteAll(uint8 *respData, Dcm_PduLengthType *respLen);
 static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType *respLen);
+static boolean CodingApp_IsNvMStackBusy(void);
+static void CodingApp_PumpNvMStack(void);
+static boolean CodingApp_CountNvMPendingPoll(void);
 static void CodingApp_ClearPendingNvMJob(void);
 static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_PduLengthType *respLen);
 
@@ -835,7 +839,7 @@ static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId)
 {
     if (((txPduId >= COM_TX_PDU_XCPREQUEST_7C8) && (txPduId <= COM_TX_PDU_XCPREQUEST_7C0)) ||
         ((txPduId >= COM_TX_PDU_DIAGREQUEST_706) && (txPduId <= COM_TX_PDU_DIAGREQUEST_700)) ||
-        ((txPduId >= COM_TX_PDU_CANFD_PDM1_DIAGREQUEST) && (txPduId <= COM_TX_PDU_CANFD_PDM4_DIAGREQUEST)))
+        (txPduId == COM_TX_PDU_CANFD_PDM1_DIAGREQUEST))
     {
         return TRUE;
     }
@@ -929,9 +933,6 @@ static void CodingApp_BuildImageFromMask(
     CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_702, TRUE);
     CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_DIAGREQUEST_700, TRUE);
     CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM1_DIAGREQUEST, TRUE);
-    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM2_DIAGREQUEST, TRUE);
-    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM3_DIAGREQUEST, TRUE);
-    CodingApp_SetTxPduEnabledBit(image, COM_TX_PDU_CANFD_PDM4_DIAGREQUEST, TRUE);
 
 }
 
@@ -1077,17 +1078,25 @@ static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType 
         return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
     }
 
+    (void)NvM_StartDeferredDefaultImage();
+    CodingApp_PumpNvMStack();
+
     if (CodingApp_PendingNvMStarted == FALSE)
     {
-        if (NvM_GetStatus() != NVM_IDLE)
+    if (NvM_GetStatus() != NVM_IDLE)
+    {
+        if (CodingApp_CountNvMPendingPoll() != FALSE)
         {
-            if (CodingApp_PendingNvMPollCount < CODINGAPP_NVM_PENDING_POLL_LIMIT)
-            {
-                CodingApp_PendingNvMPollCount++;
-            }
             CodingApp_UpdateDebug();
             return DCM_E_PENDING;
         }
+
+        CodingApp_Status.lastNvMResult = NVM_REQ_NOT_OK;
+        CodingApp_Status.validationStatus = CODINGAPP_VALIDATION_NVM_ERROR;
+        CodingApp_ClearPendingNvMJob();
+        CodingApp_UpdateDebug();
+        return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
+    }
 
         if (NvM_WriteBlock(NVM_BLOCK_ID_APP_DATA, NULL_PTR) != E_OK)
         {
@@ -1102,17 +1111,23 @@ static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType 
         CodingApp_PendingNvMPollCount = 0u;
         CodingApp_Status.lastNvMResult = NVM_REQ_PENDING;
         CodingApp_UpdateDebug();
-        return DCM_E_PENDING;
+
+        CodingApp_PumpNvMStack();
     }
 
     if (NvM_GetStatus() != NVM_IDLE)
     {
-        if (CodingApp_PendingNvMPollCount < CODINGAPP_NVM_PENDING_POLL_LIMIT)
+        if (CodingApp_CountNvMPendingPoll() != FALSE)
         {
-            CodingApp_PendingNvMPollCount++;
+            CodingApp_UpdateDebug();
+            return DCM_E_PENDING;
         }
+
+        CodingApp_Status.lastNvMResult = NVM_REQ_NOT_OK;
+        CodingApp_Status.validationStatus = CODINGAPP_VALIDATION_NVM_ERROR;
+        CodingApp_ClearPendingNvMJob();
         CodingApp_UpdateDebug();
-        return DCM_E_PENDING;
+        return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
     }
 
     if (NvM_GetErrorStatus(NVM_BLOCK_ID_APP_DATA, &nvmResult) != E_OK)
@@ -1136,6 +1151,59 @@ static Dcm_ReturnType CodingApp_PollWriteAll(uint8 *respData, Dcm_PduLengthType 
     CodingApp_UpdateDebug();
     CodingApp_FillRoutineResponse(CODINGAPP_ROUTINE_STATUS_OK, respData, respLen);
     return DCM_E_OK;
+}
+
+static boolean CodingApp_IsNvMStackBusy(void)
+{
+    NvM_StatusType nvmStatus;
+    MemIf_StatusType feeStatus;
+    MemIf_StatusType flsStatus;
+
+    nvmStatus = NvM_GetStatus();
+    feeStatus = Fee_GetStatus();
+    flsStatus = Fls_GetStatus();
+
+    if ((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL))
+    {
+        return TRUE;
+    }
+
+    if ((feeStatus == MEMIF_BUSY) || (feeStatus == MEMIF_BUSY_INTERNAL))
+    {
+        return TRUE;
+    }
+
+    if (flsStatus == MEMIF_BUSY)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void CodingApp_PumpNvMStack(void)
+{
+    uint16 cycleBudget;
+
+    cycleBudget = CODINGAPP_NVM_PUMP_CYCLE_BUDGET;
+    while ((cycleBudget > 0u) && (CodingApp_IsNvMStackBusy() != FALSE))
+    {
+        Fls_MainFunction();
+        Fee_MainFunction();
+        NvM_MainFunction();
+        cycleBudget--;
+    }
+}
+
+static boolean CodingApp_CountNvMPendingPoll(void)
+{
+    if (CodingApp_PendingNvMPollCount < CODINGAPP_NVM_PENDING_POLL_LIMIT)
+    {
+        CodingApp_PendingNvMPollCount++;
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 static void CodingApp_ClearPendingNvMJob(void)

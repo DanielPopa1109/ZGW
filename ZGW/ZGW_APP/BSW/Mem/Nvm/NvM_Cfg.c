@@ -24,7 +24,7 @@ const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS] =
         NVM_BLOCK_DEM_PRIMARY_LENGTH,
         (uint8 *)&Dem_NvImage,
         NULL_PTR,
-        NVM_BLOCK_REDUNDANT,
+        NVM_BLOCK_NATIVE,
         TRUE,
         FALSE,
         FALSE
@@ -34,7 +34,7 @@ const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS] =
         NVM_BLOCK_APP_DATA_LENGTH,
         NvM_AppData_Ram,
         NvM_AppData_Rom,
-        NVM_BLOCK_REDUNDANT,
+        NVM_BLOCK_NATIVE,
         TRUE,
         FALSE,
         FALSE
@@ -44,7 +44,7 @@ const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS] =
         NVM_BLOCK_TIMEBASE_LENGTH,
         NvM_TimeBase_Ram,
         NvM_TimeBase_Rom,
-        NVM_BLOCK_REDUNDANT,
+        NVM_BLOCK_NATIVE,
         TRUE,
         FALSE,
         FALSE
