@@ -74,6 +74,7 @@ static uint8 CanTp_TxPayloadBufferOwner[CANTP_MAX_TX_BUFFERS];
 static uint8 CanTp_TxAddressOverrideValid[CANTP_MAX_CHANNELS];
 static uint8 CanTp_TxAddressOverride[CANTP_MAX_CHANNELS];
 
+#if CANTP_DEBUG_INSTRUMENTATION
 volatile uint32 CanTp_DebugExtendedTxRequests = 0u;
 volatile uint32 CanTp_DebugExtendedTxOk = 0u;
 volatile uint32 CanTp_DebugExtendedTxFail = 0u;
@@ -83,6 +84,15 @@ volatile uint8 CanTp_DebugExtendedLastTarget = 0u;
 volatile uint8 CanTp_DebugExtendedLastChannel = 0xFFu;
 volatile uint8 CanTp_DebugExtendedLastState = 0xFFu;
 volatile uint8 CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BAD_CONFIG;
+#endif
+
+#if CANTP_DEBUG_INSTRUMENTATION
+#define CANTP_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define CANTP_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define CANTP_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#define CANTP_DEBUG_INC(lhs) do { (void)0; } while (0)
+#endif
 
 static uint8 CanTp_IsConfigValid(void);
 
@@ -224,7 +234,7 @@ static uint8 CanTp_CanUseExtendedFfLength(const CanTp_ChannelConfigType* cfg)
     /* Lab deviation: the 32-bit FF_DL escape format is valid on classic 8-byte
      * frames per ISO 15765-2, so it is no longer restricted to CAN-FD (canDl>8).
      * This lets large diagnostic responses (e.g. 19 0A reportSupportedDTC) span
-     * more than 4095 bytes over standard CAN. */
+     * more than CANTP_LEGACY_MAX_PAYLOAD_LEN over standard CAN. */
     return (cfg != NULL_PTR) ? TRUE : FALSE;
 }
 
@@ -991,43 +1001,40 @@ static Std_ReturnType CanTp_TransmitExtendedAddressInternal(PduIdType CanTpTxSdu
     uint8 ch;
     Std_ReturnType ret;
 
-    CanTp_DebugExtendedTxRequests++;
-    CanTp_DebugExtendedLastUpperTxPdu = (uint16)CanTpTxSduId;
-    CanTp_DebugExtendedLastTarget = targetAddress;
-    CanTp_DebugExtendedLastLen = (uint16)len;
-    CanTp_DebugExtendedLastChannel = 0xFFu;
-    CanTp_DebugExtendedLastState = 0xFFu;
-    CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BAD_CONFIG;
-
+    CANTP_DEBUG_INC(CanTp_DebugExtendedTxRequests);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastUpperTxPdu, (uint16)CanTpTxSduId);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastTarget, targetAddress);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastLen, (uint16)len);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastChannel, 0xFFu);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastState, 0xFFu);
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_BAD_CONFIG);
     if ((CanTp_IsConfigValid() == FALSE) || (data == NULL_PTR) || (len == 0u))
     {
-        CanTp_DebugExtendedTxFail++;
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxFail);
         return E_NOT_OK;
     }
 
     ch = CanTp_FindIdleTxChannelByUpper(CanTpTxSduId);
-    CanTp_DebugExtendedLastChannel = ch;
-
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastChannel, ch);
     if (ch >= CanTp_ConfigPtr->numChannels)
     {
-        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_NO_CHANNEL;
-        CanTp_DebugExtendedTxFail++;
+        CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_NO_CHANNEL);
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxFail);
         return E_NOT_OK;
     }
 
-    CanTp_DebugExtendedLastState = (uint8)CanTp_Channel[ch].state;
-
+    CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastState, (uint8)CanTp_Channel[ch].state);
     if (CanTp_UsesAddressByte(&CanTp_ConfigPtr->channels[ch]) == FALSE)
     {
-        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_NOT_EXTENDED;
-        CanTp_DebugExtendedTxFail++;
+        CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_NOT_EXTENDED);
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxFail);
         return E_NOT_OK;
     }
 
     if (CanTp_Channel[ch].state != CANTP_IDLE)
     {
-        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_BUSY;
-        CanTp_DebugExtendedTxFail++;
+        CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_BUSY);
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxFail);
         return E_NOT_OK;
     }
 
@@ -1038,13 +1045,13 @@ static Std_ReturnType CanTp_TransmitExtendedAddressInternal(PduIdType CanTpTxSdu
 
     if (ret == E_OK)
     {
-        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_OK;
-        CanTp_DebugExtendedTxOk++;
+        CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_OK);
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxOk);
     }
     else
     {
-        CanTp_DebugExtendedLastReason = CANTP_DEBUG_EXT_TX_TRANSMIT_FAIL;
-        CanTp_DebugExtendedTxFail++;
+        CANTP_DEBUG_ASSIGN(CanTp_DebugExtendedLastReason, CANTP_DEBUG_EXT_TX_TRANSMIT_FAIL);
+        CANTP_DEBUG_INC(CanTp_DebugExtendedTxFail);
         CanTp_TxAddressOverrideValid[ch] = FALSE;
         CanTp_TxAddressOverride[ch] = 0u;
         CanTp_Channel[ch].txAssumeFlowControl = FALSE;

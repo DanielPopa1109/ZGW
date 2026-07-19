@@ -31,6 +31,7 @@
 
 static lwip_geth_PhyDp83825i_StatusType Dp83825i_Status;
 
+#if DP83825I_DEBUG_INSTRUMENTATION
 volatile uint32 Dp83825i_DebugPhyScanAddr;
 volatile uint32 Dp83825i_DebugPhyAddrFound = 0xFFFFFFFFu;
 volatile uint32 Dp83825i_DebugPhyId1;
@@ -43,7 +44,17 @@ volatile uint32 Dp83825i_DebugReadFailCount;
 volatile uint32 Dp83825i_DebugInitFailCount;
 volatile uint32 Dp83825i_DebugResetWaitFailCount;
 volatile uint32 Dp83825i_DebugConfigureFailCount;
+#endif
 
+#if DP83825I_DEBUG_INSTRUMENTATION
+#define DP83825I_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define DP83825I_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define DP83825I_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#define DP83825I_DEBUG_INC(lhs) do { (void)0; } while (0)
+#endif
+
+#if DP83825I_DEBUG_INSTRUMENTATION
 void Dp83825i_DebugScanMdio(void)
 {
     uint32 addr;
@@ -53,50 +64,47 @@ void Dp83825i_DebugScanMdio(void)
     uint32 bmsr = 0u;
     uint32 physts = 0u;
 
-    Dp83825i_DebugPhyAddrFound = 0xFFFFFFFFu;
-    Dp83825i_DebugPhyId1 = 0u;
-    Dp83825i_DebugPhyId2 = 0u;
-    Dp83825i_DebugBmcr = 0u;
-    Dp83825i_DebugBmsr = 0u;
-    Dp83825i_DebugPhysts = 0u;
-
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyAddrFound, 0xFFFFFFFFu);
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyId1, 0u);
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyId2, 0u);
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmcr, 0u);
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, 0u);
+    DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, 0u);
     for (addr = 0u; addr < 32u; addr++)
     {
-        Dp83825i_DebugPhyScanAddr = addr;
-
+        DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyScanAddr, addr);
         if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYIDR1, &id1) == 0u)
         {
-            Dp83825i_DebugReadFailCount++;
+            DP83825I_DEBUG_INC(Dp83825i_DebugReadFailCount);
             continue;
         }
 
         if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYIDR2, &id2) == 0u)
         {
-            Dp83825i_DebugReadFailCount++;
+            DP83825I_DEBUG_INC(Dp83825i_DebugReadFailCount);
             continue;
         }
 
-        Dp83825i_DebugReadOkCount++;
-
+        DP83825I_DEBUG_INC(Dp83825i_DebugReadOkCount);
         if ((id1 != 0x0000u) && (id1 != 0xFFFFu) &&
             (id2 != 0x0000u) && (id2 != 0xFFFFu))
         {
-            Dp83825i_DebugPhyAddrFound = addr;
-            Dp83825i_DebugPhyId1 = id1;
-            Dp83825i_DebugPhyId2 = id2;
-
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyAddrFound, addr);
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyId1, id1);
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhyId2, id2);
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMCR, &bmcr);
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMSR, &bmsr);
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_BMSR, &bmsr);
             (void)lwip_geth_private_Phy_Dp83825i_read_mdio_reg(addr, DP83825I_REG_PHYSTS, &physts);
 
-            Dp83825i_DebugBmcr = bmcr;
-            Dp83825i_DebugBmsr = bmsr;
-            Dp83825i_DebugPhysts = physts;
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmcr, bmcr);
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, bmsr);
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, physts);
             break;
         }
     }
 }
+#endif
 
 static uint32 Dp83825i_WaitMdioReady(void)
 {
@@ -208,7 +216,7 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
             DP83825I_BMCR_RESET) == 0u)
     {
         Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
-        Dp83825i_DebugInitFailCount++;
+        DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
 
@@ -219,7 +227,7 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
         if (lwip_geth_private_Phy_Dp83825i_read_mdio_reg(DP83825I_PHY_ADDR, DP83825I_REG_BMCR, &bmcr) == 0u)
         {
             Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
-            Dp83825i_DebugInitFailCount++;
+            DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
             return 0u;
         }
 
@@ -230,8 +238,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
     {
         Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
         Dp83825i_Status.resetTimeoutCnt++;
-        Dp83825i_DebugResetWaitFailCount++;
-        Dp83825i_DebugInitFailCount++;
+        DP83825I_DEBUG_INC(Dp83825i_DebugResetWaitFailCount);
+        DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
 
@@ -241,8 +249,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
             0x01E1u) == 0u)
     {
         Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
-        Dp83825i_DebugConfigureFailCount++;
-        Dp83825i_DebugInitFailCount++;
+        DP83825I_DEBUG_INC(Dp83825i_DebugConfigureFailCount);
+        DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
 
@@ -252,8 +260,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
             DP83825I_BMCR_AUTONEG_ENABLE | DP83825I_BMCR_RESTART_AUTONEG) == 0u)
     {
         Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_ERROR;
-        Dp83825i_DebugConfigureFailCount++;
-        Dp83825i_DebugInitFailCount++;
+        DP83825I_DEBUG_INC(Dp83825i_DebugConfigureFailCount);
+        DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
 
@@ -266,8 +274,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
         (((bmsrSecond & DP83825I_BMSR_LINK_STATUS) != 0u) ||
          ((physts & DP83825I_PHYSTS_LINK) != 0u)))
     {
-        Dp83825i_DebugBmsr = bmsrSecond;
-        Dp83825i_DebugPhysts = physts;
+        DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, bmsrSecond);
+        DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, physts);
         Dp83825i_Status.linkUp = 1u;
         Dp83825i_Status.speed100 = ((physts & DP83825I_PHYSTS_SPEED_10) == 0u) ? 1u : 0u;
         Dp83825i_Status.fullDuplex = ((physts & DP83825I_PHYSTS_FULL_DUPLEX) != 0u) ? 1u : 0u;
@@ -392,9 +400,8 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 break;
             }
 
-            Dp83825i_DebugBmsr = bmsr;
-            Dp83825i_DebugPhysts = physts;
-
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, bmsr);
+            DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, physts);
             if (((bmsr & DP83825I_BMSR_LINK_STATUS) != 0u) ||
                 ((physts & DP83825I_PHYSTS_LINK) != 0u))
             {

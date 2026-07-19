@@ -4,8 +4,12 @@
 #include "Dem_Types.h"
 #include "Dem_Cfg.h"
 
-#define DEM_EVENT_STATUS_DEBUG_COUNT    4u
+#ifndef DEM_DEBUG_INSTRUMENTATION
+#define DEM_DEBUG_INSTRUMENTATION       0
+#endif
 
+#if DEM_DEBUG_INSTRUMENTATION
+#define DEM_EVENT_STATUS_DEBUG_COUNT    4u
 typedef struct
 {
     Dem_EventIdType eventId;
@@ -21,12 +25,15 @@ typedef struct
     uint32 setPreFailedCount;
     uint32 statusChangeCount;
 } Dem_DebugEventStatusType;
+#endif
 
 extern volatile uint32 Dem_ChangeCounter;
+#if DEM_DEBUG_INSTRUMENTATION
 extern volatile uint16 Dem_DtcStatusListCount;
 extern volatile Dem_DebugEventStatusType Dem_DtcStatusList[DEM_MAX_EVENTS];
 extern volatile uint32 Dem_SetEventStatusCounter[DEM_MAX_EVENTS][DEM_EVENT_STATUS_DEBUG_COUNT];
 extern volatile uint32 Dem_EventStatusChangeCounter[DEM_MAX_EVENTS];
+#endif
 
 void Dem_PreInit(void);
 void Dem_Init(const Dem_ConfigType *ConfigPtr);

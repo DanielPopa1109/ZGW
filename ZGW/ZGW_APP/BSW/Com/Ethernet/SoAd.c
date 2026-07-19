@@ -1,5 +1,6 @@
 #include "SoAd.h"
 #include "GatewaySwc.h"
+#include "EthernetDiag.h"
 #include "../ComM/ComM.h"
 #include "SysMgr.h"
 #include "FreeRTOS_core2.h"
@@ -36,6 +37,7 @@ volatile uint32 SoAd_ApiLockCreateFailCounter = 0u;
 volatile uint32 SoAd_ApiLockTakeFailCounter = 0u;
 volatile uint32 SoAd_ApiLockGiveFailCounter = 0u;
 volatile uint8 SoAd_DebugState[SOAD_MAX_CONNECTIONS];
+#if SOAD_DEBUG_INSTRUMENTATION
 volatile uint8 SoAd_DebugRequestedOpen[SOAD_MAX_CONNECTIONS];
 volatile sint32 SoAd_DebugSocket[SOAD_MAX_CONNECTIONS];
 volatile uint8 SoAd_DebugLastOpenResult[SOAD_MAX_CONNECTIONS];
@@ -57,6 +59,15 @@ volatile uint32 SoAd_DebugTcpStaleReplaceCounter = 0u;
 volatile uint32 SoAd_DebugSocketLossCounter = 0u;
 volatile SoAd_SoConIdType SoAd_DebugLastSocketLossSoConId = 0u;
 volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
+#endif
+
+#if SOAD_DEBUG_INSTRUMENTATION
+#define SOAD_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define SOAD_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define SOAD_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#define SOAD_DEBUG_INC(lhs) do { (void)0; } while (0)
+#endif
 
 static void SoAd_InitLock(void)
 {
@@ -166,12 +177,12 @@ void SoAd_AbortTcpConnection(SoAd_SoConIdType id)
             (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
     {
         rt->state = SOAD_SOCON_OPEN;
-        SoAd_DebugSocket[id] = rt->listenSock;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], rt->listenSock);
     }
     else
     {
         rt->state = SOAD_SOCON_CLOSED;
-        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
     }
 
     SoAd_DebugState[id] = (uint8)rt->state;
@@ -231,6 +242,27 @@ static uint8 SoAd_IsTcpFatalError(sint32 err)
     return 0u;
 }
 
+static EthernetDiagCloseReasonType SoAd_ToDiagCloseReason(sint32 err, uint8 peerFin)
+{
+    if (peerFin != 0u)
+    {
+        return ETHERNETDIAG_CLOSE_PEER_FIN;
+    }
+#if defined(ECONNRESET)
+    if (err == ECONNRESET) { return ETHERNETDIAG_CLOSE_RESET; }
+#endif
+#if defined(ETIMEDOUT)
+    if (err == ETIMEDOUT) { return ETHERNETDIAG_CLOSE_TIMEOUT; }
+#endif
+#if defined(EPIPE)
+    if (err == EPIPE) { return ETHERNETDIAG_CLOSE_PIPE; }
+#endif
+#if defined(ENOTCONN)
+    if (err == ENOTCONN) { return ETHERNETDIAG_CLOSE_NOT_CONNECTED; }
+#endif
+    return ETHERNETDIAG_CLOSE_SOCKET_LOST;
+}
+
 static void SoAd_TcpDisconnectToOpen(SoAd_SoConRuntimeType *rt, SoAd_SoConIdType id)
 {
     if ((rt == 0) || (rt->cfg == 0))
@@ -257,12 +289,12 @@ static void SoAd_TcpDisconnectToOpen(SoAd_SoConRuntimeType *rt, SoAd_SoConIdType
             (TcpIp_IsSocketOpen(rt->listenSock) != 0u))
     {
         rt->state = SOAD_SOCON_OPEN;
-        SoAd_DebugSocket[id] = rt->listenSock;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], rt->listenSock);
     }
     else
     {
         rt->state = SOAD_SOCON_CLOSED;
-        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
     }
 
     SoAd_DebugState[id] = (uint8)rt->state;
@@ -288,10 +320,9 @@ static uint8 SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
         return 0u;
     }
 
-    SoAd_DebugPcHeartbeatRxCounter++;
-    SoAd_DebugPcHeartbeatLastRemoteAddr = remoteAddr->addr;
-    SoAd_DebugPcHeartbeatLastRemotePort = remoteAddr->port;
-
+    SOAD_DEBUG_INC(SoAd_DebugPcHeartbeatRxCounter);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatLastRemoteAddr, remoteAddr->addr);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatLastRemotePort, remoteAddr->port);
     ackDst = *remoteAddr;
 
     if ((ackDst.addr == 0u) || (ackDst.port == 0u))
@@ -305,7 +336,7 @@ static uint8 SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
             ackPayload,
             (uint16)(sizeof(ackPayload) - 1u)) > 0)
     {
-        SoAd_DebugPcHeartbeatAckCounter++;
+        SOAD_DEBUG_INC(SoAd_DebugPcHeartbeatAckCounter);
     }
     else
     {
@@ -320,7 +351,7 @@ static uint8 SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
                 ackPayload,
                 (uint16)(sizeof(ackPayload) - 1u)) > 0)
         {
-            SoAd_DebugPcHeartbeatBroadcastAckCounter++;
+            SOAD_DEBUG_INC(SoAd_DebugPcHeartbeatBroadcastAckCounter);
         }
 
         if (ackDst.port != SOAD_PC_HEARTBEAT_PORT)
@@ -332,7 +363,7 @@ static uint8 SoAd_HandlePcHeartbeat(SoAd_SoConRuntimeType *rt,
                     ackPayload,
                     (uint16)(sizeof(ackPayload) - 1u)) > 0)
             {
-                SoAd_DebugPcHeartbeatBroadcastAckCounter++;
+                SOAD_DEBUG_INC(SoAd_DebugPcHeartbeatBroadcastAckCounter);
             }
         }
     }
@@ -403,14 +434,15 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     rt = &SoAd_Runtime[id];
     cfg = rt->cfg;
     reopen = rt->requestedOpen;
-    SoAd_DebugSocketLossCounter++;
-    SoAd_DebugLastSocketLossSoConId = id;
-
+    SOAD_DEBUG_INC(SoAd_DebugSocketLossCounter);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastSocketLossSoConId, id);
     if ((cfg != 0) &&
             (cfg->tcpDisconnected != 0) &&
             (rt->state == SOAD_SOCON_CONNECTED))
     {
         cfg->tcpDisconnected(id);
+        EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                ETHERNETDIAG_CLOSE_SOCKET_LOST);
     }
 
     if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
@@ -432,11 +464,10 @@ static void SoAd_HandleSocketLoss(SoAd_SoConIdType id)
     rt->remoteAddr.port = 0u;
     rt->state = SOAD_SOCON_CLOSED;
     SoAd_DebugState[id] = (uint8)rt->state;
-    SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+    SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
     rt->cfg = 0;
     rt->requestedOpen = reopen;
-    SoAd_DebugRequestedOpen[id] = reopen;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugRequestedOpen[id], reopen);
     if ((reopen != 0u) &&
             (((cfg != 0) && (cfg->isServer != 0u)) ||
                     (TcpIp_IsLinkAvailable() != 0u)))
@@ -462,27 +493,27 @@ void SoAd_Init(const SoAd_ConfigType *cfg)
         SoAd_Runtime[i].cfg = 0;
         SoAd_Runtime[i].requestedOpen = 0u;
         SoAd_DebugState[i] = SOAD_SOCON_CLOSED;
-        SoAd_DebugRequestedOpen[i] = 0u;
-        SoAd_DebugSocket[i] = TCPIP_INVALID_SOCKET;
-        SoAd_DebugTcpLastAcceptedSocket[i] = TCPIP_INVALID_SOCKET;
-        SoAd_DebugLastOpenResult[i] = 0u;
-        SoAd_DebugRxCounter[i] = 0u;
-        SoAd_DebugRxDropCounter[i] = 0u;
-        SoAd_DebugLastRxLength[i] = 0u;
-        SoAd_DebugLastRxRemotePort[i] = 0u;
-        SoAd_DebugLastRxRemoteAddr[i] = 0u;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugRequestedOpen[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[i], TCPIP_INVALID_SOCKET);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugTcpLastAcceptedSocket[i], TCPIP_INVALID_SOCKET);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugRxCounter[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugRxDropCounter[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxLength[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemotePort[i], 0u);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemoteAddr[i], 0u);
     }
 
-    SoAd_DebugLastTxSoConId = 0u;
-    SoAd_DebugLastTxResult = SOAD_NOT_OK;
-    SoAd_DebugLastTxTcpIpResult = 0;
-    SoAd_DebugLastTxLength = 0u;
-    SoAd_DebugPcHeartbeatRxCounter = 0u;
-    SoAd_DebugPcHeartbeatAckCounter = 0u;
-    SoAd_DebugPcHeartbeatLastRemoteAddr = 0u;
-    SoAd_DebugPcHeartbeatLastRemotePort = 0u;
-    SoAd_DebugSocketLossCounter = 0u;
-    SoAd_DebugLastSocketLossSoConId = 0u;
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxSoConId, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxResult, SOAD_NOT_OK);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, 0);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxLength, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatRxCounter, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatAckCounter, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatLastRemoteAddr, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugPcHeartbeatLastRemotePort, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugSocketLossCounter, 0u);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastSocketLossSoConId, 0u);
 }
 
 uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
@@ -512,11 +543,10 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
 
     rt = &SoAd_Runtime[id];
     rt->requestedOpen = 1u;
-    SoAd_DebugRequestedOpen[id] = 1u;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugRequestedOpen[id], 1u);
     if (rt->state != SOAD_SOCON_CLOSED)
     {
-        SoAd_DebugLastOpenResult[id] = 1u;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 1u);
         SoAd_Unlock();
         return 1u;
     }
@@ -524,7 +554,8 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
     if ((cfg->isServer == 0u) && (TcpIp_IsLinkAvailable() == 0u))
     {
         SoAd_OpenFailNoLinkCounter++;
-        SoAd_DebugLastOpenResult[id] = 0u;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 0u);
+        EthernetDiag_ReportSocketOpenFailed(EthernetDiag_GetConnectionIdForSoCon(id));
         SoAd_Unlock();
         return 0u;
     }
@@ -537,13 +568,13 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
     if (rt->listenSock == TCPIP_INVALID_SOCKET)
     {
         SoAd_OpenFailCreateCounter++;
-        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
-        SoAd_DebugLastOpenResult[id] = 0u;
-        SoAd_Unlock();
+        EthernetDiag_ReportSocketOpenFailed(EthernetDiag_GetConnectionIdForSoCon(id));
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 0u);
+        SoAd_Unlock(); // @suppress("Unused static function")
         return 0u;
     }
-    SoAd_DebugSocket[id] = rt->listenSock;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], rt->listenSock);
     /* Server sockets must bind to INADDR_ANY.  Binding UDP sockets to the
      * exact ECU unicast address prevents delivery of subnet-directed
      * broadcasts such as 192.168.1.255:30600 and makes lab bring-up fragile
@@ -555,10 +586,11 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
                     cfg->localAddr.port) != 0)
     {
         SoAd_OpenFailBindCounter++;
+        EthernetDiag_ReportSocketOpenFailed(EthernetDiag_GetConnectionIdForSoCon(id));
         TcpIp_Close(rt->listenSock);
         rt->listenSock = TCPIP_INVALID_SOCKET;
-        SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
-        SoAd_DebugLastOpenResult[id] = 0u;
+        SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 0u);
         SoAd_Unlock();
         return 0u;
     }
@@ -569,10 +601,11 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
 
         if (TcpIp_Listen(rt->listenSock) != 0)
         {
+            EthernetDiag_ReportSocketOpenFailed(EthernetDiag_GetConnectionIdForSoCon(id));
             TcpIp_Close(rt->listenSock);
             rt->listenSock = TCPIP_INVALID_SOCKET;
-            SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
-            SoAd_DebugLastOpenResult[id] = 0u;
+            SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
+            SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 0u);
             SoAd_Unlock();
             return 0u;
         }
@@ -586,8 +619,7 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id)
 
     rt->state = SOAD_SOCON_OPEN;
     SoAd_DebugState[id] = (uint8)rt->state;
-    SoAd_DebugLastOpenResult[id] = 1u;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastOpenResult[id], 1u);
     SoAd_Unlock();
     return 1u;
 }
@@ -608,6 +640,7 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     }
 
     rt = &SoAd_Runtime[id];
+    EthernetDiag_ReportSocketCloseRequested(EthernetDiag_GetConnectionIdForSoCon(id));
 
     if ((rt->activeSock != TCPIP_INVALID_SOCKET) &&
             (rt->activeSock != rt->listenSock))
@@ -624,15 +657,17 @@ void SoAd_CloseSoCon(SoAd_SoConIdType id)
     {
         rt->cfg->tcpDisconnected(id);
     }
+    EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+            ETHERNETDIAG_CLOSE_INTENTIONAL);
 
     rt->listenSock = TCPIP_INVALID_SOCKET;
     rt->activeSock = TCPIP_INVALID_SOCKET;
     rt->state = SOAD_SOCON_CLOSED;
     SoAd_DebugState[id] = (uint8)rt->state;
-    SoAd_DebugSocket[id] = TCPIP_INVALID_SOCKET;
+    SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], TCPIP_INVALID_SOCKET);
     rt->cfg = 0;
     rt->requestedOpen = 0u;
-    SoAd_DebugRequestedOpen[id] = 0u;
+    SOAD_DEBUG_ASSIGN(SoAd_DebugRequestedOpen[id], 0u);
     SoAd_Unlock();
 }
 
@@ -678,14 +713,14 @@ static uint8 SoAd_TryReplaceStaleTcpClient(SoAd_SoConRuntimeType *rt, SoAd_SoCon
     rt->state = SOAD_SOCON_CONNECTED;
 
     SoAd_DebugState[id] = (uint8)rt->state;
-    SoAd_DebugSocket[id] = rt->listenSock;
-    SoAd_DebugTcpLastAcceptedSocket[id] = newSock;
-    SoAd_DebugTcpStaleReplaceCounter++;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], rt->listenSock);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugTcpLastAcceptedSocket[id], newSock);
+    SOAD_DEBUG_INC(SoAd_DebugTcpStaleReplaceCounter);
     if (rt->cfg->tcpConnected != 0)
     {
         rt->cfg->tcpConnected(id);
     }
+    EthernetDiag_ReportSocketConnected(EthernetDiag_GetConnectionIdForSoCon(id));
 
     return 1u;
 }
@@ -700,11 +735,10 @@ static void SoAd_DispatchTcpRx(SoAd_SoConRuntimeType *rt,
         return;
     }
 
-    SoAd_DebugRxCounter[id]++;
-    SoAd_DebugLastRxLength[id] = len;
-    SoAd_DebugLastRxRemoteAddr[id] = rt->remoteAddr.addr;
-    SoAd_DebugLastRxRemotePort[id] = rt->remoteAddr.port;
-
+    SOAD_DEBUG_INC(SoAd_DebugRxCounter[id]);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxLength[id], len);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemoteAddr[id], rt->remoteAddr.addr);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemotePort[id], rt->remoteAddr.port);
     if ((rt->cfg->rxIndication != 0) &&
             ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||
                     (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE)))
@@ -766,15 +800,15 @@ void SoAd_MainFunction(void)
                 {
                     rt->state = SOAD_SOCON_CONNECTED;
                     SoAd_DebugState[id] = (uint8)rt->state;
-                    SoAd_DebugSocket[id] = rt->listenSock;
-                    SoAd_DebugTcpLastAcceptedSocket[id] = rt->activeSock;
-                    SoAd_DebugLastRxRemoteAddr[id] = rt->remoteAddr.addr;
-                    SoAd_DebugLastRxRemotePort[id] = rt->remoteAddr.port;
-
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugSocket[id], rt->listenSock);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugTcpLastAcceptedSocket[id], rt->activeSock);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemoteAddr[id], rt->remoteAddr.addr);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemotePort[id], rt->remoteAddr.port);
                     if (rt->cfg->tcpConnected != 0)
                     {
                         rt->cfg->tcpConnected(id);
                     }
+                    EthernetDiag_ReportSocketConnected(EthernetDiag_GetConnectionIdForSoCon(id));
 
                     {
                         uint8 budget = SOAD_RX_DRAIN_BUDGET_PER_SOCON;
@@ -785,17 +819,22 @@ void SoAd_MainFunction(void)
 
                             if (len == 0)
                             {
+                                EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                                        ETHERNETDIAG_CLOSE_PEER_FIN);
                                 SoAd_TcpDisconnectToOpen(rt, id);
                             }
                             else if (len < 0)
                             {
                                 if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
                                 {
+                                    EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                                            SoAd_ToDiagCloseReason(TcpIp_LastSocketError, 0u));
                                     SoAd_TcpDisconnectToOpen(rt, id);
                                 }
                             }
                             else
                             {
+                                EthernetDiag_ReportRxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
                                 SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
                             }
 
@@ -830,17 +869,22 @@ void SoAd_MainFunction(void)
 
                     if (len == 0)
                     {
+                        EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                                ETHERNETDIAG_CLOSE_PEER_FIN);
                         SoAd_TcpDisconnectToOpen(rt, id);
                     }
                     else if (len < 0)
                     {
                         if (SoAd_IsTcpFatalError(TcpIp_LastSocketError) != 0u)
                         {
+                            EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                                    SoAd_ToDiagCloseReason(TcpIp_LastSocketError, 0u));
                             SoAd_TcpDisconnectToOpen(rt, id);
                         }
                     }
                     else
                     {
+                        EthernetDiag_ReportRxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
                         SoAd_DispatchTcpRx(rt, id, buffer, (uint16)len);
                     }
 
@@ -863,11 +907,10 @@ void SoAd_MainFunction(void)
 
                 if (len > 0)
                 {
-                    SoAd_DebugRxCounter[id]++;
-                    SoAd_DebugLastRxLength[id] = (uint16)len;
-                    SoAd_DebugLastRxRemoteAddr[id] = remote.addr;
-                    SoAd_DebugLastRxRemotePort[id] = remote.port;
-
+                    SOAD_DEBUG_INC(SoAd_DebugRxCounter[id]);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxLength[id], (uint16)len);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemoteAddr[id], remote.addr);
+                    SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemotePort[id], remote.port);
                     if (rt->cfg->useConfiguredRemote == 0u)
                     {
                         rt->remoteAddr = remote;
@@ -875,12 +918,14 @@ void SoAd_MainFunction(void)
 
                     if (SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len) != 0u)
                     {
+                        EthernetDiag_ReportRxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
                         SysMgr_NotifyBusActivity();
                     }
                     else if ((rt->cfg->rxIndication != 0) &&
                             ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||
                                     (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE)))
                     {
+                        EthernetDiag_ReportRxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
                         rt->cfg->rxIndication(id, &remote, buffer, (uint16)len);
                         SysMgr_NotifyBusActivity();
                     }
@@ -903,6 +948,42 @@ void SoAd_MainFunction(void)
     SoAd_Unlock();
 }
 
+Std_ReturnType SoAd_GetDiagSnapshot(SoAd_SoConIdType id, SoAd_DiagSnapshotType *snapshot)
+{
+    const SoAd_SoConRuntimeType *rt;
+
+    if ((snapshot == 0) || (id >= SOAD_MAX_CONNECTIONS) || (SoAd_Cfg == 0) ||
+            (id >= SoAd_Cfg->numConnections))
+    {
+        return E_NOT_OK;
+    }
+
+    if (SoAd_Lock() == 0u)
+    {
+        return E_NOT_OK;
+    }
+
+    rt = &SoAd_Runtime[id];
+    if (rt->cfg == 0)
+    {
+        SoAd_Unlock();
+        return E_NOT_OK;
+    }
+
+    snapshot->state = rt->state;
+    snapshot->listenSock = rt->listenSock;
+    snapshot->activeSock = rt->activeSock;
+    snapshot->localAddr.addr = SoAd_Ip4ToU32(rt->cfg->localAddr.addr);
+    snapshot->localAddr.port = rt->cfg->localAddr.port;
+    snapshot->remoteAddr = rt->remoteAddr;
+    snapshot->requestedOpen = rt->requestedOpen;
+    snapshot->protocol = (uint8)rt->cfg->protocol;
+    snapshot->upperLayer = (uint8)rt->cfg->upperLayer;
+
+    SoAd_Unlock();
+    return E_OK;
+}
+
 sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len)
 {
     return (GatewaySwc_RequestSoAdIfTransmit(id, 0, data, len) == SOAD_OK) ? (sint32)len : -1;
@@ -918,11 +999,10 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
     sint32 tcpIpResult;
     SoAd_ReturnType soAdResult;
 
-    SoAd_DebugLastTxSoConId = id;
-    SoAd_DebugLastTxLength = len;
-    SoAd_DebugLastTxTcpIpResult = -1;
-    SoAd_DebugLastTxResult = SOAD_NOT_OK;
-
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxSoConId, id);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxLength, len);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, -1);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxResult, SOAD_NOT_OK);
     if (SoAd_Lock() == 0u)
     {
         return SOAD_NOT_OK;
@@ -959,13 +1039,22 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
 
         tcpIpResult = TcpIp_Send(rt->activeSock, data, len);
         soAdResult = (tcpIpResult == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
-        SoAd_DebugLastTxTcpIpResult = tcpIpResult;
-        SoAd_DebugLastTxResult = (uint8)soAdResult;
-
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, tcpIpResult);
+        SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxResult, (uint8)soAdResult);
         if ((soAdResult != SOAD_OK) &&
                 (TcpIp_IsSocketOpen(rt->activeSock) == 0u))
         {
+            EthernetDiag_ReportSocketClosed(EthernetDiag_GetConnectionIdForSoCon(id),
+                    ETHERNETDIAG_CLOSE_SEND_FAILURE);
             SoAd_TcpDisconnectToOpen(rt, id);
+        }
+        else if (soAdResult == SOAD_OK)
+        {
+            EthernetDiag_ReportTxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
+        }
+        else
+        {
+            EthernetDiag_ReportTxError(1u);
         }
 
         SoAd_Unlock();
@@ -982,8 +1071,16 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
 
     tcpIpResult = TcpIp_SendTo(rt->listenSock, dst, data, len);
     soAdResult = (tcpIpResult == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
-    SoAd_DebugLastTxTcpIpResult = tcpIpResult;
-    SoAd_DebugLastTxResult = (uint8)soAdResult;
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, tcpIpResult);
+    SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxResult, (uint8)soAdResult);
+    if (soAdResult == SOAD_OK)
+    {
+        EthernetDiag_ReportTxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
+    }
+    else
+    {
+        EthernetDiag_ReportTxError(1u);
+    }
     SoAd_Unlock();
     return soAdResult;
 }

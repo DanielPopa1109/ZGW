@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define DCM_ETHTP_MAX_PAYLOAD_LEN 8192u
+#define DCM_ETHTP_MAX_PAYLOAD_LEN 256u
 
 typedef enum
 {

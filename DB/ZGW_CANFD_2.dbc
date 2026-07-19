@@ -111,40 +111,6 @@ BO_ 259 LightData1: 3 ZGW
  SG_ LD1_HighBeamStatus : 2|2@1+ (1,0) [0|3] ""  Tester
  SG_ LD1_FogLightsStatus : 0|2@1+ (1,0) [0|3] ""  Tester
 
-BO_ 258 PowerTrainData2: 16 ZGW
- SG_ PT2_VehSpeed : 96|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT2_TractionControlStatus : 88|8@1+ (1,0) [0|255] ""  Tester
- SG_ PT2_TorqueValue : 80|5@1+ (1,0) [0|63] ""  Tester
- SG_ PT2_ShiftPhase : 29|3@1+ (1,0) [0|7] ""  Tester
- SG_ PT2_PedalStatus : 56|7@1+ (1,0) [0|127] ""  Tester
- SG_ PT2_EngineRPM : 64|13@1+ (1,0) [0|8191] ""  Tester
- SG_ PT2_DSCStatus : 40|8@1+ (1,0) [0|255] ""  Tester
- SG_ PT2_CurrentGear : 48|4@1+ (1,0) [0|15] ""  Tester
- SG_ PT2_ClutchStatus : 26|3@1+ (1,0) [0|7] ""  Tester
- SG_ PT2_BrakeWheelStatus : 32|8@1+ (1,0) [0|255] ""  Tester
- SG_ PT2_ASGStatus : 24|2@1+ (1,0) [0|3] ""  Tester
- SG_ PT2_ActualTorque : 16|7@1+ (1,0) [0|127] ""  Tester
- SG_ PT2_ABSStatus : 8|8@1+ (1,0) [0|255] ""  Tester
- SG_ PT2_BrakePressureValue : 0|8@1+ (1,0) [0|255] ""  Tester
-
-BO_ 257 PowerTrainData1: 64 ZGW
- SG_ PT1_LatAcc : 64|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_IntakeTemperature : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_CoolantTemperature : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_YawRate : 480|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_ShortTermFuelTrimBank2 : 448|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_ShortTermFuelTrimBank1 : 416|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SensorVoltage2Bank2 : 384|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SensorVoltage2Bank1 : 352|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SensorVoltage1Bank2 : 320|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SensorVoltage1Bank1 : 288|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SensB1_ShortTermFuelTrim : 256|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_O2SenB2_ShortTermFuelTrim : 224|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_MafValue : 192|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_LongTermFuelTrimBank2 : 160|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_LongTermFuelTrimBank1 : 128|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
- SG_ PT1_LongAcc : 96|32@1- (1,0) [-3.4E+38|3.4E+38] ""  Tester
-
 BO_ 256 BodyData1: 20 ZGW
  SG_ BD1_WiperStockCommand : 128|8@1+ (1,0) [0|255] ""  Tester
  SG_ BD1_VibrationSensorStatus : 120|8@1+ (1,0) [0|255] ""  Tester
@@ -494,24 +460,12 @@ BO_ 128 CommandLoad_PDM1: 12 ZGW
 
 
 
-BO_ 263 EnergyManagementData3: 20 ZGW
- SG_ ALT_ResponseError : 0|1@1+ (1,0) [0|1] ""  Tester
- SG_ ALT_ChargingActive : 8|1@1+ (1,0) [0|1] ""  Tester
- SG_ ALT_OutputCurrent : 16|8@1+ (1,0) [0|255] ""  Tester
- SG_ ALT_OutputVoltage : 24|8@1+ (1,0) [0|255] ""  Tester
- SG_ ALT_FieldDutyActual : 32|8@1+ (1,0) [0|255] ""  Tester
- SG_ ALT_Power : 40|8@1+ (1,0) [0|255] ""  Tester
- SG_ ALT_Temperature : 48|8@1+ (1,0) [0|255] ""  Tester
- SG_ HVDCDC_ResponseError : 56|1@1+ (1,0) [0|1] ""  Tester
- SG_ HVDCDC_LV_Voltage : 64|8@1+ (1,0) [0|255] ""  Tester
- SG_ HVDCDC_LV_Current : 72|8@1+ (1,0) [0|255] ""  Tester
- SG_ HVDCDC_HV_Voltage : 80|8@1+ (1,0) [0|255] ""  Tester
- SG_ HVDCDC_HV_Current : 88|8@1+ (1,0) [0|255] ""  Tester
- SG_ PCU48_ResponseError : 96|1@1+ (1,0) [0|1] ""  Tester
- SG_ PCU48_SoH : 104|8@1+ (1,0) [0|255] ""  Tester
- SG_ PCU48_SoC : 112|8@1+ (1,0) [0|255] ""  Tester
- SG_ PCU48_Voltage : 120|8@1+ (1,0) [0|255] ""  Tester
- SG_ PCU48_ChargeState : 128|8@1+ (1,0) [0|255] ""  Tester
+BO_ 263 EnergyManagementData3: 5 ZGW
+ SG_ HVDCDC_ResponseError : 0|1@1+ (1,0) [0|1] ""  Tester
+ SG_ HVDCDC_LV_Voltage : 8|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_LV_Current : 16|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_HV_Voltage : 24|8@1+ (1,0) [0|255] ""  Tester
+ SG_ HVDCDC_HV_Current : 32|8@1+ (1,0) [0|255] ""  Tester
 
 
 
@@ -717,22 +671,4 @@ SIG_VALTYPE_ 260 EM1_DischargeAh : 1;
 SIG_VALTYPE_ 260 EM1_ChargeAh : 1;
 SIG_VALTYPE_ 260 EM1_AvgDischargeCurrent : 1;
 SIG_VALTYPE_ 260 EM1_AvgChargeCurrent : 1;
-SIG_VALTYPE_ 258 PT2_VehSpeed : 1;
-SIG_VALTYPE_ 257 PT1_LatAcc : 1;
-SIG_VALTYPE_ 257 PT1_IntakeTemperature : 1;
-SIG_VALTYPE_ 257 PT1_CoolantTemperature : 1;
-SIG_VALTYPE_ 257 PT1_YawRate : 1;
-SIG_VALTYPE_ 257 PT1_ShortTermFuelTrimBank2 : 1;
-SIG_VALTYPE_ 257 PT1_ShortTermFuelTrimBank1 : 1;
-SIG_VALTYPE_ 257 PT1_O2SensorVoltage2Bank2 : 1;
-SIG_VALTYPE_ 257 PT1_O2SensorVoltage2Bank1 : 1;
-SIG_VALTYPE_ 257 PT1_O2SensorVoltage1Bank2 : 1;
-SIG_VALTYPE_ 257 PT1_O2SensorVoltage1Bank1 : 1;
-SIG_VALTYPE_ 257 PT1_O2SensB1_ShortTermFuelTrim : 1;
-SIG_VALTYPE_ 257 PT1_O2SenB2_ShortTermFuelTrim : 1;
-SIG_VALTYPE_ 257 PT1_MafValue : 1;
-SIG_VALTYPE_ 257 PT1_LongTermFuelTrimBank2 : 1;
-SIG_VALTYPE_ 257 PT1_LongTermFuelTrimBank1 : 1;
-SIG_VALTYPE_ 257 PT1_LongAcc : 1;
-SIG_VALTYPE_ 256 BD1_OutsideTemperature : 1;
 

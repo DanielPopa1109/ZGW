@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-extern uint8_t scr_xram[3100];
+extern uint8_t scr_xram[3077];
 
 #define OFFSET_scr_xram    (0) /*(0x0) */
-#define SIZE_scr_xram      (3100) /*(0xc1c) */
+#define SIZE_scr_xram      (3077) /*(0xc05) */
 
 #define LABEL_scr_xram___sdcc_init_data      (278) /*(0x116) */
 #define LABEL_scr_xram__SCR_TimeLoadU32_sloc0_1_0      (33) /*(0x21) */
@@ -131,24 +131,21 @@ extern uint8_t scr_xram[3100];
 #define LABEL_scr_xram__00341      (2602) /*(0xa2a) */
 #define LABEL_scr_xram__WCAN_CheckWake      (2603) /*(0xa2b) */
 #define LABEL_scr_xram__00344      (2681) /*(0xa79) */
-#define LABEL_scr_xram__00384      (2670) /*(0xa6e) */
-#define LABEL_scr_xram__00351      (2697) /*(0xa89) */
-#define LABEL_scr_xram__00385      (2689) /*(0xa81) */
-#define LABEL_scr_xram__00355      (2730) /*(0xaaa) */
-#define LABEL_scr_xram__00347      (2717) /*(0xa9d) */
-#define LABEL_scr_xram__00386      (2701) /*(0xa8d) */
-#define LABEL_scr_xram__00387      (2709) /*(0xa95) */
-#define LABEL_scr_xram__00388      (2724) /*(0xaa4) */
-#define LABEL_scr_xram__00358      (2743) /*(0xab7) */
-#define LABEL_scr_xram__00389      (2738) /*(0xab2) */
-#define LABEL_scr_xram__00391      (2890) /*(0xb4a) */
-#define LABEL_scr_xram__00404      (2884) /*(0xb44) */
-#define LABEL_scr_xram__00393      (2932) /*(0xb74) */
-#define LABEL_scr_xram__00405      (2924) /*(0xb6c) */
-#define LABEL_scr_xram__00394      (2969) /*(0xb99) */
-#define LABEL_scr_xram__00407      (3039) /*(0xbdf) */
-#define LABEL_scr_xram__00410      (3094) /*(0xc16) */
-#define LABEL_scr_xram___xinit__SCR_TimeBaseActive      (3099) /*(0xc1b) */
+#define LABEL_scr_xram__00376      (2670) /*(0xa6e) */
+#define LABEL_scr_xram__00347      (2697) /*(0xa89) */
+#define LABEL_scr_xram__00377      (2689) /*(0xa81) */
+#define LABEL_scr_xram__00355      (2707) /*(0xa93) */
+#define LABEL_scr_xram__00378      (2701) /*(0xa8d) */
+#define LABEL_scr_xram__00358      (2720) /*(0xaa0) */
+#define LABEL_scr_xram__00379      (2715) /*(0xa9b) */
+#define LABEL_scr_xram__00381      (2867) /*(0xb33) */
+#define LABEL_scr_xram__00394      (2861) /*(0xb2d) */
+#define LABEL_scr_xram__00383      (2909) /*(0xb5d) */
+#define LABEL_scr_xram__00395      (2901) /*(0xb55) */
+#define LABEL_scr_xram__00384      (2946) /*(0xb82) */
+#define LABEL_scr_xram__00397      (3016) /*(0xbc8) */
+#define LABEL_scr_xram__00400      (3071) /*(0xbff) */
+#define LABEL_scr_xram___xinit__SCR_TimeBaseActive      (3076) /*(0xc04) */
 #define LABEL_scr_xram___sdcc_init_xstack      (265) /*(0x109) */
 #define LABEL_scr_xram___mcs51_genXINIT      (281) /*(0x119) */
 #define LABEL_scr_xram_L00003      (315) /*(0x13b) */
@@ -160,17 +157,17 @@ extern uint8_t scr_xram[3100];
 #define LABEL_scr_xram_L00006      (344) /*(0x158) */
 #define LABEL_scr_xram_L00008      (363) /*(0x16b) */
 #define LABEL_scr_xram_L00007      (357) /*(0x165) */
-#define LABEL_scr_xram__00101      (3098) /*(0xc1a) */
+#define LABEL_scr_xram__00101      (3075) /*(0xc03) */
 #define LABEL_scr_xram___xstack_start      (7169) /*(0x1c01) */
 #define LABEL_scr_xram___sdcc_gsinit3_start      (281) /*(0x119) */
 #define LABEL_scr_xram__resetvec      (0) /*(0x0) */
 #define LABEL_scr_xram___xdatac_end      (7525) /*(0x1d65) */
 #define LABEL_scr_xram___xdatac_start      (7424) /*(0x1d00) */
 #define LABEL_scr_xram__SCR_RtcCompareIsr      (733) /*(0x2dd) */
-#define LABEL_scr_xram__etext      (3099) /*(0xc1b) */
+#define LABEL_scr_xram__etext      (3076) /*(0xc04) */
 #define LABEL_scr_xram_s_PSEG      (7169) /*(0x1c01) */
 #define LABEL_scr_xram_bits      (32) /*(0x20) */
-#define LABEL_scr_xram___roxdata_end      (3100) /*(0xc1c) */
+#define LABEL_scr_xram___roxdata_end      (3077) /*(0xc05) */
 #define LABEL_scr_xram___sdcc_program_startup      (369) /*(0x171) */
 #define LABEL_scr_xram___stack_start      (49) /*(0x31) */
 #define LABEL_scr_xram___ddata_end      (49) /*(0x31) */
@@ -181,16 +178,16 @@ extern uint8_t scr_xram[3100];
 #define LABEL_scr_xram___xdatai_start      (7525) /*(0x1d65) */
 #define LABEL_scr_xram_s_XSEG      (7424) /*(0x1d00) */
 #define LABEL_scr_xram___pdata_end      (7169) /*(0x1c01) */
-#define LABEL_scr_xram___roxdata_start      (3099) /*(0xc1b) */
-#define LABEL_scr_xram_s_XINIT      (3099) /*(0xc1b) */
-#define LABEL_scr_xram___sdcc_external_startup      (3095) /*(0xc17) */
+#define LABEL_scr_xram___roxdata_start      (3076) /*(0xc04) */
+#define LABEL_scr_xram_s_XINIT      (3076) /*(0xc04) */
+#define LABEL_scr_xram___sdcc_external_startup      (3072) /*(0xc00) */
 #define LABEL_scr_xram___sdcc_gsinit2_start      (268) /*(0x10c) */
 #define LABEL_scr_xram___sdcc_gsinit4_start      (318) /*(0x13e) */
 #define LABEL_scr_xram___pdata_start      (7169) /*(0x1c01) */
 #define LABEL_scr_xram___init_table      (256) /*(0x100) */
-#define LABEL_scr_xram__WCAN_Init      (2744) /*(0xab8) */
+#define LABEL_scr_xram__WCAN_Init      (2721) /*(0xaa1) */
 #define LABEL_scr_xram_s_XISEG      (7525) /*(0x1d65) */
-#define LABEL_scr_xram__main      (2970) /*(0xb9a) */
+#define LABEL_scr_xram__main      (2947) /*(0xb83) */
 #define LABEL_scr_xram___sdcc_gsinit_startup      (259) /*(0x103) */
 
 #endif

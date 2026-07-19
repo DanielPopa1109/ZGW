@@ -139,6 +139,30 @@ Std_ReturnType EthSM_GetCurrentComMode(uint8 channel, EthSM_ComModeType* mode)
     return E_OK;
 }
 
+Std_ReturnType EthSM_GetRequestedComMode(uint8 channel, EthSM_ComModeType* mode)
+{
+    if ((channel >= ETHSM_MAX_CHANNELS) ||
+        (mode == NULL_PTR) ||
+        (EthSM_Channel[channel].initialized == FALSE))
+    {
+        return E_NOT_OK;
+    }
+
+    *mode = EthSM_Channel[channel].requestedMode;
+    return E_OK;
+}
+
+boolean EthSM_IsStackInitialized(uint8 channel)
+{
+    if ((channel >= ETHSM_MAX_CHANNELS) ||
+        (EthSM_Channel[channel].initialized == FALSE))
+    {
+        return FALSE;
+    }
+
+    return (EthSM_Channel[channel].ethStackInitialized != FALSE) ? TRUE : FALSE;
+}
+
 void EthSM_MainFunction(void)
 {
     uint8 channel;

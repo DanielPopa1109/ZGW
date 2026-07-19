@@ -182,7 +182,7 @@ struct ethernetif
   /* Add whatever per-interface state that is needed here. */
 };
 
-static void lwip_geth_CacheInvalidateRange(const void *address, uint32 length)
+static void lwip_geth_CacheInvalidateRange(const volatile void *address, uint32 length)
 {
   uint32 line;
   uint32 end;
@@ -206,7 +206,7 @@ static void lwip_geth_CacheInvalidateRange(const void *address, uint32 length)
   lwip_geth_DebugRxCacheInvalidateCnt++;
 }
 
-static void lwip_geth_CacheWritebackInvalidateRange(const void *address, uint32 length)
+static void lwip_geth_CacheWritebackInvalidateRange(const volatile void *address, uint32 length)
 {
   uint32 line;
   uint32 end;
@@ -485,7 +485,7 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
   firstDescr->TDES2.R.B1L = packetLength;
   firstDescr->TDES3.R.OWN = 1u;
 
-  lwip_geth_CacheWritebackInvalidateRange((const void *)firstDescr, sizeof(*firstDescr));
+  lwip_geth_CacheWritebackInvalidateRange(firstDescr, sizeof(IfxGeth_TxDescr));
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
   IfxGeth_dma_setTxDescriptorTailPointer(ethernetif->gethSFR, IfxGeth_TxDmaChannel_0, (uint32)nextDescr);
   IfxGeth_Eth_wakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);

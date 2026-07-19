@@ -44,7 +44,7 @@ SCR_AURIX_TC3x: $(EXECUTABLES) makefile $(OPTIONAL_TOOL_DEPS)
 
 SCR_AURIX_TC3x.elf: $(OBJS) makefile $(OPTIONAL_TOOL_DEPS)
 	@echo 'Invoking: SDCC Linker'
-	i51-elf-ld $(OBJS) -T"../SCR/scr.ld" --gc-sections -L"C:\Infineon\AURIX-Studio-1.10.32\tools\Compilers\sdcc_421/share/sdcc/lib/large" -lsdcc -lmcs51 -lint -lsdcc -llonglong -llong -lint -lfloat -Map="SCR_AURIX_TC3x.map"   -o  "SCR_AURIX_TC3x.elf"
+	i51-elf-ld $(OBJS) -T"../SCR/scr.ld" --gc-sections -L"C:\Infineon\AURIX-Studio-1.10.36\tools\Compilers\sdcc_423/share/sdcc/lib/large" -lsdcc -lmcs51 -lint -lsdcc -llonglong -llong -lint -lfloat -Map="SCR_AURIX_TC3x.map"   -o  "SCR_AURIX_TC3x.elf"
 	@echo 'Finished building: $@'
 	@echo ' '
 

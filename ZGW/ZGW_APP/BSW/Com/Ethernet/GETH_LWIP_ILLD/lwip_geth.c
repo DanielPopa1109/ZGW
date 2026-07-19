@@ -54,34 +54,34 @@ volatile uint32 LWIP_GETH_TcpipInitCallCounter;
 /* Function to initialize the GETH module by the configuration made in GUI */
 LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
 {
-  IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, ((handle != NULL) && (handle->app_config != NULL)));
-  LWIP_GETH_STATUS_t status = LWIP_GETH_STATUS_SUCCESS;
-  LWIP_GETH_InitCallCounter++;
+    IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, ((handle != NULL) && (handle->app_config != NULL)));
+    LWIP_GETH_STATUS_t status = LWIP_GETH_STATUS_SUCCESS;
+    LWIP_GETH_InitCallCounter++;
 
-  if (!handle->app_is_initialized)
-  {
-    handle->app_is_initialized = TRUE;
-#if LWIP_GETH_DEBUG_ENABLED
-    if (handle->printf_asclin_app != NULL)
+    if (!handle->app_is_initialized)
     {
-      PRINTF_ASCLIN_Init(handle->printf_asclin_app);
-    }
+        handle->app_is_initialized = TRUE;
+#if LWIP_GETH_DEBUG_ENABLED
+        if (handle->printf_asclin_app != NULL)
+        {
+            PRINTF_ASCLIN_Init(handle->printf_asclin_app);
+        }
 #endif
-    IfxGeth_enableModule(handle->app_config->geth_lld_config->gethSFR);
+        IfxGeth_enableModule(handle->app_config->geth_lld_config->gethSFR);
 #if LWIP_GETH_RTOS_ENABLED
-    LWIP_GETH_TcpipInitCallCounter++;
-    tcpip_init(lwip_geth_Lwip_init, NULL_PTR);
+        LWIP_GETH_TcpipInitCallCounter++;
+        tcpip_init(lwip_geth_Lwip_init, NULL_PTR);
 #else
-    lwip_geth_Lwip_init(NULL_PTR);
-    TIMER_STM_Init(handle->stm_module);
+        lwip_geth_Lwip_init(NULL_PTR);
+        TIMER_STM_Init(handle->stm_module);
 #endif
-  }
-  else
-  {
-    status = LWIP_GETH_STATUS_FAILURE;
-  }
+    }
+    else
+    {
+        status = LWIP_GETH_STATUS_FAILURE;
+    }
 
-  return status;
+    return status;
 }
 
 /* CODE_BLOCK_END */

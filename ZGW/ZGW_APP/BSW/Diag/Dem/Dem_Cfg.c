@@ -1,8 +1,73 @@
 #include "Dem_Cfg.h"
 #include "SysMgr.h"
+#include "EthernetDiag.h"
+#include "BSW/Time/TimeBase.h"
+#include "SafetyKit_Main.h"
 #include <string.h>
 
-#define DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE 48u
+static void Dem_StoreU64(uint8 *buffer, uint16 offset, uint64 value)
+{
+    buffer[offset] = (uint8)((value >> 56u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)((value >> 48u) & 0xFFu);
+    buffer[(uint16)(offset + 2u)] = (uint8)((value >> 40u) & 0xFFu);
+    buffer[(uint16)(offset + 3u)] = (uint8)((value >> 32u) & 0xFFu);
+    buffer[(uint16)(offset + 4u)] = (uint8)((value >> 24u) & 0xFFu);
+    buffer[(uint16)(offset + 5u)] = (uint8)((value >> 16u) & 0xFFu);
+    buffer[(uint16)(offset + 6u)] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 7u)] = (uint8)(value & 0xFFu);
+}
+
+static void Dem_StoreU16(uint8 *buffer, uint16 offset, uint16 value)
+{
+    buffer[offset] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)(value & 0xFFu);
+}
+
+static sint16 Dem_ScaleMcuTemperatureCdeg(float32 temperature)
+{
+    float32 scaled;
+
+    scaled = temperature * 100.0f;
+    if (scaled > 32767.0f)
+    {
+        return 32767;
+    }
+
+    if (scaled < -32768.0f)
+    {
+        return -32768;
+    }
+
+    return (sint16)scaled;
+}
+
+Std_ReturnType Dem_Cfg_CaptureTimestampTemperatureData(uint8 *buffer, uint16 *length, uint8 snapshotKind)
+{
+    TimeBase_DtcTimestampType timestamp;
+    sint16 mcuTempCdeg;
+
+    if ((buffer == NULL_PTR) ||
+        (length == NULL_PTR) ||
+        (*length < DEM_DTC_TIMESTAMP_DATA_SIZE))
+    {
+        return E_NOT_OK;
+    }
+
+    memset(buffer, 0, DEM_DTC_TIMESTAMP_DATA_SIZE);
+    TimeBase_GetDtcTimestamp(&timestamp);
+    mcuTempCdeg = Dem_ScaleMcuTemperatureCdeg(g_SafetyKitStatus.dieTempStatus.dieTemperatureCore);
+
+    Dem_StoreU64(buffer, DEM_SNAPSHOT_VEHICLE_TIME_NS_OFFSET, timestamp.vehicle_time_ns);
+    Dem_StoreU64(buffer, DEM_SNAPSHOT_UTC_TIME_NS_OFFSET, timestamp.utc_time_ns);
+    buffer[DEM_SNAPSHOT_UTC_VALID_OFFSET] = (timestamp.utc_valid != FALSE) ? 1u : 0u;
+    buffer[DEM_SNAPSHOT_TIME_SOURCE_OFFSET] = timestamp.time_source;
+    Dem_StoreU16(buffer, DEM_SNAPSHOT_MCU_TEMP_CDEG_OFFSET, (uint16)mcuTempCdeg);
+    buffer[DEM_SNAPSHOT_VERSION_OFFSET] = DEM_SNAPSHOT_VERSION;
+    buffer[DEM_SNAPSHOT_KIND_OFFSET] = snapshotKind;
+
+    *length = DEM_DTC_TIMESTAMP_DATA_SIZE;
+    return E_OK;
+}
 
 static Std_ReturnType Dem_DefaultSnapshotDataCapture(
     Dem_EventIdType eventId,
@@ -10,43 +75,8 @@ static Std_ReturnType Dem_DefaultSnapshotDataCapture(
     uint16 *length
 )
 {
-    uint16 i;
-    uint16 maxLen;
-
-    if ((buffer == NULL_PTR) || (length == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    maxLen = *length;
-    if (maxLen > DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE)
-    {
-        maxLen = DEM_DEFAULT_SNAPSHOT_DATA_CAPTURE_SIZE;
-    }
-
-    for (i = 0u; i < maxLen; i++)
-    {
-        buffer[i] = 0u;
-    }
-
-    if (maxLen >= 4u)
-    {
-        buffer[0] = (uint8)((eventId >> 8u) & 0xFFu);
-        buffer[1] = (uint8)(eventId & 0xFFu);
-        buffer[2] = 0u;
-        buffer[3] = 0u;
-    }
-
-    if (maxLen >= 36u)
-    {
-        buffer[32] = (uint8)((eventId >> 8u) & 0xFFu);
-        buffer[33] = (uint8)(eventId & 0xFFu);
-        buffer[34] = 0u;
-        buffer[35] = 1u;
-    }
-
-    *length = maxLen;
-    return E_OK;
+    (void)eventId;
+    return Dem_Cfg_CaptureTimestampTemperatureData(buffer, length, DEM_SNAPSHOT_KIND_COMMON);
 }
 
 static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType *dtc)
@@ -71,6 +101,14 @@ static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType 
     if (eventId == DEM_EVENT_ID_CODING_INVALID)
     {
         *dtc = DEM_DTC_CODING_INVALID;
+        return E_OK;
+    }
+
+    if ((eventId >= DEM_EVENT_ID_ETH_LINK_LOST) &&
+        (eventId <= DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED))
+    {
+        *dtc = (Dem_DTCType)(DEM_DTC_ETH_LINK_LOST +
+                (Dem_DTCType)(eventId - DEM_EVENT_ID_ETH_LINK_LOST));
         return E_OK;
     }
 
@@ -152,6 +190,166 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         40u,
         TRUE,
         Dem_DefaultSnapshotDataCapture,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_LINK_LOST,
+        DEM_DTC_ETH_LINK_LOST,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_CTRL_DMA_FAILURE,
+        DEM_DTC_ETH_CTRL_DMA_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_RX_COMM_FAILURE,
+        DEM_DTC_ETH_RX_COMM_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_TX_COMM_FAILURE,
+        DEM_DTC_ETH_TX_COMM_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_TCP_UNEXPECTED_TERMINATION,
+        DEM_DTC_ETH_TCP_UNEXPECTED_TERMINATION,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_TCP_ESTABLISHMENT_FAILURE,
+        DEM_DTC_ETH_TCP_ESTABLISHMENT_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_UDP_SUPERVISION_TIMEOUT,
+        DEM_DTC_ETH_UDP_SUPERVISION_TIMEOUT,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_SERVICE_AVAILABILITY_FAILURE,
+        DEM_DTC_ETH_SERVICE_AVAILABILITY_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_DOIP_COMM_FAILURE,
+        DEM_DTC_ETH_DOIP_COMM_FAILURE,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED,
+        DEM_DTC_ETH_PARTNER_COMM_TERMINATED,
+        0u,
+        1u,
+        1,
+        -1,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        EthernetDiag_CaptureSnapshotData,
         NULL_PTR
     }
 };

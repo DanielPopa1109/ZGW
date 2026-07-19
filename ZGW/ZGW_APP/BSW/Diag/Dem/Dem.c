@@ -21,9 +21,8 @@ static Dem_InitStateType Dem_InitState = DEM_UNINIT;
 static Dem_InternalNvMStateType Dem_NvMState = DEM_NVM_STATE_IDLE;
 
 static Dem_RuntimeEventType Dem_RuntimeEvents[DEM_MAX_EVENTS];
-static Dem_PrimaryEntryType Dem_PrimaryMemory[DEM_PRIMARY_MEMORY_SIZE];
-
 Dem_NvImageType Dem_NvImage;
+#define Dem_PrimaryMemory (Dem_NvImage.primaryEntries)
 static Dem_FilterType Dem_Filter;
 
 static boolean Dem_Dirty = FALSE;
@@ -37,10 +36,15 @@ static volatile uint8 Dem_CriticalOwnedByCore[DEM_CRITICAL_CORE_COUNT];
 
 volatile uint32 Dem_ChangeCounter = 0u;
 volatile uint32 Dem_CriticalTimeoutCounter = 0u;
+#if DEM_DEBUG_INSTRUMENTATION
 volatile uint16 Dem_DtcStatusListCount = 0u;
 volatile Dem_DebugEventStatusType Dem_DtcStatusList[DEM_MAX_EVENTS];
 volatile uint32 Dem_SetEventStatusCounter[DEM_MAX_EVENTS][DEM_EVENT_STATUS_DEBUG_COUNT];
 volatile uint32 Dem_EventStatusChangeCounter[DEM_MAX_EVENTS];
+#define DEM_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define DEM_DEBUG_INC(lhs) do { } while (0)
+#endif
 
 long long Dem_MainFunction_Counter = 0;
 
@@ -150,6 +154,7 @@ static boolean Dem_IsStoredDataAllowed(uint16 eventIndex)
     return (eventIndex < DEM_STORED_DATA_EVENT_LIMIT) ? TRUE : FALSE;
 }
 
+#if DEM_DEBUG_INSTRUMENTATION
 static void Dem_DebugUpdateEvent(uint16 eventIndex)
 {
     Dem_EventConfigType eventConfig;
@@ -231,6 +236,11 @@ static void Dem_DebugReset(void)
         }
     }
 }
+#else
+#define Dem_DebugUpdateEvent(eventIndex) ((void)0)
+#define Dem_DebugRefreshStatusList() ((void)0)
+#define Dem_DebugReset() ((void)0)
+#endif
 
 static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
 {
@@ -522,7 +532,7 @@ static void Dem_SetStatusByte(uint16 eventIndex, Dem_UdsStatusByteType newStatus
 
         DEM_ENTER_CRITICAL();
         Dem_RuntimeEvents[eventIndex].udsStatus = newStatus;
-        Dem_EventStatusChangeCounter[eventIndex]++;
+        DEM_DEBUG_INC(Dem_EventStatusChangeCounter[eventIndex]);
         Dem_UpdatePrimaryEntryStatus(
             eventConfig.EventId,
             newStatus
@@ -574,13 +584,6 @@ static void Dem_BuildNvImage(void)
 {
     uint16 i;
 
-    memset(&Dem_NvImage, 0, sizeof(Dem_NvImage));
-
-    Dem_NvImage.magic = DEM_NV_MAGIC;
-    Dem_NvImage.version = DEM_NV_VERSION;
-    Dem_NvImage.eventRecordCount = Dem_ConfigPtr->EventCount;
-    Dem_NvImage.primaryEntryCount = DEM_PRIMARY_MEMORY_SIZE;
-
     for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
         Dem_NvImage.eventRecords[i].eventId = Dem_RuntimeEvents[i].eventId;
@@ -594,7 +597,6 @@ static void Dem_BuildNvImage(void)
 
     for (i = 0u; i < DEM_PRIMARY_MEMORY_SIZE; i++)
     {
-        Dem_NvImage.primaryEntries[i] = Dem_PrimaryMemory[i];
         Dem_NvImage.primaryEntries[i].udsStatus =
             Dem_GetPersistentStatus(Dem_PrimaryMemory[i].udsStatus);
     }
@@ -616,7 +618,7 @@ static Std_ReturnType Dem_UpdateNvMRamImageIfIdle(void)
 
     Dem_BuildNvImage();
 
-    if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) != E_OK)
+    if (Dem_NvM_UpdateRamBlockForced(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) != E_OK)
     {
         return E_NOT_OK;
     }
@@ -636,26 +638,6 @@ static boolean Dem_IsNvImageValid(const Dem_NvImageType *image)
         return FALSE;
     }
 
-    if (image->magic != DEM_NV_MAGIC)
-    {
-        return FALSE;
-    }
-
-    if (image->version != DEM_NV_VERSION)
-    {
-        return FALSE;
-    }
-
-    if (image->eventRecordCount > DEM_MAX_EVENTS)
-    {
-        return FALSE;
-    }
-
-    if (image->primaryEntryCount > DEM_PRIMARY_MEMORY_SIZE)
-    {
-        return FALSE;
-    }
-
     return TRUE;
 }
 
@@ -671,7 +653,7 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
         return;
     }
 
-    for (i = 0u; i < image->eventRecordCount; i++)
+    for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
     {
         uint16 eventIndex = Dem_FindEventIndex(image->eventRecords[i].eventId);
 
@@ -694,7 +676,7 @@ static void Dem_LoadNvImage(const Dem_NvImageType *image)
         }
     }
 
-    for (i = 0u; i < image->primaryEntryCount; i++)
+    for (i = 0u; i < DEM_PRIMARY_MEMORY_SIZE; i++)
     {
         uint16 eventIndex = Dem_FindEventIndex(image->primaryEntries[i].eventId);
 
@@ -1110,7 +1092,7 @@ static void Dem_ClearRuntimeEvent(uint16 eventIndex)
 
     if (oldStatus != newStatus)
     {
-        Dem_EventStatusChangeCounter[eventIndex]++;
+        DEM_DEBUG_INC(Dem_EventStatusChangeCounter[eventIndex]);
         Dem_InvokeStatusChanged(eventIndex, oldStatus, newStatus);
     }
 
@@ -1132,7 +1114,6 @@ void Dem_PreInit(void)
     Dem_ClearStatus = DEM_CLEAR_IDLE;
 
     memset(Dem_RuntimeEvents, 0, sizeof(Dem_RuntimeEvents));
-    memset(Dem_PrimaryMemory, 0, sizeof(Dem_PrimaryMemory));
     memset(&Dem_NvImage, 0, sizeof(Dem_NvImage));
     memset(&Dem_Filter, 0, sizeof(Dem_Filter));
     Dem_DebugReset();
@@ -1190,7 +1171,7 @@ Std_ReturnType Dem_Shutdown(void)
 #if (DEM_NVM_ENABLED == 1u)
     Dem_BuildNvImage();
 
-    if (Dem_NvM_UpdateRamBlock(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
+    if (Dem_NvM_UpdateRamBlockForced(Dem_ConfigPtr->NvMBlockId, &Dem_NvImage) == E_OK)
     {
         Dem_Dirty = FALSE;
         if (Dem_ClearStatus == DEM_CLEAR_PENDING)
@@ -1297,10 +1278,12 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
 
     DEM_ENTER_CRITICAL();
 
+#if DEM_DEBUG_INSTRUMENTATION
     if ((uint8)EventStatus < DEM_EVENT_STATUS_DEBUG_COUNT)
     {
-        Dem_SetEventStatusCounter[eventIndex][(uint8)EventStatus]++;
+        DEM_DEBUG_INC(Dem_SetEventStatusCounter[eventIndex][(uint8)EventStatus]);
     }
+#endif
 
     switch (EventStatus)
     {
@@ -1720,6 +1703,8 @@ Std_ReturnType Dem_ClearDTC(
     if (Dem_UpdateNvMRamImageIfIdle() != E_OK)
     {
         Dem_Dirty = TRUE;
+        Dem_ClearStatus = DEM_CLEAR_FAILED;
+        return E_NOT_OK;
     }
 
     Dem_ClearStatus = DEM_CLEAR_OK;

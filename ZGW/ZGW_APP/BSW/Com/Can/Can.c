@@ -11,8 +11,8 @@
 #define CAN_IRQ_PRIO_BUSOFF_CLASSIC   42u
 #define CAN_IRQ_PRIO_BUSOFF_FD        43u
 
-#define CAN_CLASSIC_TRCV_STB_PORT     (&MODULE_P20)
-#define CAN_CLASSIC_TRCV_STB_PIN      6u
+#define CAN_ONBOARD_TRCV_STB_PORT     (&MODULE_P20)
+#define CAN_ONBOARD_TRCV_STB_PIN      6u
 #define CAN_TX_CANCEL_TIMEOUT         1000u
 #define CAN_RX_FIFO_DRAIN_BUDGET      2u
 #define CAN_TX_HW_PENDING_TIMEOUT_MS  64u
@@ -93,18 +93,7 @@ static const Can_StdIdFilterConfigType Can_ClassicStdIdFilters[] =
     { 0x250u, "CentralCommand1" }, /* CentralCommand1, sender CBM */
     { 0x201u, "DmuStatus" }, /* DmuStatus, sender DMU */
     { 0x220u, "CommandDisplayStatus" }, /* CommandDisplayStatus, sender ZGW */
-    { 0x086u, "EngineData7" }, /* EngineData7, sender DME */
     { 0x6F6u, "BattFullStat" }, /* BattFullStat, sender ELC */
-    { 0x085u, "EngineData6" }, /* EngineData6, sender DME */
-    { 0x084u, "EngineData5" }, /* EngineData5, sender DME */
-    { 0x083u, "EngineData4" }, /* EngineData4, sender DME */
-    { 0x082u, "EngineData3" }, /* EngineData3, sender DME */
-    { 0x081u, "EngineData2" }, /* EngineData2, sender DME */
-    { 0x092u, "DSCData3" }, /* DSCData3, sender DSC */
-    { 0x091u, "DSCData2" }, /* DSCData2, sender DSC */
-    { 0x090u, "DSCData1" }, /* DSCData1, sender DSC */
-    { 0x080u, "EngineData1" }, /* EngineData1, sender DME */
-    { 0x100u, "ASGData1" }, /* ASGData1, sender AGS */
     { 0x10Du, "PdcStat" }, /* PdcStat, sender FRBE */
     { 0x299u, "Mileage" }, /* Mileage, sender DMU */
     { 0x200u, "Dmu_Alive" }, /* Dmu_Alive, sender DMU */
@@ -203,23 +192,25 @@ volatile uint32 Can_TxControllerNotReadyCounter = 0u;
 volatile uint32 Can_TxPendingBusyCounter = 0u;
 volatile uint32 Can_TxSendRetryCounter = 0u;
 volatile uint32 Can_TxProcessAttemptLimitCounter = 0u;
+volatile uint32 Can_TxPendingRecoveredCounter = 0u;
+volatile uint32 Can_TxPendingDropCounter = 0u;
 
 static void Can_ReadRxFifo(uint8 controllerId);
 static void Can_ProcessRx(void);
 static void Can_RequeuePendingTx(uint8 controllerId);
 
-static void CanClassic_TrcvSetNormalMode(void)
+static void CanOnboard_TrcvSetNormalMode(void)
 {
-    IfxPort_setPinModeOutput(CAN_CLASSIC_TRCV_STB_PORT,
-            CAN_CLASSIC_TRCV_STB_PIN,
+    IfxPort_setPinModeOutput(CAN_ONBOARD_TRCV_STB_PORT,
+            CAN_ONBOARD_TRCV_STB_PIN,
             IfxPort_OutputMode_pushPull,
             IfxPort_OutputIdx_general);
 
     /* KIT on-board CAN transceiver STB is active high; low keeps normal mode. */
-    IfxPort_setPinLow(CAN_CLASSIC_TRCV_STB_PORT, CAN_CLASSIC_TRCV_STB_PIN);
+    IfxPort_setPinLow(CAN_ONBOARD_TRCV_STB_PORT, CAN_ONBOARD_TRCV_STB_PIN);
 }
 
-static void Can_ReleaseFdRxPinFromScr(void)
+static void Can_ReleaseClassicRxPinFromScr(void)
 {
     uint16 safetyWdtPw;
 
@@ -687,15 +678,16 @@ static void Can_RequeuePendingTxBuffer(uint8 controllerId, uint8 bufferIdx)
     pdu.sdu = data;
 
     pending->active = FALSE;
+    pending->ageTicks = 0u;
 
     if (Can_TxQueuePush(&pdu) != E_OK)
     {
-        pending->pdu = pdu;
-        memcpy(pending->data, data, pdu.dlc);
-        pending->pdu.sdu = pending->data;
-        pending->swPduHandle = pdu.swPduHandle;
-        pending->active = TRUE;
-        pending->ageTicks = 0u;
+        Can_Runtime[controllerId].txOverflowCounter++;
+        Can_TxPendingDropCounter++;
+    }
+    else
+    {
+        Can_TxPendingRecoveredCounter++;
     }
 }
 
@@ -798,9 +790,11 @@ static Std_ReturnType Can_RxQueuePop(Can_FrameType* frame)
 
 static void Can_InitClassicNode(void)
 {
+    Can_ReleaseClassicRxPinFromScr();
+
     IfxCan_Can_initNodeConfig(&Can_Hw.nodeConfigClassic, &Can_Hw.moduleClassic);
 
-    Can_Hw.nodeConfigClassic.nodeId = IfxCan_NodeId_0;
+    Can_Hw.nodeConfigClassic.nodeId = IfxCan_NodeId_3;
     Can_Hw.nodeConfigClassic.baudRate.baudrate = 500000u;
     Can_Hw.nodeConfigClassic.calculateBitTimingValues = TRUE;
     Can_Hw.nodeConfigClassic.frame.mode = IfxCan_FrameMode_standard;
@@ -841,15 +835,13 @@ static void Can_InitClassicNode(void)
     Can_CancelPendingTxBuffers(&Can_Hw.nodeClassic, CAN_TX_HW_BUFFER_COUNT_CLASSIC);
 
     IfxCan_Node_initRxPin(Can_Hw.nodeClassic.node,
-            &IfxCan_RXD00B_P20_7_IN,
+            &IfxCan_RXD13B_P33_5_IN,
             IfxPort_Mode_inputPullUp,
             IfxPort_PadDriver_cmosAutomotiveSpeed1);
 
-    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT,
+    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT,
             IfxPort_OutputMode_pushPull,
             IfxPort_PadDriver_cmosAutomotiveSpeed4);
-
-    CanClassic_TrcvSetNormalMode();
 
     {
         uint8 i;
@@ -869,11 +861,9 @@ static void Can_InitClassicNode(void)
 
 static void Can_InitFdNode(void)
 {
-    Can_ReleaseFdRxPinFromScr();
-
     IfxCan_Can_initNodeConfig(&Can_Hw.nodeConfigFd, &Can_Hw.moduleFd);
 
-    Can_Hw.nodeConfigFd.nodeId = IfxCan_NodeId_3;
+    Can_Hw.nodeConfigFd.nodeId = IfxCan_NodeId_0;
     Can_Hw.nodeConfigFd.baudRate.baudrate = 500000u;
     Can_Hw.nodeConfigFd.baudRate.prescaler = 3u;
     Can_Hw.nodeConfigFd.baudRate.timeSegment1 = 14u;
@@ -924,13 +914,15 @@ static void Can_InitFdNode(void)
     Can_CancelPendingTxBuffers(&Can_Hw.nodeFd, CAN_TX_HW_BUFFER_COUNT_FD);
 
     IfxCan_Node_initRxPin(Can_Hw.nodeFd.node,
-            &IfxCan_RXD13B_P33_5_IN,
+            &IfxCan_RXD00B_P20_7_IN,
             IfxPort_Mode_inputPullUp,
             IfxPort_PadDriver_cmosAutomotiveSpeed1);
 
-    IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT,
+    IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT,
             IfxPort_OutputMode_pushPull,
             IfxPort_PadDriver_cmosAutomotiveSpeed4);
+
+    CanOnboard_TrcvSetNormalMode();
 
     {
         uint8 i;
@@ -1055,12 +1047,12 @@ void Can_Init(void)
     Can_InterruptsEnabled[CAN_CONTROLLER_FD] = TRUE;
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
-    Can_ReleaseFdRxPinFromScr();
+    Can_ReleaseClassicRxPinFromScr();
 
-    IfxCan_Can_initModuleConfig(&Can_Hw.moduleConfigClassic, &MODULE_CAN0);
+    IfxCan_Can_initModuleConfig(&Can_Hw.moduleConfigClassic, &MODULE_CAN1);
     IfxCan_Can_initModule(&Can_Hw.moduleClassic, &Can_Hw.moduleConfigClassic);
 
-    IfxCan_Can_initModuleConfig(&Can_Hw.moduleConfigFd, &MODULE_CAN1);
+    IfxCan_Can_initModuleConfig(&Can_Hw.moduleConfigFd, &MODULE_CAN0);
     IfxCan_Can_initModule(&Can_Hw.moduleFd, &Can_Hw.moduleConfigFd);
 
     Can_InitClassicNode();

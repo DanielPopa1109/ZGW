@@ -21,6 +21,7 @@
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX2 6u
 #define CANIF_PDU_CLASSIC_EXT_PHYS_TX3 7u
 #define CANIF_DIAGREQUEST_TESTER_CAN_ID 0x710u
+#define CANIF_DIAGRESPONSE_ZGW_CAN_ID   0x711u
 #define CANIF_DIAGREQUEST_CLASSIC_CAN_ID CANIF_DIAGREQUEST_TESTER_CAN_ID
 #define CANIF_DIAGREQUEST_CANFD_CAN_ID   CANIF_DIAGREQUEST_TESTER_CAN_ID
 #define CANIF_RX_PDU_CENTRALLOCKDATA                          10u
@@ -29,18 +30,7 @@
 #define CANIF_RX_PDU_OUTSIDETEMPERATURESTATUS                 13u
 #define CANIF_RX_PDU_CENTRALCOMMAND1                          14u
 #define CANIF_RX_PDU_DMUSTATUS                                15u
-#define CANIF_RX_PDU_ENGINEDATA7                              16u
 #define CANIF_RX_PDU_BATTFULLSTAT                             17u
-#define CANIF_RX_PDU_ENGINEDATA6                              18u
-#define CANIF_RX_PDU_ENGINEDATA5                              19u
-#define CANIF_RX_PDU_ENGINEDATA4                              20u
-#define CANIF_RX_PDU_ENGINEDATA3                              21u
-#define CANIF_RX_PDU_ENGINEDATA2                              22u
-#define CANIF_RX_PDU_DSCDATA3                                 23u
-#define CANIF_RX_PDU_DSCDATA2                                 24u
-#define CANIF_RX_PDU_DSCDATA1                                 25u
-#define CANIF_RX_PDU_ENGINEDATA1                              26u
-#define CANIF_RX_PDU_ASGDATA1                                 27u
 #define CANIF_RX_PDU_PDCSTAT                                  28u
 #define CANIF_RX_PDU_MILEAGE                                  29u
 #define CANIF_RX_PDU_DMU_ALIVE                                30u
@@ -112,8 +102,6 @@
 #define CANIF_TX_PDU_CANFD_NM3                                                104u
 #define CANIF_TX_PDU_CANFD_SDAT                                               105u
 #define CANIF_TX_PDU_CANFD_LIGHTDATA1                                         106u
-#define CANIF_TX_PDU_CANFD_POWERTRAINDATA2                                    107u
-#define CANIF_TX_PDU_CANFD_POWERTRAINDATA1                                    108u
 #define CANIF_TX_PDU_CANFD_BODYDATA1                                          109u
 #define CANIF_TX_PDU_CANFD_PDM1_DIAGREQUEST                                   110u
 #define CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM1                                   114u

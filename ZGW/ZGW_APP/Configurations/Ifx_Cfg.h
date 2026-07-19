@@ -42,6 +42,8 @@
  * DLMU sections. */
 #define AURIX_LMU_CACHED_BSS            __attribute__((section(".bss.lmu_cached")))
 #define AURIX_LMU_CACHED_DATA           __attribute__((section(".data.lmu_cached")))
+#define AURIX_LMU_CPU0_CACHED_BSS       __attribute__((section(".bss.lmubss_cpu0")))
+#define AURIX_LMU_CPU0_CACHED_DATA      __attribute__((section(".data.lmudata_cpu0")))
 #define AURIX_ETH_DMA_CACHED            __attribute__((section(".bss.eth_dma_cached")))
 #define AURIX_SHARED_CACHED             __attribute__((section(".bss.shared_cached")))
 

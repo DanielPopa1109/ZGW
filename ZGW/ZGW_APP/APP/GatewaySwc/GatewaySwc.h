@@ -10,6 +10,10 @@
 #define GATEWAYSWC_VERSION_MAJOR        1u
 #define GATEWAYSWC_VERSION_MINOR        4u
 
+#ifndef GATEWAYSWC_DEBUG_INSTRUMENTATION
+#define GATEWAYSWC_DEBUG_INSTRUMENTATION 0
+#endif
+
 #define GATEWAYSWC_MAIN_PERIOD_MS       5u
 #define GATEWAYSWC_ROUTE_PERIOD_MS      10u
 #define GATEWAYSWC_OUTPUT_PERIOD_MS     10u
@@ -38,27 +42,37 @@
 #define GATEWAYSWC_RX_DIAG_KIND_MESSAGE_TIMEOUT  0x01u
 
 #define GATEWAYSWC_CAN_RX_FIRST_0          COM_SIG_RX_CENTRALLOCKDATA_VIBRATIONSENSORSTATUS
-#define GATEWAYSWC_CAN_RX_LAST_0           COM_SIG_RX_L1_I2T_COUNTER_I2TCOUNTER
+#define GATEWAYSWC_CAN_RX_LAST_0           COM_SIG_RX_DMUSTATUS_DISPLAYCAMERASTATUS
 
-#define GATEWAYSWC_CAN_RX_FIRST_1          COM_SIG_RX_BATTSOCSOH_SOH
-#define GATEWAYSWC_CAN_RX_LAST_1           COM_SIG_RX_BATTCAPRES_CAPACITYAH
+#define GATEWAYSWC_CAN_RX_FIRST_1          COM_SIG_RX_BATTFULLSTAT_RUNTIMEREMAINING
+#define GATEWAYSWC_CAN_RX_LAST_1           COM_SIG_RX_BATTFULLSTAT_TIMETOFULL
+
+#define GATEWAYSWC_CAN_RX_FIRST_2          COM_SIG_RX_PDCSTAT_PDCDISTANCEREAR
+#define GATEWAYSWC_CAN_RX_LAST_2           COM_SIG_RX_L1_I2T_COUNTER_I2TCOUNTER
+
+#define GATEWAYSWC_CAN_RX_FIRST_3          COM_SIG_RX_BATTSOCSOH_SOH
+#define GATEWAYSWC_CAN_RX_LAST_3           COM_SIG_RX_BATTCAPRES_CAPACITYAH
 
 #define GATEWAYSWC_CANFD_RX_FIRST          COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_01
 #define GATEWAYSWC_CANFD_RX_LAST           COM_SIG_RX_CANFD_PDM1_TEMPERATUREFEEDBACK_5_PDM1_TEMPFB_075
 
-#define GATEWAYSWC_LIN_RX_FIRST            COM_SIG_RX_LIN_ALT_STATUS_ALT_RESPONSEERROR
-#define GATEWAYSWC_LIN_RX_LAST             COM_SIG_RX_LIN_PCU48_STATUS_PCU48_CHARGESTATE
+#define GATEWAYSWC_LIN_RX_FIRST            COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_RESPONSEERROR
+#define GATEWAYSWC_LIN_RX_LAST             COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_CURRENT
 
 #define GATEWAYSWC_RANGE_SIZE(first, last)  (((uint16)(last) - (uint16)(first)) + 1u)
 
-#define GATEWAYSWC_RX_MESSAGE_DIAG_COUNT    (GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_CENTRALLOCKDATA, COM_RX_PDU_DMU_ALIVE) + \
+#define GATEWAYSWC_RX_MESSAGE_DIAG_COUNT    (GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_CENTRALLOCKDATA, COM_RX_PDU_DMUSTATUS) + \
+        GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_BATTFULLSTAT, COM_RX_PDU_BATTFULLSTAT) + \
+        GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_PDCSTAT, COM_RX_PDU_DMU_ALIVE) + \
         GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_VOLTAGECURRENT, COM_RX_PDU_L1_I2T_COUNTER) + \
         GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_BATTSOCSOH, COM_RX_PDU_BATTCAPRES) + \
         GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_CANFD_PDM1_LOADSTATUS, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5) + \
-        GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_LIN_ALT_STATUS, COM_RX_PDU_LIN_PCU48_STATUS))
+        GATEWAYSWC_RANGE_SIZE(COM_RX_PDU_LIN_HVDCDC_STATUS, COM_RX_PDU_LIN_HVDCDC_STATUS))
 
 #define GATEWAYSWC_RX_SIGNAL_DIAG_COUNT     (GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_CAN_RX_FIRST_0, GATEWAYSWC_CAN_RX_LAST_0) + \
         GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_CAN_RX_FIRST_1, GATEWAYSWC_CAN_RX_LAST_1) + \
+        GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_CAN_RX_FIRST_2, GATEWAYSWC_CAN_RX_LAST_2) + \
+        GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_CAN_RX_FIRST_3, GATEWAYSWC_CAN_RX_LAST_3) + \
         GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_CANFD_RX_FIRST, GATEWAYSWC_CANFD_RX_LAST) + \
         GATEWAYSWC_RANGE_SIZE(GATEWAYSWC_LIN_RX_FIRST, GATEWAYSWC_LIN_RX_LAST))
 
@@ -134,32 +148,26 @@ typedef struct
 {
     uint32 pdmCommandLoad[1u][GATEWAYSWC_PDM_LOADS_PER_PDM];
 
-    uint32 linAltTargetCurrent;
-    uint32 linAltTargetVoltage;
-    uint32 linAltEnable;
-    uint32 linAltFieldDutyCommand;
-
     uint32 linHvDcdcEnable;
     uint32 linHvDcdcTargetVoltage;
-
-    uint32 linPcu48RequestAvailability;
 
     uint32 vehicleStatus;
     uint32 nmPn1;
 } GatewaySwc_CommandType;
 
-extern volatile uint16 GatewaySwc_RxMessageDiagDebugPduId[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
-extern volatile uint8 GatewaySwc_RxMessageDiagDebugStatus[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxMessageTimeoutCounter[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxMessageTimeoutActiveSamples[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
-extern volatile uint16 GatewaySwc_RxSignalDiagDebugSignalId[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
-extern volatile uint8 GatewaySwc_RxSignalDiagDebugStatus[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
-extern volatile uint32 GatewaySwc_RxSignalDiagDebugValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
-extern volatile uint32 GatewaySwc_RxSignalDiagDebugInvalidValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxSignalTimeoutCounter[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxSignalTimeoutActiveSamples[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxSignalInvalidCounter[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxSignalInvalidActiveSamples[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+#if GATEWAYSWC_DEBUG_INSTRUMENTATION
+extern volatile uint16 GatewaySwc_RxMessageDiagDebugPduId[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint8 GatewaySwc_RxMessageDiagDebugStatus[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
+extern volatile uint16 GatewaySwc_RxSignalDiagDebugSignalId[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint8 GatewaySwc_RxSignalDiagDebugStatus[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalDiagDebugValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
+extern volatile uint32 GatewaySwc_RxSignalDiagDebugInvalidValue[GATEWAYSWC_RX_SIGNAL_DIAG_COUNT];
 extern volatile uint16 GatewaySwc_DebugPublishFirstSignalId;
 extern volatile uint16 GatewaySwc_DebugPublishLastSignalId;
 extern volatile uint16 GatewaySwc_DebugPublishSignalId;
@@ -192,6 +200,7 @@ extern volatile uint32 GatewaySwc_DebugEthTxQueueDropped;
 extern volatile uint32 GatewaySwc_DebugEthTxResultQueueDropped;
 extern volatile uint32 GatewaySwc_DebugEthRxQueueDropped;
 extern volatile uint32 GatewaySwc_DebugCrossCoreLockTimeout;
+#endif
 
 void GatewaySwc_Init(void);
 void GatewaySwc_MainFunction(void);

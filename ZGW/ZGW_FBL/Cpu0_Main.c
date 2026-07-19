@@ -12,6 +12,7 @@
 #define FBL_TRANSPORT_ETH                1u
 #define FBL_TRANSPORT_CANFD              2u
 #define FBL_TRANSPORT_CAN_CLASSIC        3u
+#define FBL_CAN_TRANSPORT_ENABLED        0u
 
 #define FBL_RESET_INFO_ENTER_DOIP        0xFCD0u
 
@@ -76,7 +77,7 @@
 #define APP_PFLASH_END_CACHED            0x805FFFFFu
 
 #define APP_PFLASH_START_NC              0xA0030000u
-#define APP_PFLASH_END_NC                0xA05FFFFFu
+#define APP_PFLASH_END_NC                0xA05FFFFFu // @suppress("Unused static function")
 
 /* APP reset/start execution address (cached alias). The FBL jumps here. */
 #define APP_START_CACHED                 APP_PFLASH_START_CACHED
@@ -98,7 +99,7 @@ typedef enum
     FBL_ADDR_ERR_PROTECTED
 } Fbl_AddressStatus;
 
-static inline uint32 Fbl_ToCachedPflash(uint32 addr)
+static inline uint32 Fbl_ToCachedPflash(uint32 addr) // @suppress("Unused static function")
 {
     return (addr & PFLASH_ALIAS_MASK) | PFLASH_CACHED_BASE;
 }
@@ -127,8 +128,8 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define FBL_CAN_CLASSIC_MAX_DL           8u
 #define FBL_CAN_EXT_ADDR_ZGW             0x41u
 #define FBL_CAN_EXT_ADDR_TESTER          0x41u
-#define FBL_CAN_CLASSIC_TRCV_STB_PORT    (&MODULE_P20)
-#define FBL_CAN_CLASSIC_TRCV_STB_PIN     6u
+#define FBL_CAN_ONBOARD_TRCV_STB_PORT    (&MODULE_P20)
+#define FBL_CAN_ONBOARD_TRCV_STB_PIN     6u
 
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
 #define FBL_ISOTP_FC_TIMEOUT_LOOPS       1000000u
@@ -317,9 +318,11 @@ static uint8 Fbl_NormalizeTransport(uint8 transport);
 static uint8 Fbl_ResetCounterForcesProgramming(uint8 resetCounter);
 static uint8 Fbl_IsAppValid(void);
 static void Fbl_PlatformInit(void);
-static void Fbl_CanReleaseFdRxPinFromScr(void);
-static void Fbl_CanClassicTrcvSetNormalMode(void);
+#if (FBL_CAN_TRANSPORT_ENABLED != 0u)
+static void Fbl_CanReleaseClassicRxPinFromScr(void);
+static void Fbl_CanOnboardTrcvSetNormalMode(void);
 static void Fbl_CanInit(uint8 transport);
+#endif
 static void Fbl_CanSend(const uint8 *data, uint8 len);
 static uint8 Fbl_CanDlcFromLen(uint8 len);
 static uint8 Fbl_CanLenFromDlc(uint8 dlc);
@@ -438,11 +441,7 @@ static void Fbl_ScrInvalidateFblHandoff(void)
 
 static uint8 Fbl_NormalizeTransport(uint8 transport)
 {
-    if((transport == FBL_TRANSPORT_CANFD) || (transport == FBL_TRANSPORT_CAN_CLASSIC))
-    {
-        return transport;
-    }
-
+    (void)transport;
     return FBL_TRANSPORT_ETH;
 }
 
@@ -490,7 +489,8 @@ void core0_main(void)
         if(Fbl_ScrReadFblHandoff(&scrProg, &scrComm, &scrResetCounter) != 0u)
         {
             programmingRequest = scrProg;
-            requestedTransport = Fbl_NormalizeTransport(scrComm);
+            (void)scrComm;
+            requestedTransport = FBL_TRANSPORT_ETH;
             resetCounter = scrResetCounter;
         }
         else
@@ -550,14 +550,8 @@ void core0_main(void)
 
     g_FblTransportSelect = Fbl_NormalizeTransport((uint8)g_FblTransportSelect);
 
-    if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
-    {
-        FblEth_Init();
-    }
-    else
-    {
-        Fbl_CanInit((uint8)g_FblTransportSelect);
-    }
+    g_FblTransportSelect = FBL_TRANSPORT_ETH;
+    FblEth_Init();
 
     while(1)
     {
@@ -566,10 +560,7 @@ void core0_main(void)
             Fbl_CopyAndJumpRamUpdater();
         }
 
-        if(g_FblTransportSelect == FBL_TRANSPORT_ETH)
-        {
-            Fbl_DoIpMain();
-        }
+        Fbl_DoIpMain();
 
         if(g_iso.rxReady != 0u)
         {
@@ -588,7 +579,8 @@ static void Fbl_PlatformInit(void)
     IfxCpu_enableInterrupts();
 }
 
-static void Fbl_CanReleaseFdRxPinFromScr(void)
+#if (FBL_CAN_TRANSPORT_ENABLED != 0u)
+static void Fbl_CanReleaseClassicRxPinFromScr(void)
 {
     uint16 safetyWdtPw;
 
@@ -601,13 +593,13 @@ static void Fbl_CanReleaseFdRxPinFromScr(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
-static void Fbl_CanClassicTrcvSetNormalMode(void)
+static void Fbl_CanOnboardTrcvSetNormalMode(void)
 {
-    IfxPort_setPinModeOutput(FBL_CAN_CLASSIC_TRCV_STB_PORT,
-            FBL_CAN_CLASSIC_TRCV_STB_PIN,
+    IfxPort_setPinModeOutput(FBL_CAN_ONBOARD_TRCV_STB_PORT,
+            FBL_CAN_ONBOARD_TRCV_STB_PIN,
             IfxPort_OutputMode_pushPull,
             IfxPort_OutputIdx_general);
-    IfxPort_setPinLow(FBL_CAN_CLASSIC_TRCV_STB_PORT, FBL_CAN_CLASSIC_TRCV_STB_PIN);
+    IfxPort_setPinLow(FBL_CAN_ONBOARD_TRCV_STB_PORT, FBL_CAN_ONBOARD_TRCV_STB_PIN);
 }
 
 static void Fbl_CanInit(uint8 transport)
@@ -616,24 +608,24 @@ static void Fbl_CanInit(uint8 transport)
 
     if(isClassic != 0u)
     {
-        can0_node0_init_pins();
+        Fbl_CanReleaseClassicRxPinFromScr();
+        can1_node3_init_pins();
     }
     else
     {
-        Fbl_CanReleaseFdRxPinFromScr();
-        can1_node3_init_pins();
+        can0_node0_init_pins();
     }
 
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN0 : &MODULE_CAN1);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN1 : &MODULE_CAN0);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
-    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_0 : IfxCan_NodeId_3;
+    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_3 : IfxCan_NodeId_0;
     g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
@@ -694,19 +686,20 @@ static void Fbl_CanInit(uint8 transport)
 
     if(isClassic != 0u)
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
-        Fbl_CanClassicTrcvSetNormalMode();
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
     }
     else
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        Fbl_CanOnboardTrcvSetNormalMode();
     }
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 }
+#endif
 
 void Fbl_CanRxIsr(void)
 {

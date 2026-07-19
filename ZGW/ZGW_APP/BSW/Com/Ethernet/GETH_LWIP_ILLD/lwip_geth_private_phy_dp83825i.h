@@ -44,6 +44,11 @@ IFX_EXTERN const lwip_geth_PhyDp83825i_StatusType *lwip_geth_private_Phy_Dp83825
 IFX_EXTERN uint32 lwip_geth_private_Phy_Dp83825i_read_mdio_reg(uint32 layeraddr, uint32 regaddr, uint32 *pdata);
 IFX_EXTERN uint32 lwip_geth_private_Phy_Dp83825i_write_mdio_reg(uint32 layeraddr, uint32 regaddr, uint32 data);
 
+#ifndef DP83825I_DEBUG_INSTRUMENTATION
+#define DP83825I_DEBUG_INSTRUMENTATION 0
+#endif
+
+#if DP83825I_DEBUG_INSTRUMENTATION
 IFX_EXTERN volatile uint32 Dp83825i_DebugPhyScanAddr;
 IFX_EXTERN volatile uint32 Dp83825i_DebugPhyAddrFound;
 IFX_EXTERN volatile uint32 Dp83825i_DebugPhyId1;
@@ -56,6 +61,7 @@ IFX_EXTERN volatile uint32 Dp83825i_DebugReadFailCount;
 IFX_EXTERN volatile uint32 Dp83825i_DebugInitFailCount;
 IFX_EXTERN volatile uint32 Dp83825i_DebugResetWaitFailCount;
 IFX_EXTERN volatile uint32 Dp83825i_DebugConfigureFailCount;
+#endif
 
 #endif
 

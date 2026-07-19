@@ -29,6 +29,7 @@ static uint8 CodingApp_PendingNvMPollCount = 0u;
 static uint8 CodingApp_DemNotCodedState = CODINGAPP_DEM_STATE_UNKNOWN;
 static uint8 CodingApp_DemInvalidState = CODINGAPP_DEM_STATE_UNKNOWN;
 
+#if CODINGAPP_DEBUG_INSTRUMENTATION
 volatile uint8 CodingApp_DebugState = CODINGAPP_STATE_NOT_CODED;
 volatile uint8 CodingApp_DebugValidationStatus = CODINGAPP_VALIDATION_NOT_CODED;
 volatile uint8 CodingApp_DebugDirty = 0u;
@@ -37,6 +38,11 @@ volatile uint32 CodingApp_DebugGeneration = 0u;
 volatile uint32 CodingApp_DebugInvalidCodingCounter = 0u;
 volatile uint32 CodingApp_DebugWriteAllCounter = 0u;
 volatile uint8 CodingApp_DebugLastNvMResult = NVM_REQ_NOT_OK;
+#endif
+
+#if CODINGAPP_DEBUG_INSTRUMENTATION
+#define CODINGAPP_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#endif
 
 static boolean CodingApp_IsBlank(const uint8 *data, uint16 len);
 static uint8 CodingApp_ValidateImage(const CodingApp_NvImageType *image);
@@ -50,8 +56,13 @@ static void CodingApp_SetExpectedBit(CodingApp_NvImageType *image, uint16 index,
 static boolean CodingApp_GetExpectedBit(const CodingApp_NvImageType *image, uint16 index);
 static void CodingApp_SetTxPduEnabledBit(CodingApp_NvImageType *image, PduIdType txPduId, boolean enabled);
 static boolean CodingApp_GetTxPduEnabledBit(const CodingApp_NvImageType *image, PduIdType txPduId);
+static boolean CodingApp_GetTxPduCodingIndex(PduIdType txPduId, uint16 *index);
 static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId);
+#if CODINGAPP_DEBUG_INSTRUMENTATION
 static void CodingApp_UpdateDebug(void);
+#else
+#define CodingApp_UpdateDebug() ((void)0)
+#endif
 static void CodingApp_SetState(uint8 state, uint8 validationStatus);
 static void CodingApp_BuildImageFromMask(
     CodingApp_NvImageType *image,
@@ -69,6 +80,28 @@ static void CodingApp_PumpNvMStack(void);
 static boolean CodingApp_CountNvMPendingPoll(void);
 static void CodingApp_ClearPendingNvMJob(void);
 static void CodingApp_FillRoutineResponse(uint8 status, uint8 *respData, Dcm_PduLengthType *respLen);
+
+static const PduIdType CodingApp_TxPduCodingList[CODINGAPP_TX_PDU_COUNT] =
+{
+    COM_TX_PDU_VEHICLESTATE,
+    COM_TX_PDU_DISPLAYOUTTEMP,
+    COM_TX_PDU_STATUSBODYDATA1,
+    COM_TX_PDU_COMMANDDISPLAYSTATUS,
+    COM_TX_PDU_SDAT,
+    COM_TX_PDU_NM3,
+    COM_TX_PDU_LOADREQUEST,
+    COM_TX_PDU_CANFD_INFOTAINMENTDATA1,
+    COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2,
+    COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA1,
+    COM_TX_PDU_CANFD_VEHICLESTATE,
+    COM_TX_PDU_CANFD_NM3,
+    COM_TX_PDU_CANFD_SDAT,
+    COM_TX_PDU_CANFD_LIGHTDATA1,
+    COM_TX_PDU_CANFD_BODYDATA1,
+    COM_TX_PDU_CANFD_COMMANDLOAD_PDM1,
+    COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3,
+    COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC
+};
 
 void DcmAppl_DiagnosticSessionChanged(uint8 connIdx, uint8 session)
 {
@@ -671,7 +704,7 @@ static uint8 CodingApp_ValidateImage(const CodingApp_NvImageType *image)
         return CODINGAPP_VALIDATION_BAD_MESSAGE_COUNT;
     }
 
-    if (image->txPduCount != (uint16)CODINGAPP_TX_PDU_MAX_ID)
+    if (image->txPduCount != (uint16)CODINGAPP_TX_PDU_COUNT)
     {
         return CODINGAPP_VALIDATION_BAD_MESSAGE_COUNT;
     }
@@ -798,16 +831,17 @@ static boolean CodingApp_GetExpectedBit(const CodingApp_NvImageType *image, uint
 
 static void CodingApp_SetTxPduEnabledBit(CodingApp_NvImageType *image, PduIdType txPduId, boolean enabled)
 {
+    uint16 txIndex;
     uint16 byteIndex;
     uint8 bitMask;
 
-    if ((image == NULL_PTR) || (txPduId > (PduIdType)CODINGAPP_TX_PDU_MAX_ID))
+    if ((image == NULL_PTR) || (CodingApp_GetTxPduCodingIndex(txPduId, &txIndex) == FALSE))
     {
         return;
     }
 
-    byteIndex = (uint16)(txPduId >> 3u);
-    bitMask = (uint8)(1u << (txPduId & 0x07u));
+    byteIndex = (uint16)(txIndex >> 3u);
+    bitMask = (uint8)(1u << (txIndex & 0x07u));
 
     if (enabled != FALSE)
     {
@@ -821,18 +855,40 @@ static void CodingApp_SetTxPduEnabledBit(CodingApp_NvImageType *image, PduIdType
 
 static boolean CodingApp_GetTxPduEnabledBit(const CodingApp_NvImageType *image, PduIdType txPduId)
 {
+    uint16 txIndex;
     uint16 byteIndex;
     uint8 bitMask;
 
-    if ((image == NULL_PTR) || (txPduId > (PduIdType)CODINGAPP_TX_PDU_MAX_ID))
+    if ((image == NULL_PTR) || (CodingApp_GetTxPduCodingIndex(txPduId, &txIndex) == FALSE))
     {
         return TRUE;
     }
 
-    byteIndex = (uint16)(txPduId >> 3u);
-    bitMask = (uint8)(1u << (txPduId & 0x07u));
+    byteIndex = (uint16)(txIndex >> 3u);
+    bitMask = (uint8)(1u << (txIndex & 0x07u));
 
     return ((image->txPduEnabled[byteIndex] & bitMask) != 0u) ? TRUE : FALSE;
+}
+
+static boolean CodingApp_GetTxPduCodingIndex(PduIdType txPduId, uint16 *index)
+{
+    uint16 i;
+
+    if (index == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    for (i = 0u; i < (uint16)CODINGAPP_TX_PDU_COUNT; i++)
+    {
+        if (CodingApp_TxPduCodingList[i] == txPduId)
+        {
+            *index = i;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
 }
 
 static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId)
@@ -847,17 +903,19 @@ static boolean CodingApp_IsTxPduCodingExempt(PduIdType txPduId)
     return FALSE;
 }
 
+#if CODINGAPP_DEBUG_INSTRUMENTATION
 static void CodingApp_UpdateDebug(void)
 {
-    CodingApp_DebugState = CodingApp_Status.state;
-    CodingApp_DebugValidationStatus = CodingApp_Status.validationStatus;
-    CodingApp_DebugDirty = CodingApp_Status.dirty;
-    CodingApp_DebugRxMessageExpectedCount = CodingApp_Status.rxMessageExpectedCount;
-    CodingApp_DebugGeneration = CodingApp_Status.generation;
-    CodingApp_DebugInvalidCodingCounter = CodingApp_Status.invalidCodingCounter;
-    CodingApp_DebugWriteAllCounter = CodingApp_Status.writeAllCounter;
-    CodingApp_DebugLastNvMResult = CodingApp_Status.lastNvMResult;
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugState, CodingApp_Status.state);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugValidationStatus, CodingApp_Status.validationStatus);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugDirty, CodingApp_Status.dirty);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugRxMessageExpectedCount, CodingApp_Status.rxMessageExpectedCount);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugGeneration, CodingApp_Status.generation);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugInvalidCodingCounter, CodingApp_Status.invalidCodingCounter);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugWriteAllCounter, CodingApp_Status.writeAllCounter);
+    CODINGAPP_DEBUG_ASSIGN(CodingApp_DebugLastNvMResult, CodingApp_Status.lastNvMResult);
 }
+#endif
 
 static void CodingApp_SetState(uint8 state, uint8 validationStatus)
 {
@@ -898,7 +956,7 @@ static void CodingApp_BuildImageFromMask(
     image->length = (uint16)sizeof(CodingApp_NvImageType);
     image->generation = generation;
     image->rxMessageCount = (uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT;
-    image->txPduCount = (uint16)CODINGAPP_TX_PDU_MAX_ID;
+    image->txPduCount = (uint16)CODINGAPP_TX_PDU_COUNT;
     memset(image->txPduEnabled, 0xFF, CODINGAPP_TX_PDU_ENABLED_BYTES);
 
     if (mask != NULL_PTR)

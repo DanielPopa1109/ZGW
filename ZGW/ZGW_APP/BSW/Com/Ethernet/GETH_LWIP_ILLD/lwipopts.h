@@ -103,17 +103,17 @@ extern "C" {
  * The gateway takes an intermittent MPU null-pointer trap on core 2 whose root
  * cause is a wild write originating in the lwIP/socket layer (the same
  * corruption also shows up as an occasional total TX freeze when it lands on a
- * pool/pcb/mbox instead of a task context). These checks make lwIP validate
- * every pool element and heap block on each alloc/free and assert at the exact
- * instant a canary or free-list is found corrupted, turning a far-away symptom
- * into a localized stop. LWIP_PLATFORM_ASSERT is wired to a real trap in
- * arch/cc.h. NOTE: this adds per-element padding (more RAM) and runtime cost -
- * dial MEMP_/MEM_*_CHECK back to 0 once the corruptor is found and fixed.
+ * pool/pcb/mbox instead of a task context). These checks can make lwIP validate
+ * every pool element and heap block on each alloc/free. Disabled for production
+ * memory footprint; re-enable only while actively investigating pool/heap
+ * corruption.
  * ------------------------------------------------------------------------ */
-#define MEMP_OVERFLOW_CHECK                 2
-#define MEMP_SANITY_CHECK                   1
-#define MEM_OVERFLOW_CHECK                  2
-#define MEM_SANITY_CHECK                    1
+#define LWIP_NOASSERT                       1
+#define MEMP_OVERFLOW_CHECK                 0
+#define MEMP_SANITY_CHECK                   0
+#define MEM_OVERFLOW_CHECK                  0
+#define MEM_SANITY_CHECK                    0
+#define LWIP_STATS                          0
 
 #define LWIP_UDP                            1
 #define MEMP_NUM_UDP_PCB                    8

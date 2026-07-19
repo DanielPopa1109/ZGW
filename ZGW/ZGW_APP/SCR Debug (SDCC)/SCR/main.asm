@@ -1,6 +1,6 @@
 ;--------------------------------------------------------
 ; File Created by SDCC : free open source ISO C Compiler 
-; Version 4.2.2 #13448 (MINGW32)
+; Version 4.2.3 #13448 (MINGW32)
 ;--------------------------------------------------------
 	.file	"main.c"
 ;	.optsdcc -mmcs51
@@ -831,7 +831,7 @@ _SCR_TimeStoreU32:
 ;elapsedTicks              Allocated with name '_SCR_TimeStoreBasePlusElapsedNs_PARM_4'
 ;offset                    Allocated with name '_SCR_TimeStoreBasePlusElapsedNs_offset_65536_32'
 ;------------------------------------------------------------
-;	../SCR/main.c:198: static void SCR_TimeStoreBasePlusElapsedNs(
+;	../SCR/main.c:198: static void SCR_TimeStoreBasePlusElapsedNs( // @suppress("Unused static function")
 ;	-----------------------------------------
 ;	 function SCR_TimeStoreBasePlusElapsedNs
 ;	-----------------------------------------
@@ -842,7 +842,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,dpl
 	mov	dptr,#_SCR_TimeStoreBasePlusElapsedNs_offset_65536_32
 	movx	@dptr,a
-;	../SCR/main.c:204: SCR_TimeProductLow = (elapsedTicks & 0xFFFFu) * (uint32)SCR_TIME_RTC_TICK_NS;
+;	../SCR/main.c:204: SCR_TimeProductLow = (elapsedTicks & 0xFFFFu) * (uint32)SCR_TIME_RTC_TICK_NS; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeStoreBasePlusElapsedNs_PARM_4
 	movx	a,@dptr
 	mov	r4,a
@@ -894,7 +894,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,r3
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:205: SCR_TimeProductHigh = (elapsedTicks >> 16u) * (uint32)SCR_TIME_RTC_TICK_NS;
+;	../SCR/main.c:205: SCR_TimeProductHigh = (elapsedTicks >> 16u) * (uint32)SCR_TIME_RTC_TICK_NS; // @suppress("Symbol is not resolved")
 	mov	ar4,r6
 	mov	ar5,r7
 	mov	r6,#0x00
@@ -939,7 +939,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 3)
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:206: SCR_TimeElapsedLow = SCR_TimeProductLow + (SCR_TimeProductHigh << 16u);
+;	../SCR/main.c:206: SCR_TimeElapsedLow = SCR_TimeProductLow + (SCR_TimeProductHigh << 16u); // @suppress("Symbol is not resolved")
 	mov	r7,(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 1)
 	mov	r6,_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0
 	clr	a
@@ -967,7 +967,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,r7
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:207: SCR_TimeElapsedHigh = (SCR_TimeProductHigh >> 16u);
+;	../SCR/main.c:207: SCR_TimeElapsedHigh = (SCR_TimeProductHigh >> 16u); // @suppress("Symbol is not resolved")
 	mov	_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0,(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 2)
 	mov	(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 1),(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 3)
 	mov	(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 2),#0x00
@@ -984,7 +984,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 3)
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:208: if (SCR_TimeElapsedLow < SCR_TimeProductLow)
+;	../SCR/main.c:208: if (SCR_TimeElapsedLow < SCR_TimeProductLow) // @suppress("Symbol is not resolved")
 	clr	c
 	mov	a,r4
 	subb	a,r0
@@ -996,7 +996,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	subb	a,r3
 	jnc	.00138
 .00151:
-;	../SCR/main.c:210: SCR_TimeElapsedHigh++;
+;	../SCR/main.c:210: SCR_TimeElapsedHigh++; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeElapsedHigh
 	mov	a,#0x01
 	add	a,_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0
@@ -1014,7 +1014,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	inc	dptr
 	movx	@dptr,a
 .00138:
-;	../SCR/main.c:213: SCR_TimeCurrentLow = baseLow + SCR_TimeElapsedLow;
+;	../SCR/main.c:213: SCR_TimeCurrentLow = baseLow + SCR_TimeElapsedLow; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeStoreBasePlusElapsedNs_PARM_3
 	movx	a,@dptr
 	mov	r0,a
@@ -1051,7 +1051,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,(_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0 + 3)
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:214: SCR_TimeCurrentHigh = baseHigh + SCR_TimeElapsedHigh;
+;	../SCR/main.c:214: SCR_TimeCurrentHigh = baseHigh + SCR_TimeElapsedHigh; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeElapsedHigh
 	movx	a,@dptr
 	mov	_SCR_TimeStoreBasePlusElapsedNs_sloc1_1_0,a
@@ -1100,7 +1100,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	mov	a,r7
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:215: if (SCR_TimeCurrentLow < baseLow)
+;	../SCR/main.c:215: if (SCR_TimeCurrentLow < baseLow) // @suppress("Symbol is not resolved")
 	clr	c
 	mov	a,_SCR_TimeStoreBasePlusElapsedNs_sloc0_1_0
 	subb	a,r0
@@ -1112,7 +1112,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	subb	a,r3
 	jnc	.00140
 .00152:
-;	../SCR/main.c:217: SCR_TimeCurrentHigh++;
+;	../SCR/main.c:217: SCR_TimeCurrentHigh++; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeCurrentHigh
 	mov	a,#0x01
 	add	a,r4
@@ -1130,7 +1130,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	inc	dptr
 	movx	@dptr,a
 .00140:
-;	../SCR/main.c:220: SCR_TimeStoreU32(offset, SCR_TimeCurrentHigh);
+;	../SCR/main.c:220: SCR_TimeStoreU32(offset, SCR_TimeCurrentHigh); // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TimeStoreBasePlusElapsedNs_offset_65536_32
 	movx	a,@dptr
 	mov	r7,a
@@ -1162,7 +1162,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 	push	ar7
 	lcall	_SCR_TimeStoreU32
 	pop	ar7
-;	../SCR/main.c:221: SCR_TimeStoreU32((uint8)(offset + 4u), SCR_TimeCurrentLow);
+;	../SCR/main.c:221: SCR_TimeStoreU32((uint8)(offset + 4u), SCR_TimeCurrentLow); // @suppress("Symbol is not resolved")
 	mov	a,r7
 	add	a,#0x04
 	mov	r7,a
@@ -1209,7 +1209,7 @@ _SCR_TimeStoreBasePlusElapsedNs:
 ;cnt1                      Allocated with name '_SCR_RtcReadCounter_cnt1_65536_37'
 ;cnt0                      Allocated with name '_SCR_RtcReadCounter_cnt0_65536_37'
 ;------------------------------------------------------------
-;	../SCR/main.c:236: static uint32 SCR_RtcReadCounter(void)
+;	../SCR/main.c:236: static uint32 SCR_RtcReadCounter(void) // @suppress("Unused static function")
 ;	-----------------------------------------
 ;	 function SCR_RtcReadCounter
 ;	-----------------------------------------
@@ -1354,7 +1354,7 @@ _SCR_RtcReadCounter:
 ;flags                     Allocated with name '_SCR_RtcCompareIsr_flags_65536_40'
 ;previousLow               Allocated with name '_SCR_RtcCompareIsr_previousLow_65536_40'
 ;------------------------------------------------------------
-;	../SCR/main.c:278: void SCR_RtcCompareIsr(void) __interrupt(XINTR13)
+;	../SCR/main.c:278: void SCR_RtcCompareIsr(void) __interrupt(XINTR13) // @suppress("Unused function declaration")
 ;	-----------------------------------------
 ;	 function SCR_RtcCompareIsr
 ;	-----------------------------------------
@@ -2111,7 +2111,7 @@ _SCR_TimeInit:
 	lcall	_SCR_TimeStoreU8
 	ljmp	.00229
 .00219:
-;	../SCR/main.c:414: SCR_TimeBaseUtcHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_UTC_NS);
+;	../SCR/main.c:414: SCR_TimeBaseUtcHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_UTC_NS); // @suppress("Symbol is not resolved")
 	mov	dpl,#0x08
 	lcall	_SCR_TimeLoadU32
 	mov	r4,dpl
@@ -2130,7 +2130,7 @@ _SCR_TimeInit:
 	mov	a,r7
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:415: SCR_TimeBaseUtcLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_UTC_NS + 4u));
+;	../SCR/main.c:415: SCR_TimeBaseUtcLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_UTC_NS + 4u)); // @suppress("Symbol is not resolved")
 	mov	dpl,#0x0C
 	lcall	_SCR_TimeLoadU32
 	mov	r4,dpl
@@ -2149,7 +2149,7 @@ _SCR_TimeInit:
 	mov	a,r7
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:416: SCR_TimeBaseVehicleHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_VEHICLE_NS);
+;	../SCR/main.c:416: SCR_TimeBaseVehicleHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_VEHICLE_NS); // @suppress("Symbol is not resolved")
 	mov	dpl,#0x24
 	lcall	_SCR_TimeLoadU32
 	mov	r4,dpl
@@ -2168,7 +2168,7 @@ _SCR_TimeInit:
 	mov	a,r7
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:417: SCR_TimeBaseVehicleLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_VEHICLE_NS + 4u));
+;	../SCR/main.c:417: SCR_TimeBaseVehicleLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_VEHICLE_NS + 4u)); // @suppress("Symbol is not resolved")
 	mov	dpl,#0x28
 	lcall	_SCR_TimeLoadU32
 	mov	r4,dpl
@@ -2191,7 +2191,7 @@ _SCR_TimeInit:
 	mov	dptr,#_SCR_TimeBaseActive
 	mov	a,#0x01
 	movx	@dptr,a
-;	../SCR/main.c:422: SCR_TotalElapsedTicksLow = 0u;
+;	../SCR/main.c:422: SCR_TotalElapsedTicksLow = 0u; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TotalElapsedTicksLow
 	clr	a
 	movx	@dptr,a
@@ -2201,7 +2201,7 @@ _SCR_TimeInit:
 	movx	@dptr,a
 	inc	dptr
 	movx	@dptr,a
-;	../SCR/main.c:423: SCR_TotalElapsedTicksHigh = 0u;
+;	../SCR/main.c:423: SCR_TotalElapsedTicksHigh = 0u; // @suppress("Symbol is not resolved")
 	mov	dptr,#_SCR_TotalElapsedTicksHigh
 	movx	@dptr,a
 	inc	dptr
@@ -2845,7 +2845,7 @@ _WCAN_CheckWake:
 ;	../SCR/main.c:674: if((p00In & CANFD_RXD_PIN_MASK) == 0u)
 	mov	a,r7
 	jb	acc.5,.00344
-.00384:
+.00376:
 ;	../SCR/main.c:676: (*G_RX_LOW_COUNT_ADDR)++;
 	mov	dptr,#0x1764
 	movx	a,@dptr
@@ -2859,36 +2859,18 @@ _WCAN_CheckWake:
 	mov	dptr,#_WCAN_CheckWake_wcanStatus1_65536_82
 	movx	a,@dptr
 	mov	r7,a
-	jnb	acc.0,.00351
-.00385:
+	jnb	acc.0,.00347
+.00377:
 ;	../SCR/main.c:681: wakeReason = WCAN_WAKE_REASON_WUF;
 	mov	dptr,#_WCAN_CheckWake_wakeReason_65536_82
 	mov	a,#0x01
 	movx	@dptr,a
-;	../SCR/main.c:683: else if((WCAN_WAKE_ON_FD_FRAME != 0u) &&
-	sjmp	.00355
-.00351:
-;	../SCR/main.c:684: ((wcanStatus1 & WCAN_STATUS1_FDF_MASK) != 0u) &&
-	mov	a,r7
-	jnb	acc.4,.00347
-.00386:
-;	../SCR/main.c:685: ((*G_FDF_BASELINE_ADDR & WCAN_STATUS1_FDF_MASK) == 0u))
-	mov	dptr,#0x1768
-	movx	a,@dptr
-	mov	r7,a
-	jb	acc.4,.00347
-.00387:
-;	../SCR/main.c:687: wakeReason = WCAN_WAKE_REASON_FDF;
-	mov	dptr,#_WCAN_CheckWake_wakeReason_65536_82
-	mov	a,#0x10
-	movx	@dptr,a
 ;	../SCR/main.c:689: else if((WCAN_WAKE_ON_SYNC_FRAME != 0u) && ((wcanStatus1 & WCAN_STATUS1_SYNC_MASK) != 0u))
 	sjmp	.00355
 .00347:
-	mov	dptr,#_WCAN_CheckWake_wcanStatus1_65536_82
-	movx	a,@dptr
+	mov	a,r7
 	jnb	acc.1,.00355
-.00388:
+.00378:
 ;	../SCR/main.c:691: wakeReason = WCAN_WAKE_REASON_SYNC;
 	mov	dptr,#_WCAN_CheckWake_wakeReason_65536_82
 	mov	a,#0x02
@@ -2900,7 +2882,7 @@ _WCAN_CheckWake:
 	mov	r7,a
 	movx	a,@dptr
 	jz	.00358
-.00389:
+.00379:
 ;	../SCR/main.c:696: SCR_RequestStandbyWake(wakeReason);
 	mov	dpl,r7
 	lcall	_SCR_RequestStandbyWake
@@ -2983,19 +2965,19 @@ _WCAN_Init:
 	mov	_SCR_WCAN_CFG,#0x09
 ;	../SCR/main.c:753: SCR_WCAN_INTMRSLT = WCAN_INT_ENABLE_WUF_ONLY;
 	mov	_SCR_WCAN_INTMRSLT,#0x04
-;	../SCR/main.c:754: SCR_WCAN_FD_CTRL = 0x01 ; // Enable CAN FD tolerant mode
-	mov	_SCR_WCAN_FD_CTRL,#0x01
+;	../SCR/main.c:754: SCR_WCAN_FD_CTRL = 0x00 ; // Classic CAN wake path
+	mov	_SCR_WCAN_FD_CTRL,#0x00
 ;	../SCR/main.c:755: *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_CFG_WRITTEN;
 	mov	dptr,#0x1769
 	inc	a
 	movx	@dptr,a
 ;	../SCR/main.c:760: SCR_WCAN_PAGE = 0x1;
 	mov	_SCR_WCAN_PAGE,#0x01
-;	../SCR/main.c:761: SCR_WCAN_FRMERRCNT = (1<<6); // Do not count CAN FD frames as wake-up frame errors
-	mov	_SCR_WCAN_FRMERRCNT,#0x40
+;	../SCR/main.c:761: SCR_WCAN_FRMERRCNT = 0x00u;
+	mov	_SCR_WCAN_FRMERRCNT,#0x00
 ;	../SCR/main.c:762: SCR_WCAN_DLC_CTRL = WCAN_WAKE_DLC_VALUE ; // 8 bytes of wake data
 	mov	_SCR_WCAN_DLC_CTRL,#0x08
-;	../SCR/main.c:763: SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure nominal Baud Rate of 500 kbit/s
+;	../SCR/main.c:763: SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure classic CAN Baud Rate of 500 kbit/s
 	mov	_SCR_WCAN_BTL1_CTRL,#0x64
 ;	../SCR/main.c:764: SCR_WCAN_BTL2_CTRL = (1<<6) | (0x33<<0) ; // BRP=01(Divide by 2) and SP=0x33 represents ~80%SP
 	mov	_SCR_WCAN_BTL2_CTRL,#0x73
@@ -3015,13 +2997,13 @@ _WCAN_Init:
 	mov	dpl,#0x00
 	lcall	_WCAN_WaitForSelectiveWakeAck
 	mov	a,dpl
-	jnz	.00391
-.00404:
+	jnz	.00381
+.00394:
 ;	../SCR/main.c:778: result |= WCAN_INIT_SWACK_CLEAR_TIMEOUT;
 	mov	dptr,#_WCAN_Init_result_65536_89
 	mov	a,#0x01
 	movx	@dptr,a
-.00391:
+.00381:
 ;	../SCR/main.c:780: *G_BOOT_STAGE_ADDR = BOOT_STAGE_SWACK_CLEAR_DONE;
 	mov	dptr,#0x1769
 	mov	a,#0x28
@@ -3042,14 +3024,14 @@ _WCAN_Init:
 	mov	dpl,#0x01
 	lcall	_WCAN_WaitForSelectiveWakeAck
 	mov	a,dpl
-	jnz	.00393
-.00405:
+	jnz	.00383
+.00395:
 ;	../SCR/main.c:792: result |= WCAN_INIT_SWACK_SET_TIMEOUT;
 	mov	dptr,#_WCAN_Init_result_65536_89
 	movx	a,@dptr
 	orl	acc,#0x02
 	movx	@dptr,a
-.00393:
+.00383:
 ;	../SCR/main.c:794: *G_BOOT_STAGE_ADDR = BOOT_STAGE_SWACK_SET_DONE;
 	mov	dptr,#0x1769
 	mov	a,#0x2A
@@ -3075,7 +3057,7 @@ _WCAN_Init:
 	movx	@dptr,a
 ;	../SCR/main.c:802: return result;
 	mov	dpl,r7
-.00394:
+.00384:
 ;	../SCR/main.c:803: }
 	ret
 ;------------------------------------------------------------
@@ -3143,7 +3125,7 @@ _main:
 ;	../SCR/main.c:821: SCR_ConfigureFaultWake();
 	lcall	_SCR_ConfigureFaultWake
 ;	../SCR/main.c:823: while(1)
-.00407:
+.00397:
 ;	../SCR/main.c:825: *G_BOOT_STAGE_ADDR = BOOT_STAGE_LOOP_RUNNING;
 	mov	dptr,#0x1769
 	mov	a,#0x40
@@ -3180,8 +3162,8 @@ _main:
 	mov	dptr,#0x1760
 	mov	a,r7
 	movx	@dptr,a
-	sjmp	.00407
-.00410:
+	sjmp	.00397
+.00400:
 ;	../SCR/main.c:836: }
 	ret
 ;--------------------------------------------------------

@@ -325,6 +325,19 @@ void FblEth_Init(void)
         return;
     }
 
+    if((LWIP_GETH_0.app_config == NULL) ||
+       (LWIP_GETH_0.app_config->geth_lld_config == NULL) ||
+       (LWIP_GETH_0.app_config->geth_lld_config->gethSFR == NULL))
+    {
+        return;
+    }
+
+    if(LWIP_GETH_0.app_is_initialized != FALSE)
+    {
+        g_ethInitDone = 1u;
+        return;
+    }
+
     FblEth_ResetTcpStream();
     memset(g_udpQ, 0u, sizeof(g_udpQ));
 

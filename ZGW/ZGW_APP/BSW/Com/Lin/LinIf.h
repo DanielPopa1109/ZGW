@@ -11,20 +11,13 @@
 
 
 /* LDF ZGW_LIN_4 generated LinIf PDU IDs. */
-#define LINIF_TX_PDU_ZGW_NM3             10u
-#define LINIF_TX_PDU_ZGW_REQUEST_ALT     11u
 #define LINIF_TX_PDU_ZGW_REQUEST_HVDCDC  12u
-#define LINIF_TX_PDU_ZGW_REQUEST_PCU48   13u
-#define LINIF_RX_PDU_ALT_STATUS          10u
 #define LINIF_RX_PDU_HVDCDC_STATUS       11u
-#define LINIF_RX_PDU_PCU48_STATUS        12u
 
-#define LINIF_NAD_ALT                    2u
-#define LINIF_NAD_PCU48                  3u
 #define LINIF_NAD_HVDCDC                 4u
 
-#define LINIF_MAX_APP_TX_PDUS    4u
-#define LINIF_MAX_APP_RX_PDUS    3u
+#define LINIF_MAX_APP_TX_PDUS    1u
+#define LINIF_MAX_APP_RX_PDUS    1u
 
 typedef enum
 {

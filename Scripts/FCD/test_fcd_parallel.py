@@ -18,12 +18,12 @@ class FcdParallelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "net.dbc").write_text("BU_: Tester ZGW ECU1\nBO_ 1792 DiagReq: 8 Tester\n", encoding="utf-8")
-            (root / "net.ldf").write_text("Nodes { Master: ZGW, 10 ms, 5 ms; Slaves: ALT, HVDCDC; }", encoding="utf-8")
+            (root / "net.ldf").write_text("Nodes { Master: ZGW, 10 ms, 5 ms; Slaves: HVDCDC; }", encoding="utf-8")
             nodes, logs = discover_nodes(root)
             names = {node.node_name for node in nodes}
             self.assertIn("ZGW", names)
             self.assertIn("ECU1", names)
-            self.assertIn("ALT", names)
+            self.assertIn("HVDCDC", names)
             self.assertIsInstance(logs, list)
 
     def test_bundle_round_trip(self):

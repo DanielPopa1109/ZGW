@@ -33,11 +33,11 @@ NS_ :
 
 BS_:
 
-BU_: Tester FRBE DSC DME AGS DMU CBM ELC ZGW
+BU_: Tester FRBE DMU CBM ELC ZGW
 
 
 BO_ 928 VehicleState: 1 ZGW
- SG_ VehicleStatus : 0|4@1+ (1,0) [0|15] ""  FRBE,ELC,DSC,DMU,DME,CBM,AGS
+ SG_ VehicleStatus : 0|4@1+ (1,0) [0|15] ""  FRBE,ELC,DMU,CBM
 
 BO_ 595 CentralLockData: 2 FRBE
  SG_ VibrationSensorStatus : 8|8@1+ (1,0) [0|255] ""  ZGW
@@ -62,14 +62,14 @@ BO_ 576 StatusActuator: 2 CBM
  SG_ StatusDoors : 0|6@1+ (1,0) [0|63] ""  ZGW
 
 BO_ 64 StatusBodyData1: 4 ZGW
- SG_ BD1_CentralLockCommand : 29|3@1+ (1,0) [0|7] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_TurnSignalCommand : 12|4@1+ (1,0) [0|15] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_RlsCommand : 24|5@1+ (1,0) [0|31] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_LigthSensor : 16|8@1+ (1,0) [0|255] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_Ignition : 8|4@1+ (1,0) [0|15] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_HighBeamCommand : 6|2@1+ (1,0) [0|3] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_Gearbox : 3|3@1+ (1,0) [0|7] ""  DSC,DME,AGS,FRBE,DMU
- SG_ BD1_FogLightsCommand : 0|3@1+ (1,0) [0|7] ""  DSC,DME,AGS,FRBE,DMU
+ SG_ BD1_CentralLockCommand : 29|3@1+ (1,0) [0|7] ""  FRBE,DMU
+ SG_ BD1_TurnSignalCommand : 12|4@1+ (1,0) [0|15] ""  FRBE,DMU
+ SG_ BD1_RlsCommand : 24|5@1+ (1,0) [0|31] ""  FRBE,DMU
+ SG_ BD1_LigthSensor : 16|8@1+ (1,0) [0|255] ""  FRBE,DMU
+ SG_ BD1_Ignition : 8|4@1+ (1,0) [0|15] ""  FRBE,DMU
+ SG_ BD1_HighBeamCommand : 6|2@1+ (1,0) [0|3] ""  FRBE,DMU
+ SG_ BD1_Gearbox : 3|3@1+ (1,0) [0|7] ""  FRBE,DMU
+ SG_ BD1_FogLightsCommand : 0|3@1+ (1,0) [0|7] ""  FRBE,DMU
 
 BO_ 593 OutsideTemperatureStatus: 4 CBM
  SG_ OutsideTemperature : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
@@ -104,61 +104,9 @@ BO_ 544 CommandDisplayStatus: 6 ZGW
  SG_ CommandDisplayMode : 4|2@1+ (1,0) [0|3] ""  DMU
  SG_ CommandDisplayClimaFan : 0|4@1+ (1,0) [0|15] ""  DMU
 
-BO_ 134 EngineData7: 8 DME
- SG_ IntakeTemperature : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ CoolantTemperature : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
 BO_ 1782 BattFullStat: 8 ELC
  SG_ RuntimeRemaining : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
  SG_ TimeToFull : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 133 EngineData6: 8 DME
- SG_ LongTermFuelTrimBank1 : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ LongTermFuelTrimBank2 : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 132 EngineData5: 8 DME
- SG_ O2SensorBank1_ShortTermFuelTrim : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ O2SensorBank2_ShortTermFuelTrim : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 131 EngineData4: 8 DME
- SG_ O2SensorVoltage1Bank1 : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ O2SensorVoltage1Bank2 : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 130 EngineData3: 8 DME
- SG_ O2SensorVoltage2Bank1 : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ O2SensorVoltage2Bank2 : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 129 EngineData2: 8 DME
- SG_ ShortTermFuelTrimBank1 : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ ShortTermFuelTrimBank2 : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 146 DSCData3: 8 DSC
- SG_ LatAcc : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ LongAcc : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 145 DSCData2: 8 DSC
- SG_ VehSpeed : 32|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ YawRate : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
-
-BO_ 144 DSCData1: 5 DSC
- SG_ TractionControlStatus : 32|8@1+ (1,0) [0|255] ""  ZGW
- SG_ DSCStatus : 24|8@1+ (1,0) [0|255] ""  ZGW
- SG_ BrakeWheelStatus : 16|8@1+ (1,0) [0|255] ""  ZGW
- SG_ ABSStatus : 8|8@1+ (1,0) [0|255] ""  ZGW
- SG_ BrakePressureValue : 0|8@1+ (1,0) [0|255] ""  ZGW
-
-BO_ 128 EngineData1: 8 DME
- SG_ MafValue : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
- SG_ TorqueValue : 59|5@1+ (1,0) [0|63] ""  ZGW
- SG_ PedalStatus : 52|7@1+ (1,0) [0|127] ""  ZGW
- SG_ EngineRPM : 32|13@1+ (1,0) [0|8191] ""  ZGW
- SG_ ActualTorque : 45|7@1+ (1,0) [0|127] ""  ZGW
-
-BO_ 256 ASGData1: 2 AGS
- SG_ ASGStatus : 14|2@1+ (1,0) [0|3] ""  ZGW
- SG_ ClutchStatus : 11|3@1+ (1,0) [0|7] ""  ZGW
- SG_ ShiftPhase : 8|3@1+ (1,0) [0|7] ""  ZGW
- SG_ CurrentGear : 4|4@1+ (1,0) [0|15] ""  ZGW
 
 BO_ 269 PdcStat: 3 FRBE
  SG_ PdcDistanceRear : 8|7@1+ (1,0) [0|127] ""  ZGW
@@ -182,20 +130,20 @@ BO_ 1774 TempMeas: 8 ELC
  SG_ McuTemp : 0|32@1- (1,0) [-3.4E+38|3.4E+38] ""  ZGW
 
 BO_ 514 SDAT: 7 ZGW
- SG_ CSB_SDAT_Year : 16|6@1+ (1,0) [0|63] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Second : 8|6@1+ (1,0) [0|63] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Month : 40|4@1+ (1,0) [0|15] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Minute : 0|6@1+ (1,0) [0|63] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Millisecond : 48|8@1+ (4,0) [0|1020] "ms"  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Hour : 32|5@1+ (1,0) [0|31] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_Day : 24|5@1+ (1,0) [0|31] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_TimeSource : 6|2@1+ (1,0) [0|3] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_UtcValid : 14|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_DefaultTime : 15|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
- SG_ CSB_SDAT_NvmRestored : 22|1@1+ (1,0) [0|1] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ CSB_SDAT_Year : 16|6@1+ (1,0) [0|63] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Second : 8|6@1+ (1,0) [0|63] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Month : 40|4@1+ (1,0) [0|15] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Minute : 0|6@1+ (1,0) [0|63] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Millisecond : 48|8@1+ (4,0) [0|1020] "ms"  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Hour : 32|5@1+ (1,0) [0|31] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_Day : 24|5@1+ (1,0) [0|31] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_TimeSource : 6|2@1+ (1,0) [0|3] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_UtcValid : 14|1@1+ (1,0) [0|1] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_DefaultTime : 15|1@1+ (1,0) [0|1] ""  DMU,CBM,FRBE,ELC
+ SG_ CSB_SDAT_NvmRestored : 22|1@1+ (1,0) [0|1] ""  DMU,CBM,FRBE,ELC
 
 BO_ 1023 NM3: 1 ZGW
- SG_ Nm3_Pn1 : 0|8@1+ (1,0) [0|255] ""  DMU,CBM,DSC,DME,FRBE,ELC,AGS
+ SG_ Nm3_Pn1 : 0|8@1+ (1,0) [0|255] ""  DMU,CBM,FRBE,ELC
 
 BO_ 81 LoadStatus: 1 ELC
  SG_ LoadStatus : 0|1@1+ (1,0) [0|0] ""  ZGW
@@ -304,25 +252,8 @@ BA_ "GenMsgCycleTime" BO_ 1782 1000;
 BA_ "GenMsgCycleTime" BO_ 1783 1000;
 SIG_VALTYPE_ 545 CommandDisplayOutsideTemperature : 1;
 SIG_VALTYPE_ 593 OutsideTemperature : 1;
-SIG_VALTYPE_ 134 IntakeTemperature : 1;
-SIG_VALTYPE_ 134 CoolantTemperature : 1;
 SIG_VALTYPE_ 1782 RuntimeRemaining : 1;
 SIG_VALTYPE_ 1782 TimeToFull : 1;
-SIG_VALTYPE_ 133 LongTermFuelTrimBank1 : 1;
-SIG_VALTYPE_ 133 LongTermFuelTrimBank2 : 1;
-SIG_VALTYPE_ 132 O2SensorBank1_ShortTermFuelTrim : 1;
-SIG_VALTYPE_ 132 O2SensorBank2_ShortTermFuelTrim : 1;
-SIG_VALTYPE_ 131 O2SensorVoltage1Bank1 : 1;
-SIG_VALTYPE_ 131 O2SensorVoltage1Bank2 : 1;
-SIG_VALTYPE_ 130 O2SensorVoltage2Bank1 : 1;
-SIG_VALTYPE_ 130 O2SensorVoltage2Bank2 : 1;
-SIG_VALTYPE_ 129 ShortTermFuelTrimBank1 : 1;
-SIG_VALTYPE_ 129 ShortTermFuelTrimBank2 : 1;
-SIG_VALTYPE_ 146 LatAcc : 1;
-SIG_VALTYPE_ 146 LongAcc : 1;
-SIG_VALTYPE_ 145 VehSpeed : 1;
-SIG_VALTYPE_ 145 YawRate : 1;
-SIG_VALTYPE_ 128 MafValue : 1;
 SIG_VALTYPE_ 1775 L1ISense : 1;
 SIG_VALTYPE_ 1774 L1Temp : 1;
 SIG_VALTYPE_ 1774 McuTemp : 1;

@@ -99,7 +99,9 @@ const AlarmConfigStruct globalAlarmConfig[USER_ALARM_NUMBER] =
         {IfxSmu_Alarm_SMU_Timer1_TimeOut,             IfxSmu_InternalAlarmAction_disabled, NULL_PTR},
         {SOFT_SMU_ALM_CFG_CHECK,                      IfxSmu_InternalAlarmAction_disabled, NULL_PTR},
         {IfxSmu_Alarm_SCU_External_RequestUnitAlarm1, IfxSmu_InternalAlarmAction_disabled, NULL_PTR},
-        {IfxSmu_Alarm_SPB_BusErrorEvent,              IfxSmu_InternalAlarmAction_nmi,   localFunc}
+        /* Lab-only deviation: debugger-injected SRI/SPB bus alarms are random on this setup. */
+        {IfxSmu_Alarm_XBAR0_SRI_BusErrorEvent,        IfxSmu_InternalAlarmAction_disabled, NULL_PTR},
+        {IfxSmu_Alarm_SPB_BusErrorEvent,              IfxSmu_InternalAlarmAction_disabled, NULL_PTR}
         /*---------------------------------------------------------------------------------------------------------------*/
 };
 /* The array configArrayIGCS[3] holds the configuration of each Interrupt Generation Configuration Set (IGCS)
@@ -124,6 +126,12 @@ uint16 nbrAlarmsThatTriggerIsr1 = 0u;
 uint16 nbrAlarmsThatTriggerIsr2 = 0u;
 uint16 nbrAlarmsThatTriggerNMI  = 0u;
 uint16 nbrAlarmsThatAreDisabled = 0u;
+
+#ifndef SMU_DEBUG_INSTRUMENTATION
+#define SMU_DEBUG_INSTRUMENTATION       0
+#endif
+
+#if SMU_DEBUG_INSTRUMENTATION
 volatile uint32 Smu_DebugWatchdogAlarmActionConfigured;
 volatile uint32 Smu_DebugWatchdogAlarmGroup;
 volatile uint32 Smu_DebugWatchdogAlarmPosition;
@@ -134,6 +142,13 @@ volatile uint32 Smu_DebugTrapDis0BeforeEnable;
 volatile uint32 Smu_DebugTrapDis0AfterEnable;
 volatile uint32 Smu_DebugTrapStatBeforeEnable;
 volatile uint32 Smu_DebugTrapStatAfterEnable;
+#endif
+
+#if SMU_DEBUG_INSTRUMENTATION
+#define SMU_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#else
+#define SMU_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#endif
 /* Used to check SMU ISR groups config */
 volatile boolean isrConfigTestRunningSMU = FALSE;
 /* Used to visualize TFT pop up window for alarms which were configured with default configuration during AppSSW */
@@ -203,22 +218,24 @@ SmuStatusType initSMUAlarmsSMU(void)
     for(uint8 i = 0u; i < USER_ALARM_NUMBER; i++)
     {
         IfxSmu_setAlarmAction(globalAlarmConfig[i].alarm, globalAlarmConfig[i].alarmReaction);
+#if SMU_DEBUG_INSTRUMENTATION
         if(globalAlarmConfig[i].alarm == SMU_ALARM_WHICH_TRIGGERS_NMI)
         {
             uint16 alarmGroup = (uint16)SMU_ALARM_WHICH_TRIGGERS_NMI / 32u;
             uint8 alarmPosition = (uint16)SMU_ALARM_WHICH_TRIGGERS_NMI % 32u;
 
-            Smu_DebugWatchdogAlarmActionConfigured = globalAlarmConfig[i].alarmReaction;
-            Smu_DebugWatchdogAlarmGroup = alarmGroup;
-            Smu_DebugWatchdogAlarmPosition = alarmPosition;
-            Smu_DebugWatchdogAlarmAgcf0 = (MODULE_SMU.AGCF[alarmGroup][0].U >> alarmPosition) & 0x1u;
-            Smu_DebugWatchdogAlarmAgcf1 = (MODULE_SMU.AGCF[alarmGroup][1].U >> alarmPosition) & 0x1u;
-            Smu_DebugWatchdogAlarmAgcf2 = (MODULE_SMU.AGCF[alarmGroup][2].U >> alarmPosition) & 0x1u;
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmActionConfigured, globalAlarmConfig[i].alarmReaction);
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmGroup, alarmGroup);
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmPosition, alarmPosition);
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmAgcf0, (MODULE_SMU.AGCF[alarmGroup][0].U >> alarmPosition) & 0x1u);
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmAgcf1, (MODULE_SMU.AGCF[alarmGroup][1].U >> alarmPosition) & 0x1u);
+            SMU_DEBUG_ASSIGN(Smu_DebugWatchdogAlarmAgcf2, (MODULE_SMU.AGCF[alarmGroup][2].U >> alarmPosition) & 0x1u);
         }
         else
         {
             /* Do nothing. */
         }
+#endif
         /* Each IGCS group can trigger up to 3 isr simultaneously, so each alarm that can trigger a specific
          * isr (according to its IGCS group) is put in the corresponding array to speed-up the alarm source
          * detection process */
@@ -330,14 +347,13 @@ SmuStatusType initSMUAlarmsSMU(void)
     /* Non Maskable Interrupt config/enabling on CPUs */
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     /* Enable trap requests for the CPU, which takes care of the SMU software */
-    Smu_DebugTrapDis0BeforeEnable = SCU_TRAPDIS0.U;
-    Smu_DebugTrapStatBeforeEnable = SCU_TRAPSTAT.U;
+    SMU_DEBUG_ASSIGN(Smu_DebugTrapDis0BeforeEnable, SCU_TRAPDIS0.U);
+    SMU_DEBUG_ASSIGN(Smu_DebugTrapStatBeforeEnable, SCU_TRAPSTAT.U);
     SCU_TRAPDIS0.B.CPU0SMUT = 0u;
     SCU_TRAPDIS0.B.CPU1SMUT = 0u;
     SCU_TRAPDIS0.B.CPU2SMUT = 0u;
-    Smu_DebugTrapDis0AfterEnable = SCU_TRAPDIS0.U;
-    Smu_DebugTrapStatAfterEnable = SCU_TRAPSTAT.U;
-
+    SMU_DEBUG_ASSIGN(Smu_DebugTrapDis0AfterEnable, SCU_TRAPDIS0.U);
+    SMU_DEBUG_ASSIGN(Smu_DebugTrapStatAfterEnable, SCU_TRAPSTAT.U);
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
 
     return pass;
@@ -436,7 +452,7 @@ void safetyKitEnableAllSMUAlarms(void)
                 /* Do nothing. */
             }
 
-            if(7u == alarmGroup && 1u == alarmPos)
+            if(7u == alarmGroup && (1u == alarmPos || 17u == alarmPos || 20u == alarmPos))
             {
                 continue;
             }

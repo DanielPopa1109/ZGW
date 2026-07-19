@@ -3,8 +3,8 @@
 
 /* The IHX representation */
 
-uint8_t scr_xram[3100] = { 
-/* csection: .reset output_size=1 section_size=107 full_size=3100 array_size=3100 vma=0 lma=0*/
+uint8_t scr_xram[3077] = { 
+/* csection: .reset output_size=1 section_size=107 full_size=3077 array_size=3077 vma=0 lma=0*/
 /* _resetvec [0]: */
     0x02,
     0x01,
@@ -120,7 +120,7 @@ uint8_t scr_xram[3100] = {
     0x00,
     0x00,
     0x00,
-/* csection: .isr13 output_size=1 section_size=149 full_size=3100 array_size=3100 vma=6b lma=6b*/
+/* csection: .isr13 output_size=1 section_size=149 full_size=3077 array_size=3077 vma=6b lma=6b*/
     0x02,
     0x02,
     0xDD,
@@ -270,12 +270,12 @@ uint8_t scr_xram[3100] = {
     0x00,
     0x00,
     0x00,
-/* csection: .gsinit output_size=1 section_size=3 full_size=3100 array_size=3100 vma=100 lma=100*/
+/* csection: .gsinit output_size=1 section_size=3 full_size=3077 array_size=3077 vma=100 lma=100*/
 /* __init_table [256]: */
     0x22,
     0x00,
     0x01,
-/* csection: .text output_size=1 section_size=2840 full_size=3100 array_size=3100 vma=103 lma=103*/
+/* csection: .text output_size=1 section_size=2817 full_size=3077 array_size=3077 vma=103 lma=103*/
 /* __sdcc_gsinit_startup [259]: */
     0x75,
     0xD4,
@@ -291,7 +291,7 @@ uint8_t scr_xram[3100] = {
 /* __sdcc_gsinit2_start [268]: */
     0x12,
     0x0C,
-    0x17,
+    0x00,
     0xE5,
     0xD5,
     0x60,
@@ -316,7 +316,7 @@ uint8_t scr_xram[3100] = {
     0x01,
     0x90,
     0x0C,
-    0x1B,
+    0x04,
     0x78,
     0x65,
     0x75,
@@ -411,7 +411,7 @@ uint8_t scr_xram[3100] = {
     0x00,
     0x12,
     0x0B,
-    0x9A,
+    0x83,
     0x80,
     0xFE,
 /* _SCR_TimeAddr [377]: */
@@ -2777,7 +2777,7 @@ uint8_t scr_xram[3100] = {
     0x20,
     0xE5,
     0x0B,
-/* .00384 [2670]: */
+/* .00376 [2670]: */
     0x90,
     0x17,
     0x64,
@@ -2798,7 +2798,7 @@ uint8_t scr_xram[3100] = {
     0x30,
     0xE0,
     0x08,
-/* .00385 [2689]: */
+/* .00377 [2689]: */
     0x90,
     0x1D,
     0x61,
@@ -2806,46 +2806,20 @@ uint8_t scr_xram[3100] = {
     0x01,
     0xF0,
     0x80,
-    0x21,
-/* .00351 [2697]: */
+    0x0A,
+/* .00347 [2697]: */
     0xEF,
-    0x30,
-    0xE4,
-    0x10,
-/* .00386 [2701]: */
-    0x90,
-    0x17,
-    0x68,
-    0xE0,
-    0xFF,
-    0x20,
-    0xE4,
-    0x08,
-/* .00387 [2709]: */
-    0x90,
-    0x1D,
-    0x61,
-    0x74,
-    0x10,
-    0xF0,
-    0x80,
-    0x0D,
-/* .00347 [2717]: */
-    0x90,
-    0x1D,
-    0x5F,
-    0xE0,
     0x30,
     0xE1,
     0x06,
-/* .00388 [2724]: */
+/* .00378 [2701]: */
     0x90,
     0x1D,
     0x61,
     0x74,
     0x02,
     0xF0,
-/* .00355 [2730]: */
+/* .00355 [2707]: */
     0x90,
     0x1D,
     0x61,
@@ -2854,15 +2828,15 @@ uint8_t scr_xram[3100] = {
     0xE0,
     0x60,
     0x05,
-/* .00389 [2738]: */
+/* .00379 [2715]: */
     0x8F,
     0xD5,
     0x12,
     0x08,
     0xF3,
-/* .00358 [2743]: */
+/* .00358 [2720]: */
     0x22,
-/* _WCAN_Init [2744]: */
+/* _WCAN_Init [2721]: */
     0x90,
     0x1D,
     0x62,
@@ -2954,7 +2928,7 @@ uint8_t scr_xram[3100] = {
     0x04,
     0x75,
     0xB7,
-    0x01,
+    0x00,
     0x90,
     0x17,
     0x69,
@@ -2965,7 +2939,7 @@ uint8_t scr_xram[3100] = {
     0x01,
     0x75,
     0xB2,
-    0x40,
+    0x00,
     0x75,
     0xB7,
     0x08,
@@ -3003,14 +2977,14 @@ uint8_t scr_xram[3100] = {
     0xD5,
     0x70,
     0x06,
-/* .00404 [2884]: */
+/* .00394 [2861]: */
     0x90,
     0x1D,
     0x62,
     0x74,
     0x01,
     0xF0,
-/* .00391 [2890]: */
+/* .00381 [2867]: */
     0x90,
     0x17,
     0x69,
@@ -3045,7 +3019,7 @@ uint8_t scr_xram[3100] = {
     0xD5,
     0x70,
     0x08,
-/* .00405 [2924]: */
+/* .00395 [2901]: */
     0x90,
     0x1D,
     0x62,
@@ -3054,7 +3028,7 @@ uint8_t scr_xram[3100] = {
     0xE0,
     0x02,
     0xF0,
-/* .00393 [2932]: */
+/* .00383 [2909]: */
     0x90,
     0x17,
     0x69,
@@ -3092,9 +3066,9 @@ uint8_t scr_xram[3100] = {
     0xF0,
     0x8F,
     0xD5,
-/* .00394 [2969]: */
+/* .00384 [2946]: */
     0x22,
-/* _main [2970]: */
+/* _main [2947]: */
     0x90,
     0x17,
     0x60,
@@ -3160,11 +3134,11 @@ uint8_t scr_xram[3100] = {
     0x95,
     0x12,
     0x0A,
-    0xB8,
+    0xA1,
     0x12,
     0x09,
     0x28,
-/* .00407 [3039]: */
+/* .00397 [3016]: */
     0x90,
     0x17,
     0x69,
@@ -3220,18 +3194,18 @@ uint8_t scr_xram[3100] = {
     0xF0,
     0x80,
     0xC9,
-/* .00410 [3094]: */
+/* .00400 [3071]: */
     0x22,
-/* __sdcc_external_startup [3095]: */
+/* __sdcc_external_startup [3072]: */
     0x75,
     0xD5,
     0x00,
-/* .00101 [3098]: */
+/* .00101 [3075]: */
     0x22,
-/* csection: .roxdata output_size=1 section_size=1 full_size=3100 array_size=3100 vma=c1b lma=c1b*/
-/* s_XINIT [3099]: */
-/* __roxdata_start [3099]: */
-/* _etext [3099]: */
-/* __xinit__SCR_TimeBaseActive [3099]: */
+/* csection: .roxdata output_size=1 section_size=1 full_size=3077 array_size=3077 vma=c04 lma=c04*/
+/* s_XINIT [3076]: */
+/* __roxdata_start [3076]: */
+/* _etext [3076]: */
+/* __xinit__SCR_TimeBaseActive [3076]: */
     0x00
 };

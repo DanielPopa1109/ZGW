@@ -44,6 +44,13 @@
 
 #include "Ifx_Types.h"
 
+#ifndef LWIP_GETH_NETIF_DEBUG_INSTRUMENTATION
+#define LWIP_GETH_NETIF_DEBUG_INSTRUMENTATION 0
+#endif
+
+extern volatile uint32 lwip_geth_LowLevelInputPacketCount;
+
+#if LWIP_GETH_NETIF_DEBUG_INSTRUMENTATION
 extern volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 extern volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
 extern volatile uint32 lwip_geth_DebugDmaResetTimeoutCnt;
@@ -61,7 +68,6 @@ extern volatile uint32 lwip_geth_DebugLowLevelOutputCount;
 extern volatile uint32 lwip_geth_DebugLowLevelOutputOkCount;
 extern volatile uint32 lwip_geth_DebugLowLevelOutputErrCnt;
 extern volatile uint32 lwip_geth_DebugLowLevelInputCallCount;
-extern volatile uint32 lwip_geth_DebugLowLevelInputPacketCount;
 extern volatile uint32 lwip_geth_DebugNetifInputLoopCount;
 extern volatile uint32 lwip_geth_DebugNetifInputOnceCount;
 extern volatile uint32 lwip_geth_DebugNetifInputOkCount;
@@ -83,9 +89,14 @@ extern volatile uint32 lwip_geth_DebugDmaCh0RxControlAfterStart;
 extern volatile uint32 lwip_geth_DebugMacConfigurationAfterStart;
 extern volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 extern volatile uint32 lwip_geth_DebugLastRxBufferAddr;
+extern volatile uint32 lwip_geth_DebugRxRecoveryRequestCnt;
+extern volatile uint32 lwip_geth_DebugRxRecoveryOkCnt;
+extern volatile uint32 lwip_geth_DebugRxRecoveryFailCnt;
+#endif
 
 err_t lwip_geth_netif_init(struct netif *netif);
 uint8 lwip_geth_netif_input_once(struct netif *netif);
+uint8 lwip_geth_netif_recover_rx(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
 
 #endif

@@ -9,6 +9,7 @@
 #define COM_FALSE 0u
 
 #define COM_RX_TIMEOUT_CYCLE_FACTOR 20u
+#define COM_RX_LIN_TIMEOUT_CYCLE_FACTOR 10u
 
 
 typedef struct
@@ -95,16 +96,11 @@ static const Com_TxIpduConfigType Com_TxIpduCfg[] =
     { COM_TX_PDU_CANFD_NM3                                                    , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_SDAT                                                   , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 159u, 2u, 1u, 2u, 100u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_LIGHTDATA1                                             , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 23u, 2u, 1u, 2u, 100u, 3u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 16u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_BODYDATA1                                              , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 23u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 199u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 20u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LIN_ZGW_NM3                            , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LIN_ZGW_REQUEST_PCU48                  , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
+    { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
 };
 
 static const Com_RxIpduConfigType Com_RxIpduCfg[] =
@@ -115,18 +111,7 @@ static const Com_RxIpduConfigType Com_RxIpduCfg[] =
     { COM_RX_PDU_OUTSIDETEMPERATURESTATUS                    , COM_IPDU_GROUP_0, 1000u, 4u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_CENTRALCOMMAND1                             , COM_IPDU_GROUP_0, 200u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_DMUSTATUS                                   , COM_IPDU_GROUP_0, 1000u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA7                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_BATTFULLSTAT                                , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA6                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA5                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA4                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA3                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA2                                 , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_DSCDATA3                                    , COM_IPDU_GROUP_0, 100u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_DSCDATA2                                    , COM_IPDU_GROUP_0, 5u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_DSCDATA1                                    , COM_IPDU_GROUP_0, 5u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ENGINEDATA1                                 , COM_IPDU_GROUP_0, 5, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_ASGDATA1                                    , COM_IPDU_GROUP_0, 100u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_PDCSTAT                                     , COM_IPDU_GROUP_0, 100u, 3u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_MILEAGE                                     , COM_IPDU_GROUP_0, 1000u, 8u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_DMU_ALIVE                                   , COM_IPDU_GROUP_0, 1000u, 1u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
@@ -172,9 +157,7 @@ static const Com_RxIpduConfigType Com_RxIpduCfg[] =
     { COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                             , COM_IPDU_GROUP_0, 1000u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                             , COM_IPDU_GROUP_0, 1000u, 48u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , COM_IPDU_GROUP_0, 0, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_LIN_ALT_STATUS                         , COM_IPDU_GROUP_0, 20u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_LIN_HVDCDC_STATUS                      , COM_IPDU_GROUP_0, 20u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_RX_PDU_LIN_PCU48_STATUS                       , COM_IPDU_GROUP_0, 20u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
+    { COM_RX_PDU_LIN_HVDCDC_STATUS                      , COM_IPDU_GROUP_0, 90u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
 };
 
 static const Com_SignalConfigType Com_SignalCfg[] =
@@ -243,38 +226,8 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_RX_CENTRALCOMMAND1_LIGTHSENSOR                                       , COM_FALSE, COM_RX_PDU_CENTRALCOMMAND1                             , 48u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_CENTRALCOMMAND1_CENTRALLOCKCOMMAND                                , COM_FALSE, COM_RX_PDU_CENTRALCOMMAND1                             , 40u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
     { COM_SIG_RX_DMUSTATUS_DISPLAYCAMERASTATUS                               , COM_FALSE, COM_RX_PDU_DMUSTATUS                                   , 0u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_ENGINEDATA7_INTAKETEMPERATURE                                 , COM_FALSE, COM_RX_PDU_ENGINEDATA7                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA7_COOLANTTEMPERATURE                                , COM_FALSE, COM_RX_PDU_ENGINEDATA7                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_RX_BATTFULLSTAT_RUNTIMEREMAINING                                  , COM_FALSE, COM_RX_PDU_BATTFULLSTAT                                , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_RX_BATTFULLSTAT_TIMETOFULL                                        , COM_FALSE, COM_RX_PDU_BATTFULLSTAT                                , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA6_LONGTERMFUELTRIMBANK1                             , COM_FALSE, COM_RX_PDU_ENGINEDATA6                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA6_LONGTERMFUELTRIMBANK2                             , COM_FALSE, COM_RX_PDU_ENGINEDATA6                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA5_O2SENSORBANK1_SHORTTERMFUELTRIM                   , COM_FALSE, COM_RX_PDU_ENGINEDATA5                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA5_O2SENSORBANK2_SHORTTERMFUELTRIM                   , COM_FALSE, COM_RX_PDU_ENGINEDATA5                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA4_O2SENSORVOLTAGE1BANK1                             , COM_FALSE, COM_RX_PDU_ENGINEDATA4                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA4_O2SENSORVOLTAGE1BANK2                             , COM_FALSE, COM_RX_PDU_ENGINEDATA4                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA3_O2SENSORVOLTAGE2BANK1                             , COM_FALSE, COM_RX_PDU_ENGINEDATA3                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA3_O2SENSORVOLTAGE2BANK2                             , COM_FALSE, COM_RX_PDU_ENGINEDATA3                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA2_SHORTTERMFUELTRIMBANK1                            , COM_FALSE, COM_RX_PDU_ENGINEDATA2                                 , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA2_SHORTTERMFUELTRIMBANK2                            , COM_FALSE, COM_RX_PDU_ENGINEDATA2                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_DSCDATA3_LATACC                                            , COM_FALSE, COM_RX_PDU_DSCDATA3                                    , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_DSCDATA3_LONGACC                                           , COM_FALSE, COM_RX_PDU_DSCDATA3                                    , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_DSCDATA2_VEHSPEED                                          , COM_FALSE, COM_RX_PDU_DSCDATA2                                    , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_DSCDATA2_YAWRATE                                           , COM_FALSE, COM_RX_PDU_DSCDATA2                                    , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_DSCDATA1_TRACTIONCONTROLSTATUS                             , COM_FALSE, COM_RX_PDU_DSCDATA1                                    , 32u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_DSCDATA1_DSCSTATUS                                         , COM_FALSE, COM_RX_PDU_DSCDATA1                                    , 24u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_DSCDATA1_BRAKEWHEELSTATUS                                  , COM_FALSE, COM_RX_PDU_DSCDATA1                                    , 16u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_DSCDATA1_ABSSTATUS                                         , COM_FALSE, COM_RX_PDU_DSCDATA1                                    , 8u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_DSCDATA1_BRAKEPRESSUREVALUE                                , COM_FALSE, COM_RX_PDU_DSCDATA1                                    , 0u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_ENGINEDATA1_MAFVALUE                                          , COM_FALSE, COM_RX_PDU_ENGINEDATA1                                 , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_RX_ENGINEDATA1_TORQUEVALUE                                       , COM_FALSE, COM_RX_PDU_ENGINEDATA1                                 , 59u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
-    { COM_SIG_RX_ENGINEDATA1_PEDALSTATUS                                       , COM_FALSE, COM_RX_PDU_ENGINEDATA1                                 , 52u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
-    { COM_SIG_RX_ENGINEDATA1_ENGINERPM                                         , COM_FALSE, COM_RX_PDU_ENGINEDATA1                                 , 32u, 13u, COM_SIGNAL_U16, COM_FALSE, 0u, 0x1FFFu     , 0u },
-    { COM_SIG_RX_ENGINEDATA1_ACTUALTORQUE                                      , COM_FALSE, COM_RX_PDU_ENGINEDATA1                                 , 45u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
-    { COM_SIG_RX_ASGDATA1_ASGSTATUS                                         , COM_FALSE, COM_RX_PDU_ASGDATA1                                    , 14u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
-    { COM_SIG_RX_ASGDATA1_CLUTCHSTATUS                                      , COM_FALSE, COM_RX_PDU_ASGDATA1                                    , 11u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
-    { COM_SIG_RX_ASGDATA1_SHIFTPHASE                                        , COM_FALSE, COM_RX_PDU_ASGDATA1                                    , 8u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
-    { COM_SIG_RX_ASGDATA1_CURRENTGEAR                                       , COM_FALSE, COM_RX_PDU_ASGDATA1                                    , 4u, 4u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFu        , 0u },
     { COM_SIG_RX_PDCSTAT_PDCDISTANCEREAR                                   , COM_FALSE, COM_RX_PDU_PDCSTAT                                     , 8u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
     { COM_SIG_RX_PDCSTAT_PDCDISTANCEFRONT                                  , COM_FALSE, COM_RX_PDU_PDCSTAT                                     , 0u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
     { COM_SIG_RX_PDCSTAT_PDCBUZZERFRONTREAR                                , COM_FALSE, COM_RX_PDU_PDCSTAT                                     , 16u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
@@ -363,36 +316,6 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_INTERIORLIGHTSTATUS                                          , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 4u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_HIGHBEAMSTATUS                                               , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 2u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
     { COM_SIG_TX_CANFD_LIGHTDATA1_LD1_FOGLIGHTSSTATUS                                              , COM_TRUE,  COM_TX_PDU_CANFD_LIGHTDATA1                                             , 0u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_VEHSPEED                                                     , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 96u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_TRACTIONCONTROLSTATUS                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 88u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_TORQUEVALUE                                                  , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 80u, 5u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1Fu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_SHIFTPHASE                                                   , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 29u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_PEDALSTATUS                                                  , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 56u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ENGINERPM                                                    , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 64u, 13u, COM_SIGNAL_U16, COM_FALSE, 0u, 0x1FFFu     , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_DSCSTATUS                                                    , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 40u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_CURRENTGEAR                                                  , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 48u, 4u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFu        , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_CLUTCHSTATUS                                                 , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 26u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_BRAKEWHEELSTATUS                                             , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 32u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ASGSTATUS                                                    , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 24u, 2u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x3u        , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ACTUALTORQUE                                                 , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 16u, 7u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7Fu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ABSSTATUS                                                    , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 8u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_BRAKEPRESSUREVALUE                                           , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , 0u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LATACC                                                       , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 64u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_INTAKETEMPERATURE                                            , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_COOLANTTEMPERATURE                                           , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_YAWRATE                                                      , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 480u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_SHORTTERMFUELTRIMBANK2                                       , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 448u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_SHORTTERMFUELTRIMBANK1                                       , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 416u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE2BANK2                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 384u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE2BANK1                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 352u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE1BANK2                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 320u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE1BANK1                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 288u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSB1_SHORTTERMFUELTRIM                                   , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 256u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENB2_SHORTTERMFUELTRIM                                    , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 224u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_MAFVALUE                                                     , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 192u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGTERMFUELTRIMBANK2                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 160u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGTERMFUELTRIMBANK1                                        , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 128u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGACC                                                      , COM_TRUE,  COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , 96u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_TX_CANFD_BODYDATA1_BD1_WIPERSTOCKCOMMAND                                            , COM_TRUE,  COM_TX_PDU_CANFD_BODYDATA1                                              , 128u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_CANFD_BODYDATA1_BD1_VIBRATIONSENSORSTATUS                                        , COM_TRUE,  COM_TX_PDU_CANFD_BODYDATA1                                              , 120u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_CANFD_BODYDATA1_BD1_STATUSWIPERS                                                 , COM_TRUE,  COM_TX_PDU_CANFD_BODYDATA1                                              , 109u, 3u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x7u        , 0u },
@@ -427,23 +350,11 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_01                                              , COM_TRUE,  COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_02                                              , COM_TRUE,  COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_03                                              , COM_TRUE,  COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , 64u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_RESPONSEERROR                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 0u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_CHARGINGACTIVE                                               , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 8u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_OUTPUTCURRENT                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 16u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_OUTPUTVOLTAGE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 24u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_FIELDDUTYACTUAL                                              , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 32u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_POWER                                                        , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 40u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_TEMPERATURE                                                  , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 48u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_RESPONSEERROR                                             , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 56u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_VOLTAGE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 64u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_CURRENT                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 72u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_VOLTAGE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 80u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_CURRENT                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 88u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_RESPONSEERROR                                              , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 96u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_SOH                                                        , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 104u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_SOC                                                        , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 112u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_VOLTAGE                                                    , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 120u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_CHARGESTATE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 128u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
+    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_RESPONSEERROR                                             , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 0u, 1u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_VOLTAGE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 8u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
+    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_CURRENT                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 16u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
+    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_VOLTAGE                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 24u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
+    { COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_CURRENT                                                , COM_TRUE,  COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , 32u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_01                                               , COM_FALSE, COM_RX_PDU_CANFD_PDM1_LOADSTATUS                                        , 0u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_02                                               , COM_FALSE, COM_RX_PDU_CANFD_PDM1_LOADSTATUS                                        , 32u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
     { COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_03                                               , COM_FALSE, COM_RX_PDU_CANFD_PDM1_LOADSTATUS                                        , 64u, 32u, COM_SIGNAL_U32, COM_FALSE, 0u, 0xFFFFFFFFu , 0u },
@@ -686,31 +597,13 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_RX_CANFD_PDM1_DIAGRESPONSE_PDM1_DIAGRESP_BYTE05                                             , COM_FALSE, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , 40u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_CANFD_PDM1_DIAGRESPONSE_PDM1_DIAGRESP_BYTE06                                             , COM_FALSE, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , 48u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_CANFD_PDM1_DIAGRESPONSE_PDM1_DIAGRESP_BYTE07                                             , COM_FALSE, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , 56u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_LIN_ZGW_NM3_ZGW_NM3_PN1                                       , COM_TRUE,  COM_TX_PDU_LIN_ZGW_NM3                            , 0u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_TARGETCURRENT_ALT                             , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , 0u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_TARGETVOLTAGE_ALT                             , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_ENABLE_ALT                                    , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , 16u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_FIELDDUTYCOMMAND_ALT                          , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , 24u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_ENABLE_HVDCDC                                 , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_TARGETVOLTAGE_HVDCDC                          , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_TX_LIN_ZGW_REQUEST_PCU48_ZGW_REQUESTAVAILABILITY_PCU48                     , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_PCU48                  , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_RESPONSEERROR                                 , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_CHARGINGACTIVE                                , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 8u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_OUTPUTCURRENT                                 , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 16u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_OUTPUTVOLTAGE                                 , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 24u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_FIELDDUTYACTUAL                               , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 32u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_POWER                                         , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 40u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_ALT_STATUS_ALT_TEMPERATURE                                   , COM_FALSE, COM_RX_PDU_LIN_ALT_STATUS                         , 48u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_RESPONSEERROR                              , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_VOLTAGE                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_CURRENT                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 16u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_VOLTAGE                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 24u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_CURRENT                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 32u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_PCU48_STATUS_PCU48_RESPONSEERROR                               , COM_FALSE, COM_RX_PDU_LIN_PCU48_STATUS                       , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
-    { COM_SIG_RX_LIN_PCU48_STATUS_PCU48_SOH                                         , COM_FALSE, COM_RX_PDU_LIN_PCU48_STATUS                       , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_PCU48_STATUS_PCU48_SOC                                         , COM_FALSE, COM_RX_PDU_LIN_PCU48_STATUS                       , 16u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_PCU48_STATUS_PCU48_VOLTAGE                                     , COM_FALSE, COM_RX_PDU_LIN_PCU48_STATUS                       , 24u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
-    { COM_SIG_RX_LIN_PCU48_STATUS_PCU48_CHARGESTATE                                 , COM_FALSE, COM_RX_PDU_LIN_PCU48_STATUS                       , 32u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u }
+    { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_CURRENT                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 32u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u }
 };
 
 #define COM_TX_IPDU_COUNT (sizeof(Com_TxIpduCfg) / sizeof(Com_TxIpduCfg[0]))
@@ -727,6 +620,7 @@ volatile uint32 Com_TxDuplicateSuppressedCounter[COM_TX_IPDU_COUNT];
 volatile uint32 Com_TxBusyRejectedCounter[COM_TX_IPDU_COUNT];
 long long Com_MainFunctionTx_Counter = 0;
 long long Com_MainFunctionRx_Counter = 0;
+#if COM_DEBUG_INSTRUMENTATION
 volatile uint16 Com_DebugFindSignalLastId = 0u;
 volatile uint16 Com_DebugFindSignalIndex = 0u;
 volatile uint16 Com_DebugFindSignalCount = (uint16)COM_SIGNAL_COUNT;
@@ -755,12 +649,19 @@ volatile uint16 Com_DebugInvalidBitPosition = 0u;
 volatile uint8 Com_DebugInvalidBitSize = 0u;
 volatile uint8 Com_DebugInvalidPduLength = 0u;
 volatile uint8 Com_DebugInvalidReason = 0u;
+#endif
 
 #define COM_DEBUG_INVALID_NONE          0u
 #define COM_DEBUG_INVALID_NULL_BUFFER   1u
 #define COM_DEBUG_INVALID_BIT_SIZE      2u
 #define COM_DEBUG_INVALID_RANGE         3u
 #define COM_DEBUG_INVALID_DATA_SIZE     4u
+
+#if COM_DEBUG_INSTRUMENTATION
+#define COM_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#else
+#define COM_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#endif
 
 
 static uint8 Com_FindTxIpdu(PduIdType pduId)
@@ -799,27 +700,26 @@ static const Com_SignalConfigType* Com_FindSignal(Com_SignalIdType signalId)
     uint16 entrySignalId;
     uint16 i;
 
-    Com_DebugFindSignalLastId = signalId;
-    Com_DebugFindSignalCount = (uint16)COM_SIGNAL_COUNT;
-    Com_DebugFindSignalHit = 0u;
-    Com_DebugFindSignalTableBase = (uint32)(const void *)&Com_SignalCfg[0u];
-    Com_DebugFindSignalTableEnd = (uint32)(const void *)&Com_SignalCfg[COM_SIGNAL_COUNT];
-    Com_DebugFindSignalEntryAddress = Com_DebugFindSignalTableBase;
-    Com_DebugFindSignalMatchAddress = 0u;
-
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalLastId, signalId);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalCount, (uint16)COM_SIGNAL_COUNT);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalHit, 0u);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalTableBase, (uint32)(const void *)&Com_SignalCfg[0u]);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalTableEnd, (uint32)(const void *)&Com_SignalCfg[COM_SIGNAL_COUNT]);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalEntryAddress, Com_DebugFindSignalTableBase);
+    COM_DEBUG_ASSIGN(Com_DebugFindSignalMatchAddress, 0u);
     for (i = 0u; i < (uint16)COM_SIGNAL_COUNT; i++)
     {
         entry = &Com_SignalCfg[i];
-        Com_DebugFindSignalIndex = i;
-        Com_DebugFindSignalEntryAddress = (uint32)(const void *)entry;
+        COM_DEBUG_ASSIGN(Com_DebugFindSignalIndex, i);
+        COM_DEBUG_ASSIGN(Com_DebugFindSignalEntryAddress, (uint32)(const void *)entry);
         entrySignalId = entry->signalId;
-        Com_DebugFindSignalEntryId = entrySignalId;
-        Com_DebugFindSignalEntryPduId = entry->pduId;
-        Com_DebugFindSignalEntryIsTx = entry->isTx;
+        COM_DEBUG_ASSIGN(Com_DebugFindSignalEntryId, entrySignalId);
+        COM_DEBUG_ASSIGN(Com_DebugFindSignalEntryPduId, entry->pduId);
+        COM_DEBUG_ASSIGN(Com_DebugFindSignalEntryIsTx, entry->isTx);
         if (entrySignalId == signalId)
         {
-            Com_DebugFindSignalHit = 1u;
-            Com_DebugFindSignalMatchAddress = (uint32)(const void *)entry;
+            COM_DEBUG_ASSIGN(Com_DebugFindSignalHit, 1u);
+            COM_DEBUG_ASSIGN(Com_DebugFindSignalMatchAddress, (uint32)(const void *)entry);
             return entry;
         }
     }
@@ -840,12 +740,12 @@ static uint8 Com_IsValidSignalAccess(const Com_SignalConfigType* sig, uint8 pduL
 
     if ((sig->bitSize == 0u) || (sig->bitSize > 32u))
     {
-        Com_DebugInvalidSignalId = sig->signalId;
-        Com_DebugInvalidPduId = sig->pduId;
-        Com_DebugInvalidBitPosition = sig->bitPosition;
-        Com_DebugInvalidBitSize = sig->bitSize;
-        Com_DebugInvalidPduLength = pduLen;
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_BIT_SIZE;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidSignalId, sig->signalId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduId, sig->pduId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, sig->bitPosition);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, sig->bitSize);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduLength, pduLen);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_BIT_SIZE);
         return COM_FALSE;
     }
 
@@ -853,12 +753,12 @@ static uint8 Com_IsValidSignalAccess(const Com_SignalConfigType* sig, uint8 pduL
         (sig->dataSize != COM_SIGNAL_U16) &&
         (sig->dataSize != COM_SIGNAL_U32))
     {
-        Com_DebugInvalidSignalId = sig->signalId;
-        Com_DebugInvalidPduId = sig->pduId;
-        Com_DebugInvalidBitPosition = sig->bitPosition;
-        Com_DebugInvalidBitSize = sig->bitSize;
-        Com_DebugInvalidPduLength = pduLen;
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_DATA_SIZE;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidSignalId, sig->signalId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduId, sig->pduId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, sig->bitPosition);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, sig->bitSize);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduLength, pduLen);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_DATA_SIZE);
         return COM_FALSE;
     }
 
@@ -866,12 +766,12 @@ static uint8 Com_IsValidSignalAccess(const Com_SignalConfigType* sig, uint8 pduL
 
     if ((signalEndBit > ((uint16)pduLen * 8u)) || (signalEndBit < sig->bitPosition))
     {
-        Com_DebugInvalidSignalId = sig->signalId;
-        Com_DebugInvalidPduId = sig->pduId;
-        Com_DebugInvalidBitPosition = sig->bitPosition;
-        Com_DebugInvalidBitSize = sig->bitSize;
-        Com_DebugInvalidPduLength = pduLen;
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_RANGE;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidSignalId, sig->signalId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduId, sig->pduId);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, sig->bitPosition);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, sig->bitSize);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidPduLength, pduLen);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_RANGE);
         return COM_FALSE;
     }
 
@@ -881,12 +781,12 @@ static uint8 Com_IsValidSignalAccess(const Com_SignalConfigType* sig, uint8 pduL
 
         if ((updateEndBit > ((uint16)pduLen * 8u)) || (updateEndBit < sig->updateBitPosition))
         {
-            Com_DebugInvalidSignalId = sig->signalId;
-            Com_DebugInvalidPduId = sig->pduId;
-            Com_DebugInvalidBitPosition = sig->updateBitPosition;
-            Com_DebugInvalidBitSize = 1u;
-            Com_DebugInvalidPduLength = pduLen;
-            Com_DebugInvalidReason = COM_DEBUG_INVALID_RANGE;
+            COM_DEBUG_ASSIGN(Com_DebugInvalidSignalId, sig->signalId);
+            COM_DEBUG_ASSIGN(Com_DebugInvalidPduId, sig->pduId);
+            COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, sig->updateBitPosition);
+            COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, 1u);
+            COM_DEBUG_ASSIGN(Com_DebugInvalidPduLength, pduLen);
+            COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_RANGE);
             return COM_FALSE;
         }
     }
@@ -903,15 +803,15 @@ static void Com_WriteBits(uint8* buffer, uint16 bitPos, uint8 bitSize, uint32 va
 
     if (buffer == NULL_PTR)
     {
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_NULL_BUFFER;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_NULL_BUFFER);
         return;
     }
 
     if ((bitSize == 0u) || (bitSize > 32u))
     {
-        Com_DebugInvalidBitPosition = bitPos;
-        Com_DebugInvalidBitSize = bitSize;
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_BIT_SIZE;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, bitPos);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, bitSize);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_BIT_SIZE);
         return;
     }
 
@@ -942,15 +842,15 @@ static uint32 Com_ReadBits(const uint8* buffer, uint16 bitPos, uint8 bitSize)
 
     if (buffer == NULL_PTR)
     {
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_NULL_BUFFER;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_NULL_BUFFER);
         return 0u;
     }
 
     if ((bitSize == 0u) || (bitSize > 32u))
     {
-        Com_DebugInvalidBitPosition = bitPos;
-        Com_DebugInvalidBitSize = bitSize;
-        Com_DebugInvalidReason = COM_DEBUG_INVALID_BIT_SIZE;
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitPosition, bitPos);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidBitSize, bitSize);
+        COM_DEBUG_ASSIGN(Com_DebugInvalidReason, COM_DEBUG_INVALID_BIT_SIZE);
         return 0u;
     }
 
@@ -1129,8 +1029,19 @@ static uint16 Com_GetRxCycleMainTicks(const Com_RxIpduConfigType* cfg)
 
 static uint16 Com_GetRxDeadlineMainTicks(const Com_RxIpduConfigType* cfg)
 {
-    return Com_MultiplyMainTicks(Com_GetRxCycleMainTicks(cfg),
-            COM_RX_TIMEOUT_CYCLE_FACTOR);
+    uint16 factor = COM_RX_TIMEOUT_CYCLE_FACTOR;
+
+    if (cfg == NULL_PTR)
+    {
+        return 0u;
+    }
+
+    if (cfg->pduId == COM_RX_PDU_LIN_HVDCDC_STATUS)
+    {
+        factor = COM_RX_LIN_TIMEOUT_CYCLE_FACTOR;
+    }
+
+    return Com_MultiplyMainTicks(Com_GetRxCycleMainTicks(cfg), factor);
 }
 
 static uint8 Com_TxIpduBelongsToChannel(PduIdType pduId, uint8 channel)
@@ -1150,8 +1061,7 @@ static uint8 Com_TxIpduBelongsToChannel(PduIdType pduId, uint8 channel)
                    COM_FALSE;
 
         case COMM_CH_LIN:
-            return ((pduId >= COM_TX_PDU_LIN_ZGW_NM3) &&
-                    (pduId <= COM_TX_PDU_LIN_ZGW_REQUEST_PCU48)) ?
+            return (pduId == COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC) ?
                    COM_TRUE :
                    COM_FALSE;
 
@@ -1336,13 +1246,12 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     uint8 pduChanged = COM_FALSE;
     uint8 triggerOnChange = COM_FALSE;
 
-    Com_DebugSendSignalLastId = SignalId;
-    Com_DebugSendSignalLastPduId = 0u;
-    Com_DebugSendSignalLastTxIdx = 0xFFu;
-    Com_DebugSendSignalLastRet = E_NOT_OK;
-    Com_DebugSendSignalLastValue = 0u;
-    Com_DebugSendSignalLastSigAddress = 0u;
-
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastId, SignalId);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastPduId, 0u);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastTxIdx, 0xFFu);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastRet, E_NOT_OK);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastValue, 0u);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastSigAddress, 0u);
     if (SignalDataPtr == NULL_PTR)
     {
         return E_NOT_OK;
@@ -1355,12 +1264,10 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
         return E_NOT_OK;
     }
 
-    Com_DebugSendSignalLastSigAddress = (uint32)(const void *)sig;
-    Com_DebugSendSignalLastPduId = sig->pduId;
-
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastSigAddress, (uint32)(const void *)sig);
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastPduId, sig->pduId);
     txIdx = Com_FindTxIpdu(sig->pduId);
-    Com_DebugSendSignalLastTxIdx = txIdx;
-
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastTxIdx, txIdx);
     if ((txIdx == 0xFFu) || (Com_TxRt[txIdx].active == COM_FALSE))
     {
         return E_NOT_OK;
@@ -1376,8 +1283,7 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
     {
         value &= (uint32)((1UL << sig->bitSize) - 1UL);
     }
-    Com_DebugSendSignalLastValue = value;
-
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastValue, value);
     previousValue = Com_ReadBits(Com_TxRt[txIdx].buffer, sig->bitPosition, sig->bitSize);
     if (previousValue != value)
     {
@@ -1417,7 +1323,7 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
         (void)Com_TriggerTransmit(txIdx);
     }
 
-    Com_DebugSendSignalLastRet = E_OK;
+    COM_DEBUG_ASSIGN(Com_DebugSendSignalLastRet, E_OK);
     return E_OK;
 }
 
@@ -1427,10 +1333,9 @@ Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr)
     uint8 rxIdx;
     uint32 value;
 
-    Com_DebugReceiveSignalLastId = SignalId;
-    Com_DebugReceiveSignalLastRxIdx = 0xFFu;
-    Com_DebugReceiveSignalLastRet = E_NOT_OK;
-
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastId, SignalId);
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastRxIdx, 0xFFu);
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastRet, E_NOT_OK);
     if (SignalDataPtr == NULL_PTR)
     {
         return E_NOT_OK;
@@ -1444,9 +1349,8 @@ Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr)
     }
 
     rxIdx = Com_FindRxIpdu(sig->pduId);
-    Com_DebugReceiveSignalLastPduId = sig->pduId;
-    Com_DebugReceiveSignalLastRxIdx = rxIdx;
-
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastPduId, sig->pduId);
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastRxIdx, rxIdx);
     if ((rxIdx == 0xFFu) || (Com_RxRt[rxIdx].active == COM_FALSE))
     {
         return E_NOT_OK;
@@ -1472,9 +1376,8 @@ Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr)
 
     value = Com_ReadBits(Com_RxRt[rxIdx].buffer, sig->bitPosition, sig->bitSize);
     Com_StoreValue(SignalDataPtr, sig->dataSize, value);
-    Com_DebugReceiveSignalLastValue = value;
-    Com_DebugReceiveSignalLastRet = E_OK;
-
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastValue, value);
+    COM_DEBUG_ASSIGN(Com_DebugReceiveSignalLastRet, E_OK);
     return E_OK;
 }
 

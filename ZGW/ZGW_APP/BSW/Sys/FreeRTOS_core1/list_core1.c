@@ -27,7 +27,6 @@
  */
 
 
-#include <stdlib.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core1 prevents task_core1.h from redefining
  * all the API functions to use the MPU wrappers.  That should only be done when

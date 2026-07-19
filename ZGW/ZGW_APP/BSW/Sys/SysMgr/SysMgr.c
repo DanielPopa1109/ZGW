@@ -16,6 +16,7 @@
 #include "IfxPort.h"
 #include "IfxPort_reg.h"
 #include "Dem.h"
+#include "Dem_Cfg.h"
 #include "SafetyKit_Main.h"
 #include "IfxAsclin_Lin.h"
 #include "IfxGeth.h"
@@ -60,8 +61,10 @@
 #define SYSMGR_MCUSM_CAPTURE_VERSION      2u
 #define SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE 64u
 #define SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE 160u
-#define SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE \
+#define SYSMGR_MCUSM_SNAPSHOT_DATA_TIME_OFFSET \
     (SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE + SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE)
+#define SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE \
+    (SYSMGR_MCUSM_SNAPSHOT_DATA_TIME_OFFSET + DEM_DTC_TIMESTAMP_DATA_SIZE)
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
@@ -389,6 +392,7 @@ Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(
 {
     uint16 i;
     uint8 *detail;
+    uint8 *timeData;
 
     if ((eventId != DEM_EVENT_ID_MCUSM_SW_ERROR) ||
             (buffer == NULL_PTR) ||
@@ -434,9 +438,9 @@ Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(
     SysMgr_StoreU32(buffer, 40u, McuSm_Trap4ErrorAddress);
     SysMgr_StoreU32(buffer, 44u, McuSm_Trap7AgRstRsn);
     SysMgr_StoreU32(buffer, 48u, McuSm_Trap7AgRstInfo);
-    SysMgr_StoreU32(buffer, 52u, McuSm_DFlashRecoveryRequest);
-    SysMgr_StoreU32(buffer, 56u, McuSm_DFlashRecoveryInfo);
-    SysMgr_StoreU32(buffer, 60u, McuSm_DFlashRecoveryLastFeePhysicalAddress);
+    SysMgr_StoreU32(buffer, 52u, 0u);
+    SysMgr_StoreU32(buffer, 56u, 0u);
+    SysMgr_StoreU32(buffer, 60u, 0u);
 
     detail = &buffer[SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE];
     SysMgr_StoreU16(detail, 0u, eventId);
@@ -492,13 +496,20 @@ Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(
     SysMgr_StoreU32(detail, 120u, SysMgr_GetLastTrapRegister(McuSm_Trap4Pietr, McuSm_Trap7Pietr));
     SysMgr_StoreU32(detail, 124u, SysMgr_GetTrap7AgRaw(McuSm_Trap7AgRstRsn));
     SysMgr_StoreU32(detail, 128u, SysMgr_GetTrap7AgMasked(McuSm_Trap7AgRstRsn));
-    SysMgr_StoreU32(detail, 132u, McuSm_DFlashRecoveryCounter);
-    SysMgr_StoreU32(detail, 136u, McuSm_DFlashRecoveryAttemptCounter);
-    SysMgr_StoreU32(detail, 140u, McuSm_DFlashRecoverySuppressCounter);
-    SysMgr_StoreU32(detail, 144u, McuSm_DFlashRecoveryLastFeeAccessKind);
-    SysMgr_StoreU32(detail, 148u, McuSm_DFlashRecoveryLastFeePhysicalAddress);
-    SysMgr_StoreU32(detail, 152u, McuSm_DFlashRecoveryRequest);
-    SysMgr_StoreU32(detail, 156u, McuSm_DFlashRecoveryInfo);
+    SysMgr_StoreU32(detail, 132u, 0u);
+    SysMgr_StoreU32(detail, 136u, 0u);
+    SysMgr_StoreU32(detail, 140u, 0u);
+    SysMgr_StoreU32(detail, 144u, 0u);
+    SysMgr_StoreU32(detail, 148u, 0u);
+    SysMgr_StoreU32(detail, 152u, 0u);
+    SysMgr_StoreU32(detail, 156u, 0u);
+
+    timeData = &buffer[SYSMGR_MCUSM_SNAPSHOT_DATA_TIME_OFFSET];
+    if (Dem_Cfg_CaptureTimestampTemperatureData(timeData, length,
+            DEM_SNAPSHOT_KIND_COMMON) != E_OK)
+    {
+        return E_NOT_OK;
+    }
 
     *length = SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE;
     return E_OK;
@@ -552,7 +563,8 @@ void SysMgr_GoSleep(void)
         }
     }
 
-    SysMgr_ClearMcuSmSwErrorTriggerData();
+    McuSm_ClearResetDataForCleanSleep();
+    SysMgr_ClearScrFaultTriggerData();
     (void)TimeBase_PrepareStandbyRtc();
     McuSm_SaveRetainedStateToScr();
 
@@ -724,7 +736,7 @@ void SysMgr_GoSleep(void)
     SRC_CAN1INT15.B.IOVCLR = 1;
     IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
 
-    /* Give SCR ownership of CANFD RX before starting WCAN wake detection. */
+    /* Give SCR ownership of classic CAN RX before starting WCAN wake detection. */
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
     while(P33_PCSR.B.LCK)
     {

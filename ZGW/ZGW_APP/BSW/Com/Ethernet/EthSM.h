@@ -15,5 +15,7 @@ void EthSM_Init(void);
 void EthSM_MainFunction(void);
 Std_ReturnType EthSM_RequestComMode(uint8 channel, EthSM_ComModeType mode);
 Std_ReturnType EthSM_GetCurrentComMode(uint8 channel, EthSM_ComModeType* mode);
+Std_ReturnType EthSM_GetRequestedComMode(uint8 channel, EthSM_ComModeType* mode);
+boolean EthSM_IsStackInitialized(uint8 channel);
 
 #endif

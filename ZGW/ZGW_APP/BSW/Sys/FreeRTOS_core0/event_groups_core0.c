@@ -27,7 +27,6 @@
  */
 
 /* Standard includes. */
-#include <stdlib.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core0 prevents task_core0.h from redefining
  * all the API functions to use the MPU wrappers.  That should only be done when

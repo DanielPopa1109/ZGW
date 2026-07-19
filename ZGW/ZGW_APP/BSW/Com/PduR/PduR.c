@@ -34,9 +34,9 @@
 #define PDUR_DOIP_RX_SHORT_QUEUE_DEPTH  17u
 #define PDUR_DOIP_RX_SHORT_QUEUE_USABLE 16u
 #define PDUR_DOIP_RX_SHORT_BUFFER       64u
-#define PDUR_DOIP_RX_LARGE_QUEUE_DEPTH  49u
-#define PDUR_DOIP_RX_LARGE_QUEUE_USABLE 48u
-#define PDUR_DOIP_RX_LARGE_BUFFER       320u
+#define PDUR_DOIP_RX_LARGE_QUEUE_DEPTH  7u
+#define PDUR_DOIP_RX_LARGE_QUEUE_USABLE 6u
+#define PDUR_DOIP_RX_LARGE_BUFFER       PDUR_MAX_TP_BUFFER
 #define PDUR_DOIP_RX_DRAIN_BUDGET       (PDUR_DOIP_RX_SHORT_QUEUE_USABLE + PDUR_DOIP_RX_LARGE_QUEUE_USABLE)
 #define PDUR_DOIP_FORWARD_NOT_ROUTED    0u
 #define PDUR_DOIP_FORWARD_ACCEPTED      1u
@@ -225,16 +225,11 @@ static const PduR_ComTxRouteType PduR_ComTxRoutes[] =
     { TRUE, COM_TX_PDU_CANFD_NM3                                                    , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_NM3                                               , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_SDAT                                                   , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_SDAT                                              , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_LIGHTDATA1                                             , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_LIGHTDATA1                                        , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_CANFD_POWERTRAINDATA2                                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_POWERTRAINDATA2                                   , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_CANFD_POWERTRAINDATA1                                        , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_POWERTRAINDATA1                                   , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_BODYDATA1                                              , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_BODYDATA1                                         , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM1_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM1                                  , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_LIN_ZGW_NM3                            , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_NM3               , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_ALT                    , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_ALT       , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_HVDCDC    , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_PCU48                  , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_PCU48     , PDUR_SOAD_INVALID_SOCON }
+    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_HVDCDC    , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =
@@ -245,18 +240,7 @@ static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =
     { TRUE, CANIF_RX_PDU_OUTSIDETEMPERATURESTATUS                , PDUR_IF_DEST_COM, COM_RX_PDU_OUTSIDETEMPERATURESTATUS                    , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CENTRALCOMMAND1                         , PDUR_IF_DEST_COM, COM_RX_PDU_CENTRALCOMMAND1                             , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_DMUSTATUS                               , PDUR_IF_DEST_COM, COM_RX_PDU_DMUSTATUS                                   , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA7                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA7                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_BATTFULLSTAT                            , PDUR_IF_DEST_COM, COM_RX_PDU_BATTFULLSTAT                                , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA6                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA6                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA5                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA5                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA4                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA4                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA3                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA3                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA2                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA2                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_DSCDATA3                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA3                                    , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_DSCDATA2                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA2                                    , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_DSCDATA1                                , PDUR_IF_DEST_COM, COM_RX_PDU_DSCDATA1                                    , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ENGINEDATA1                             , PDUR_IF_DEST_COM, COM_RX_PDU_ENGINEDATA1                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_ASGDATA1                                , PDUR_IF_DEST_COM, COM_RX_PDU_ASGDATA1                                    , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_PDCSTAT                                 , PDUR_IF_DEST_COM, COM_RX_PDU_PDCSTAT                                     , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_MILEAGE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_MILEAGE                                     , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_DMU_ALIVE                               , PDUR_IF_DEST_COM, COM_RX_PDU_DMU_ALIVE                                   , PDUR_SOAD_INVALID_SOCON },
@@ -306,9 +290,7 @@ static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =
 
 static const PduR_IfRxRouteType PduR_LinIfRxRoutes[] =
 {
-    { TRUE, LINIF_RX_PDU_ALT_STATUS            , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_ALT_STATUS                         , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, LINIF_RX_PDU_HVDCDC_STATUS         , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_HVDCDC_STATUS                      , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, LINIF_RX_PDU_PCU48_STATUS          , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_PCU48_STATUS                       , PDUR_SOAD_INVALID_SOCON }
+    { TRUE, LINIF_RX_PDU_HVDCDC_STATUS         , PDUR_IF_DEST_COM, COM_RX_PDU_LIN_HVDCDC_STATUS                      , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_SoAdRxRouteType PduR_SoAdRxRoutes[] =
@@ -320,8 +302,6 @@ static const PduR_SoAdRxRouteType PduR_SoAdRxRoutes[] =
 
 static const PduR_TpRxRouteType PduR_TpRxRoutes[] =
 {
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_PHYS,        DCM_RX_CAN_PHYS        },
-    { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CANFD_PHYS,      DCM_RX_CANFD_PHYS      },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS,    DCM_RX_CAN_EXT_PHYS    },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS_2,  DCM_RX_CAN_EXT_PHYS_2  },
     { TRUE, PDUR_TP_LOWER_CANTP, DCM_RX_CAN_EXT_PHYS_3,  DCM_RX_CAN_EXT_PHYS_3  },
@@ -333,8 +313,6 @@ static const PduR_TpRxRouteType PduR_TpRxRoutes[] =
 
 static const PduR_DcmTxRouteType PduR_DcmTxRoutes[] =
 {
-    { TRUE, DCM_TX_CAN_PHYS,        PDUR_TP_LOWER_CANTP, DCM_TX_CAN_PHYS        },
-    { TRUE, DCM_TX_CANFD_PHYS,      PDUR_TP_LOWER_CANTP, DCM_TX_CANFD_PHYS      },
     { TRUE, DCM_TX_CAN_EXT_PHYS,    PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS    },
     { TRUE, DCM_TX_CAN_EXT_PHYS_2,  PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS_2  },
     { TRUE, DCM_TX_CAN_EXT_PHYS_3,  PDUR_TP_LOWER_CANTP, DCM_TX_CAN_EXT_PHYS_3  },
@@ -382,10 +360,15 @@ volatile uint32 PduR_DoIPTxConfirmFullCounter;
 volatile uint32 PduR_DoIPTxSentCounter;
 volatile uint32 PduR_DoIPTxFailCounter;
 volatile uint32 PduR_DoIPFastConfirmCounter;
+#if PDUR_DEBUG_INSTRUMENTATION
 volatile uint8 PduR_DebugInitialized;
 volatile uint8 PduR_DebugInitFailure;
 volatile uint8 PduR_DebugTpRxRouteCount;
 volatile uint8 PduR_DebugMaxTpRxRoutes;
+#define PDUR_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#else
+#define PDUR_DEBUG_ASSIGN(lhs, rhs) do { } while (0)
+#endif
 
 static void PduR_DoIPRxQueueReset(void)
 {
@@ -720,6 +703,11 @@ static uint8 PduR_DoIPForwardRoutedRequest(const uint8* uds, uint16 udsLen)
         (PduR_DoIPIsRoutedExtendedAddress(uds[0u]) == FALSE))
     {
         return PDUR_DOIP_FORWARD_NOT_ROUTED;
+    }
+
+    if (ParallelFlashSwc_CanAcceptRoutedRequest(uds[0u]) == FALSE)
+    {
+        return PDUR_DOIP_FORWARD_RETRY;
     }
 
     responseLength = 0u;
@@ -1143,11 +1131,14 @@ static void PduR_TpRxIndication(PduR_TpLowerType lower,
 
 void PduR_Init(void)
 {
+    uint8 tpRxRouteCount;
+
     PduR_Initialized = FALSE;
-    PduR_DebugInitialized = FALSE;
-    PduR_DebugInitFailure = PDUR_INIT_FAIL_NONE;
-    PduR_DebugTpRxRouteCount = PduR_GetTpRxRouteCount();
-    PduR_DebugMaxTpRxRoutes = PDUR_MAX_TP_RX_ROUTES;
+    tpRxRouteCount = PduR_GetTpRxRouteCount();
+    PDUR_DEBUG_ASSIGN(PduR_DebugInitialized, FALSE);
+    PDUR_DEBUG_ASSIGN(PduR_DebugInitFailure, PDUR_INIT_FAIL_NONE);
+    PDUR_DEBUG_ASSIGN(PduR_DebugTpRxRouteCount, tpRxRouteCount);
+    PDUR_DEBUG_ASSIGN(PduR_DebugMaxTpRxRoutes, PDUR_MAX_TP_RX_ROUTES);
 
     PduR_DoIPCtx.valid = FALSE;
     PduR_DoIPCtx.sourceAddress = 0u;
@@ -1184,14 +1175,14 @@ void PduR_Init(void)
     PduR_DoIPRoutedRelayDroppedCounter = 0u;
     PduR_DoIPRoutedForwardDroppedCounter = 0u;
 
-    if (PduR_DebugTpRxRouteCount > PDUR_MAX_TP_RX_ROUTES)
+    if (tpRxRouteCount > PDUR_MAX_TP_RX_ROUTES)
     {
-        PduR_DebugInitFailure = PDUR_INIT_FAIL_TP_RX_ROUTES;
+        PDUR_DEBUG_ASSIGN(PduR_DebugInitFailure, PDUR_INIT_FAIL_TP_RX_ROUTES);
         return;
     }
 
     PduR_Initialized = TRUE;
-    PduR_DebugInitialized = TRUE;
+    PDUR_DEBUG_ASSIGN(PduR_DebugInitialized, TRUE);
 }
 
 uint8 PduR_IsInitialized(void)
@@ -1700,7 +1691,12 @@ void PduR_CanTpTxConfirmation(PduIdType CanTpTxPduId,
 
     if (route != NULL_PTR)
     {
-        Dcm_TxConfirmation(route->dcmTxPduId, result);
+        uint8 wasForwarded = ParallelFlashSwc_IsForwardTxPending(route->dcmTxPduId);
+        ParallelFlashSwc_OnForwardTxConfirmation(route->dcmTxPduId, result);
+        if (wasForwarded == FALSE)
+        {
+            Dcm_TxConfirmation(route->dcmTxPduId, result);
+        }
     }
 }
 
@@ -1737,7 +1733,12 @@ void PduR_LinTpTxConfirmation(PduIdType LinTpTxPduId,
 
     if (route != NULL_PTR)
     {
-        Dcm_TxConfirmation(route->dcmTxPduId, result);
+        uint8 wasForwarded = ParallelFlashSwc_IsForwardTxPending(route->dcmTxPduId);
+        ParallelFlashSwc_OnForwardTxConfirmation(route->dcmTxPduId, result);
+        if (wasForwarded == FALSE)
+        {
+            Dcm_TxConfirmation(route->dcmTxPduId, result);
+        }
     }
 }
 

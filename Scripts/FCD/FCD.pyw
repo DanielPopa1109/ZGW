@@ -37,15 +37,26 @@ DEFAULT_SOURCE_ADDR = 0x0710
 DEFAULT_TARGET_ADDR = 0x1001
 DEFAULT_APP_START = 0xA0030000
 DEFAULT_APP_END = 0xA07FFFFF
-DEFAULT_BLOCK_SIZE = 512
-TRANSFER_DATA_REQUEST_LIMIT = 4095
+# Keep the whole TransferData diagnostic packet inside the ZGW_APP bus payload cap.
+DEFAULT_BLOCK_SIZE = 256
+TRANSFER_DATA_REQUEST_LIMIT = 256
 TRANSFER_DATA_OVERHEAD_BYTES = 2
 TRANSFER_DATA_MAX_CHUNK_SIZE = TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
-ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE = 256
+ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT = 4093
+ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE = (
+    ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
+)
+ROUTED_TRANSFER_ADDRESS_OVERHEAD_BYTES = 1
+ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE = (
+    TRANSFER_DATA_REQUEST_LIMIT
+    - ROUTED_TRANSFER_ADDRESS_OVERHEAD_BYTES
+    - TRANSFER_DATA_OVERHEAD_BYTES
+)
 TRANSFER_LOG_FULL_HEX_LIMIT = 256
 TRANSFER_LOG_EDGE_BYTES = 16
 PARALLEL_BUNDLE_MAX_WORKERS = 6
 ROUTED_BUS_MAX_IN_FLIGHT = 2
+ROUTED_NODE_MAX_IN_FLIGHT = 1
 ROUTED_RECOVERY_TIMEOUT_SECONDS = 3.0
 
 # Minimum spacing between consecutive UDS requests on the normal request/response path.
@@ -57,14 +68,15 @@ ROUTED_FORWARD_RETRY_COUNT = 8
 ROUTED_FORWARD_RETRY_DELAY_SECONDS = 0.1
 ROUTED_READ_CODING_NODE_STAGGER_SECONDS = 0.005
 ROUTED_READ_CODING_SERVICE_GAP_SECONDS = 0.100
+ROUTED_LIN_REQUEST_SPACING_SECONDS = 1.000
 ROUTED_READ_CODING_DRAIN_SECONDS = 0.020
 ROUTED_WAITING_SETTLE_SECONDS = 0.150
 ROUTED_CODE_VEHICLE_POST_RESET_GAP_SECONDS = 1.000
 ROUTED_CODE_VEHICLE_SETTLE_SECONDS = 1.000
 ROUTED_FLASH_POST_RESET_GAP_SECONDS = 1.000
-ROUTED_FLASH_DRAIN_EVERY_SENDS = 6
 ROUTED_SEND_BACKPRESSURE_TIMEOUT_SECONDS = 30.0
 ROUTED_SEND_BACKPRESSURE_POLL_SECONDS = 0.050
+ROUTED_TRANSPORT_ACK_TIMEOUT_SECONDS = 120.0
 TRACE_DRAIN_MAX_LINES = 100
 
 # Fault-memory Snapshot Data readout can require hundreds of short 0x19 requests.
@@ -166,16 +178,14 @@ def _build_coding_parameter_names():
 
     The first mask bytes are the CodingApp rxMessageExpected bits, in the same
     order as GatewaySwc_RxMessageDiagRanges. The remaining bytes are the
-    txPduEnabled bits indexed by COM TX PDU ID. XCP and diagnostic request TX
-    PDUs are intentionally not exposed because CodingApp always treats them as
-    enabled.
+    compact txPduEnabled bits, ordered as CodingApp_TxPduCodingList. XCP and
+    diagnostic request TX PDUs are intentionally not exposed because CodingApp
+    always treats them as enabled.
     """
     rx_names = [
         # CAN: COM_RX_PDU_CENTRALLOCKDATA .. COM_RX_PDU_DMU_ALIVE
         "CENTRALLOCKDATA", "LIGHTDATA1", "STATUSACTUATOR", "OUTSIDETEMPERATURESTATUS",
-        "CENTRALCOMMAND1", "DMUSTATUS", "ENGINEDATA7", "BATTFULLSTAT", "ENGINEDATA6",
-        "ENGINEDATA5", "ENGINEDATA4", "ENGINEDATA3", "ENGINEDATA2", "DSCDATA3", "DSCDATA2",
-        "DSCDATA1", "ENGINEDATA1", "ASGDATA1", "PDCSTAT", "MILEAGE", "DMU_ALIVE",
+        "CENTRALCOMMAND1", "DMUSTATUS", "BATTFULLSTAT", "PDCSTAT", "MILEAGE", "DMU_ALIVE",
         # CAN: COM_RX_PDU_VOLTAGECURRENT .. COM_RX_PDU_L1_I2T_COUNTER
         "VOLTAGECURRENT", "TEMPMEAS", "LOADSTATUS", "L1_I2T_COUNTER",
         # CAN: COM_RX_PDU_BATTSOCSOH .. COM_RX_PDU_BATTCAPRES
@@ -188,41 +198,35 @@ def _build_coding_parameter_names():
         rx_names += [f"CANFD_PDM{pdm}_CURRENTFEEDBACK_{i}" for i in range(1, 6)]
         rx_names += [f"CANFD_PDM{pdm}_STUCKATONEVENT", f"CANFD_PDM{pdm}_STUCKATOFFEVENT"]
         rx_names += [f"CANFD_PDM{pdm}_TEMPERATUREFEEDBACK_{i}" for i in range(1, 6)]
-    # LIN: COM_RX_PDU_LIN_ALT_STATUS .. COM_RX_PDU_LIN_PCU48_STATUS
-    rx_names += ["LIN_ALT_STATUS", "LIN_HVDCDC_STATUS", "LIN_PCU48_STATUS"]
+    # LIN: HVDCDC is the only configured slave node.
+    rx_names += ["LIN_HVDCDC_STATUS"]
 
-    tx_names = {
-        10: "TX_VEHICLESTATE",
-        11: "TX_DISPLAYOUTTEMP",
-        12: "TX_STATUSBODYDATA1",
-        13: "TX_COMMANDDISPLAYSTATUS",
-        19: "TX_SDAT",
-        20: "TX_NM3",
-        21: "TX_LOADREQUEST",
-        100: "TX_CANFD_INFOTAINMENTDATA1",
-        101: "TX_CANFD_ENERGYMANAGEMENTDATA2",
-        102: "TX_CANFD_ENERGYMANAGEMENTDATA1",
-        103: "TX_CANFD_VEHICLESTATE",
-        104: "TX_CANFD_NM3",
-        105: "TX_CANFD_SDAT",
-        106: "TX_CANFD_LIGHTDATA1",
-        107: "TX_CANFD_POWERTRAINDATA2",
-        108: "TX_CANFD_POWERTRAINDATA1",
-        109: "TX_CANFD_BODYDATA1",
-        114: "TX_CANFD_COMMANDLOAD_PDM1",
-        118: "TX_CANFD_ENERGYMANAGEMENTDATA3",
-        200: "TX_LIN_ZGW_NM3",
-        201: "TX_LIN_ZGW_REQUEST_ALT",
-        202: "TX_LIN_ZGW_REQUEST_HVDCDC",
-        203: "TX_LIN_ZGW_REQUEST_PCU48",
-    }
+    tx_names = [
+        "TX_VEHICLESTATE",
+        "TX_DISPLAYOUTTEMP",
+        "TX_STATUSBODYDATA1",
+        "TX_COMMANDDISPLAYSTATUS",
+        "TX_SDAT",
+        "TX_NM3",
+        "TX_LOADREQUEST",
+        "TX_CANFD_INFOTAINMENTDATA1",
+        "TX_CANFD_ENERGYMANAGEMENTDATA2",
+        "TX_CANFD_ENERGYMANAGEMENTDATA1",
+        "TX_CANFD_VEHICLESTATE",
+        "TX_CANFD_NM3",
+        "TX_CANFD_SDAT",
+        "TX_CANFD_LIGHTDATA1",
+        "TX_CANFD_BODYDATA1",
+        "TX_CANFD_COMMANDLOAD_PDM1",
+        "TX_CANFD_ENERGYMANAGEMENTDATA3",
+        "TX_LIN_ZGW_REQUEST_HVDCDC",
+    ]
 
     rx_mask_bytes = (len(rx_names) + 7) // 8
     tx_bit_offset = rx_mask_bytes * 8
     names = list(rx_names)
-    names.extend(f"(reserved bit {idx})" for idx in range(len(names), tx_bit_offset + max(tx_names) + 1))
-    for pdu_id, name in tx_names.items():
-        names[tx_bit_offset + pdu_id] = name
+    names.extend(f"(reserved bit {idx})" for idx in range(len(names), tx_bit_offset))
+    names.extend(tx_names)
     return names
 
 
@@ -230,8 +234,8 @@ CODING_PARAMETER_NAMES = _build_coding_parameter_names()
 CODING_PARAMETER_INDEX = {name: idx for idx, name in enumerate(CODING_PARAMETER_NAMES)}
 CODING_RX_PARAMETER_COUNT = len([name for name in CODING_PARAMETER_NAMES if not name.startswith("TX_") and not name.startswith("(reserved")])
 CODING_RX_MASK_BYTES = (CODING_RX_PARAMETER_COUNT + 7) // 8
-CODING_TX_PDU_MAX_ID = 203
-CODING_MASK_BYTES = CODING_RX_MASK_BYTES + ((CODING_TX_PDU_MAX_ID + 8) // 8)
+CODING_TX_PDU_COUNT = len([name for name in CODING_PARAMETER_NAMES if name.startswith("TX_")])
+CODING_MASK_BYTES = CODING_RX_MASK_BYTES + ((CODING_TX_PDU_COUNT + 7) // 8)
 DUMMY_CODING_VALUES = (
     ("dummy_coding_value_1", 0, "1"),
     ("dummy_coding_value_2", 1, "0"),
@@ -260,6 +264,8 @@ DEM_DTC_CODING_ECU_NOT_CODED = 0x023000
 DEM_DTC_CODING_INVALID = 0x023001
 DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT = 0x021000
 DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT = CODING_RX_PARAMETER_COUNT
+DEM_DTC_TIMESTAMP_DATA_SIZE = 18
+MCUSM_SNAPSHOT_TIMESTAMP_OFFSET = 224
 
 STATIC_DTC_DESCRIPTIONS = {
     DEM_DTC_MCUSM_SW_ERROR: "MCUSM software error",
@@ -275,6 +281,12 @@ STATIC_DTC_DESCRIPTIONS = {
 #   Dem_DefaultSnapshotDataCapture       (Dem_Cfg.c)
 GATEWAY_BUS_TEXT = {1: "CAN", 2: "CAN-FD", 3: "LIN"}
 GATEWAY_RX_DIAG_STATUS_TEXT = {0x00: "OK", 0x01: "TIMEOUT", 0x02: "INVALID"}
+TIMEBASE_SOURCE_TEXT = {
+    0: "default compile-time",
+    1: "UDS routine",
+    2: "gPTP master",
+    255: "invalid",
+}
 MCUSM_FAULT_SOURCE_BITS = [
     (0x01, "MCU reset latched"),
     (0x02, "SCR ECC double-bit error"),
@@ -379,9 +391,6 @@ DEM_EVENT_ID_NAMES = {
     3: "Coding invalid",
 }
 
-# Lab DCM identifier. Mirrors DCM_ROUTINE_SELECT_FBL_INTERFACE in Dcm.c.
-ROUTINE_SELECT_FBL_INTERFACE = 0x0205
-FBL_INTERFACE_DOIP = 0x01
 ROUTINE_ERASE_MEMORY = 0x0001
 ROUTINE_CHECK_MEMORY_CRC = 0x0002
 ROUTINE_START_FBL_RAM_UPDATER = 0x0155
@@ -489,14 +498,9 @@ def int_hex(value, width=4):
 DEFAULT_EXTENDED_DIAG_ADDRESSES = {
     "ZGW": 0x41,
     "PDM1": 0x42,
-    "ALT": 0x50,
     "HVDCDC": 0x51,
-    "PCU48": 0x52,
-    "AGS": 0x53,
     "CBM": 0x54,
-    "DME": 0x55,
     "DMU": 0x56,
-    "DSC": 0x57,
     "ELC": 0x58,
     "FRBE": 0x59,
 }
@@ -545,6 +549,39 @@ def ecu_name_from_hex_stem(stem):
     return name
 
 
+def current_layout_node_names(root_path):
+    try:
+        nodes, _logs = discover_nodes(root_path)
+    except Exception:
+        return set()
+    return {str(node.node_name).strip().upper() for node in nodes}
+
+
+def filtered_hex_rows_for_layout(rows, root_path):
+    valid_nodes = current_layout_node_names(root_path)
+    if not valid_nodes:
+        return list(rows)
+
+    filtered = []
+    seen = set()
+    for row in rows:
+        hex_path_text = str(row.get("hex", "")).strip()
+        if not hex_path_text:
+            continue
+        ecu_name = ecu_name_from_hex_stem(row.get("ecu") or Path(hex_path_text).stem)
+        if ecu_name not in valid_nodes:
+            continue
+        hex_path = Path(hex_path_text)
+        if not hex_path.exists():
+            continue
+        dedupe_key = (ecu_name, str(hex_path).lower())
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        filtered.append(row)
+    return filtered
+
+
 def bytes_to_hex(data):
     return data.hex(" ").upper()
 
@@ -575,6 +612,32 @@ def u32_be(data, offset):
         | (data[offset + 2] << 8)
         | data[offset + 3]
     )
+
+def u64_be(data, offset):
+    value = 0
+    for byte in data[offset:offset + 8]:
+        value = (value << 8) | byte
+    return value
+
+
+def format_dtc_timestamp_data(data, prefix="DTC occurrence time"):
+    if len(data) < DEM_DTC_TIMESTAMP_DATA_SIZE:
+        return ""
+    vehicle_ns = u64_be(data, 0)
+    utc_ns = u64_be(data, 8)
+    utc_valid = data[16]
+    source = data[17]
+    source_text = TIMEBASE_SOURCE_TEXT.get(source, f"source {source}")
+    parts = [f"{prefix}: vehicleTimeNs={vehicle_ns}"]
+    if utc_valid != 0 and utc_ns != 0:
+        utc_dt = datetime.utcfromtimestamp(utc_ns / 1_000_000_000)
+        parts.append(f"UTC {utc_dt.isoformat(timespec='milliseconds')}Z")
+        parts.append(f"utcNs={utc_ns}")
+    else:
+        parts.append("UTC not valid")
+        parts.append(f"utcNs={utc_ns}")
+    parts.append(f"time source: {source_text} ({source})")
+    return ", ".join(parts)
 
 
 def flag_names(value, table, empty="none"):
@@ -966,32 +1029,37 @@ class DoipClient:
                 self.sock.settimeout(self.timeout)
 
     def _recv_exact(self, length, deadline=None):
-        if self.sock is None:
+        sock = self.sock
+        if sock is None:
             raise DoipError("Not connected")
         out = bytearray()
         try:
             while len(out) < length:
+                if self.sock is not sock:
+                    raise DoipError("Connection closed")
                 if deadline is not None:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise TimeoutError("Timed out waiting for DoIP data")
-                    self.sock.settimeout(remaining)
+                    sock.settimeout(remaining)
                 else:
-                    self.sock.settimeout(self.timeout)
+                    sock.settimeout(self.timeout)
                 try:
-                    chunk = self.sock.recv(length - len(out))
+                    chunk = sock.recv(length - len(out))
                 except TimeoutError as exc:
                     raise TimeoutError("Timed out waiting for DoIP data")
                 except OSError:
-                    self.close()
+                    if self.sock is sock:
+                        self.close()
                     raise
                 if not chunk:
-                    self.close()
+                    if self.sock is sock:
+                        self.close()
                     raise DoipError("TCP connection closed")
                 out.extend(chunk)
         finally:
-            if self.sock is not None:
-                self.sock.settimeout(self.timeout)
+            if self.sock is sock:
+                sock.settimeout(self.timeout)
         return bytes(out)
 
     def _recv_frame(self, deadline=None):
@@ -1092,6 +1160,82 @@ class DoipClient:
                 send_timeout=ROUTED_SEND_BACKPRESSURE_TIMEOUT_SECONDS,
             )
             self._last_request_ts = time.monotonic()
+
+    def recv_routed_transport_acks(self, expected_requests, timeout=None):
+        timeout = ROUTED_TRANSPORT_ACK_TIMEOUT_SECONDS if timeout is None else float(timeout)
+        deadline = time.monotonic() + timeout
+        pending = []
+        for expected in expected_requests:
+            label, request = expected[:2]
+            tolerate_negative_ack = bool(expected[2]) if len(expected) > 2 else False
+            pending.append({
+                "label": str(label),
+                "request": bytes(request),
+                "tolerate_negative_ack": tolerate_negative_ack,
+            })
+        completed = []
+
+        with self.lock:
+            while pending:
+                try:
+                    payload_type, response = self._recv_frame(deadline)
+                except TimeoutError as exc:
+                    labels = ", ".join(item["label"] for item in pending[:4])
+                    if len(pending) > 4:
+                        labels += f", ... +{len(pending) - 4} more"
+                    raise TimeoutError(f"Timed out waiting for ZGW routed transport ack: {labels}") from exc
+
+                if payload_type == DOIP_PT_ALIVE_CHECK_REQ:
+                    self._send_frame(DOIP_PT_ALIVE_CHECK_RES, struct.pack(">H", self.source_addr))
+                    continue
+                if payload_type == DOIP_PT_DIAG_ACK:
+                    if len(response) >= 5 and response[4] != 0:
+                        raise DoipError(f"Diagnostic ACK code 0x{response[4]:02X}")
+                    continue
+                if payload_type == DOIP_PT_DIAG_NACK:
+                    code = response[4] if len(response) >= 5 else 0xFF
+                    raise DoipError(f"Diagnostic NACK code 0x{code:02X}")
+                if payload_type != DOIP_PT_DIAG_MSG:
+                    continue
+                if len(response) < 5:
+                    raise DoipError("Short diagnostic message")
+
+                source, target = struct.unpack(">HH", response[:4])
+                uds = response[4:]
+                if target != self.source_addr or source != self.target_addr:
+                    continue
+
+                matched_index = None
+                for index, item in enumerate(pending):
+                    request = item["request"]
+                    if not request:
+                        continue
+                    if (
+                        len(uds) >= 4
+                        and len(request) >= 2
+                        and uds[0] == request[0]
+                        and uds[1] == 0x7F
+                        and uds[2] == request[1]
+                    ):
+                        if item["tolerate_negative_ack"]:
+                            matched_index = index
+                            break
+                        nrc_text = NRC_TEXT.get(uds[3], "Unknown")
+                        raise FcdError(
+                            f"{item['label']}: ZGW routed transport ack failed "
+                            f"for 0x{uds[2]:02X}: NRC 0x{uds[3]:02X} ({nrc_text})"
+                        )
+                    if uds_response_matches_request(uds, request):
+                        matched_index = index
+                        break
+
+                if matched_index is None:
+                    continue
+
+                completed.append((pending[matched_index]["label"], uds))
+                pending.pop(matched_index)
+
+        return completed
 
     def send_uds_suppress_positive(self, request, timeout=None):
         timeout = self.timeout if timeout is None else float(timeout)
@@ -1523,9 +1667,13 @@ class FcdApp:
         self.keepalive_stop = threading.Event()
         self.keepalive_thread = None
         self.worker_stop = threading.Event()
+        self.worker_lock = threading.Lock()
+        self.worker_running = False
         self.test_stop = threading.Event()
         self.test_lock = threading.Lock()
         self.test_running = False
+        self.discovery_lock = threading.Lock()
+        self.discovery_running = False
         self.generator_rows = {}
         self.discovered_nodes = []
         self.discovery_logs = []
@@ -1539,7 +1687,9 @@ class FcdApp:
         self.payload_enabled = {}
         self.routed_bus_pace_lock = threading.RLock()
         self.routed_bus_semaphores = {}
+        self.routed_node_semaphores = {}
         self.routed_bus_last_request_ts = {}
+        self.routed_node_last_request_ts = {}
         self.coding_shared_client = None
         self.settings = self._load_settings_file()
 
@@ -1572,7 +1722,7 @@ class FcdApp:
         data_editor = self.settings.get("data_editor", {})
         if data_editor.get("output_folder"):
             self.gen_output_var.set(str(data_editor["output_folder"]))
-        for row in data_editor.get("hex_rows", []):
+        for row in filtered_hex_rows_for_layout(data_editor.get("hex_rows", []), SCRIPT_DIR.parent.parent):
             if row.get("hex"):
                 self._insert_generator_row({
                     "ecu": row.get("ecu", Path(row["hex"]).stem.upper()),
@@ -1774,6 +1924,9 @@ class FcdApp:
         )
         ttk.Button(controls, text="Clear DTCs", command=self.clear_diagnostic_information_clicked).grid(
             row=0, column=4, sticky="w", padx=4, pady=4
+        )
+        ttk.Button(controls, text="Hard Reset", command=self.hard_reset_clicked).grid(
+            row=0, column=5, sticky="w", padx=4, pady=4
         )
 
         columns = ("node", "dtc", "status", "description", "snapshot_data")
@@ -2000,7 +2153,7 @@ class FcdApp:
             self.generator_tree.heading(col, text=text)
             self.generator_tree.column(col, width=width, stretch=(col == "hex"))
         self.generator_tree.grid(row=3, column=0, sticky="nsew", padx=4, pady=4)
-        self.root.after(200, self.discover_nodes_clicked)
+        self.root.after(200, self.discover_nodes_startup)
 
     def _build_tal_tab(self):
         outer = ttk.Frame(self.tal_tab)
@@ -2031,7 +2184,7 @@ class FcdApp:
         self.flash_fbl_var = tk.BooleanVar(value=True)
         self.flash_appl_var = tk.BooleanVar(value=True)
         self.flash_coding_var = tk.BooleanVar(value=True)
-        self.block_size_var = tk.StringVar(value="4095")
+        self.block_size_var = tk.StringVar(value=str(DEFAULT_BLOCK_SIZE))
         self.session_var = tk.StringVar(value="0x02")
 
         ttk.Checkbutton(options, text="Dry run", variable=self.dry_run_var).grid(row=0, column=0, sticky="w", padx=6)
@@ -2271,6 +2424,12 @@ class FcdApp:
         self.root.after(10 if drained else 50, self._drain_log_queue)
 
     def worker(self, name, func):
+        with self.worker_lock:
+            if self.worker_running:
+                self.log(f"{name}: skipped; another operation is already running")
+                return
+            self.worker_running = True
+
         def run():
             try:
                 self.worker_stop.clear()
@@ -2282,6 +2441,9 @@ class FcdApp:
             except Exception as exc:
                 self.log(f"{name}: ERROR: {exc}")
                 self.log(traceback.format_exc().strip())
+            finally:
+                with self.worker_lock:
+                    self.worker_running = False
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -2617,6 +2779,11 @@ class FcdApp:
         self.test_stop.set()
         self.worker_stop.set()
         self.stop_keepalive()
+        with self.worker_lock:
+            operation_running = self.worker_running
+        if operation_running:
+            self.log("Disconnect requested; waiting for active operation to stop")
+            return
         if self.client is not None:
             self.client.close()
             self.client = None
@@ -2853,6 +3020,20 @@ class FcdApp:
             ],
         )
 
+    def hard_reset_clicked(self):
+        requests = [
+            (bytes([0x10, SESSION_EXTENDED]), "Extended Session for hard reset"),
+            (b"\x11\x01", "ECUReset hardReset"),
+        ]
+
+        def zgw_worker(send, target, client):
+            node = self._target_label(target)
+            self._send_session(send, SESSION_EXTENDED, f"{node}: Extended Session for hard reset")
+            self._send_ecu_reset_best_effort(send, f"{node}: ECUReset hardReset")
+            self._recover_doip_after_reset(client, f"{node} hard reset", require_current_client=False)
+
+        self._run_vehicle_uds_action("Hard Reset", requests, zgw_worker=zgw_worker)
+
     def read_fault_memory_clicked(self):
         try:
             status_mask = parse_int(self.dtc_status_mask_var.get())
@@ -2988,6 +3169,11 @@ class FcdApp:
             index = dtc - DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
             name = CODING_PARAMETER_NAMES[index] if index < len(CODING_PARAMETER_NAMES) else f"index {index}"
         if is_snapshot:
+            timestamp_text = format_dtc_timestamp_data(data)
+            if timestamp_text:
+                if is_message:
+                    return f"RX message timeout - {name} | {timestamp_text}"
+                return timestamp_text
             if len(data) < 30:
                 return ""
             bus_text = GATEWAY_BUS_TEXT.get(data[1], f"bus {data[1]}")
@@ -3083,6 +3269,10 @@ class FcdApp:
                 detail = self._explain_mcusm_detail(data[64:], False)
                 if detail:
                     parts.append(f"snapshot detail: {detail}")
+            if len(data) >= (MCUSM_SNAPSHOT_TIMESTAMP_OFFSET + DEM_DTC_TIMESTAMP_DATA_SIZE):
+                timestamp_text = format_dtc_timestamp_data(data[MCUSM_SNAPSHOT_TIMESTAMP_OFFSET:])
+                if timestamp_text:
+                    parts.append(timestamp_text)
             return " | ".join(parts)
         if len(data) < 16:
             return ""
@@ -3173,7 +3363,12 @@ class FcdApp:
         return " | ".join(parts)
 
     def _explain_default_detail(self, data, is_snapshot):
-        # Dem_DefaultSnapshotDataCapture layout, with legacy 0x19/06 fallback.
+        # Current ZGW coding DTC snapshots are timestamp-only. Keep the legacy
+        # default snapshot decode below for older targets.
+        if is_snapshot:
+            timestamp_text = format_dtc_timestamp_data(data)
+            if timestamp_text:
+                return f"Coding DTC snapshot | {timestamp_text}"
         if len(data) < 4:
             return ""
         event_id = u16_be(data, 0)
@@ -3668,7 +3863,23 @@ class FcdApp:
             if required:
                 raise FcdError(f"{prefix}: CodingApp status read failed after reset") from exc
 
+    def _ensure_coding_session_for_routine(self, send, label, timeout=3.0):
+        if getattr(send, "dry_run", False):
+            return
+        try:
+            active_session = self._read_active_diag_session(send, label, timeout=2.0)
+            if active_session == SESSION_CODING_REQUESTED:
+                return
+            self.log(
+                f"{label}: active session is 0x{active_session:02X}; "
+                "requesting coding session before RoutineControl"
+            )
+        except Exception as exc:
+            self.log(f"{label}: active session check failed ({exc}); requesting coding session")
+        self._ensure_session(send, SESSION_CODING_REQUESTED, f"{label}: Coding Session requested as 10 41", timeout=timeout)
+
     def _run_coding_routine(self, send, rid, option, label, timeout=60.0, max_pending_polls=10):
+        self._ensure_coding_session_for_routine(send, label)
         start_resp = send(
             b"\x31\x01" + struct.pack(">H", rid) + bytes(option),
             f"RoutineControl {rid:04X} {label} start",
@@ -3698,6 +3909,7 @@ class FcdApp:
                 raise FcdError(f"{label} did not finish before timeout")
             time.sleep(min(1.0, remaining))
             try:
+                self._ensure_coding_session_for_routine(send, label)
                 result_resp = send(
                     b"\x31\x03" + struct.pack(">H", rid),
                     f"RoutineControl {rid:04X} {label} result",
@@ -3776,30 +3988,58 @@ class FcdApp:
         if keepalive_was_on:
             self.stop_keepalive(update_var=False)
             self.log(f"{action_name}: paused automatic tester present")
-        shared_client = None
-        shared_client_created = False
-        old_request_spacing = None
-        try:
-            if self.transport_var.get() == "DoIP":
-                try:
-                    shared_client = self.require_client()
-                except FcdError:
-                    shared_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                    shared_client_created = True
-                if isinstance(shared_client, DoipClient):
-                    shared_client.target_addr = parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
-                    old_request_spacing = shared_client.request_spacing_seconds
-                    shared_client.request_spacing_seconds = max(old_request_spacing, REQUEST_SPACING_SECONDS)
-                    shared_client.drain()
-                    self.coding_shared_client = shared_client
-                    self.log(f"{action_name}: using one DoIP TCP connection for routed parallel requests")
-            for slot in sorted({event.time_slot for event in coding_events}):
-                events = [event for event in coding_events if event.time_slot == slot]
-                work = []
-                for event in events:
-                    if event.node_name not in target_by_name:
-                        continue
-                    work.append((event, target_by_name[event.node_name]))
+
+        lanes = {}
+        zgw_tasks = []
+        for slot in sorted({event.time_slot for event in coding_events}):
+            work_by_bus = {}
+            zgw_work = []
+            for event in coding_events:
+                if event.time_slot != slot or event.node_name not in target_by_name:
+                    continue
+                target = target_by_name[event.node_name]
+                item = (event, target)
+                if self._target_is_zgw(target):
+                    zgw_work.append(item)
+                    continue
+                bus = bus_category(self._work_item_bus_type(item))
+                work_by_bus.setdefault(bus, []).append(item)
+            for bus, work in work_by_bus.items():
+                lanes.setdefault(bus, []).append((slot, work))
+            if zgw_work:
+                zgw_tasks.append((slot, zgw_work))
+
+        def handle_worker_exception(event, target, exc):
+            target_strict = self._strict_response_for_target(target, strict_response)
+            if isinstance(exc, NodeTimeout):
+                if target_strict:
+                    raise FcdError(f"{action_name}: {event.node_name} node timeout ({exc})") from exc
+                self.log(f"{action_name}: {event.node_name} node timeout; skipped ({exc})")
+                return
+            if target_strict:
+                raise FcdError(
+                    f"{action_name}: {event.node_name} did not respond or failed ({exc})"
+                ) from exc
+            self.log(f"{action_name}: {event.node_name} did not respond or failed; skipped ({exc})")
+
+        def run_waiting_work(work):
+            with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                future_to_event = {
+                    executor.submit(worker, target): event
+                    for event, target in work
+                }
+                for future in as_completed(future_to_event):
+                    event = future_to_event[future]
+                    target = target_by_name.get(event.node_name, {})
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        handle_worker_exception(event, target, exc)
+
+        shared_paced_client = None
+
+        def run_lane(bus, tasks):
+            for slot, work in tasks:
                 if not work:
                     continue
                 if len(work) > 1:
@@ -3807,47 +4047,61 @@ class FcdApp:
                         f"{self._work_item_node_name(item)}({self._work_item_bus_type(item)})"
                         for item in work
                     )
-                    self.log(f"{action_name}: slot {slot} parallel nodes={nodes}")
+                    self.log(f"{action_name}: slot {slot} bus={bus} parallel nodes={nodes}")
                 if (
-                    isinstance(shared_client, DoipClient)
+                    self.transport_var.get() == "DoIP"
+                    and shared_paced_client is not None
                     and self._can_run_paced_coding_slot(action_name, work)
                 ):
                     if action_name == "Read Coding":
-                        self._run_paced_read_coding_slot(slot, work, shared_client)
+                        self._run_paced_read_coding_slot(slot, work, shared_paced_client)
                     elif action_name == "Load Coding Default":
-                        self._run_paced_load_default_coding_slot(slot, work, shared_client)
+                        self._run_paced_load_default_coding_slot(slot, work, shared_paced_client)
                     elif action_name == "Check Coding":
-                        self._run_paced_check_coding_slot(slot, work, shared_client)
+                        self._run_paced_check_coding_slot(slot, work, shared_paced_client)
                     elif action_name == "Code Vehicle":
-                        self._run_paced_code_vehicle_slot(slot, work, shared_client)
+                        self._run_paced_code_vehicle_slot(slot, work, shared_paced_client)
                     continue
-                with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-                    future_to_event = {
-                        executor.submit(worker, target): event
-                        for event, target in work
-                    }
-                    for future in as_completed(future_to_event):
-                        event = future_to_event[future]
-                        target = target_by_name.get(event.node_name, {})
-                        target_strict = self._strict_response_for_target(target, strict_response)
-                        try:
+                run_waiting_work(work)
+
+        try:
+            if self.transport_var.get() != "DoIP":
+                self.coding_shared_client = self.require_client()
+            elif lanes and any(
+                self._can_run_paced_coding_slot(action_name, work)
+                for tasks in lanes.values()
+                for _slot, work in tasks
+            ):
+                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_paced_client.drain()
+                self.log(f"{action_name}: using one DoIP TCP connection for routed bus schedule")
+
+            if lanes:
+                lane_text = ", ".join(f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items()))
+                self.log(f"{action_name}: bus lanes={lane_text}")
+                if len(lanes) == 1:
+                    bus, tasks = next(iter(lanes.items()))
+                    run_lane(bus, tasks)
+                else:
+                    with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                        futures = [
+                            executor.submit(run_lane, bus, tasks)
+                            for bus, tasks in lanes.items()
+                        ]
+                        for future in as_completed(futures):
                             future.result()
-                        except NodeTimeout as exc:
-                            if target_strict:
-                                raise FcdError(f"{action_name}: {event.node_name} node timeout ({exc})") from exc
-                            self.log(f"{action_name}: {event.node_name} node timeout; skipped ({exc})")
-                        except Exception as exc:
-                            if target_strict:
-                                raise FcdError(
-                                    f"{action_name}: {event.node_name} did not respond or failed ({exc})"
-                                ) from exc
-                            self.log(f"{action_name}: {event.node_name} did not respond or failed; skipped ({exc})")
+
+            for slot, work in zgw_tasks:
+                if self.worker_stop.is_set():
+                    break
+                self.log(f"{action_name}: slot {slot} ZGW last/alone")
+                for item in work:
+                    run_waiting_work([item])
         finally:
+            if shared_paced_client is not None:
+                shared_paced_client.close()
             self.coding_shared_client = None
-            if (shared_client is not None) and (old_request_spacing is not None):
-                shared_client.request_spacing_seconds = old_request_spacing
-            if shared_client_created and (shared_client is not None):
-                shared_client.close()
             if keepalive_was_on and not self.worker_stop.is_set():
                 self.start_keepalive()
 
@@ -3932,87 +4186,121 @@ class FcdApp:
         if keepalive_was_on:
             self.stop_keepalive(update_var=False)
             self.log(f"{action_name}: paused automatic tester present")
-        shared_client = None
-        shared_client_created = False
-        old_request_spacing = None
-        try:
-            if self.transport_var.get() == "DoIP":
-                try:
-                    shared_client = self.require_client()
-                except FcdError:
-                    shared_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                    shared_client_created = True
-                if isinstance(shared_client, DoipClient):
-                    shared_client.target_addr = parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
-                    old_request_spacing = shared_client.request_spacing_seconds
-                    shared_client.request_spacing_seconds = max(old_request_spacing, REQUEST_SPACING_SECONDS)
-                    shared_client.drain()
-                    self.coding_shared_client = shared_client
-                    self.log(f"{action_name}: using one DoIP TCP connection for routed requests")
-            else:
-                # Non-DoIP transport has no ZGW forwarder, so there is nothing to
-                # route through; run every target against the single connected
-                # client (extended-address prefixes are still applied but harmless).
-                shared_client = self.require_client()
-                self.coding_shared_client = shared_client
 
-            routed_requests_pending_drain = False
-            for slot in sorted({event.time_slot for event in events}):
+        lanes = {}
+        zgw_tasks = []
+        for slot in sorted({event.time_slot for event in events}):
+            work_by_bus = {}
+            zgw_work = []
+            for event in events:
+                if event.time_slot != slot:
+                    continue
+                target = target_by_name.get(event.node_name)
+                if target is None:
+                    continue
+                item = (event, target)
+                if self._target_is_zgw(target):
+                    zgw_work.append(item)
+                    continue
+                bus = bus_category(self._work_item_bus_type(item))
+                work_by_bus.setdefault(bus, []).append(item)
+            for bus, work in work_by_bus.items():
+                lanes.setdefault(bus, []).append((slot, work))
+            if zgw_work:
+                zgw_tasks.append((slot, zgw_work))
+
+        def handle_waiting_exception(target, exc):
+            if isinstance(exc, NodeTimeout):
+                if self._strict_response_for_target(target, strict_response):
+                    raise FcdError(f"{action_name}: {self._target_label(target)} node timeout ({exc})") from exc
+                self.log(f"{action_name}: {self._target_label(target)} node timeout; skipped ({exc})")
+                return
+            if self._strict_response_for_target(target, strict_response):
+                raise FcdError(
+                    f"{action_name}: {self._target_label(target)} did not respond or failed ({exc})"
+                ) from exc
+            self.log(f"{action_name}: {self._target_label(target)} did not respond or failed; skipped ({exc})")
+
+        def run_waiting_item(item):
+            _event, target = item
+            try:
+                run_waiting(target)
+            except Exception as exc:
+                handle_waiting_exception(target, exc)
+
+        def run_waiting_items(work):
+            for item in work:
                 if self.worker_stop.is_set():
                     break
-                work = []
-                for event in events:
-                    if event.time_slot != slot:
-                        continue
-                    target = target_by_name.get(event.node_name)
-                    if target is not None:
-                        work.append((event, target))
-                if not work:
-                    continue
+                run_waiting_item(item)
 
+        shared_paced_client = None
+
+        def run_uds_lane(bus, tasks):
+            for slot, work in tasks:
+                if self.worker_stop.is_set():
+                    break
                 paced_work = [item for item in work if self._can_pace_uds_target(item[1])]
-                other_work = [item for item in work if not self._can_pace_uds_target(item[1])]
+                waiting_work = [item for item in work if not self._can_pace_uds_target(item[1])]
 
-                if paced_work and isinstance(shared_client, DoipClient):
+                if paced_work and self.transport_var.get() == "DoIP" and shared_paced_client is not None:
                     nodes = ", ".join(
                         f"{self._work_item_node_name(item)}({self._work_item_bus_type(item)})"
                         for item in paced_work
                     )
-                    self.log(f"{action_name}: slot {slot} routed nodes={nodes}")
-                    self._run_paced_routed_coding_rounds(paced_work, shared_client, rounds)
-                    routed_requests_pending_drain = True
+                    self.log(f"{action_name}: slot {slot} bus={bus} routed nodes={nodes}")
+                    self._run_paced_routed_coding_rounds(paced_work, shared_paced_client, rounds)
                 elif paced_work:
-                    # No DoIP forwarder available, or strict test mode requested:
-                    # fall back to waiting sends so failures can stop the action.
-                    other_work = work
+                    waiting_work = work
 
-                if other_work and routed_requests_pending_drain and isinstance(shared_client, DoipClient):
-                    if self.worker_stop.wait(ROUTED_WAITING_SETTLE_SECONDS):
-                        break
-                    shared_client.drain()
-                    routed_requests_pending_drain = False
+                if waiting_work:
+                    self.log(
+                        f"{action_name}: slot {slot} bus={bus} waiting nodes="
+                        f"{', '.join(self._target_label(target) for _event, target in waiting_work)}"
+                    )
+                    run_waiting_items(waiting_work)
 
-                for _event, target in other_work:
-                    if self.worker_stop.is_set():
-                        break
-                    try:
-                        run_waiting(target)
-                    except NodeTimeout as exc:
-                        if self._strict_response_for_target(target, strict_response):
-                            raise FcdError(f"{action_name}: {self._target_label(target)} node timeout ({exc})") from exc
-                        self.log(f"{action_name}: {self._target_label(target)} node timeout; skipped ({exc})")
-                    except Exception as exc:
-                        if self._strict_response_for_target(target, strict_response):
-                            raise FcdError(
-                                f"{action_name}: {self._target_label(target)} did not respond or failed ({exc})"
-                            ) from exc
-                        self.log(f"{action_name}: {self._target_label(target)} did not respond or failed; skipped ({exc})")
+        try:
+            if self.transport_var.get() != "DoIP":
+                # Non-DoIP transport has no ZGW forwarder, so there is nothing to
+                # route through; run every target against the single connected
+                # client (extended-address prefixes are still applied but harmless).
+                self.coding_shared_client = self.require_client()
+            elif lanes and any(
+                self._can_pace_uds_target(item[1])
+                for tasks in lanes.values()
+                for _slot, work in tasks
+                for item in work
+            ):
+                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_paced_client.drain()
+                self.log(f"{action_name}: using one DoIP TCP connection for routed bus schedule")
+
+            if lanes:
+                lane_text = ", ".join(f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items()))
+                self.log(f"{action_name}: bus lanes={lane_text}")
+                if len(lanes) == 1:
+                    bus, tasks = next(iter(lanes.items()))
+                    run_uds_lane(bus, tasks)
+                else:
+                    with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                        futures = [
+                            executor.submit(run_uds_lane, bus, tasks)
+                            for bus, tasks in lanes.items()
+                        ]
+                        for future in as_completed(futures):
+                            future.result()
+
+            for slot, work in zgw_tasks:
+                if self.worker_stop.is_set():
+                    break
+                self.log(f"{action_name}: slot {slot} ZGW last/alone")
+                run_waiting_items(work)
         finally:
+            if shared_paced_client is not None:
+                shared_paced_client.close()
             self.coding_shared_client = None
-            if (shared_client is not None) and (old_request_spacing is not None):
-                shared_client.request_spacing_seconds = old_request_spacing
-            if shared_client_created and (shared_client is not None):
-                shared_client.close()
             if keepalive_was_on and not self.worker_stop.is_set():
                 self.start_keepalive()
             if on_complete is not None:
@@ -4211,7 +4499,19 @@ class FcdApp:
                 return
             time.sleep(min(remaining, 0.005))
 
-    def _send_routed_uds_no_wait(self, client, target, request, label):
+    def _scheduled_routed_due(self, bus, desired_due, next_due_by_bus):
+        if bus != "LIN":
+            return desired_due
+        next_due = next_due_by_bus.get(bus)
+        if next_due is None:
+            with self.routed_bus_pace_lock:
+                last_bus = self.routed_bus_last_request_ts.get(bus, 0.0)
+            next_due = last_bus + ROUTED_LIN_REQUEST_SPACING_SECONDS
+        due = max(desired_due, next_due)
+        next_due_by_bus[bus] = due + ROUTED_LIN_REQUEST_SPACING_SECONDS
+        return due
+
+    def _send_routed_uds_no_wait(self, client, target, request, label, apply_pacing=True):
         node_name = target.get("node_name", "")
         extended = target.get("extended_diag_address", "")
         if not extended:
@@ -4221,11 +4521,113 @@ class FcdApp:
         prefixed_request = bytes([extended_byte]) + bytes(request)
         bus = bus_category(target.get("bus_type", "UNKNOWN"))
 
+        if apply_pacing:
+            self._pace_routed_bus_request(target)
         self.log(f"TX {label}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
         client.send_uds_no_wait(prefixed_request)
         with self.routed_bus_pace_lock:
             self.routed_bus_last_request_ts[bus] = time.monotonic()
-        self.log(f"RX {label}: no response accepted")
+            self.routed_node_last_request_ts[(bus, extended_byte)] = time.monotonic()
+        self.log(f"RX {label}: waiting for ZGW transport complete")
+        return prefixed_request
+
+    def _wait_routed_transport_acks(self, client, expected_requests):
+        if not expected_requests:
+            return
+        wait_requests = [
+            expected for expected in expected_requests
+            if not (len(expected) > 2 and bool(expected[2]))
+        ]
+        for expected in expected_requests:
+            if len(expected) > 2 and bool(expected[2]):
+                label = expected[0]
+                self.log(f"RX {label}: simulated target no response accepted")
+        if not wait_requests:
+            return
+        completed = client.recv_routed_transport_acks(
+            wait_requests,
+            timeout=ROUTED_TRANSPORT_ACK_TIMEOUT_SECONDS,
+        )
+        for label, response in completed:
+            if len(response) >= 4 and response[1] == 0x7F:
+                nrc_text = NRC_TEXT.get(response[3], "Unknown")
+                self.log(
+                    f"RX {label}: simulated target transport failure accepted "
+                    f"NRC 0x{response[3]:02X} ({nrc_text})"
+                )
+            else:
+                self.log(f"RX {label}: ZGW transport complete {uds_request_log_text(response)}")
+
+    def _paced_grouped_no_wait_rounds(self, groups, client, rounds, progress_cb=None, drain_every_sends=0):
+        bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
+        ordered_buses = sorted(groups, key=lambda bus: bus_order.get(bus, 99))
+        if not ordered_buses:
+            return 0
+
+        max_depth = max(len(items) for items in groups.values())
+        sends_since_drain = 0
+        start_time = time.monotonic()
+        next_due_by_bus = {}
+        events = []
+        order = 0
+
+        for round_offset, request_factory, label_factory in rounds:
+            for node_index in range(max_depth):
+                for bus in ordered_buses:
+                    items = groups[bus]
+                    if node_index >= len(items):
+                        continue
+                    item = items[node_index]
+                    target = item[1]
+                    request = request_factory(target, item)
+                    if request is None:
+                        continue
+                    desired_due = start_time + round_offset + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
+                    due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
+                    progress_count = 0
+                    if len(item) > 4:
+                        progress_count = item[4] or 0
+                    label = label_factory(target, item)
+                    events.append((
+                        due,
+                        bus_order.get(bus, 99),
+                        node_index,
+                        order,
+                        bus,
+                        target,
+                        bytes(request),
+                        label,
+                        progress_count,
+                    ))
+                    order += 1
+
+        expected_requests = []
+        for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+            self._sleep_until_monotonic(due)
+            if progress_count and progress_cb is not None:
+                progress_cb(progress_count)
+            prefixed_request = self._send_routed_uds_no_wait(
+                client,
+                target,
+                request,
+                label,
+                apply_pacing=(bus != "LIN"),
+            )
+            # Simulated routed targets are allowed to stay silent after the
+            # ZGW-forwarded request, regardless of bus. LIN simulations can
+            # sometimes acknowledge one step and then omit the next, which
+            # should not fail a non-strict paced read/flash flow.
+            no_response_only = self._target_is_simulated(target)
+            expected_requests.append((label, prefixed_request, no_response_only))
+            sends_since_drain += 1
+            if drain_every_sends and sends_since_drain >= drain_every_sends:
+                self._wait_routed_transport_acks(client, expected_requests)
+                expected_requests = []
+                sends_since_drain = 0
+
+        self._wait_routed_transport_acks(client, expected_requests)
+
+        return sends_since_drain
 
     def _run_paced_routed_coding_rounds(self, work, client, rounds):
         groups = {}
@@ -4234,25 +4636,7 @@ class FcdApp:
         if not groups:
             return
 
-        bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
-        ordered_buses = sorted(groups, key=lambda bus: bus_order.get(bus, 99))
-        max_depth = max(len(targets) for targets in groups.values())
-        start_time = time.monotonic()
-
-        for round_offset, request_factory, label_factory in rounds:
-            for node_index in range(max_depth):
-                due = start_time + round_offset + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
-                self._sleep_until_monotonic(due)
-                for bus in ordered_buses:
-                    targets = groups[bus]
-                    if node_index >= len(targets):
-                        continue
-                    item = targets[node_index]
-                    target = item[1]
-                    request = request_factory(target, item)
-                    if request is None:
-                        continue
-                    self._send_routed_uds_no_wait(client, target, request, label_factory(target, item))
+        self._paced_grouped_no_wait_rounds(groups, client, rounds)
 
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
         client.drain()
@@ -4262,8 +4646,8 @@ class FcdApp:
         rounds = (
             (
                 0.0,
-                lambda _target, _item: bytes([0x10, SESSION_EXTENDED]),
-                lambda target, _item: f"{target.get('node_name', '')}: Extended Session",
+                lambda _target, _item: bytes([0x10, SESSION_CODING_REQUESTED]),
+                lambda target, _item: f"{target.get('node_name', '')}: Coding Session requested as 10 41",
             ),
             (
                 ROUTED_READ_CODING_SERVICE_GAP_SECONDS,
@@ -4386,8 +4770,8 @@ class FcdApp:
             ),
             (
                 post_reset_base,
-                lambda _target, _item: bytes([0x10, SESSION_EXTENDED]),
-                lambda target, _item: f"{target_node_name(target)}: Extended Session after coding reset",
+                lambda _target, _item: bytes([0x10, SESSION_CODING_REQUESTED]),
+                lambda target, _item: f"{target_node_name(target)}: Coding Session after coding reset requested as 10 41",
             ),
             (
                 post_reset_base + (1 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
@@ -4411,11 +4795,16 @@ class FcdApp:
             ),
             (
                 post_reset_base + (5 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
+                lambda _target, _item: bytes([0x10, SESSION_CODING_REQUESTED]),
+                lambda target, _item: f"{target_node_name(target)}: Coding Session before Read Coding requested as 10 41",
+            ),
+            (
+                post_reset_base + (6 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
                 lambda _target, item: b"\x31\x01" + struct.pack(">H", item[4]),
                 lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read Coding start",
             ),
             (
-                post_reset_base + (6 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
+                post_reset_base + (7 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
                 lambda _target, _item: bytes([0x10, SESSION_DEFAULT]),
                 lambda target, _item: f"{target_node_name(target)}: Default Session after coding",
             ),
@@ -4438,9 +4827,24 @@ class FcdApp:
         bus = bus_category(target.get("bus_type", "UNKNOWN"))
         if bus == "ETHERNET":
             return
+        extended = target.get("extended_diag_address", "")
+        if not extended:
+            extended = default_extended_diag_address(target.get("node_name", ""), target.get("bus_type", "UNKNOWN"))
+            target["extended_diag_address"] = extended
+        node_key = (bus, parse_int(extended) & 0xFF)
         now = time.monotonic()
-        last = self.routed_bus_last_request_ts.get(bus, 0.0)
-        wait = REQUEST_SPACING_SECONDS - (now - last)
+        with self.routed_bus_pace_lock:
+            last_node = self.routed_node_last_request_ts.get(node_key, 0.0)
+            last_bus = self.routed_bus_last_request_ts.get(bus, 0.0)
+        node_spacing = ROUTED_LIN_REQUEST_SPACING_SECONDS if bus == "LIN" else REQUEST_SPACING_SECONDS
+        node_wait = node_spacing - (now - last_node)
+        bus_spacing = (
+            ROUTED_LIN_REQUEST_SPACING_SECONDS
+            if bus == "LIN"
+            else ROUTED_READ_CODING_NODE_STAGGER_SECONDS
+        )
+        bus_wait = bus_spacing - (now - last_bus)
+        wait = max(node_wait, bus_wait)
         if wait > 0:
             time.sleep(wait)
 
@@ -4454,6 +4858,22 @@ class FcdApp:
                 semaphore = threading.BoundedSemaphore(ROUTED_BUS_MAX_IN_FLIGHT)
                 self.routed_bus_semaphores[bus] = semaphore
         return bus, semaphore
+
+    def _routed_node_semaphore(self, target):
+        bus = bus_category(target.get("bus_type", "UNKNOWN"))
+        if bus == "ETHERNET":
+            return None, None
+        extended = target.get("extended_diag_address", "")
+        if not extended:
+            extended = default_extended_diag_address(target.get("node_name", ""), target.get("bus_type", "UNKNOWN"))
+            target["extended_diag_address"] = extended
+        key = (bus, parse_int(extended) & 0xFF)
+        with self.routed_bus_pace_lock:
+            semaphore = self.routed_node_semaphores.get(key)
+            if semaphore is None:
+                semaphore = threading.BoundedSemaphore(ROUTED_NODE_MAX_IN_FLIGHT)
+                self.routed_node_semaphores[key] = semaphore
+        return key, semaphore
 
     def _recover_routed_client_after_accepted_error(self, client, node_name, name, exc):
         if not isinstance(client, DoipClient):
@@ -4518,6 +4938,7 @@ class FcdApp:
                 self.log(f"DRY {name}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
                 return b""
             bus, bus_semaphore = self._routed_bus_semaphore(target)
+            _node_key, node_semaphore = self._routed_node_semaphore(target)
 
             def do_send():
                 attempt = 0
@@ -4580,8 +5001,9 @@ class FcdApp:
 
             if bus_semaphore is None:
                 return do_send()
-            with bus_semaphore:
-                return do_send()
+            with node_semaphore:
+                with bus_semaphore:
+                    return do_send()
 
         send.dry_run = getattr(base_send, "dry_run", effective_dry)
         return send
@@ -4590,6 +5012,7 @@ class FcdApp:
         prefix = f"{node_name}: {phase}: " if phase else f"{node_name}: "
         start_label = f"{prefix}Read Coding start"
         result_label = f"{prefix}Read Coding result"
+        self._ensure_coding_session_for_routine(send, start_label)
         start_resp = send(
             b"\x31\x01" + struct.pack(">H", rid),
             start_label,
@@ -4618,6 +5041,7 @@ class FcdApp:
             if remaining <= 0:
                 raise FcdError(f"{prefix}Read Coding did not finish before timeout")
             time.sleep(min(0.2, remaining))
+            self._ensure_coding_session_for_routine(send, result_label)
             result_resp = send(
                 b"\x31\x03" + struct.pack(">H", rid),
                 result_label,
@@ -4640,7 +5064,6 @@ class FcdApp:
         client = self._coding_worker_client(target)
         try:
             send = self._make_target_uds_sender(client, target, dry=False)
-            self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session")
             result_resp = self._request_read_coding_routine(send, rid, node_name, timeout=20.0)
             if not result_resp:
                 if self._target_is_simulated(target):
@@ -4716,7 +5139,7 @@ class FcdApp:
             if not self._target_is_simulated(target):
                 self._recover_doip_after_reset(client, f"{node_name} after coding", require_current_client=False)
             send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
-            self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session after coding reset")
+            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session after coding reset requested as 10 41")
             self._read_post_coding_status_for_target(send, target, "After Coding Reset", required=strict_response)
             self._read_back_coding_for_target(
                 send,
@@ -4804,7 +5227,7 @@ class FcdApp:
                 send = self._make_uds_sender(client, dry=False)
 
                 # --- Read back the standard status and the persisted coding ---
-                self._send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
+                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session after coding reset requested as 10 41")
                 self._read_coding_app_status(send, "Code ECU", required=True)
                 for did, name in [
                     (DID_APP_SW_VERSION, "Read Software Version F101"),
@@ -4813,16 +5236,7 @@ class FcdApp:
                 ]:
                     send(b"\x22" + struct.pack(">H", did), f"Code ECU: {name}")
 
-                send(
-                    b"\x31\x01" + struct.pack(">H", read_rid),
-                    "RoutineControl 0203 Read Coding start",
-                    timeout=10.0,
-                )
-                result_resp = send(
-                    b"\x31\x03" + struct.pack(">H", read_rid),
-                    "RoutineControl 0203 Read Coding result",
-                    timeout=10.0,
-                )
+                result_resp = self._request_read_coding_routine(send, read_rid, "Code ECU", timeout=10.0)
                 coding_payload = self._parse_read_coding_result(result_resp)
                 self.root.after(0, self._load_mask_to_coding_tree, coding_payload)
 
@@ -5015,12 +5429,12 @@ class FcdApp:
             }
             self._insert_generator_row(row)
 
-    def discover_nodes_clicked(self):
-        try:
-            self.discovered_nodes, self.discovery_logs = discover_nodes(SCRIPT_DIR.parent.parent)
-        except Exception as exc:
-            messagebox.showerror(APP_NAME, f"Node discovery failed: {exc}")
-            return
+    def discover_nodes_startup(self):
+        self.discover_nodes_clicked(startup=True)
+
+    def _apply_discovered_nodes(self, discovered_nodes, discovery_logs):
+        self.discovered_nodes = discovered_nodes
+        self.discovery_logs = discovery_logs
         self.node_rows = {}
         self.node_tree.delete(*self.node_tree.get_children())
         persisted_nodes = self.settings.get("data_editor", {}).get("nodes", {})
@@ -5050,6 +5464,33 @@ class FcdApp:
         for line in self.discovery_logs:
             self.log(f"Node discovery: {line}")
         self.log(f"Node discovery: {len(self.discovered_nodes)} nodes")
+
+    def discover_nodes_clicked(self, startup=False):
+        with self.discovery_lock:
+            if self.discovery_running:
+                if not startup:
+                    self.log("Node discovery: skipped; discovery already running")
+                return
+            self.discovery_running = True
+
+        def run():
+            try:
+                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parent.parent)
+            except Exception as exc:
+                def handle_error():
+                    if startup:
+                        self.log(f"Node discovery: ERROR: {exc}")
+                    else:
+                        messagebox.showerror(APP_NAME, f"Node discovery failed: {exc}")
+
+                self.root.after(0, handle_error)
+            else:
+                self.root.after(0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs))
+            finally:
+                with self.discovery_lock:
+                    self.discovery_running = False
+
+        threading.Thread(target=run, daemon=True).start()
 
     def _refresh_connection_node_tree(self):
         if not hasattr(self, "connection_node_tree"):
@@ -5322,7 +5763,9 @@ class FcdApp:
             ordered_rows = [self.generator_rows[iid] for iid in self.generator_tree.get_children() if iid in self.generator_rows]
             for row in ordered_rows:
                 hex_path = Path(row["hex"])
-                ecu_name = ecu_name_from_hex_stem(row.get("ecu") or hex_path.stem)
+                source_ecu_name = str(row.get("ecu") or hex_path.stem).strip()
+                ecu_name = ecu_name_from_hex_stem(source_ecu_name)
+                flash_kind = "FBL" if "FBL" in source_ecu_name.upper() else "APPL"
                 segments = parse_intel_hex(hex_path)
                 if not segments:
                     raise FcdError(f"No data records in {hex_path}")
@@ -5378,6 +5821,7 @@ class FcdApp:
                         "file": str(Path("payloads") / name),
                         "source_hex": str(hex_path),
                         "source_address": int_hex(segment.address, 8),
+                        "flash_kind": flash_kind,
                     }
                     payloads.append(payload_entry)
                     bundle_payload_files.append((payload_path, str(Path("payloads") / name)))
@@ -5389,6 +5833,7 @@ class FcdApp:
                             "file": payload_entry["file"],
                             "source_hex": payload_entry["source_hex"],
                             "source_address": payload_entry["source_address"],
+                            "flash_kind": payload_entry["flash_kind"],
                         }
                     )
                     ecu_segment = {key: value for key, value in payload_entry.items() if key != "data_base64"}
@@ -5820,9 +6265,9 @@ class FcdApp:
         return max(8, min(max_chunk_size, configured_block_size))
 
     def _payloads_total_packets(self, payloads):
-        # Progress is tracked in TransferData packets, not raw bytes. Routed nodes
-        # use 256-byte chunks while ZGW uses ~4 KB chunks, so byte-weighting made the
-        # green bar crawl through the long routed phase and only fill during ZGW.
+        # Progress is tracked in TransferData packets, not raw bytes. The effective
+        # data chunk is derived from the 256-byte diagnostic packet limit, so
+        # byte-weighting can make small packets look stalled on larger payloads.
         # Counting packets keeps the bar advancing in step with what is being sent.
         total = 0
         for payload in payloads:
@@ -5884,7 +6329,8 @@ class FcdApp:
         manifest = self.package_manifest or {}
         by_node = {}
         for payload in payloads:
-            by_node.setdefault(payload.get("ecu", payload.get("node_name", "")), []).append(payload)
+            node_key = payload.get("node_name") or ecu_name_from_hex_stem(payload.get("ecu", ""))
+            by_node.setdefault(node_key, []).append(payload)
         targets = {t.get("node_name", ""): t for t in manifest.get("targets", [])}
         start_time = time.monotonic()
         progress_cb, complete_progress = self._make_package_progress(
@@ -5902,20 +6348,11 @@ class FcdApp:
             non_zgw_flash_events = [e for e in flash_events if not e.get("is_zgw")]
             zgw_flash_events = [e for e in flash_events if e.get("is_zgw")]
 
-            self._execute_parallel_flash_phase(
+            self._execute_non_zgw_flash_by_bus(
                 non_zgw_flash_events,
                 by_node,
                 targets,
                 progress_cb,
-                is_fbl=True,
-                strict_response=strict_response,
-            )
-            self._execute_parallel_flash_phase(
-                non_zgw_flash_events,
-                by_node,
-                targets,
-                progress_cb,
-                is_fbl=False,
                 strict_response=strict_response,
             )
             if self.flash_coding_var.get():
@@ -5957,11 +6394,75 @@ class FcdApp:
             if keepalive_was_on and completed and not self.worker_stop.is_set():
                 self.start_keepalive()
 
-    def _execute_parallel_flash_phase(self, events, by_node, targets, progress_cb, is_fbl, strict_response=False):
-        phase_name = "FBL" if is_fbl else "APP"
+    def _execute_non_zgw_flash_by_bus(self, events, by_node, targets, progress_cb, strict_response=False):
+        by_bus = {}
+        for event in events:
+            by_bus.setdefault(bus_category(event.get("bus_type", "UNKNOWN")), []).append(event)
+        if not by_bus:
+            return
+
+        if self.dry_run_var.get():
+            fbl_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=True)
+            app_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=False)
+            phase_lanes = {}
+            for bus, tasks in fbl_lanes.items():
+                phase_lanes.setdefault(bus, []).extend(("FBL", True, slot, work) for slot, work in tasks)
+            for bus, tasks in app_lanes.items():
+                phase_lanes.setdefault(bus, []).extend(("APP", False, slot, work) for slot, work in tasks)
+            if phase_lanes and all(
+                self._can_run_paced_flash_slot(work)
+                for tasks in phase_lanes.values()
+                for _phase_name, _is_fbl, _slot, work in tasks
+            ):
+                client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+                try:
+                    client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                    client.drain()
+                    self.log(
+                        "Execute Parallel Bundle: non-ZGW flash uses one DoIP TCP connection "
+                        "for independent routed bus lanes"
+                    )
+                    self._execute_paced_simulated_flash_phase_lanes(
+                        phase_lanes,
+                        client,
+                        progress_cb,
+                    )
+                finally:
+                    client.close()
+                return
+
+        def run_bus(bus_events):
+            self._execute_parallel_flash_phase(
+                bus_events,
+                by_node,
+                targets,
+                progress_cb,
+                is_fbl=True,
+                strict_response=strict_response,
+            )
+            self._execute_parallel_flash_phase(
+                bus_events,
+                by_node,
+                targets,
+                progress_cb,
+                is_fbl=False,
+                strict_response=strict_response,
+            )
+
+        if len(by_bus) == 1:
+            run_bus(next(iter(by_bus.values())))
+            return
+
+        with ThreadPoolExecutor(max_workers=max(1, min(len(by_bus), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+            futures = [executor.submit(run_bus, bus_events) for bus_events in by_bus.values()]
+            for future in as_completed(futures):
+                future.result()
+
+    def _collect_parallel_flash_lanes(self, events, by_node, targets, is_fbl):
+        lanes = {}
         for slot in sorted({e.get("time_slot", 0) for e in events}):
             slot_events = [e for e in events if e.get("time_slot", 0) == slot]
-            work = []
+            work_by_bus = {}
             for event in slot_events:
                 node_name = event.get("node_name", "")
                 node_payloads = [
@@ -5970,30 +6471,98 @@ class FcdApp:
                 ]
                 node_payloads = self._unique_payloads(node_payloads)
                 if node_payloads:
-                    work.append((node_name, node_payloads, targets.get(node_name, {})))
-            if not work:
-                continue
-            self.log(f"Execute Parallel Bundle: {phase_name} slot {slot} nodes={', '.join(item[0] for item in work)}")
-            if self.dry_run_var.get() and self._can_run_paced_flash_slot(work):
-                client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                try:
-                    self._execute_paced_simulated_flash_slot(slot, work, client, progress_cb, is_fbl)
-                finally:
-                    client.close()
-                continue
-            with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-                futures = [
-                    executor.submit(
-                        self._execute_payloads_parallel_worker,
-                        node_payloads,
-                        target,
-                        progress_cb,
-                        self._strict_response_for_target(target, strict_response),
-                    )
-                    for _node_name, node_payloads, target in work
-                ]
-                for future in as_completed(futures):
-                    future.result()
+                    target = targets.get(node_name, {})
+                    bus = bus_category(target.get("bus_type") or event.get("bus_type", "UNKNOWN"))
+                    work_by_bus.setdefault(bus, []).append((node_name, node_payloads, target))
+            for bus, work in work_by_bus.items():
+                lanes.setdefault(bus, []).append((slot, work))
+        return lanes
+
+    def _execute_parallel_flash_phase(self, events, by_node, targets, progress_cb, is_fbl, strict_response=False):
+        phase_name = "FBL" if is_fbl else "APP"
+        lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl)
+
+        if not lanes:
+            return
+
+        lane_text = ", ".join(
+            f"{bus}:{len(tasks)} slot(s)"
+            for bus, tasks in sorted(lanes.items())
+        )
+        self.log(f"Execute Parallel Bundle: {phase_name} bus lanes={lane_text}")
+
+        if self.dry_run_var.get() and self._can_run_paced_flash_lanes(lanes):
+            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            try:
+                client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                client.drain()
+                self.log(
+                    f"Execute Parallel Bundle: {phase_name} uses one DoIP TCP connection "
+                    "for routed bus schedule"
+                )
+                self._execute_paced_simulated_flash_lanes(
+                    phase_name,
+                    lanes,
+                    client,
+                    progress_cb,
+                    is_fbl,
+                )
+            finally:
+                client.close()
+            return
+
+        def run_lane(bus, tasks):
+            for slot, work in tasks:
+                self._execute_parallel_flash_slot_work(
+                    phase_name,
+                    slot,
+                    bus,
+                    work,
+                    progress_cb,
+                    is_fbl,
+                    strict_response,
+                )
+
+        if len(lanes) == 1:
+            bus, tasks = next(iter(lanes.items()))
+            run_lane(bus, tasks)
+            return
+
+        with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+            futures = [
+                executor.submit(run_lane, bus, tasks)
+                for bus, tasks in lanes.items()
+            ]
+            for future in as_completed(futures):
+                future.result()
+
+    def _execute_parallel_flash_slot_work(self, phase_name, slot, bus, work, progress_cb, is_fbl, strict_response):
+        if not work:
+            return
+        self.log(
+            f"Execute Parallel Bundle: {phase_name} slot {slot} bus={bus} "
+            f"nodes={', '.join(item[0] for item in work)}"
+        )
+        if self.dry_run_var.get() and self._can_run_paced_flash_slot(work):
+            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            try:
+                self._execute_paced_simulated_flash_slot(slot, work, client, progress_cb, is_fbl)
+            finally:
+                client.close()
+            return
+        with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+            futures = [
+                executor.submit(
+                    self._execute_payloads_parallel_worker,
+                    node_payloads,
+                    target,
+                    progress_cb,
+                    self._strict_response_for_target(target, strict_response),
+                )
+                for _node_name, node_payloads, target in work
+            ]
+            for future in as_completed(futures):
+                future.result()
 
     def _unique_payloads(self, payloads):
         unique = []
@@ -6028,6 +6597,179 @@ class FcdApp:
                 return False
         return True
 
+    def _can_run_paced_flash_lanes(self, lanes):
+        if not lanes:
+            return False
+        for tasks in lanes.values():
+            for _slot, work in tasks:
+                if not self._can_run_paced_flash_slot(work):
+                    return False
+        return True
+
+    def _execute_paced_simulated_flash_lanes(self, phase_name, lanes, client, progress_cb, is_fbl):
+        bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
+        start_time = time.monotonic()
+        next_due_by_bus = {}
+        events = []
+        order = 0
+
+        if "LIN" in lanes:
+            self.log(
+                "Execute Parallel Bundle: LIN routed flash pacing "
+                f"{int(ROUTED_LIN_REQUEST_SPACING_SECONDS * 1000)} ms; "
+                "other bus lanes continue independently on the shared DoIP connection"
+            )
+
+        for bus in sorted(lanes, key=lambda item: bus_order.get(item, 99)):
+            lane_start = start_time
+            for slot, work in sorted(lanes[bus], key=lambda item: item[0]):
+                prepared = []
+                for node_name, payloads, target in work:
+                    sequence = self._simulated_flash_request_sequence(node_name, payloads, target, is_fbl)
+                    if sequence:
+                        prepared.append((node_name, payloads, target, sequence))
+                if not prepared:
+                    continue
+
+                self.log(
+                    f"Execute Parallel Bundle: {phase_name} slot {slot} bus={bus} "
+                    f"nodes={', '.join(item[0] for item in prepared)}"
+                )
+
+                max_steps = max(len(item[3]) for item in prepared)
+                for step_index in range(max_steps):
+                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(prepared):
+                        if step_index >= len(sequence):
+                            continue
+                        request, label, progress_count = sequence[step_index]
+                        if request is None:
+                            continue
+                        desired_due = (
+                            lane_start
+                            + (step_index * ROUTED_READ_CODING_SERVICE_GAP_SECONDS)
+                            + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
+                        )
+                        due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
+                        events.append((
+                            due,
+                            bus_order.get(bus, 99),
+                            slot,
+                            node_index,
+                            order,
+                            bus,
+                            target,
+                            bytes(request),
+                            label,
+                            progress_count,
+                        ))
+                        order += 1
+
+                lane_start += (
+                    max_steps * ROUTED_READ_CODING_SERVICE_GAP_SECONDS
+                    + max(0, len(prepared) - 1) * ROUTED_READ_CODING_NODE_STAGGER_SECONDS
+                    + ROUTED_READ_CODING_DRAIN_SECONDS
+                )
+
+        expected_requests = []
+        for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+            self._sleep_until_monotonic(due)
+            if progress_count and progress_cb is not None:
+                progress_cb(progress_count)
+            prefixed_request = self._send_routed_uds_no_wait(
+                client,
+                target,
+                request,
+                label,
+                apply_pacing=(bus != "LIN"),
+            )
+            expected_requests.append((label, prefixed_request, self._target_is_simulated(target)))
+
+        self._wait_routed_transport_acks(client, expected_requests)
+        time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
+        client.drain()
+
+    def _execute_paced_simulated_flash_phase_lanes(self, phase_lanes, client, progress_cb):
+        bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
+        start_time = time.monotonic()
+        next_due_by_bus = {}
+        events = []
+        order = 0
+
+        if "LIN" in phase_lanes:
+            self.log(
+                "Execute Parallel Bundle: LIN routed flash pacing "
+                f"{int(ROUTED_LIN_REQUEST_SPACING_SECONDS * 1000)} ms; "
+                "CAN/CANFD lanes continue independently on the shared DoIP connection"
+            )
+
+        for bus in sorted(phase_lanes, key=lambda item: bus_order.get(item, 99)):
+            lane_start = start_time
+            for phase_name, is_fbl, slot, work in sorted(phase_lanes[bus], key=lambda item: (item[2], 0 if item[1] else 1)):
+                prepared = []
+                for node_name, payloads, target in work:
+                    sequence = self._simulated_flash_request_sequence(node_name, payloads, target, is_fbl)
+                    if sequence:
+                        prepared.append((node_name, payloads, target, sequence))
+                if not prepared:
+                    continue
+
+                self.log(
+                    f"Execute Parallel Bundle: {phase_name} slot {slot} bus={bus} "
+                    f"nodes={', '.join(item[0] for item in prepared)}"
+                )
+
+                max_steps = max(len(item[3]) for item in prepared)
+                for step_index in range(max_steps):
+                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(prepared):
+                        if step_index >= len(sequence):
+                            continue
+                        request, label, progress_count = sequence[step_index]
+                        if request is None:
+                            continue
+                        desired_due = (
+                            lane_start
+                            + (step_index * ROUTED_READ_CODING_SERVICE_GAP_SECONDS)
+                            + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
+                        )
+                        due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
+                        events.append((
+                            due,
+                            bus_order.get(bus, 99),
+                            slot,
+                            node_index,
+                            order,
+                            bus,
+                            target,
+                            bytes(request),
+                            label,
+                            progress_count,
+                        ))
+                        order += 1
+
+                lane_start += (
+                    max_steps * ROUTED_READ_CODING_SERVICE_GAP_SECONDS
+                    + max(0, len(prepared) - 1) * ROUTED_READ_CODING_NODE_STAGGER_SECONDS
+                    + ROUTED_READ_CODING_DRAIN_SECONDS
+                )
+
+        expected_requests = []
+        for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+            self._sleep_until_monotonic(due)
+            if progress_count and progress_cb is not None:
+                progress_cb(progress_count)
+            prefixed_request = self._send_routed_uds_no_wait(
+                client,
+                target,
+                request,
+                label,
+                apply_pacing=(bus != "LIN"),
+            )
+            expected_requests.append((label, prefixed_request, self._target_is_simulated(target)))
+
+        self._wait_routed_transport_acks(client, expected_requests)
+        time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
+        client.drain()
+
     def _execute_paced_simulated_flash_slot(self, slot, work, client, progress_cb, is_fbl):
         prepared = []
         for node_name, payloads, target in work:
@@ -6046,18 +6788,27 @@ class FcdApp:
         bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
         ordered_buses = sorted(groups, key=lambda bus: bus_order.get(bus, 99))
         max_depth = max(len(items) for items in groups.values())
-        max_steps = max(len(item[3]) for item in prepared)
+        max_steps = 0
+        for items in groups.values():
+            max_steps = max(max_steps, max(len(item[3]) for item in items))
         start_time = time.monotonic()
-        sends_since_drain = 0
+        if "LIN" in groups:
+            self.log(
+                "Execute Parallel Bundle: LIN routed flash pacing "
+                f"{int(ROUTED_LIN_REQUEST_SPACING_SECONDS * 1000)} ms; "
+                "other bus lanes continue independently"
+            )
 
+        next_due_by_bus = {}
+        events = []
+        order = 0
         for step_index in range(max_steps):
             for node_index in range(max_depth):
-                due = (
+                desired_due = (
                     start_time
                     + (step_index * ROUTED_READ_CODING_SERVICE_GAP_SECONDS)
                     + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
                 )
-                self._sleep_until_monotonic(due)
                 for bus in ordered_buses:
                     items = groups[bus]
                     if node_index >= len(items):
@@ -6068,13 +6819,39 @@ class FcdApp:
                     request, label, progress_count = sequence[step_index]
                     if request is None:
                         continue
-                    if progress_count and progress_cb is not None:
-                        progress_cb(progress_count)
-                    self._send_routed_uds_no_wait(client, target, request, label)
-                    sends_since_drain += 1
-                    if sends_since_drain >= ROUTED_FLASH_DRAIN_EVERY_SENDS:
-                        client.drain()
-                        sends_since_drain = 0
+                    due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
+                    events.append((
+                        due,
+                        bus_order.get(bus, 99),
+                        node_index,
+                        order,
+                        bus,
+                        target,
+                        bytes(request),
+                        label,
+                        progress_count,
+                    ))
+                    order += 1
+
+        expected_requests = []
+        for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+            self._sleep_until_monotonic(due)
+            if progress_count and progress_cb is not None:
+                progress_cb(progress_count)
+            prefixed_request = self._send_routed_uds_no_wait(
+                client,
+                target,
+                request,
+                label,
+                apply_pacing=(bus != "LIN"),
+            )
+            # Simulated routed targets are allowed to stay silent after the
+            # ZGW-forwarded request, regardless of bus. LIN simulations can
+            # sometimes acknowledge one step and then omit the next, which
+            # should not fail a non-strict paced read/flash flow.
+            no_response_only = self._target_is_simulated(target)
+            expected_requests.append((label, prefixed_request, no_response_only))
+        self._wait_routed_transport_acks(client, expected_requests)
 
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
         client.drain()
@@ -6096,10 +6873,6 @@ class FcdApp:
         add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Default Session before flash")
         add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session before flash")
         add_status(f"{node_name}: Flash preamble")
-        add(
-            b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_FBL_INTERFACE) + bytes([FBL_INTERFACE_DOIP]),
-            f"{node_name}: RoutineControl 0205 Select Communication Interface Ethernet",
-        )
         add(b"\x28\x01", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: Programming Session")
@@ -6264,11 +7037,6 @@ class FcdApp:
         self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session before flash")
         self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash")
         self._read_standard_status(send, f"{node_name}: Flash preamble")
-        send(
-            b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_FBL_INTERFACE) + bytes([FBL_INTERFACE_DOIP]),
-            f"{node_name}: RoutineControl 0205 Select Communication Interface Ethernet",
-            timeout=10.0,
-        )
         send(b"\x28\x01", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
@@ -6310,47 +7078,113 @@ class FcdApp:
             coding_events = [e for e in coding_events if e.get("is_zgw")]
         elif not include_zgw:
             coding_events = [e for e in coding_events if not e.get("is_zgw")]
-        shared_client = None
+        lanes = {}
+        for slot in sorted({e.get("time_slot", 0) for e in coding_events}):
+            events = [e for e in coding_events if e.get("time_slot", 0) == slot]
+            work_by_bus = {}
+            for event in events:
+                target = targets.get(event.get("node_name", ""), {})
+                if not target.get("coding_descriptor"):
+                    continue
+                bus = bus_category(target.get("bus_type") or event.get("bus_type", "UNKNOWN"))
+                work_by_bus.setdefault(bus, []).append((event, target))
+            for bus, work in work_by_bus.items():
+                lanes.setdefault(bus, []).append((slot, work))
+
+        if not lanes:
+            return
+
+        lane_text = ", ".join(
+            f"{bus}:{len(tasks)} slot(s)"
+            for bus, tasks in sorted(lanes.items())
+        )
+        self.log(f"Execute Parallel Bundle: coding bus lanes={lane_text}")
+
+        shared_paced_client = None
+
+        def run_lane(bus, tasks):
+            for slot, work in tasks:
+                self._execute_parallel_coding_slot_work(
+                    slot,
+                    bus,
+                    work,
+                    shared_paced_client,
+                    strict_response,
+                )
+
         try:
-            for slot in sorted({e.get("time_slot", 0) for e in coding_events}):
-                events = [e for e in coding_events if e.get("time_slot", 0) == slot]
-                work = []
-                for event in events:
-                    target = targets.get(event.get("node_name", ""), {})
-                    if target.get("coding_descriptor"):
-                        work.append((event, target))
-                if not work:
-                    continue
+            if (
+                self.transport_var.get() == "DoIP"
+                and self.dry_run_var.get()
+                and any(
+                    self._can_run_paced_coding_slot("Code Vehicle", work)
+                    for tasks in lanes.values()
+                    for _slot, work in tasks
+                )
+            ):
+                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_paced_client.drain()
+                self.log("Execute Parallel Bundle: coding uses one DoIP TCP connection for routed bus schedule")
 
-                if (
-                    self.transport_var.get() == "DoIP"
-                    and self.dry_run_var.get()
-                    and self._can_run_paced_coding_slot("Code Vehicle", work)
-                ):
-                    if shared_client is None:
-                        shared_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                        shared_client.request_spacing_seconds = max(shared_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
-                        shared_client.drain()
-                        self.log("Execute Parallel Bundle: coding uses one DoIP TCP connection for routed parallel requests")
-                    nodes = ", ".join(f"{event.get('node_name', '')}({event.get('bus_type', 'UNKNOWN')})" for event, _target in work)
-                    self.log(f"Execute Parallel Bundle: coding slot {slot} parallel nodes={nodes}")
-                    self._run_paced_code_vehicle_slot(slot, work, shared_client)
-                    continue
+            if len(lanes) == 1:
+                bus, tasks = next(iter(lanes.items()))
+                run_lane(bus, tasks)
+                return
 
-                with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-                    futures = [
-                        executor.submit(
-                            self._execute_coding_descriptor_worker,
-                            target,
-                            self._strict_response_for_target(target, strict_response),
-                        )
-                        for _event, target in work
-                    ]
-                    for future in as_completed(futures):
-                        future.result()
+            with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                futures = [
+                    executor.submit(run_lane, bus, tasks)
+                    for bus, tasks in lanes.items()
+                ]
+                for future in as_completed(futures):
+                    future.result()
         finally:
-            if shared_client is not None:
-                shared_client.close()
+            if shared_paced_client is not None:
+                shared_paced_client.close()
+
+    def _execute_parallel_coding_slot_work(self, slot, bus, work, shared_client, strict_response=False):
+        if not work:
+            return shared_client
+
+        if (
+            self.transport_var.get() == "DoIP"
+            and self.dry_run_var.get()
+            and self._can_run_paced_coding_slot("Code Vehicle", work)
+        ):
+            owns_client = False
+            if shared_client is None:
+                shared_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+                shared_client.request_spacing_seconds = max(shared_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_client.drain()
+                owns_client = True
+                self.log(f"Execute Parallel Bundle: coding bus={bus} uses one DoIP TCP connection for routed requests")
+            nodes = ", ".join(f"{event.get('node_name', '')}({event.get('bus_type', 'UNKNOWN')})" for event, _target in work)
+            self.log(f"Execute Parallel Bundle: coding slot {slot} bus={bus} parallel nodes={nodes}")
+            try:
+                self._run_paced_code_vehicle_slot(slot, work, shared_client)
+            finally:
+                if owns_client:
+                    shared_client.close()
+                    shared_client = None
+            return shared_client
+
+        self.log(
+            f"Execute Parallel Bundle: coding slot {slot} bus={bus} "
+            f"nodes={', '.join(event.get('node_name', '') for event, _target in work)}"
+        )
+        with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+            futures = [
+                executor.submit(
+                    self._execute_coding_descriptor_worker,
+                    target,
+                    self._strict_response_for_target(target, strict_response),
+                )
+                for _event, target in work
+            ]
+            for future in as_completed(futures):
+                future.result()
+        return shared_client
 
     def _execute_coding_descriptor_worker(self, target, strict_response=False):
         descriptor = target.get("coding_descriptor", {})
@@ -6374,6 +7208,9 @@ class FcdApp:
                 client.close()
 
     def _payload_is_fbl(self, payload):
+        flash_kind = str(payload.get("flash_kind", "")).strip().upper()
+        if flash_kind:
+            return flash_kind == "FBL"
         name = str(payload.get("ecu", "") + " " + payload.get("file", "")).upper()
         address = parse_int(payload.get("address", "0"))
         return "FBL" in name or address < DEFAULT_APP_START
@@ -6513,11 +7350,6 @@ class FcdApp:
         self._send_session(send, SESSION_DEFAULT, "Default Session")
         self._send_session(send, SESSION_EXTENDED, "Extended Session")
         self._read_standard_status(send, "Preamble")
-        send(
-            b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_FBL_INTERFACE) + bytes([FBL_INTERFACE_DOIP]),
-            "RoutineControl 0205 Select Communication Interface Ethernet",
-            timeout=10.0,
-        )
         send(b"\x28\x01", "CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", "ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, "Programming Session")
@@ -6566,8 +7398,7 @@ class FcdApp:
 
     def _execute_final_readback(self, client):
         send = self._make_uds_sender(client)
-        self._send_session(send, SESSION_DEFAULT, "Default Session after coding reset")
-        self._send_session(send, SESSION_EXTENDED, "Extended Session after coding reset")
+        self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session after coding reset requested as 10 41")
         self._read_coding_app_status(send, "Final", required=True)
         for did, name in [
             (DID_APP_SW_VERSION, "Read Software Version F101"),
@@ -6600,22 +7431,27 @@ class FcdApp:
             raise FcdError(f"{payload['ecu']}: payload size mismatch {len(data)} != {size}")
         if (binascii.crc32(data) & 0xFFFFFFFF) != expected_crc:
             raise FcdError(f"{payload['ecu']}: payload CRC mismatch")
-        if isinstance(client, DoipClient):
-            target_is_zgw = bool(target_info.get("is_zgw")) or str(target_info.get("node_name", "")).upper() == "ZGW"
-            if target_is_zgw:
-                client.target_addr = target
+        target_is_zgw = bool(target_info.get("is_zgw")) or str(target_info.get("node_name", "")).upper() == "ZGW"
+        if isinstance(client, DoipClient) and target_is_zgw:
+            client.target_addr = target
 
         configured_block_size = parse_int(self.block_size_var.get())
         routed_target = bool(target_info) and not (
             bool(target_info.get("is_zgw")) or str(target_info.get("node_name", "")).upper() == "ZGW"
         )
-        max_chunk_size = ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target else TRANSFER_DATA_MAX_CHUNK_SIZE
-        block_size = max(8, min(max_chunk_size, configured_block_size))
+        if target_is_zgw:
+            max_chunk_size = ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE
+            transfer_request_limit = ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT
+            block_size = max_chunk_size
+        else:
+            max_chunk_size = ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target else TRANSFER_DATA_MAX_CHUNK_SIZE
+            transfer_request_limit = TRANSFER_DATA_REQUEST_LIMIT
+            block_size = max(8, min(max_chunk_size, configured_block_size))
         dry = self.dry_run_var.get() and not self._target_is_simulated(target_info)
         block_name = "FBL" if is_fbl else "APPL"
         label = f"{payload['ecu']} {block_name} {int_hex(address, 8)} size={size}"
         block_note = (
-            f"block_data={block_size} transfer_request_limit={TRANSFER_DATA_REQUEST_LIMIT}"
+            f"block_data={block_size} transfer_request_limit={transfer_request_limit}"
         )
         if configured_block_size != block_size:
             block_note += f" configured_block_size={configured_block_size}"

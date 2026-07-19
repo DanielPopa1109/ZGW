@@ -26,7 +26,6 @@
  *
  */
 
-#include <stdlib.h>
 #include <string.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core2 prevents task_core2.h from redefining

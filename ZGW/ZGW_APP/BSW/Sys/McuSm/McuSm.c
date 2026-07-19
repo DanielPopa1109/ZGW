@@ -3,8 +3,6 @@
 #include "IfxCpu_IntrinsicsTasking.h"
 #include "IfxCpu_reg.h"
 #include "IfxPms_reg.h"
-#include "Fls.h"
-#include "Fls_Cfg.h"
 #include "BSW/Time/TimeBase.h"
 
 uint32 McuSm_AGs[12u];
@@ -75,13 +73,6 @@ volatile uint32 McuSm_Trap7DomActiveErr;
 uint8 McuSm_Trap4ScrRtcRecord[SCR_TIME_RECORD_LENGTH];
 volatile uint8 McuSm_Trap4ScrRtcRecordValid;
 volatile uint32 McuSm_Trap4ScrRtcRecordCounter;
-volatile uint32 McuSm_DFlashRecoveryRequest;
-volatile uint32 McuSm_DFlashRecoveryInfo;
-volatile uint32 McuSm_DFlashRecoveryCounter;
-volatile uint32 McuSm_DFlashRecoveryAttemptCounter;
-volatile uint32 McuSm_DFlashRecoverySuppressCounter;
-volatile uint32 McuSm_DFlashRecoveryLastFeeAccessKind;
-volatile uint32 McuSm_DFlashRecoveryLastFeePhysicalAddress;
 volatile uint32 McuSm_ScrStateStoreCounter;
 volatile uint32 McuSm_ScrStateRestoreCounter;
 volatile uint32 McuSm_ScrStateInvalidCounter;
@@ -106,7 +97,6 @@ volatile uint8 debugvar = 0;
 #define MCUSM_ENDINIT_WAIT_LIMIT 100000u
 #define MCUSM_TRAP4_REACTION_NONE 0u
 #define MCUSM_TRAP4_REACTION_XRAM 1u
-#define MCUSM_DFLASH_RECOVERY_MAX_ATTEMPTS 2u
 #define MCUSM_POWERON_RESET_MASK \
         ((uint32)((IFX_SCU_RSTSTAT_STBYR_MSK << IFX_SCU_RSTSTAT_STBYR_OFF) | \
                   (IFX_SCU_RSTSTAT_SWD_MSK << IFX_SCU_RSTSTAT_SWD_OFF) | \
@@ -146,9 +136,6 @@ volatile uint8 debugvar = 0;
 #ifndef MCUSM_DEBUG_HALT_BEFORE_RESET
 #define MCUSM_DEBUG_HALT_BEFORE_RESET 0u
 #endif
-
-extern volatile uint32 Fee_DebugLastFlashAccessKind;
-extern volatile uint32 Fee_DebugLastFlashAccessPhysicalAddress;
 
 typedef struct
 {
@@ -213,13 +200,6 @@ typedef struct
     uint8 trap4ScrRtcRecord[SCR_TIME_RECORD_LENGTH];
     uint8 trap4ScrRtcRecordValid;
     uint32 trap4ScrRtcRecordCounter;
-    uint32 dFlashRecoveryRequest;
-    uint32 dFlashRecoveryInfo;
-    uint32 dFlashRecoveryCounter;
-    uint32 dFlashRecoveryAttemptCounter;
-    uint32 dFlashRecoverySuppressCounter;
-    uint32 dFlashRecoveryLastFeeAccessKind;
-    uint32 dFlashRecoveryLastFeePhysicalAddress;
 } McuSm_RetainedStateType;
 
 typedef char McuSm_RetainedStateFitsScrXram[
@@ -228,7 +208,6 @@ typedef char McuSm_RetainedStateFitsScrXram[
 static McuSm_RetainedStateType McuSm_RetainedStateWork;
 
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd);
-static boolean McuSm_IsDFlashAddress(uint32 address);
 static boolean McuSm_IsScrXramAddress(uint32 address);
 static void McuSm_ZeroFillRange(uint32 rangeStart, uint32 rangeEnd);
 static uint32 McuSm_LoadU32FromBuffer(const uint8 *buffer, uint16 offset);
@@ -245,9 +224,7 @@ static void McuSm_ApplyRetainedState(const McuSm_RetainedStateType *state);
 static void McuSm_CaptureScrRtcRecord(void);
 static uint32 McuSm_GetTrap4ErrorAddress(IfxCpu_Trap trapInfo);
 static uint32 McuSm_Trap4ZeroFillIfRecoverable(uint32 errorAddress);
-static void McuSm_RequestDFlashRecoveryForAddress(uint32 recoveryInfo, uint32 physicalAddress);
 static void McuSm_CaptureTrap7DomError(void);
-static void McuSm_RequestDFlashRecoveryFromFee(void);
 
 #define MCUSM_RECORD_TRAP(trapClass, trapInfo)                 \
         do                                                         \
@@ -273,29 +250,103 @@ void McuSm_ClearResetDtcTriggerData(void)
     McuSm_SafetyKitResetInhibit = 0u;
 }
 
-void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
+void McuSm_ClearResetDataForCleanSleep(void)
 {
-    uint32 cpuDeadd;
+    uint8 index;
+    McuSm_SswStatusData_t sswStatusData = {0u};
 
-    /* Do not clear SMU alarms from the trap/reset path. This can interrupt an
-     * ENDINIT-protected sequence and re-enter safety ENDINIT handling. */
+    McuSm_ClearResetDtcTriggerData();
 
-    if ((resetReason == 7u) &&
-            ((resetInformation == 17u) || (resetInformation == 20u)))
+    McuSm_IndexResetHistory = 0u;
+    for (index = 0u; index < 20u; index++)
     {
-        cpuDeadd = __mfcr(CPU_DEADD);
-        if (McuSm_IsDFlashAddress(cpuDeadd) != FALSE)
-        {
-            McuSm_RequestDFlashRecoveryForAddress(
-                    cpuDeadd & 0x00FFFFFFu,
-                    cpuDeadd);
-        }
-        else
-        {
-            McuSm_RequestDFlashRecoveryFromFee();
-        }
+        McuSm_ResetHistory[index].reason = 0u;
+        McuSm_ResetHistory[index].information = 0u;
     }
 
+    McuSm_FBL_ResetCounter = 0u;
+    McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
+    McuSm_FBL_CommInterface = 0u;
+    McuSm_SswStartupCounter = 0u;
+    McuSm_SafetyKitFailureMask = 0u;
+    McuSm_SafetyKitResetReactionCounter = 0u;
+    McuSm_SafetyKitResetInhibit = 0u;
+    McuSm_SafetyKitFwCheckLastSshFail = 0u;
+    McuSm_SswStatusData = sswStatusData;
+    McuSm_SafetyKitFwCheckResultMask = 0u;
+    McuSm_SafetyKitFwCheckSshActualEccd = 0u;
+    McuSm_SafetyKitFwCheckSshActualFaultsts = 0u;
+    McuSm_SafetyKitFwCheckSshActualErrinfo = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedEccd = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedFaultsts = 0u;
+    McuSm_SafetyKitFwCheckSshExpectedErrinfo = 0u;
+    McuSm_SafetyKitFwCheckLastRegFail = 0u;
+    McuSm_SafetyKitFwCheckRegActual = 0u;
+    McuSm_SafetyKitFwCheckRegExpected = 0u;
+    McuSm_SafetyKitFwCheckRegMask = 0u;
+    McuSm_SafetyKitFwCheckRegResetType = 0u;
+
+    McuSm_LastTrapClass = 0u;
+    McuSm_LastTrapId = 0u;
+    McuSm_LastTrapCoreId = 0u;
+    McuSm_LastTrapTAddr = 0u;
+    McuSm_LastTrapPcxi = 0u;
+    McuSm_LastTrapFcx = 0u;
+    McuSm_LastTrapLcx = 0u;
+    McuSm_LastTrapPsw = 0u;
+    McuSm_TrapCounter = 0u;
+    McuSm_EndinitWaitCounter = 0u;
+    McuSm_EndinitTimeoutCounter = 0u;
+
+    McuSm_Trap4Dstr = 0u;
+    McuSm_Trap4Datr = 0u;
+    McuSm_Trap4Deadd = 0u;
+    McuSm_Trap4Diear = 0u;
+    McuSm_Trap4Dietr = 0u;
+    McuSm_Trap4Piear = 0u;
+    McuSm_Trap4Pietr = 0u;
+    McuSm_Trap4ErrorAddress = 0u;
+    McuSm_Trap4ZeroFillReaction = 0u;
+    McuSm_Trap4ZeroFillReactionCounter = 0u;
+
+    McuSm_Trap7Dstr = 0u;
+    McuSm_Trap7Datr = 0u;
+    McuSm_Trap7Deadd = 0u;
+    McuSm_Trap7Diear = 0u;
+    McuSm_Trap7Dietr = 0u;
+    McuSm_Trap7Piear = 0u;
+    McuSm_Trap7Pietr = 0u;
+    for (index = 0u; index < 12u; index++)
+    {
+        McuSm_AGs[index] = 0u;
+        McuSm_Trap7AgRaw[index] = 0u;
+        McuSm_Trap7AgMasked[index] = 0u;
+    }
+    McuSm_Trap7AgRstRsn = 0u;
+    McuSm_Trap7AgRstInfo = 0u;
+    McuSm_Trap7DomPestat = 0u;
+    McuSm_Trap7DomTidstat = 0u;
+    McuSm_Trap7DomActiveSci = 0u;
+    McuSm_Trap7DomActiveErrAddr = 0u;
+    McuSm_Trap7DomActiveErr = 0u;
+    for (index = 0u; index < 16u; index++)
+    {
+        McuSm_Trap7DomErrAddr[index] = 0u;
+        McuSm_Trap7DomErr[index] = 0u;
+    }
+
+    for (index = 0u; index < SCR_TIME_RECORD_LENGTH; index++)
+    {
+        McuSm_Trap4ScrRtcRecord[index] = 0u;
+    }
+    McuSm_Trap4ScrRtcRecordValid = 0u;
+    McuSm_Trap4ScrRtcRecordCounter = 0u;
+
+    McuSm_PublishFblResetCounter();
+}
+
+void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
+{
     if(McuSm_IndexResetHistory >= 20u)
     {
         McuSm_IndexResetHistory = 0u;
@@ -336,94 +387,6 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd)
 {
     return ((address >= rangeStart) && (address < rangeEnd)) ? TRUE : FALSE;
-}
-
-static boolean McuSm_IsDFlashAddress(uint32 address)
-{
-    return McuSm_IsAddressInRange(
-            address,
-            FLS_DFLASH0_BASE_ADDRESS,
-            FLS_DFLASH0_BASE_ADDRESS + FLS_DFLASH0_TOTAL_SIZE);
-}
-
-static void McuSm_RequestDFlashRecoveryForAddress(uint32 recoveryInfo, uint32 physicalAddress)
-{
-    if (McuSm_DFlashRecoveryRequest != MCUSM_DFLASH_RECOVERY_MAGIC)
-    {
-        McuSm_DFlashRecoveryAttemptCounter = 0u;
-    }
-
-    McuSm_DFlashRecoveryInfo = recoveryInfo;
-    McuSm_DFlashRecoveryLastFeeAccessKind = Fee_DebugLastFlashAccessKind;
-    McuSm_DFlashRecoveryLastFeePhysicalAddress = physicalAddress;
-    McuSm_DFlashRecoveryRequest = MCUSM_DFLASH_RECOVERY_MAGIC;
-    McuSm_DFlashRecoveryCounter++;
-}
-
-void McuSm_RequestDFlashRecovery(uint32 recoveryInfo)
-{
-    McuSm_RequestDFlashRecoveryForAddress(
-            recoveryInfo,
-            Fee_DebugLastFlashAccessPhysicalAddress);
-}
-
-boolean McuSm_IsDFlashRecoveryRequested(void)
-{
-    if (McuSm_DFlashRecoveryRequest == MCUSM_DFLASH_RECOVERY_MAGIC)
-    {
-        return McuSm_IsDFlashAddress(McuSm_DFlashRecoveryLastFeePhysicalAddress);
-    }
-
-    /*
-     * Loop breaker for reset paths where the SMU NMI was raised by the
-     * DFlash bus-error alarm before the explicit recovery marker could be
-     * trusted on the next boot.  Re-scanning Fee after this reset would repeat
-     * the same unsafe DFlash read and stay in cyclic resets.
-     */
-    if ((McuSm_LastResetReason == 7u) &&
-            ((McuSm_LastResetInformation == 17u) || (McuSm_LastResetInformation == 20u)) &&
-            (McuSm_IsDFlashAddress(McuSm_DFlashRecoveryLastFeePhysicalAddress) != FALSE))
-    {
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-void McuSm_ClearDFlashRecoveryRequest(void)
-{
-    McuSm_DFlashRecoveryRequest = 0u;
-    McuSm_DFlashRecoveryInfo = 0u;
-    McuSm_DFlashRecoveryAttemptCounter = 0u;
-    McuSm_DFlashRecoveryLastFeeAccessKind = 0u;
-    McuSm_DFlashRecoveryLastFeePhysicalAddress = 0u;
-}
-
-boolean McuSm_BeginDFlashRecoveryAttempt(void)
-{
-    if (McuSm_IsDFlashRecoveryRequested() == FALSE)
-    {
-        return FALSE;
-    }
-
-    if (McuSm_DFlashRecoveryAttemptCounter >= MCUSM_DFLASH_RECOVERY_MAX_ATTEMPTS)
-    {
-        McuSm_DFlashRecoverySuppressCounter++;
-        return FALSE;
-    }
-
-    McuSm_DFlashRecoveryAttemptCounter++;
-    return TRUE;
-}
-
-static void McuSm_RequestDFlashRecoveryFromFee(void)
-{
-    if (McuSm_IsDFlashAddress(Fee_DebugLastFlashAccessPhysicalAddress) != FALSE)
-    {
-        McuSm_RequestDFlashRecovery(
-                (Fee_DebugLastFlashAccessKind << 24u) |
-                (Fee_DebugLastFlashAccessPhysicalAddress & 0x00FFFFFFu));
-    }
 }
 
 static boolean McuSm_IsScrXramAddress(uint32 address)
@@ -558,7 +521,7 @@ static void McuSm_ScrWriteFblHandoff(uint8 progRequest, uint8 commInterface, uin
 void McuSm_ArmFblProgrammingRequest(void)
 {
     McuSm_ScrWriteFblHandoff(MCUSM_FBL_PROGRAMMING_REQUEST_ACTIVE,
-                             McuSm_FBL_CommInterface,
+                             MCUSM_FBL_COMM_ETHERNET,
                              McuSm_FBL_ResetCounter);
 }
 
@@ -661,13 +624,6 @@ static void McuSm_CaptureRetainedState(McuSm_RetainedStateType *state)
 
     state->trap4ScrRtcRecordValid = McuSm_Trap4ScrRtcRecordValid;
     state->trap4ScrRtcRecordCounter = McuSm_Trap4ScrRtcRecordCounter;
-    state->dFlashRecoveryRequest = McuSm_DFlashRecoveryRequest;
-    state->dFlashRecoveryInfo = McuSm_DFlashRecoveryInfo;
-    state->dFlashRecoveryCounter = McuSm_DFlashRecoveryCounter;
-    state->dFlashRecoveryAttemptCounter = McuSm_DFlashRecoveryAttemptCounter;
-    state->dFlashRecoverySuppressCounter = McuSm_DFlashRecoverySuppressCounter;
-    state->dFlashRecoveryLastFeeAccessKind = McuSm_DFlashRecoveryLastFeeAccessKind;
-    state->dFlashRecoveryLastFeePhysicalAddress = McuSm_DFlashRecoveryLastFeePhysicalAddress;
 }
 
 static void McuSm_ApplyRetainedState(const McuSm_RetainedStateType *state)
@@ -763,13 +719,6 @@ static void McuSm_ApplyRetainedState(const McuSm_RetainedStateType *state)
 
     McuSm_Trap4ScrRtcRecordValid = state->trap4ScrRtcRecordValid;
     McuSm_Trap4ScrRtcRecordCounter = state->trap4ScrRtcRecordCounter;
-    McuSm_DFlashRecoveryRequest = state->dFlashRecoveryRequest;
-    McuSm_DFlashRecoveryInfo = state->dFlashRecoveryInfo;
-    McuSm_DFlashRecoveryCounter = state->dFlashRecoveryCounter;
-    McuSm_DFlashRecoveryAttemptCounter = state->dFlashRecoveryAttemptCounter;
-    McuSm_DFlashRecoverySuppressCounter = state->dFlashRecoverySuppressCounter;
-    McuSm_DFlashRecoveryLastFeeAccessKind = state->dFlashRecoveryLastFeeAccessKind;
-    McuSm_DFlashRecoveryLastFeePhysicalAddress = state->dFlashRecoveryLastFeePhysicalAddress;
 }
 
 void McuSm_SaveRetainedStateToScr(void)
@@ -972,12 +921,6 @@ void McuSm_TRAP4(IfxCpu_Trap trapInfo)
     MCUSM_RECORD_TRAP(4u, trapInfo);
     McuSm_Trap4ErrorAddress = McuSm_GetTrap4ErrorAddress(trapInfo);
 
-    if ((trapInfo.tId == IfxCpu_Trap_Bus_Id_dataMemoryIntegrityError) &&
-            (McuSm_IsDFlashAddress(Fee_DebugLastFlashAccessPhysicalAddress) != FALSE))
-    {
-        McuSm_RequestDFlashRecoveryFromFee();
-    }
-
     if (McuSm_IsScrXramAddress(McuSm_Trap4ErrorAddress) == FALSE)
     {
         TimeBase_CaptureStandbyRtcBeforeScrReset();
@@ -1079,30 +1022,6 @@ void McuSm_TRAP7(IfxCpu_Trap trapInfo)
 
     McuSm_Trap7AgRstRsn = agRstRsn;
     McuSm_Trap7AgRstInfo = agRstInfo;
-    /*
-     * SMU alarms 7/17 (XBAR0 SRI bus error) and 7/20 (SPB bus error) can both
-     * be raised by DFlash access. Classify DFlash recovery from the Fee access
-     * recorder when available, otherwise fall back to CPU_DEADD.  (The DOM0
-     * ERRADDR fallback was removed: that peripheral is not accessible on this
-     * device and reading it aborted the handler before reaching this point.)
-     */
-    if ((agRstRsn == 7u) &&
-            ((agRstInfo == 17u) || (agRstInfo == 20u)) &&
-            ((McuSm_IsDFlashAddress(Fee_DebugLastFlashAccessPhysicalAddress) != FALSE) ||
-                    (McuSm_IsDFlashAddress(McuSm_Trap7Deadd) != FALSE)))
-    {
-        if (McuSm_IsDFlashAddress(Fee_DebugLastFlashAccessPhysicalAddress) != FALSE)
-        {
-            McuSm_RequestDFlashRecoveryFromFee();
-        }
-        else
-        {
-            McuSm_RequestDFlashRecoveryForAddress(
-                    McuSm_Trap7Deadd & 0x00FFFFFFu,
-                    McuSm_Trap7Deadd);
-        }
-    }
-
     McuSm_PerformResetHook(agRstRsn, agRstInfo);
 }
 

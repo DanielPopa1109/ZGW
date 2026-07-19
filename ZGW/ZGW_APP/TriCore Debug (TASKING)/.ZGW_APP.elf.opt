@@ -356,6 +356,8 @@
 "BSW/Com/Ethernet/EthSM.o"
 "BSW/Com/Ethernet/EthStack.o"
 "BSW/Com/Ethernet/EthStack_Cfg.o"
+"BSW/Com/Ethernet/EthernetDiag.o"
+"BSW/Com/Ethernet/EthernetDiag_Cfg.o"
 "BSW/Com/Ethernet/SoAd.o"
 "BSW/Com/Ethernet/SomeIp.o"
 "BSW/Com/Ethernet/SomeIpSd.o"

@@ -33,13 +33,13 @@ static Std_ReturnType CanSM_ApplyMode(uint8 ControllerId, CanSM_ComModeType Mode
     switch (Mode)
     {
         case CANSM_COMM_NO_COMMUNICATION:
-            (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_OFFLINE);
-            ret = Can_SetControllerMode(ControllerId, CAN_SLEEP);
+            /* NoCom only gates upper-layer TX. Keep the controller active so RX
+             * and physical ACK remain present until the ECU enters real sleep. */
+            ret = Can_SetControllerMode(ControllerId, CAN_READY);
 
-            if ((ret == E_OK) &&
-                ((Can_GetControllerMode(ControllerId) == CAN_SLEEP) ||
-                 (Can_GetControllerMode(ControllerId) == CAN_UNINIT)))
+            if ((ret == E_OK) && (Can_GetControllerMode(ControllerId) == CAN_READY))
             {
+                (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_RX_ONLINE);
                 CanSM_Channel[ControllerId].state = CANSM_BSM_NO_COMMUNICATION;
                 CanSM_Channel[ControllerId].currentMode = CANSM_COMM_NO_COMMUNICATION;
                 CanSM_ModeChangeNotification(ControllerId, CANSM_COMM_NO_COMMUNICATION);
@@ -239,8 +239,7 @@ static void CanSM_HandleBusOff(uint8 ControllerId)
         }
         else
         {
-            (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_OFFLINE);
-            (void)Can_SetControllerMode(ControllerId, CAN_SLEEP);
+            (void)CanIf_SetPduMode(ControllerId, CANIF_PDU_MODE_RX_ONLINE);
             CanIf_ControllerRecovered(ControllerId);
             CanSM_Channel[ControllerId].currentMode = CANSM_COMM_NO_COMMUNICATION;
             CanSM_Channel[ControllerId].state = CANSM_BSM_NO_COMMUNICATION;

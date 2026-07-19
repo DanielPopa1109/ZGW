@@ -1,6 +1,7 @@
 #include "TcpIpH.h"
 #include "lwip_geth_private_phy_dp83825i.h"
 #include "lwip_geth_lwip.h"
+#include "EthernetDiag.h"
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "lwip/errno.h"
@@ -18,6 +19,10 @@
 #define TCPIP_TCP_KEEPALIVE_COUNT       3
 #define TCPIP_TCP_SEND_RETRY_LIMIT      4u
 
+#ifndef TCPIPH_DEBUG_INSTRUMENTATION
+#define TCPIPH_DEBUG_INSTRUMENTATION    0
+#endif
+
 typedef struct
 {
     TcpIp_SocketIdType sock;
@@ -33,11 +38,13 @@ volatile uint32 TcpIp_CreateFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockCreateFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockTakeFailCounter = 0u;
 volatile uint32 TcpIp_ApiLockGiveFailCounter = 0u;
+#if TCPIPH_DEBUG_INSTRUMENTATION
 /* Debug only: same recursive-mutex give-fail fingerprint as sys_arch.c. Holder
  * is the task the kernel thinks owns TcpIp_ApiMutex; current is the task that
  * tried to release it. A mismatch points at CB/TCB corruption, not lwIP logic. */
 volatile void *TcpIp_ApiLockGiveFailHolder = NULL;
 volatile void *TcpIp_ApiLockGiveFailCurrent = NULL;
+#endif
 volatile sint32 TcpIp_LastSocketError = 0;
 volatile uint8 TcpIp_LastLinkUp = 0u;
 volatile uint8 TcpIp_LastNetifFlags = 0u;
@@ -116,8 +123,10 @@ static void TcpIp_Unlock(void)
     {
         if (xSemaphoreGiveRecursive_core2(TcpIp_ApiMutex) != pdTRUE_core2)
         {
+#if TCPIPH_DEBUG_INSTRUMENTATION
             TcpIp_ApiLockGiveFailHolder = (void *)xSemaphoreGetMutexHolder_core2(TcpIp_ApiMutex);
             TcpIp_ApiLockGiveFailCurrent = (void *)xTaskGetCurrentTaskHandle_core2();
+#endif
             TcpIp_ApiLockGiveFailCounter++;
         }
     }
@@ -143,14 +152,17 @@ static uint8 TcpIp_IsLinkUp(void)
         ((netif->flags & NETIF_FLAG_LINK_UP) != 0u))
     {
         TcpIp_LastLinkUp = 1u;
+        EthernetDiag_ReportPhyLink(TRUE);
         return 1u;
     }
 
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
     TcpIp_LastLinkUp = (uint8)lwip_geth_private_Phy_Dp83825i_is_link_up();
+    EthernetDiag_ReportPhyLink((TcpIp_LastLinkUp != 0u) ? TRUE : FALSE);
     return TcpIp_LastLinkUp;
 #else
     TcpIp_LastLinkUp = 1u;
+    EthernetDiag_ReportPhyLink(TRUE);
     return 1u;
 #endif
 #endif
@@ -553,8 +565,8 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
 
             if (TcpIp_IsWouldBlockError(lastErr) != 0u)
             {
-                TcpIp_SendWouldBlockCounter++;
-                break;
+            TcpIp_SendWouldBlockCounter++;
+            break;
             }
         }
 
@@ -572,6 +584,7 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         if (sent > 0u)
         {
             TcpIp_SendPartialCloseCounter++;
+            EthernetDiag_ReportTxError(1u);
             (void)lwip_close(sock);
             slot->sock = TCPIP_INVALID_SOCKET;
             slot->used = 0u;
@@ -580,6 +593,7 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         else if ((lastErr != 0) && (TcpIp_IsWouldBlockError(lastErr) == 0u))
         {
             TcpIp_SendFatalCounter++;
+            EthernetDiag_ReportTxError(1u);
             (void)lwip_close(sock);
             slot->sock = TCPIP_INVALID_SOCKET;
             slot->used = 0u;
@@ -640,6 +654,7 @@ sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
     if (ret < 0)
     {
         TcpIp_LastSocketError = errno;
+        EthernetDiag_ReportTxError(1u);
     }
 
     TcpIp_Unlock();

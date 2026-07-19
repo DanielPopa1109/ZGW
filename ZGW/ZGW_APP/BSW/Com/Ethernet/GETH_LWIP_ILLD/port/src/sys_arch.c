@@ -77,6 +77,12 @@
 #define LWIP_FREERTOS_CHECK_CORE_LOCKING              0
 #endif
 
+#define SYS_ARCH_UNPROTECT_FAIL_TASKNAME_LENGTH       16u
+
+#ifndef SYS_ARCH_DEBUG_INSTRUMENTATION
+#define SYS_ARCH_DEBUG_INSTRUMENTATION                0
+#endif
+
 /** Set this to 0 to implement sys_now() yourself, e.g. using a hw timer.
  * Default is 1, where FreeRTOS ticks are used to calculate back to ms.
  */
@@ -86,10 +92,17 @@
 
 //#define portTICK_PERIOD_MS (1000/configTICK_RATE_HZ)
 
+#if SYS_ARCH_DEBUG_INSTRUMENTATION
 volatile u32_t sys_arch_DebugMutexUnlockFailCounter;
 volatile void *sys_arch_DebugMutexUnlockFailMutex;
 volatile void *sys_arch_DebugMutexUnlockFailNativeMutex;
 volatile void *sys_arch_DebugMutexUnlockFailTask;
+#endif
+
+#if SYS_ARCH_DEBUG_INSTRUMENTATION
+#define SYS_ARCH_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define SYS_ARCH_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#endif
 
 
 #if !configSUPPORT_DYNAMIC_ALLOCATION_core2
@@ -114,7 +127,7 @@ static SemaphoreHandle_t_core2  sys_arch_protect_mutex;
 static sys_prot_t sys_arch_protect_nesting;
 #endif
 
-#if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
+#if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX && SYS_ARCH_DEBUG_INSTRUMENTATION
 /* Debug only: forensic snapshot for the "sys_arch_unprotect failed to give the
  * mutex" assert (sys_arch.c). A FreeRTOS recursive-mutex give fails for exactly
  * one reason: the calling task is not the current holder. In correct, balanced
@@ -127,7 +140,7 @@ static sys_prot_t sys_arch_protect_nesting;
 volatile uint32 sys_arch_unprotect_give_fail_count = 0u;
 volatile void  *sys_arch_unprotect_fail_holder     = NULL;
 volatile void  *sys_arch_unprotect_fail_current    = NULL;
-volatile char   sys_arch_unprotect_fail_taskname[16] = { 0 };
+volatile char   sys_arch_unprotect_fail_taskname[SYS_ARCH_UNPROTECT_FAIL_TASKNAME_LENGTH] = { 0 };
 #endif
 
 /* Initialize this module (see description in sys.h) */
@@ -203,6 +216,7 @@ sys_arch_unprotect(sys_prot_t pval)
     LWIP_ASSERT("sys_arch_protect_mutex != NULL", sys_arch_protect_mutex != NULL);
 
     ret = xSemaphoreGiveRecursive_core2(sys_arch_protect_mutex);
+#if SYS_ARCH_DEBUG_INSTRUMENTATION
     if (ret != pdTRUE_core2)
     {
         /* Capture the offending context before asserting. The holder is the task
@@ -210,6 +224,7 @@ sys_arch_unprotect(sys_prot_t pval)
          * tried to release it. If they differ (or holder is NULL/garbage), that
          * is the corruption fingerprint to chase with a watchpoint. */
         const char *name;
+        const uint8 taskNameLastIndex = (uint8)(SYS_ARCH_UNPROTECT_FAIL_TASKNAME_LENGTH - 1u);
         uint8 i;
 
         sys_arch_unprotect_fail_holder  = (void *)xSemaphoreGetMutexHolder_core2(sys_arch_protect_mutex);
@@ -217,7 +232,7 @@ sys_arch_unprotect(sys_prot_t pval)
         name = pcTaskGetName_core2(NULL);
         if (name != NULL)
         {
-            for (i = 0u; i < (sizeof(sys_arch_unprotect_fail_taskname) - 1u); i++)
+            for (i = 0u; i < taskNameLastIndex; i++)
             {
                 sys_arch_unprotect_fail_taskname[i] = name[i];
                 if (name[i] == '\0')
@@ -226,9 +241,10 @@ sys_arch_unprotect(sys_prot_t pval)
                 }
             }
         }
-        sys_arch_unprotect_fail_taskname[sizeof(sys_arch_unprotect_fail_taskname) - 1u] = '\0';
+        sys_arch_unprotect_fail_taskname[taskNameLastIndex] = '\0';
         sys_arch_unprotect_give_fail_count++;
     }
+#endif
     LWIP_ASSERT("sys_arch_unprotect failed to give the mutex", ret == pdTRUE_core2);
 #else /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
     taskEXIT_CRITICAL();
@@ -282,13 +298,15 @@ sys_mutex_unlock(sys_mutex_t *mutex)
     LWIP_ASSERT("mutex->mut != NULL", mutex->mut != NULL);
 
     ret = xSemaphoreGiveRecursive_core2(mutex->mut);
+#if SYS_ARCH_DEBUG_INSTRUMENTATION
     if (ret != pdTRUE_core2)
     {
-        sys_arch_DebugMutexUnlockFailCounter++;
-        sys_arch_DebugMutexUnlockFailMutex       = (void *)mutex;
-        sys_arch_DebugMutexUnlockFailNativeMutex = mutex->mut;
-        sys_arch_DebugMutexUnlockFailTask        = xTaskGetCurrentTaskHandle_core2();
+        SYS_ARCH_DEBUG_INC(sys_arch_DebugMutexUnlockFailCounter);
+        SYS_ARCH_DEBUG_ASSIGN(sys_arch_DebugMutexUnlockFailMutex, (void *)mutex);
+        SYS_ARCH_DEBUG_ASSIGN(sys_arch_DebugMutexUnlockFailNativeMutex, mutex->mut);
+        SYS_ARCH_DEBUG_ASSIGN(sys_arch_DebugMutexUnlockFailTask, xTaskGetCurrentTaskHandle_core2());
     }
+#endif
     LWIP_ASSERT("failed to give the mutex", ret == pdTRUE_core2);
 }
 

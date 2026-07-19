@@ -152,6 +152,20 @@ IFX_EXTERN volatile uint32 g_LwipLinkStatusCallbackFailCounter;
 IFX_EXTERN volatile uint32 g_LwipRxIsrBeforeTaskCounter;
 IFX_EXTERN volatile uint32 g_LwipForcedMacConfigCounter;
 IFX_EXTERN volatile uint32 g_LwipLinkTaskSkippedForForceUp;
+IFX_EXTERN volatile uint32 g_LwipRxStallRecoveryCounter;
+IFX_EXTERN volatile uint32 g_LwipRxStallObserveCounter;
+IFX_EXTERN volatile uint32 g_LwipRxStallNoProgressCycles;
+IFX_EXTERN volatile uint32 g_LwipRxStallStoppedCycles;
+IFX_EXTERN volatile uint32 g_LwipRxStallStatusCycles;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastStatusErrorMask;
+IFX_EXTERN volatile uint32 g_LwipRxRecoveryManualRequest;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastIsrCount;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastPacketCount;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastDmaStatus;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastRxControl;
+IFX_EXTERN volatile uint32 g_LwipRxStallLastCurrentDesc;
+IFX_EXTERN volatile uint32 g_LwipRxStallRecoverOkCounter;
+IFX_EXTERN volatile uint32 g_LwipRxStallRecoverFailCounter;
 IFX_EXTERN volatile uint32 g_LwipEthTxDescriptorCount;
 IFX_EXTERN volatile uint32 g_LwipEthRxDescriptorCount;
 IFX_EXTERN volatile uint32 g_LwipEthTxBufferBytes;
@@ -167,6 +181,7 @@ IFX_EXTERN uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BU
  * \{ */
 IFX_EXTERN void     lwip_geth_Lwip_init(void *arg);
 IFX_EXTERN void     lwip_geth_Lwip_WaitForInput(void);
+IFX_EXTERN void     lwip_geth_Lwip_watchRxProgress(void);
 IFX_EXTERN uint8    lwip_geth_Lwip_isNetifReady(void);
 IFX_EXTERN void     lwip_geth_Lwip_forceNetifUp(void);
 IFX_INLINE netif_t *lwip_geth_Lwip_getNetIf(void);

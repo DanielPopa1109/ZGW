@@ -11,6 +11,7 @@ long long LinIf_MainFunction_Counter = 0;
 #define LINIF_MS_TO_TICKS(delayMs) \
     ((uint16)(((delayMs) + LINIF_MAIN_FUNCTION_PERIOD_MS - 1u) / LINIF_MAIN_FUNCTION_PERIOD_MS))
 #define LINIF_LDF_SLOT_TICKS LINIF_MS_TO_TICKS(LIN_LDF_TIME_BASE_MS)
+#define LINIF_DIAG_INTERFRAME_TICKS LINIF_MS_TO_TICKS(60u)
 
 static const Lin_FrameConfigType LinIf_Frame_MRF =
 {
@@ -22,29 +23,9 @@ static const Lin_FrameConfigType LinIf_Frame_SRF =
     0x3Du, LIN_PID_SLAVE_RESPONSE, 8u, LIN_CS_CLASSIC, LIN_FRM_DIAGNOSTIC_SRF, 20u
 };
 
-static const Lin_FrameConfigType LinIf_Frame_ZGW_NM3 =
-{
-    0x01u, 0u, 1u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
-};
-
-static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_ALT =
-{
-    0x02u, 0u, 4u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
-};
-
 static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_HVDCDC =
 {
     0x03u, 0u, 2u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
-};
-
-static const Lin_FrameConfigType LinIf_Frame_ZGW_REQUEST_PCU48 =
-{
-    0x04u, 0u, 1u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
-};
-
-static const Lin_FrameConfigType LinIf_Frame_ALT_STATUS =
-{
-    0x0Au, 0u, 7u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
 static const Lin_FrameConfigType LinIf_Frame_HVDCDC_STATUS =
@@ -52,30 +33,21 @@ static const Lin_FrameConfigType LinIf_Frame_HVDCDC_STATUS =
     0x0Bu, 0u, 5u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
-static const Lin_FrameConfigType LinIf_Frame_PCU48_STATUS =
-{
-    0x0Cu, 0u, 5u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
-};
 static const LinIf_ScheduleEntryType LinIf_NormalEntries[] =
 {
-    { &LinIf_Frame_ZGW_NM3, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_ZGW_REQUEST_PCU48, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
     { &LinIf_Frame_ZGW_REQUEST_HVDCDC, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_ZGW_REQUEST_ALT, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_PCU48_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE },
-    { &LinIf_Frame_HVDCDC_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE },
-    { &LinIf_Frame_ALT_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_HVDCDC_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
 };
 
 
 static const LinIf_ScheduleEntryType LinIf_DiagReqEntries[] =
 {
-    { &LinIf_Frame_MRF, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE }
+    { &LinIf_Frame_MRF, LINIF_DIAG_INTERFRAME_TICKS, LIN_MASTER_RESPONSE }
 };
 
 static const LinIf_ScheduleEntryType LinIf_DiagRespEntries[] =
 {
-    { &LinIf_Frame_SRF, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_SRF, LINIF_DIAG_INTERFRAME_TICKS, LIN_SLAVE_RESPONSE }
 };
 
 static const LinIf_ScheduleTableType LinIf_Schedules[] =
@@ -108,6 +80,7 @@ typedef struct
     uint8 diagReq[8];
     uint8 diagResp[8];
     uint8 diagRespValid;
+    uint8 diagReqPending;
     LinIf_DiagStateType diagState;
 
     uint16 diagTimer;
@@ -118,17 +91,12 @@ typedef struct
 
 static const LinIf_AppPduConfigType LinIf_AppTxPduCfg[] =
 {
-    { LINIF_TX_PDU_ZGW_NM3, 0x01u, 1u },
-    { LINIF_TX_PDU_ZGW_REQUEST_ALT, 0x02u, 4u },
-    { LINIF_TX_PDU_ZGW_REQUEST_HVDCDC, 0x03u, 2u },
-    { LINIF_TX_PDU_ZGW_REQUEST_PCU48, 0x04u, 1u }
+    { LINIF_TX_PDU_ZGW_REQUEST_HVDCDC, 0x03u, 2u }
 };
 
 static const LinIf_AppPduConfigType LinIf_AppRxPduCfg[] =
 {
-    { LINIF_RX_PDU_ALT_STATUS, 0x0Au, 7u },
-    { LINIF_RX_PDU_HVDCDC_STATUS, 0x0Bu, 5u },
-    { LINIF_RX_PDU_PCU48_STATUS, 0x0Cu, 5u }
+    { LINIF_RX_PDU_HVDCDC_STATUS, 0x0Bu, 5u }
 };
 
 static LinIf_StateType LinIf_State;
@@ -251,10 +219,11 @@ Std_ReturnType LinIf_SetDiagRequest(const uint8 data[8])
 
     memcpy(LinIf_State.diagReq, data, 8u);
     LinIf_State.diagRespValid = FALSE;
+    LinIf_State.diagReqPending = TRUE;
     LinIf_State.diagState = LINIF_DIAG_MRF_PENDING;
     LinIf_State.diagTimer = LINIF_DIAG_TIMEOUT_TICKS;
 
-    return LinIf_SwitchSchedule(LINIF_SCHED_DIAG_REQ);
+    return E_OK;
 }
 
 Std_ReturnType LinIf_GetDiagResponse(uint8 data[8])
@@ -280,6 +249,7 @@ void LinIf_DiagFrameDone(uint8 success)
     if (success == FALSE)
     {
         LinIf_State.diagState = LINIF_DIAG_ERROR;
+        LinIf_State.diagReqPending = FALSE;
         LinIf_State.channelState = LINIF_CHANNEL_ERROR;
         LinIf_State.scheduleErrorCounter++;
         (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
@@ -288,8 +258,10 @@ void LinIf_DiagFrameDone(uint8 success)
 
     if (LinIf_State.diagState == LINIF_DIAG_MRF_ACTIVE)
     {
+        LinIf_State.diagReqPending = FALSE;
         LinIf_State.diagState = LINIF_DIAG_SRF_PENDING;
         (void)LinIf_SwitchSchedule(LINIF_SCHED_DIAG_RESP);
+        LinIf_State.timer = LINIF_DIAG_INTERFRAME_TICKS;
     }
     else if (LinIf_State.diagState == LINIF_DIAG_SRF_ACTIVE)
     {
@@ -500,6 +472,13 @@ void LinIf_MainFunction(void)
         return;
     }
 
+    if ((LinIf_State.diagReqPending != FALSE) &&
+        (LinIf_State.activeSchedule == LINIF_SCHED_NORMAL) &&
+        (LinIf_State.index == 0u))
+    {
+        (void)LinIf_SwitchSchedule(LINIF_SCHED_DIAG_REQ);
+    }
+
     sched = &LinIf_Schedules[LinIf_State.activeSchedule];
     entry = &sched->entries[LinIf_State.index];
 
@@ -522,6 +501,7 @@ LinIf_ChannelStateType LinIf_GetChannelState(void)
 void LinIf_ResetDiagnostic(void)
 {
     LinIf_State.diagRespValid = FALSE;
+    LinIf_State.diagReqPending = FALSE;
     LinIf_State.diagState = LINIF_DIAG_IDLE;
     LinIf_State.diagTimer = 0u;
 }

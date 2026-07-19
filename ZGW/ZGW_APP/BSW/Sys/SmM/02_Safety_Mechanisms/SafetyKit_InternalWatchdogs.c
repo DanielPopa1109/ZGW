@@ -70,8 +70,8 @@ void initSafetyWatchdog(void)
 
     IfxScuWdt_initConfig(&cfgSafetyWatchdog);
 
-    cfgSafetyWatchdog.inputFrequency = WDG_INPUT_FREQUENCY;
-    cfgSafetyWatchdog.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY;
+    cfgSafetyWatchdog.inputFrequency = WDG_INPUT_FREQUENCY; // @suppress("Symbol is not resolved")
+    cfgSafetyWatchdog.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY; // @suppress("Symbol is not resolved")
     cfgSafetyWatchdog.reload = WDG_RELOAD_VALUE;
 
     IfxScuWdt_initSafetyWatchdog(safetyWatchdog, &cfgSafetyWatchdog);
@@ -86,7 +86,7 @@ void serviceSafetyWatchdog(void)
 {
     /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in
      * use somewhere else */
-    if((IfxCpu_getCoreIndex() == IfxCpu_ResourceCpu_0) &&
+    if((IfxCpu_getCoreIndex() == IfxCpu_ResourceCpu_0) && // @suppress("Symbol is not resolved")
             (IfxScuWdt_getSafetyWatchdogEndInit()))
     {
         SafetyKit_SafetyWdtServiceCount++;
@@ -109,16 +109,16 @@ void initCpuWatchdog(uint8 cpuIndex)
 
     switch (cpuIndex)
     {
-        case IfxCpu_ResourceCpu_0:
+        case IfxCpu_ResourceCpu_0: // @suppress("Symbol is not resolved")
             ptrCpuXwatchdog = &MODULE_SCU.WDTCPU[0];
             break;
 #if (IFXCPU_NUM_MODULES > 1)
-        case IfxCpu_ResourceCpu_1:
+        case IfxCpu_ResourceCpu_1: // @suppress("Symbol is not resolved")
             ptrCpuXwatchdog = &MODULE_SCU.WDTCPU[1];
             break;
 #endif
 #if (IFXCPU_NUM_MODULES > 2)
-        case IfxCpu_ResourceCpu_2:
+        case IfxCpu_ResourceCpu_2: // @suppress("Symbol is not resolved")
             ptrCpuXwatchdog = &MODULE_SCU.WDTCPU[2];
             break;
 #endif
@@ -133,8 +133,8 @@ void initCpuWatchdog(uint8 cpuIndex)
 
     IfxScuWdt_initConfig(&cpuXwdgCfg);
 
-    cpuXwdgCfg.inputFrequency = WDG_INPUT_FREQUENCY;
-    cpuXwdgCfg.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY;
+    cpuXwdgCfg.inputFrequency = WDG_INPUT_FREQUENCY; // @suppress("Symbol is not resolved")
+    cpuXwdgCfg.globalEndInitInputFrequency = WDG_INPUT_FREQUENCY; // @suppress("Symbol is not resolved")
     cpuXwdgCfg.reload = WDG_RELOAD_VALUE;
     cpuXwdgCfg.disableWatchdog = FALSE;
 
@@ -156,7 +156,7 @@ void initCpuWatchdog(uint8 cpuIndex)
  * */
 void serviceCpuWatchdog(void)
 {
-    uint8 coreIndex = IfxCpu_getCoreIndex();
+    uint8 coreIndex = (uint8)IfxCpu_getCoreIndex();
     /* Only service Safety Watchdog if ENDINIT is set, otherwise ENDINIT is currently cleared and in used somewhere else */
     if(IfxScuWdt_getCpuWatchdogEndInitInline(&MODULE_SCU.WDTCPU[coreIndex]))
     {

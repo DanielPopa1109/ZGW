@@ -9,6 +9,10 @@
 #define CODINGAPP_VERSION_MAJOR                 1u
 #define CODINGAPP_VERSION_MINOR                 0u
 
+#ifndef CODINGAPP_DEBUG_INSTRUMENTATION
+#define CODINGAPP_DEBUG_INSTRUMENTATION         0
+#endif
+
 #define CODINGAPP_DID_STATUS                    0xF1C0u
 #define CODINGAPP_DID_IMAGE                     0xF1C1u
 #define CODINGAPP_DID_RX_MESSAGE_EXPECTED       0xF1C2u
@@ -23,11 +27,11 @@
 #define CODINGAPP_ROUTINE_REQUEST_RESULTS       0x03u
 
 #define CODINGAPP_IMAGE_MAGIC                   0x434F4447u
-#define CODINGAPP_IMAGE_VERSION                 0x0001u
+#define CODINGAPP_IMAGE_VERSION                 0x0002u
 
 #define CODINGAPP_RX_MESSAGE_EXPECTED_BYTES     (((uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT + 7u) / 8u)
-#define CODINGAPP_TX_PDU_MAX_ID                 COM_TX_PDU_LIN_ZGW_REQUEST_PCU48
-#define CODINGAPP_TX_PDU_ENABLED_BYTES          (((uint16)CODINGAPP_TX_PDU_MAX_ID + 8u) / 8u)
+#define CODINGAPP_TX_PDU_COUNT                  18u
+#define CODINGAPP_TX_PDU_ENABLED_BYTES          (((uint16)CODINGAPP_TX_PDU_COUNT + 7u) / 8u)
 #define CODINGAPP_MASK_BYTES                    (CODINGAPP_RX_MESSAGE_EXPECTED_BYTES + CODINGAPP_TX_PDU_ENABLED_BYTES)
 
 #define CODINGAPP_STATE_NOT_CODED               0u
@@ -100,6 +104,7 @@ Dcm_ReturnType CodingApp_RoutineControl(
     Dcm_PduLengthType *respLen
 );
 
+#if CODINGAPP_DEBUG_INSTRUMENTATION
 extern volatile uint8 CodingApp_DebugState;
 extern volatile uint8 CodingApp_DebugValidationStatus;
 extern volatile uint8 CodingApp_DebugDirty;
@@ -108,5 +113,6 @@ extern volatile uint32 CodingApp_DebugGeneration;
 extern volatile uint32 CodingApp_DebugInvalidCodingCounter;
 extern volatile uint32 CodingApp_DebugWriteAllCounter;
 extern volatile uint8 CodingApp_DebugLastNvMResult;
+#endif
 
 #endif /* CODINGAPP_H */

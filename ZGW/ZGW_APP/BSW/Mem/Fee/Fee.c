@@ -4,7 +4,6 @@
 #include "Fls.h"
 #include "Crc.h"
 #include "MemStack_Error.h"
-#include "McuSm.h"
 
 #define FEE_API_INIT                    (0x00u)
 #define FEE_API_SET_MODE                (0x01u)
@@ -238,11 +237,6 @@ volatile uint32 Fee_DebugLastScanSector = 0u;
 volatile uint32 Fee_DebugLastScanCursor = 0u;
 volatile uint32 Fee_DebugLastScanEnd = 0u;
 volatile uint32 Fee_DebugScanStepCounter = 0u;
-volatile uint32 Fee_DebugRecoveryFormatRequestSeen = 0u;
-volatile uint32 Fee_DebugRecoveryFormatStartCounter = 0u;
-volatile uint32 Fee_DebugRecoveryFormatDoneCounter = 0u;
-volatile uint32 Fee_DebugRecoveryFormatSuppressedCounter = 0u;
-
 static void Fee_RecordFlashAccess(uint32 kind, uint32 offset, uint32 length)
 {
     Fee_DebugLastFlashAccessKind = kind;
@@ -270,34 +264,6 @@ static uint32 Fee_SectorBase(uint8 sector)
 static uint32 Fee_SectorEnd(uint8 sector)
 {
     return Fee_SectorBase(sector) + FEE_VIRTUAL_SECTOR_SIZE;
-}
-
-static boolean Fee_IsPhysicalAddressInSector(uint32 physicalAddress, uint8 sector)
-{
-    uint32 sectorStart = Fls_GetPhysicalAddress(Fee_SectorBase(sector));
-    uint32 sectorEnd = sectorStart + FEE_VIRTUAL_SECTOR_SIZE;
-
-    return (boolean)((physicalAddress >= sectorStart) && (physicalAddress < sectorEnd));
-}
-
-static uint8 Fee_GetRecoverySkipSector(void)
-{
-    if (McuSm_IsDFlashRecoveryRequested() == FALSE)
-    {
-        return FEE_INVALID_SECTOR;
-    }
-
-    if (Fee_IsPhysicalAddressInSector(McuSm_DFlashRecoveryLastFeePhysicalAddress, 0u) != FALSE)
-    {
-        return 0u;
-    }
-
-    if (Fee_IsPhysicalAddressInSector(McuSm_DFlashRecoveryLastFeePhysicalAddress, 1u) != FALSE)
-    {
-        return 1u;
-    }
-
-    return FEE_INVALID_SECTOR;
 }
 
 /* The sector-valid marker lives at a fixed slot immediately after the sector
@@ -941,7 +907,6 @@ static void Fee_SetFailed(uint8 error, uint32 detail)
 
 static void Fee_StartFormat(void)
 {
-    Fls_ClearDFlashSmuBusError();
     Fee_State.status = MEMIF_BUSY_INTERNAL;
     Fee_State.result = MEMIF_JOB_PENDING;
     Fee_State.activeSector = 0u;
@@ -950,7 +915,6 @@ static void Fee_StartFormat(void)
     Fee_UpdateNextWriteDFlashAddress();
     Fee_State.state = FEE_STATE_FORMAT_ERASE0_START;
     Fee_NextSequence = 1u;
-    Fee_DebugRecoveryFormatStartCounter++;
 }
 
 static Std_ReturnType Fee_StartErase(uint32 address, uint32 length)
@@ -1088,10 +1052,6 @@ static void Fee_RestorePendingJobAfterGc(void)
 
 void Fee_Init(const Fee_ConfigType *ConfigPtr)
 {
-    boolean recoveryFormatRequested;
-    boolean tryExistingSectors;
-    uint8 recoverySkipSector;
-
     (void)ConfigPtr;
     memset(&Fee_State, 0, sizeof(Fee_State));
     Fee_RuntimeInit(Fee_Runtime);
@@ -1099,29 +1059,8 @@ void Fee_Init(const Fee_ConfigType *ConfigPtr)
     Fee_DeferredFormatPending = FALSE;
     Fls_Init(NULL_PTR);
 
-    recoveryFormatRequested = McuSm_IsDFlashRecoveryRequested();
-    recoverySkipSector = Fee_GetRecoverySkipSector();
-    tryExistingSectors = TRUE;
-    if (recoveryFormatRequested != FALSE)
+    if (Fee_ChooseActiveSector(FEE_INVALID_SECTOR) == TRUE)
     {
-        Fee_DebugRecoveryFormatRequestSeen++;
-        if (McuSm_BeginDFlashRecoveryAttempt() == FALSE)
-        {
-            /* Do not keep re-scanning forever if the recovery-attempt limiter
-             * trips. At that point the retained marker is treated as unrecovered
-             * corruption and Fee falls back to formatting below. */
-            McuSm_ClearDFlashRecoveryRequest();
-            tryExistingSectors = FALSE;
-            Fee_DebugRecoveryFormatSuppressedCounter++;
-        }
-    }
-
-    if ((tryExistingSectors != FALSE) && (Fee_ChooseActiveSector(recoverySkipSector) == TRUE))
-    {
-        if (recoveryFormatRequested != FALSE)
-        {
-            McuSm_ClearDFlashRecoveryRequest();
-        }
         Fee_State.status = MEMIF_IDLE;
         Fee_State.result = MEMIF_JOB_OK;
         Fee_State.state = FEE_STATE_IDLE;
@@ -1643,8 +1582,6 @@ static void Fee_MainFunctionStep(void)
                 {
                     Fee_State.activeSector = 0u;
                     Fee_State.activeGeneration = 1u;
-                    McuSm_ClearDFlashRecoveryRequest();
-                    Fee_DebugRecoveryFormatDoneCounter++;
                     Fee_SetIdle(MEMIF_JOB_OK);
                 }
             }

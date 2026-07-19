@@ -5,9 +5,13 @@
 
 #define CANTP_MAX_CHANNELS       16u
 #define CANTP_MAX_TX_BUFFERS     6u
-#define CANTP_LEGACY_MAX_PAYLOAD_LEN 4095u
-#define CANTP_MAX_PAYLOAD_LEN    8192u
+#define CANTP_LEGACY_MAX_PAYLOAD_LEN 256u
+#define CANTP_MAX_PAYLOAD_LEN    256u
 #define CANTP_MAIN_PERIOD_MS     5u
+
+#ifndef CANTP_DEBUG_INSTRUMENTATION
+#define CANTP_DEBUG_INSTRUMENTATION 0
+#endif
 
 #define CANTP_NPCI_SF            0x00u
 #define CANTP_NPCI_FF            0x10u
@@ -116,6 +120,7 @@ void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType
 void CanTp_TxConfirmation(PduIdType CanIfTxPduId);
 
 extern const CanTp_ConfigType CanTp_Config;
+#if CANTP_DEBUG_INSTRUMENTATION
 extern volatile uint32 CanTp_DebugExtendedTxRequests;
 extern volatile uint32 CanTp_DebugExtendedTxOk;
 extern volatile uint32 CanTp_DebugExtendedTxFail;
@@ -125,5 +130,6 @@ extern volatile uint8 CanTp_DebugExtendedLastTarget;
 extern volatile uint8 CanTp_DebugExtendedLastChannel;
 extern volatile uint8 CanTp_DebugExtendedLastState;
 extern volatile uint8 CanTp_DebugExtendedLastReason;
+#endif
 
 #endif

@@ -5,7 +5,7 @@
 
 #define LINTP_NAD_BROADCAST       0x7Fu
 #define LINTP_NAD_FUNCTIONAL      0x7Eu
-#define LINTP_MAX_PAYLOAD         4095u
+#define LINTP_MAX_PAYLOAD         256u
 
 #define LINTP_PCI_SF              0x00u
 #define LINTP_PCI_FF              0x10u
@@ -31,6 +31,7 @@ void LinTp_MainFunction(void);
 Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len);
 Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len);
 uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad);
+uint8 LinTp_CanStartTransmitToNadNow(uint8 targetNad);
 void LinTp_TxFrameConfirmation(uint8 success);
 
 void LinTp_RxMasterRequest(const uint8 frame[8]);

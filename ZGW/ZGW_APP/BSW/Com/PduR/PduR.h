@@ -4,7 +4,7 @@
 #include "ComStack_Types.h"
 #include "TcpIpH.h"
 
-#define PDUR_MAX_TP_BUFFER             8192u
+#define PDUR_MAX_TP_BUFFER             256u
 #define PDUR_MAX_TP_RX_ROUTES          16u
 #define PDUR_MAX_TP_RX_BUFFERS         4u
 #define PDUR_MAX_IF_ROUTE_DATA_LEN     64u
@@ -12,6 +12,10 @@
 
 #define PDUR_INIT_FAIL_NONE            0u
 #define PDUR_INIT_FAIL_TP_RX_ROUTES    1u
+
+#ifndef PDUR_DEBUG_INSTRUMENTATION
+#define PDUR_DEBUG_INSTRUMENTATION     0
+#endif
 
 void PduR_Init(void);
 uint8 PduR_IsInitialized(void);
@@ -82,10 +86,12 @@ void PduR_DoIPCore0MainFunction(void);
 void PduR_DoIPCore2MainFunction(void);
 void PduR_DoIPResetSession(void);
 
+#if PDUR_DEBUG_INSTRUMENTATION
 extern volatile uint8 PduR_DebugInitialized;
 extern volatile uint8 PduR_DebugInitFailure;
 extern volatile uint8 PduR_DebugTpRxRouteCount;
 extern volatile uint8 PduR_DebugMaxTpRxRoutes;
+#endif
 extern volatile uint32 PduR_DoIPSessionResetAgeTicks;
 extern volatile uint32 PduR_DoIPSessionResetStallCounter;
 

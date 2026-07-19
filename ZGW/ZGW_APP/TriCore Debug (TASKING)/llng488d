@@ -44693,8 +44693,6 @@ other spaces is called "Foreign used" memory.
 | LinIf.o                        | .rodata.LinIf.LinIf_DiagRespEn | 0x0000000c      | 0x0          | .rodata.LinIf.LinIf_DiagRespEntries    | 0x0000000c       |
 |                                | tries (25043)                  |                 |              | (25043)                                |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| LinIf.o                        | .rodata.LinIf.LinIf_Frame_ALT_ | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_ALT_STATUS   | 0x00000010       |
-|                                | STATUS (25038)                 |                 |              | (25038)                                |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_HVDC | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_HVDCDC_STATU | 0x00000010       |
 |                                | DC_STATUS (25039)              |                 |              | S (25039)                              |                  |
@@ -44702,8 +44700,6 @@ other spaces is called "Foreign used" memory.
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_MRF  | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_MRF (25032)  | 0x00000010       |
 |                                | (25032)                        |                 |              |                                        |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| LinIf.o                        | .rodata.LinIf.LinIf_Frame_PCU4 | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_PCU48_STATUS | 0x00000010       |
-|                                | 8_STATUS (25040)               |                 |              |  (25040)                               |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_SRF  | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_SRF (25033)  | 0x00000010       |
 |                                | (25033)                        |                 |              |                                        |                  |
@@ -44712,13 +44708,11 @@ other spaces is called "Foreign used" memory.
 |                                | NM3 (25034)                    |                 |              | (25034)                                |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_ZGW_ | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_ZGW_REQUEST_ | 0x00000010       |
-|                                | REQUEST_ALT (25035)            |                 |              | ALT (25035)                            |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_ZGW_ | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_ZGW_REQUEST_ | 0x00000010       |
 |                                | REQUEST_HVDCDC (25036)         |                 |              | HVDCDC (25036)                         |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_Frame_ZGW_ | 0x00000010      | 0x0          | .rodata.LinIf.LinIf_Frame_ZGW_REQUEST_ | 0x00000010       |
-|                                | REQUEST_PCU48 (25037)          |                 |              | PCU48 (25037)                          |                  |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | LinIf.o                        | .rodata.LinIf.LinIf_NormalEntr | 0x00000054      | 0x0          | .rodata.LinIf.LinIf_NormalEntries      | 0x00000054       |
 |                                | ies (25041)                    |                 |              | (25041)                                |                  |
@@ -87470,12 +87464,10 @@ Note:
 |                                  |                            | (25042)                                  |            |            |            |            |
 | mpe:pfls0                        |                            | .rodata.LinIf.LinIf_DiagRespEntries      | 0x0000000c | 0x800a3770 | 0x00073770 | 0x00000004 |
 |                                  |                            | (25043)                                  |            |            |            |            |
-| mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_ALT_STATUS     | 0x00000010 | 0x800a377c | 0x0007377c | 0x00000004 |
 |                                  |                            | (25038)                                  |            |            |            |            |
 | mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_HVDCDC_STATUS  | 0x00000010 | 0x800a378c | 0x0007378c | 0x00000004 |
 |                                  |                            | (25039)                                  |            |            |            |            |
 | mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_MRF (25032)    | 0x00000010 | 0x800a379c | 0x0007379c | 0x00000004 |
-| mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_PCU48_STATUS   | 0x00000010 | 0x800a37ac | 0x000737ac | 0x00000004 |
 |                                  |                            | (25040)                                  |            |            |            |            |
 | mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_SRF (25033)    | 0x00000010 | 0x800a37bc | 0x000737bc | 0x00000004 |
 | mpe:pfls0                        |                            | .rodata.LinIf.LinIf_Frame_ZGW_NM3        | 0x00000010 | 0x800a37cc | 0x000737cc | 0x00000004 |
@@ -116580,14 +116572,10 @@ Note:
 |                                                   |              |                                               |      |  (25042) <                         |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_DiagRespEntrie |
 |                                                   |              |                                               |      | s (25043) <                        |
-|                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_ALT_STAT |
-|                                                   |              |                                               |      | US (25038) <                       |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_HVDCDC_S |
 |                                                   |              |                                               |      | TATUS (25039) <                    |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_MRF      |
 |                                                   |              |                                               |      | (25032) <                          |
-|                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_PCU48_ST |
-|                                                   |              |                                               |      | ATUS (25040) <                     |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_SRF      |
 |                                                   |              |                                               |      | (25033) <                          |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_ZGW_NM3  |
@@ -116597,7 +116585,6 @@ Note:
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_ZGW_REQU |
 |                                                   |              |                                               |      | EST_HVDCDC (25036) <               |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Frame_ZGW_REQU |
-|                                                   |              |                                               |      | EST_PCU48 (25037) <                |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_NormalEntries  |
 |                                                   |              |                                               |      | (25041) <                          |
 |                                                   |              |                                               |      | .rodata.LinIf.LinIf_Schedules      |

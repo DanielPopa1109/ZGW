@@ -56,7 +56,7 @@
 #define SOFT_SMU_ALM_DTS            IfxSmu_Alarm_Software_Alarm13
 #define SOFT_SMU_ALM_PORT_SMs       IfxSmu_Alarm_Software_Alarm14      /* used for port redundancy and loopback*/
 #define SOFT_SMU_ALM_CLOCK_PLAUS    IfxSmu_Alarm_Software_Alarm15     /* used the same for QPSI safe communication */
-#define USER_ALARM_NUMBER           36u
+#define USER_ALARM_NUMBER           37u
 #define AMOUNT_OF_SMU_ALARMS        (uint16)(IfxSmu_Alarm_XBAR_SOTA_SwapError + 1u)
 /* Just took last alarm as default, any alarm can be set here */
 #define DEFAULT_ALARM               (uint16)(IfxSmu_Alarm_XBAR_SOTA_SwapError)

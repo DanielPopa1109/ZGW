@@ -78,6 +78,7 @@
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  100
 #define LWIP_GETH_OS_POLL_PERIOD_MS         (5U)
 #define LWIP_GETH_RX_POLL_BUDGET            (192U)
+#define LWIP_GETH_RX_STALL_RECOVERY_CYCLES  (200U)
 /* Use the 5 ms core2 poll path for RX. This keeps Ethernet active while
  * removing the ISR -> FreeRTOS task-notify path from AG7/17 investigations.
  */
@@ -137,6 +138,20 @@ volatile uint32 g_LwipRxPollPacketCounter;
 volatile uint32 g_LwipRxPollBudgetHitCounter;
 volatile uint32 g_LwipForcedMacConfigCounter;
 volatile uint32 g_LwipLinkTaskSkippedForForceUp;
+volatile uint32 g_LwipRxStallRecoveryCounter;
+volatile uint32 g_LwipRxStallObserveCounter;
+volatile uint32 g_LwipRxStallNoProgressCycles;
+volatile uint32 g_LwipRxStallStoppedCycles;
+volatile uint32 g_LwipRxStallStatusCycles;
+volatile uint32 g_LwipRxStallLastStatusErrorMask;
+volatile uint32 g_LwipRxRecoveryManualRequest;
+volatile uint32 g_LwipRxStallLastIsrCount;
+volatile uint32 g_LwipRxStallLastPacketCount;
+volatile uint32 g_LwipRxStallLastDmaStatus;
+volatile uint32 g_LwipRxStallLastRxControl;
+volatile uint32 g_LwipRxStallLastCurrentDesc;
+volatile uint32 g_LwipRxStallRecoverOkCounter;
+volatile uint32 g_LwipRxStallRecoverFailCounter;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -152,7 +167,7 @@ void lwip_geth_Lwip_onTimerTick(void)
     Ifx_Lwip_timerIncr(lwip->timer.arp, IFX_LWIP_ARP_PERIOD, IFX_LWIP_FLAG_ARP);
 
     Ifx_Lwip_timerIncr(lwip->timer.tcp_fast, IFX_LWIP_TCP_FAST_PERIOD, IFX_LWIP_FLAG_TCP_FAST);
-    Ifx_Lwip_timerIncr(lwip->timer.tcp_slow, IFX_LWIP_TCP_SLOW_PERIOD, IFX_LWIP_FLAG_TCP_SLOW);
+    Ifx_Lwip_timerIncr(lwip->timer.tcp_slow, IFX_LWIP_TCP_SLOW_PERIOD, IFX_LWIP_FLAG_TCP_SLOW); // @suppress("Unused static function")
 
 #if LWIP_DHCP
     Ifx_Lwip_timerIncr(lwip->timer.dhcp_coarse, IFX_LWIP_DHCP_COARSE_PERIOD, IFX_LWIP_FLAG_DHCP_COARSE);
@@ -167,6 +182,7 @@ void lwip_geth_Lwip_onTimerTick(void)
     lwip->timerFlags = timerFlags;
 }
 
+#if !LWIP_GETH_RTOS_ENABLED
 static void lwip_geth_Lwip_advancePolledTime(uint8 elapsedMs)
 {
     uint8 tick;
@@ -178,6 +194,7 @@ static void lwip_geth_Lwip_advancePolledTime(uint8 elapsedMs)
         g_LwipSoftwareTimerTickCounter++;
     }
 }
+#endif
 
 static void lwip_geth_Lwip_configureForcedMacMode(IfxGeth_Eth *ethernetif)
 {
@@ -252,6 +269,12 @@ static void lwip_geth_Lwip_applyLinkStatusCb(void *ctx)
 {
     (void)ctx;
     lwip_geth_Lwip_applyLinkStatus();
+}
+
+static void lwip_geth_Lwip_forceNetifUpCb(void *ctx)
+{
+    (void)ctx;
+    lwip_geth_Lwip_forceNetifUp();
 }
 #endif
 
@@ -398,6 +421,153 @@ void lwip_geth_Lwip_pollReceiveFlags(void)
     if ((processed != 0u) && (budget == 0u))
     {
         g_LwipRxPollBudgetHitCounter++;
+    }
+}
+
+static void lwip_geth_Lwip_recoverNetifFlags(void)
+{
+#if LWIP_GETH_RTOS_ENABLED && !LWIP_TCPIP_CORE_LOCKING
+    if (tcpip_try_callback(lwip_geth_Lwip_forceNetifUpCb, NULL_PTR) != ERR_OK)
+    {
+        g_LwipLinkStatusCallbackFailCounter++;
+    }
+#else
+    lwip_geth_Lwip_forceNetifUp();
+#endif
+}
+
+static uint32 lwip_geth_Lwip_getRxStatusErrorMask(IfxGeth_Eth *ethernetif)
+{
+    Ifx_GETH_DMA_CH_STATUS status;
+
+    if ((ethernetif == NULL_PTR) || (ethernetif->gethSFR == NULL_PTR))
+    {
+        return 0u;
+    }
+
+    status.U = ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].STATUS.U;
+
+    return ((uint32)status.B.RBU << 0u) |
+        ((uint32)status.B.RPS << 1u) |
+        ((uint32)status.B.RWT << 2u) |
+        ((uint32)status.B.FBE << 3u) |
+        ((uint32)status.B.CDE << 4u) |
+        ((uint32)status.B.REB << 8u);
+}
+
+static void lwip_geth_Lwip_recoverRxPath(void)
+{
+    g_LwipRxStallRecoveryCounter++;
+    g_LwipRxStallNoProgressCycles = 0u;
+    g_LwipRxStallStoppedCycles = 0u;
+    g_LwipRxStallStatusCycles = 0u;
+
+    if (lwip_geth_netif_recover_rx(&g_Lwip.netif) != 0u)
+    {
+        g_LwipRxStallRecoverOkCounter++;
+        lwip_geth_Lwip_recoverNetifFlags();
+    }
+    else
+    {
+        g_LwipRxStallRecoverFailCounter++;
+    }
+
+    g_LwipRxStallLastIsrCount = isrRxCount;
+    g_LwipRxStallLastPacketCount = lwip_geth_LowLevelInputPacketCount;
+}
+
+void lwip_geth_Lwip_watchRxProgress(void)
+{
+    IfxGeth_Eth *ethernetif;
+    uint32 currentIsrCount;
+    uint32 currentPacketCount;
+    uint8 linkUp;
+    uint8 rxRunning;
+    uint32 statusErrorMask;
+
+    ethernetif = (IfxGeth_Eth *)g_Lwip.netif.state;
+    currentIsrCount = isrRxCount;
+    currentPacketCount = lwip_geth_LowLevelInputPacketCount;
+    linkUp = ((g_Lwip.netif.flags & NETIF_FLAG_UP) != 0u) &&
+        ((g_Lwip.netif.flags & NETIF_FLAG_LINK_UP) != 0u);
+    rxRunning = 1u;
+
+    if ((ethernetif != NULL_PTR) && (ethernetif->gethSFR != NULL_PTR))
+    {
+        g_LwipRxStallLastDmaStatus =
+            ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].STATUS.U;
+        g_LwipRxStallLastRxControl =
+            ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.U;
+        g_LwipRxStallLastCurrentDesc =
+            ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].CURRENT_APP_RXDESC.U;
+        rxRunning =
+            (ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR != 0u) ? 1u : 0u;
+    }
+
+    statusErrorMask = lwip_geth_Lwip_getRxStatusErrorMask(ethernetif);
+    g_LwipRxStallLastStatusErrorMask = statusErrorMask;
+
+    if (g_LwipRxRecoveryManualRequest != 0u)
+    {
+        g_LwipRxRecoveryManualRequest = 0u;
+        lwip_geth_Lwip_recoverRxPath();
+        return;
+    }
+
+    if (linkUp == 0u)
+    {
+        g_LwipRxStallNoProgressCycles = 0u;
+        g_LwipRxStallStoppedCycles = 0u;
+        g_LwipRxStallStatusCycles = 0u;
+        g_LwipRxStallLastIsrCount = currentIsrCount;
+        g_LwipRxStallLastPacketCount = currentPacketCount;
+        return;
+    }
+
+    if (rxRunning == 0u)
+    {
+        g_LwipRxStallStoppedCycles++;
+    }
+    else
+    {
+        g_LwipRxStallStoppedCycles = 0u;
+    }
+
+    if (currentPacketCount != g_LwipRxStallLastPacketCount)
+    {
+        g_LwipRxStallNoProgressCycles = 0u;
+        g_LwipRxStallStoppedCycles = 0u;
+        g_LwipRxStallStatusCycles = 0u;
+        g_LwipRxStallLastIsrCount = currentIsrCount;
+        g_LwipRxStallLastPacketCount = currentPacketCount;
+        return;
+    }
+
+    if (statusErrorMask != 0u)
+    {
+        g_LwipRxStallStatusCycles++;
+    }
+    else
+    {
+        g_LwipRxStallStatusCycles = 0u;
+    }
+
+    if (currentIsrCount != g_LwipRxStallLastIsrCount)
+    {
+        g_LwipRxStallObserveCounter++;
+        g_LwipRxStallNoProgressCycles++;
+        g_LwipRxStallLastIsrCount = currentIsrCount;
+    }
+    else
+    {
+        g_LwipRxStallNoProgressCycles = 0u;
+    }
+
+    if ((g_LwipRxStallNoProgressCycles >= LWIP_GETH_RX_STALL_RECOVERY_CYCLES) ||
+        (g_LwipRxStallStoppedCycles >= LWIP_GETH_RX_STALL_RECOVERY_CYCLES) ||
+        (g_LwipRxStallStatusCycles >= LWIP_GETH_RX_STALL_RECOVERY_CYCLES))
+    {
+        lwip_geth_Lwip_recoverRxPath();
     }
 }
 

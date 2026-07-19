@@ -22,6 +22,10 @@ typedef NotifResultType Dcm_NotifResultType;
 
 #define DCM_S3_SERVER_TICKS 1000u
 
+#ifndef DCM_DEBUG_INSTRUMENTATION
+#define DCM_DEBUG_INSTRUMENTATION 0
+#endif
+
 #define DCM_SESSION_MASK_DEFAULT     (1u << DCM_SESSION_DEFAULT)
 #define DCM_SESSION_MASK_PROGRAMMING (1u << DCM_SESSION_PROGRAMMING)
 #define DCM_SESSION_MASK_EXTENDED    (1u << DCM_SESSION_EXTENDED)
@@ -32,23 +36,23 @@ typedef uint8 Dcm_OpStatusType;
 /* ===================== Limits ===================== */
 
 #define DCM_MAX_CONNECTIONS          16u
-#define DCM_CLASSIC_ISOTP_MAX_LEN    4095u
-#define DCM_MAX_PDU_LEN              8192u
-#define DCM_MAX_RESPONSE_LEN         8192u
+#define DCM_CLASSIC_ISOTP_MAX_LEN    256u
+#define DCM_MAX_PDU_LEN              256u
+#define DCM_MAX_RESPONSE_LEN         256u
 #define DCM_RX_QUEUE_DEPTH           8u
-#define DCM_RX_QUEUE_BUFFER_LEN      320u
+#define DCM_RX_QUEUE_BUFFER_LEN      256u
 #define DCM_MAX_SERVICES             32u
-#define DCM_MAX_DID_RESPONSE_LEN     512u
-#define DCM_MAX_ROUTINE_RESPONSE_LEN 512u
+#define DCM_MAX_DID_RESPONSE_LEN     256u
+#define DCM_MAX_ROUTINE_RESPONSE_LEN 256u
 #define DCM_MAX_SERVICE_RESPONSE_LEN (DCM_MAX_RESPONSE_LEN - 1u)
 #define DCM_MAX_DTC_RESPONSE_LEN     (DCM_MAX_SERVICE_RESPONSE_LEN - 1u)
-#define DCM_TRANSFER_BLOCK_LEN       1024u
+#define DCM_TRANSFER_BLOCK_LEN       256u
 
 /* ===================== Timing ===================== */
 
 #define DCM_P2_SERVER_TICKS          50u
 #define DCM_P2STAR_SERVER_TICKS      5000u
-#define DCM_RESPONSE_PENDING_MAX     6u
+#define DCM_RESPONSE_PENDING_MAX     2u
 
 /* ===================== AUTOSAR-like TP ===================== */
 
@@ -192,6 +196,7 @@ void Dcm_MainFunction(void);
 Std_ReturnType Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len);
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result);
 uint8 Dcm_GetActiveSession(uint8 connIdx);
+uint8 Dcm_HasActiveEthernetDiagnosticConnection(void);
 uint8 *Dcm_ProvideRxBufferFromDoIP(uint16 len);
 
 BufReq_ReturnType Dcm_StartOfReception(
@@ -231,11 +236,13 @@ Std_ReturnType Dcm_LoTransmit(
     Dcm_PduLengthType len
 );
 
+#if DCM_DEBUG_INSTRUMENTATION
 extern volatile uint32 Dcm_DebugExtForwardRequests;
 extern volatile uint8 Dcm_DebugExtForwardLastExt;
 extern volatile uint8 Dcm_DebugExtForwardLastSid;
 extern volatile uint16 Dcm_DebugExtForwardLastLen;
 extern volatile uint8 Dcm_DebugExtForwardLastResult;
+#endif
 
 /* ===================== Weak application hooks ===================== */
 

@@ -24,7 +24,7 @@
 #define DCM_TX_CAN_EXT_PHYS_3    10u
 #define DCM_TX_CAN_EXT_PHYS_4    11u
 
-#define DCM_EXT_ADDR_ZGW         0x41u
+#define DCM_EXT_ADDR_ZGW         0xF0u
 #define DCM_EXT_ADDR_TESTER      0x41u
 
 #endif

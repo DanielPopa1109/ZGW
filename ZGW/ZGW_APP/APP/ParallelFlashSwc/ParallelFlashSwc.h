@@ -15,6 +15,10 @@
 #define PARALLELFLASHSWC_NODE_NAME_LEN              24u
 #define PARALLELFLASHSWC_EXT_ADDR_LEN                8u
 
+#ifndef PARALLELFLASHSWC_DEBUG_INSTRUMENTATION
+#define PARALLELFLASHSWC_DEBUG_INSTRUMENTATION       0
+#endif
+
 typedef enum
 {
     PARALLELFLASHSWC_JOB_IDLE = 0u,
@@ -120,6 +124,9 @@ Dcm_ReturnType ParallelFlashSwc_ForwardCodingRequest(uint8 extendedAddress,
                                                      Dcm_PduLengthType udsRequestLength,
                                                      uint8 *response,
                                                      Dcm_PduLengthType *responseLength);
+void ParallelFlashSwc_OnForwardTxConfirmation(PduIdType txPduId, Std_ReturnType result);
+uint8 ParallelFlashSwc_CanAcceptRoutedRequest(uint8 extendedAddress);
+uint8 ParallelFlashSwc_IsForwardTxPending(PduIdType txPduId);
 
 /* Returns the node extended address last forwarded on the given diagnostic RX PDU id
  * (E_OK), so a forwarded slave response can be tagged before relaying it to the
@@ -136,6 +143,7 @@ Std_ReturnType ParallelFlashSwc_GetLastForwardExt(uint8 *extendedAddress);
  * the ZGW receives a TesterPresent from the tester. */
 void ParallelFlashSwc_BroadcastTesterPresent(void);
 
+#if PARALLELFLASHSWC_DEBUG_INSTRUMENTATION
 extern volatile uint8 ParallelFlashSwc_DebugActiveCan;
 extern volatile uint8 ParallelFlashSwc_DebugActiveCanFd;
 extern volatile uint8 ParallelFlashSwc_DebugActiveLin;
@@ -156,5 +164,7 @@ extern volatile uint32 ParallelFlashSwc_DebugForwardQueueDepth;
 extern volatile uint32 ParallelFlashSwc_DebugForwardQueueMaxDepth;
 extern volatile uint32 ParallelFlashSwc_DebugForwardLinBusy;
 extern volatile uint32 ParallelFlashSwc_DebugForwardLinDropped;
+extern volatile uint32 ParallelFlashSwc_DebugForwardLinFastFail;
+#endif
 
 #endif

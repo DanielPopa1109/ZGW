@@ -1,5 +1,6 @@
 #include "SomeIpSd.h"
 #include "GatewaySwc.h"
+#include "EthernetDiag.h"
 #include "../../Time/TimeBase.h"
 #include <string.h>
 
@@ -484,6 +485,7 @@ void SomeIpSd_Init(const SomeIpSd_ConfigType *config)
     SomeIpSd_NextOfferTimeNs = 0ull;
     SomeIpSd_LastMainTimeNs = 0ull;
     memset(SomeIpSd_Subscriptions, 0, sizeof(SomeIpSd_Subscriptions));
+    EthernetDiag_ReportServiceAvailable(0u, TRUE);
 }
 
 void SomeIpSd_MainFunction(uint32 elapsedMs)

@@ -9,37 +9,19 @@ Channel_name = "ZGW_LIN_4  ";
 
 Nodes {
   Master: ZGW, 10 ms, 5 ms;
-  Slaves: ALT, HVDCDC, PCU48;
+  Slaves: HVDCDC;
 }
 
 
 Signals {
-	ALT_ResponseError: 1, 1, ALT, ZGW;
-	ZGW_NM3_PN1: 8, 0, ZGW, ALT;
-	PCU48_ResponseError: 1, 1, PCU48, ZGW;
 	HVDCDC_ResponseError: 1, 1, HVDCDC, ZGW;
-	ALT_OutputVoltage: 8, 0, ALT, ZGW;
-	ALT_ChargingActive: 1, 0, ALT, ZGW;
-	ALT_OutputCurrent: 8, 0, ALT, ZGW;
-	ZGW_TargetCurrent_ALT: 8, 0, ZGW, ALT;
-	ZGW_TargetVoltage_ALT: 8, 0, ZGW, ALT;
-	ALT_FieldDutyActual: 8, 0, ALT, ZGW;
-	ALT_Power: 8, 0, ALT, ZGW;
-	ALT_Temperature: 8, 0, ALT, ZGW;
-	ZGW_Enable_ALT: 1, 0, ZGW, ALT;
 	HVDCDC_LV_Voltage: 8, 0, HVDCDC, ZGW;
 	HVDCDC_LV_Current: 8, 0, HVDCDC, ZGW;
 	HVDCDC_HV_Voltage: 8, 0, HVDCDC, ZGW;
 	HVDCDC_HV_Current: 8, 0, HVDCDC, ZGW;
 	HVDCDC_ChargingActive: 1, 0, HVDCDC, ZGW;
 	ZGW_Enable_HVDCDC: 1, 0, ZGW, HVDCDC;
-	ZGW_FieldDutyCommand_ALT: 8, 0, ZGW, ALT;
 	ZGW_TargetVoltage_HVDCDC: 8, 0, ZGW, HVDCDC;
-	PCU48_SoH: 8, 0, PCU48, ZGW;
-	PCU48_SoC: 8, 0, PCU48, ZGW;
-	PCU48_Voltage: 8, 0, PCU48, ZGW;
-	PCU48_ChargeState: 8, 0, PCU48, ZGW;
-	ZGW_RequestAvailability_PCU48: 1, 0, ZGW, PCU48;
 }
 
 Diagnostic_signals {
@@ -63,15 +45,6 @@ Diagnostic_signals {
 
 
 Frames {
-	ALT_Status: 0x0A, ALT, 7 {
-		ALT_ResponseError, 0;
-		ALT_ChargingActive, 1;
-		ALT_OutputCurrent, 2;
-		ALT_OutputVoltage, 3;
-		ALT_FieldDutyActual, 4;
-		ALT_Power, 5;
-		ALT_Temperature, 6;
-	}
 	HVDCDC_Status: 0x0B, HVDCDC, 5 {
 		HVDCDC_ResponseError, 0;
 		HVDCDC_LV_Voltage, 1;
@@ -79,28 +52,9 @@ Frames {
 		HVDCDC_HV_Voltage, 3;
 		HVDCDC_HV_Current, 4;
 	}
-	ZGW_Request_ALT: 0x02, ZGW, 4 {
-		ZGW_TargetCurrent_ALT, 0;
-		ZGW_TargetVoltage_ALT, 1;
-		ZGW_Enable_ALT, 2;
-		ZGW_FieldDutyCommand_ALT, 3;
-	}
 	ZGW_Request_HVDCDC: 0x03, ZGW, 2 {
 		ZGW_Enable_HVDCDC, 0;
 		ZGW_TargetVoltage_HVDCDC, 1;
-	}
-	PCU48_Status: 0x0C, PCU48, 5 {
-		PCU48_ResponseError, 0;
-		PCU48_SoH, 1;
-		PCU48_SoC, 2;
-		PCU48_Voltage, 3;
-		PCU48_ChargeState, 4;
-	}
-	ZGW_Request_PCU48: 0x04, ZGW, 1 {
-		ZGW_RequestAvailability_PCU48, 0;
-	}
-	ZGW_NM3: 0x01, ZGW, 1 {
-		ZGW_NM3_PN1, 0;
 	}
 }
 
@@ -128,19 +82,6 @@ Diagnostic_frames {
 }
 
 Node_attributes {
-	ALT { 
-		LIN_protocol = "2.1";
-		configured_NAD = L2;
-		product_id = L0x1234,0x0001,0x01;
-		response_error = LALT_ResponseError;
-		fault_state_signals = LALT_ResponseError;
-		P2_min = L50 ms;
-		ST_min = L50 ms;
-		configurable_frames {
-			ALT_Status;
-			ZGW_Request_ALT;
-		}
-	} 
 	HVDCDC { 
 		LIN_protocol = "2.1";
 		configured_NAD = L4;
@@ -154,30 +95,12 @@ Node_attributes {
 			ZGW_Request_HVDCDC;
 		}
 	} 
-	PCU48 { 
-		LIN_protocol = "2.1";
-		configured_NAD = L3;
-		product_id = L0x1235,2,2;
-		response_error = LPCU48_ResponseError;
-		fault_state_signals = LPCU48_ResponseError;
-		P2_min = L50 ms;
-		ST_min = L50 ms;
-		configurable_frames {
-			PCU48_Status;
-			ZGW_Request_PCU48;
-		}
-	} 
 }
 
 Schedule_tables {
 	ZGW_LIN_4_Normal_Schedule_Table { 
-		ZGW_NM3 delay 10 ms;
-		ZGW_Request_PCU48 delay 10 ms;
 		ZGW_Request_HVDCDC delay 10 ms;
-		ZGW_Request_ALT delay 10 ms;
-		PCU48_Status delay 10 ms;
 		HVDCDC_Status delay 10 ms;
-		ALT_Status delay 10 ms;
 	} 
 	ZGW_LIN_4_Diagnostics_Schedule_Table { 
 		MasterReq delay 10 ms;

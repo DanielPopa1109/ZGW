@@ -6,6 +6,10 @@
 #define COM_MAX_IPDU_LEN      64u
 #define COM_MAIN_PERIOD_MS    5u
 
+#ifndef COM_DEBUG_INSTRUMENTATION
+#define COM_DEBUG_INSTRUMENTATION 0
+#endif
+
 #define COM_SIGNAL_U8         1u
 #define COM_SIGNAL_U16        2u
 #define COM_SIGNAL_U32        4u
@@ -48,6 +52,7 @@ Std_ReturnType Com_GetRxSignalDiagStatus(Com_SignalIdType SignalId,
 void Com_RxIndication(PduIdType RxPduId, const uint8* data, PduLengthType len);
 void Com_TxConfirmation(PduIdType TxPduId);
 
+#if COM_DEBUG_INSTRUMENTATION
 extern volatile uint16 Com_DebugFindSignalLastId;
 extern volatile uint16 Com_DebugFindSignalIndex;
 extern volatile uint16 Com_DebugFindSignalCount;
@@ -70,6 +75,7 @@ extern volatile uint16 Com_DebugReceiveSignalLastPduId;
 extern volatile uint8 Com_DebugReceiveSignalLastRxIdx;
 extern volatile uint8 Com_DebugReceiveSignalLastRet;
 extern volatile uint32 Com_DebugReceiveSignalLastValue;
+#endif
 
 
 /* DBC generated CAN Classic COM I-PDU IDs and Signal IDs. */
@@ -95,18 +101,7 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_RX_PDU_OUTSIDETEMPERATURESTATUS                     13u
 #define COM_RX_PDU_CENTRALCOMMAND1                              14u
 #define COM_RX_PDU_DMUSTATUS                                    15u
-#define COM_RX_PDU_ENGINEDATA7                                  16u
 #define COM_RX_PDU_BATTFULLSTAT                                 17u
-#define COM_RX_PDU_ENGINEDATA6                                  18u
-#define COM_RX_PDU_ENGINEDATA5                                  19u
-#define COM_RX_PDU_ENGINEDATA4                                  20u
-#define COM_RX_PDU_ENGINEDATA3                                  21u
-#define COM_RX_PDU_ENGINEDATA2                                  22u
-#define COM_RX_PDU_DSCDATA3                                     23u
-#define COM_RX_PDU_DSCDATA2                                     24u
-#define COM_RX_PDU_DSCDATA1                                     25u
-#define COM_RX_PDU_ENGINEDATA1                                  26u
-#define COM_RX_PDU_ASGDATA1                                     27u
 #define COM_RX_PDU_PDCSTAT                                      28u
 #define COM_RX_PDU_MILEAGE                                      29u
 #define COM_RX_PDU_DMU_ALIVE                                    30u
@@ -197,38 +192,8 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_RX_CENTRALCOMMAND1_LIGTHSENSOR                                        57u
 #define COM_SIG_RX_CENTRALCOMMAND1_CENTRALLOCKCOMMAND                                 58u
 #define COM_SIG_RX_DMUSTATUS_DISPLAYCAMERASTATUS                                59u
-#define COM_SIG_RX_ENGINEDATA7_INTAKETEMPERATURE                                  60u
-#define COM_SIG_RX_ENGINEDATA7_COOLANTTEMPERATURE                                 61u
 #define COM_SIG_RX_BATTFULLSTAT_RUNTIMEREMAINING                                   62u
 #define COM_SIG_RX_BATTFULLSTAT_TIMETOFULL                                         63u
-#define COM_SIG_RX_ENGINEDATA6_LONGTERMFUELTRIMBANK1                              64u
-#define COM_SIG_RX_ENGINEDATA6_LONGTERMFUELTRIMBANK2                              65u
-#define COM_SIG_RX_ENGINEDATA5_O2SENSORBANK1_SHORTTERMFUELTRIM                    66u
-#define COM_SIG_RX_ENGINEDATA5_O2SENSORBANK2_SHORTTERMFUELTRIM                    67u
-#define COM_SIG_RX_ENGINEDATA4_O2SENSORVOLTAGE1BANK1                              68u
-#define COM_SIG_RX_ENGINEDATA4_O2SENSORVOLTAGE1BANK2                              69u
-#define COM_SIG_RX_ENGINEDATA3_O2SENSORVOLTAGE2BANK1                              70u
-#define COM_SIG_RX_ENGINEDATA3_O2SENSORVOLTAGE2BANK2                              71u
-#define COM_SIG_RX_ENGINEDATA2_SHORTTERMFUELTRIMBANK1                             72u
-#define COM_SIG_RX_ENGINEDATA2_SHORTTERMFUELTRIMBANK2                             73u
-#define COM_SIG_RX_DSCDATA3_LATACC                                             74u
-#define COM_SIG_RX_DSCDATA3_LONGACC                                            75u
-#define COM_SIG_RX_DSCDATA2_VEHSPEED                                           76u
-#define COM_SIG_RX_DSCDATA2_YAWRATE                                            77u
-#define COM_SIG_RX_DSCDATA1_TRACTIONCONTROLSTATUS                              78u
-#define COM_SIG_RX_DSCDATA1_DSCSTATUS                                          79u
-#define COM_SIG_RX_DSCDATA1_BRAKEWHEELSTATUS                                   80u
-#define COM_SIG_RX_DSCDATA1_ABSSTATUS                                          81u
-#define COM_SIG_RX_DSCDATA1_BRAKEPRESSUREVALUE                                 82u
-#define COM_SIG_RX_ENGINEDATA1_MAFVALUE                                           83u
-#define COM_SIG_RX_ENGINEDATA1_TORQUEVALUE                                        84u
-#define COM_SIG_RX_ENGINEDATA1_PEDALSTATUS                                        85u
-#define COM_SIG_RX_ENGINEDATA1_ENGINERPM                                          86u
-#define COM_SIG_RX_ENGINEDATA1_ACTUALTORQUE                                       87u
-#define COM_SIG_RX_ASGDATA1_ASGSTATUS                                          88u
-#define COM_SIG_RX_ASGDATA1_CLUTCHSTATUS                                       89u
-#define COM_SIG_RX_ASGDATA1_SHIFTPHASE                                         90u
-#define COM_SIG_RX_ASGDATA1_CURRENTGEAR                                        91u
 #define COM_SIG_RX_PDCSTAT_PDCDISTANCEREAR                                    92u
 #define COM_SIG_RX_PDCSTAT_PDCDISTANCEFRONT                                   93u
 #define COM_SIG_RX_PDCSTAT_PDCBUZZERFRONTREAR                                 94u
@@ -273,8 +238,6 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_TX_PDU_CANFD_NM3                                                     104u
 #define COM_TX_PDU_CANFD_SDAT                                                    105u
 #define COM_TX_PDU_CANFD_LIGHTDATA1                                              106u
-#define COM_TX_PDU_CANFD_POWERTRAINDATA2                                         107u
-#define COM_TX_PDU_CANFD_POWERTRAINDATA1                                         108u
 #define COM_TX_PDU_CANFD_BODYDATA1                                               109u
 #define COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                        110u
 #define COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                        114u
@@ -351,36 +314,6 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_INTERIORLIGHTSTATUS                                           1046u
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_HIGHBEAMSTATUS                                                1047u
 #define COM_SIG_TX_CANFD_LIGHTDATA1_LD1_FOGLIGHTSSTATUS                                               1048u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_VEHSPEED                                                      1049u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_TRACTIONCONTROLSTATUS                                         1050u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_TORQUEVALUE                                                   1051u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_SHIFTPHASE                                                    1052u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_PEDALSTATUS                                                   1053u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ENGINERPM                                                     1054u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_DSCSTATUS                                                     1055u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_CURRENTGEAR                                                   1056u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_CLUTCHSTATUS                                                  1057u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_BRAKEWHEELSTATUS                                              1058u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ASGSTATUS                                                     1059u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ACTUALTORQUE                                                  1060u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_ABSSTATUS                                                     1061u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA2_PT2_BRAKEPRESSUREVALUE                                            1062u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LATACC                                                        1063u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_INTAKETEMPERATURE                                             1064u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_COOLANTTEMPERATURE                                            1065u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_YAWRATE                                                       1066u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_SHORTTERMFUELTRIMBANK2                                        1067u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_SHORTTERMFUELTRIMBANK1                                        1068u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE2BANK2                                         1069u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE2BANK1                                         1070u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE1BANK2                                         1071u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSORVOLTAGE1BANK1                                         1072u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENSB1_SHORTTERMFUELTRIM                                    1073u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_O2SENB2_SHORTTERMFUELTRIM                                     1074u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_MAFVALUE                                                      1075u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGTERMFUELTRIMBANK2                                         1076u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGTERMFUELTRIMBANK1                                         1077u
-#define COM_SIG_TX_CANFD_POWERTRAINDATA1_PT1_LONGACC                                                       1078u
 #define COM_SIG_TX_CANFD_BODYDATA1_BD1_WIPERSTOCKCOMMAND                                             1079u
 #define COM_SIG_TX_CANFD_BODYDATA1_BD1_VIBRATIONSENSORSTATUS                                         1080u
 #define COM_SIG_TX_CANFD_BODYDATA1_BD1_STATUSWIPERS                                                  1081u
@@ -415,23 +348,11 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_01                                               1134u
 #define COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_02                                               1135u
 #define COM_SIG_TX_CANFD_COMMANDLOAD_PDM1_PDM1_COMMANDLOAD_03                                               1136u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_RESPONSEERROR                                                 1146u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_CHARGINGACTIVE                                                1147u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_OUTPUTCURRENT                                                 1148u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_OUTPUTVOLTAGE                                                 1149u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_FIELDDUTYACTUAL                                               1150u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_POWER                                                         1151u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_ALT_TEMPERATURE                                                   1152u
 #define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_RESPONSEERROR                                              1153u
 #define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_VOLTAGE                                                 1154u
 #define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_LV_CURRENT                                                 1155u
 #define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_VOLTAGE                                                 1156u
 #define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_HVDCDC_HV_CURRENT                                                 1157u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_RESPONSEERROR                                               1158u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_SOH                                                         1159u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_SOC                                                         1160u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_VOLTAGE                                                     1161u
-#define COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA3_PCU48_CHARGESTATE                                                 1162u
 #define COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_01                                                1172u
 #define COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_02                                                1173u
 #define COM_SIG_RX_CANFD_PDM1_LOADSTATUS_PDM1_LOADSTATUS_03                                                1174u
@@ -676,37 +597,14 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 #define COM_SIG_RX_CANFD_PDM1_DIAGRESPONSE_PDM1_DIAGRESP_BYTE07                                              2106u
 
 /* DBC/LDF generated LIN COM I-PDU IDs and Signal IDs. */
-#define COM_TX_PDU_LIN_ZGW_NM3                             200u
-#define COM_TX_PDU_LIN_ZGW_REQUEST_ALT                     201u
 #define COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                  202u
-#define COM_TX_PDU_LIN_ZGW_REQUEST_PCU48                   203u
-#define COM_RX_PDU_LIN_ALT_STATUS                          200u
 #define COM_RX_PDU_LIN_HVDCDC_STATUS                       201u
-#define COM_RX_PDU_LIN_PCU48_STATUS                        202u
-#define COM_SIG_TX_LIN_ZGW_NM3_ZGW_NM3_PN1                                        2200u
-#define COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_TARGETCURRENT_ALT                              2201u
-#define COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_TARGETVOLTAGE_ALT                              2202u
-#define COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_ENABLE_ALT                                     2203u
-#define COM_SIG_TX_LIN_ZGW_REQUEST_ALT_ZGW_FIELDDUTYCOMMAND_ALT                           2204u
 #define COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_ENABLE_HVDCDC                                  2205u
 #define COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_TARGETVOLTAGE_HVDCDC                           2206u
-#define COM_SIG_TX_LIN_ZGW_REQUEST_PCU48_ZGW_REQUESTAVAILABILITY_PCU48                      2207u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_RESPONSEERROR                                  2208u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_CHARGINGACTIVE                                 2209u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_OUTPUTCURRENT                                  2210u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_OUTPUTVOLTAGE                                  2211u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_FIELDDUTYACTUAL                                2212u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_POWER                                          2213u
-#define COM_SIG_RX_LIN_ALT_STATUS_ALT_TEMPERATURE                                    2214u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_RESPONSEERROR                               2215u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_VOLTAGE                                  2216u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_CURRENT                                  2217u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_VOLTAGE                                  2218u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_HV_CURRENT                                  2219u
-#define COM_SIG_RX_LIN_PCU48_STATUS_PCU48_RESPONSEERROR                                2220u
-#define COM_SIG_RX_LIN_PCU48_STATUS_PCU48_SOH                                          2221u
-#define COM_SIG_RX_LIN_PCU48_STATUS_PCU48_SOC                                          2222u
-#define COM_SIG_RX_LIN_PCU48_STATUS_PCU48_VOLTAGE                                      2223u
-#define COM_SIG_RX_LIN_PCU48_STATUS_PCU48_CHARGESTATE                                  2224u
 
 #endif

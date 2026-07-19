@@ -1,0 +1,673 @@
+#include "EthernetDiag.h"
+#include "Dem.h"
+#include "Dem_Cfg.h"
+#include "EthSM.h"
+#include "SoAd.h"
+#include "TcpIpH.h"
+#include "BSW/Time/TimeBase.h"
+#include <string.h>
+
+#define ETHERNETDIAG_LINK_DEBOUNCE_MS       3000u
+#define ETHERNETDIAG_CTRL_DEBOUNCE_MS       1000u
+#define ETHERNETDIAG_ERROR_WINDOW_MS        10000u
+#define ETHERNETDIAG_RX_ERROR_THRESHOLD     8u
+#define ETHERNETDIAG_TX_ERROR_THRESHOLD     5u
+#define ETHERNETDIAG_DEFAULT_HEALING_MS     30000u
+#define ETHERNETDIAG_DOIP_DEBOUNCE_MS       25000u
+#define ETHERNETDIAG_SNAPSHOT_DATA_SIZE     71u
+#define ETHERNETDIAG_SNAPSHOT_LOCAL_IP_OFFSET           22u
+#define ETHERNETDIAG_SNAPSHOT_REMOTE_IP_OFFSET          26u
+#define ETHERNETDIAG_SNAPSHOT_LOCAL_PORT_OFFSET         30u
+#define ETHERNETDIAG_SNAPSHOT_REMOTE_PORT_OFFSET        32u
+#define ETHERNETDIAG_SNAPSHOT_SOCON_ID_OFFSET           34u
+#define ETHERNETDIAG_SNAPSHOT_CONNECTION_ID_OFFSET      35u
+#define ETHERNETDIAG_SNAPSHOT_PROTOCOL_OFFSET           36u
+#define ETHERNETDIAG_SNAPSHOT_LINK_UP_OFFSET            37u
+#define ETHERNETDIAG_SNAPSHOT_RX_ERRORS_OFFSET          38u
+#define ETHERNETDIAG_SNAPSHOT_TX_ERRORS_OFFSET          42u
+#define ETHERNETDIAG_SNAPSHOT_DMA_ERRORS_OFFSET         46u
+#define ETHERNETDIAG_SNAPSHOT_TCP_CLOSES_OFFSET         50u
+#define ETHERNETDIAG_SNAPSHOT_OPEN_FAILS_OFFSET         54u
+#define ETHERNETDIAG_SNAPSHOT_LINK_DOWNS_OFFSET         58u
+#define ETHERNETDIAG_SNAPSHOT_LISTEN_SOCKET_OFFSET      62u
+#define ETHERNETDIAG_SNAPSHOT_ACTIVE_SOCKET_OFFSET      66u
+#define ETHERNETDIAG_SNAPSHOT_SOAD_STATE_OFFSET         70u
+
+typedef struct
+{
+    Dem_EventIdType eventId;
+    uint32 debounceMs;
+    uint32 healingMs;
+    boolean failedInput;
+    boolean reportedFailed;
+    uint32 failStartMs;
+    uint32 passStartMs;
+} EthernetDiagEventRuntimeType;
+
+typedef struct
+{
+    EthernetDiagConnectionStateType state;
+    uint8 intentionalClosePending;
+    uint8 connectedOnce;
+    uint8 openFailCount;
+    uint32 startupUntilMs;
+    uint32 lastRxMs;
+    uint32 lastTxMs;
+    uint32 lastAliveMs;
+    uint32 lossStartMs;
+} EthernetDiagConnectionRuntimeType;
+
+typedef struct
+{
+    uint8 available;
+    uint8 availableOnce;
+    uint32 startupUntilMs;
+    uint32 lossStartMs;
+} EthernetDiagServiceRuntimeType;
+
+static EthernetDiagEventRuntimeType EthernetDiag_Events[ETHERNETDIAG_EVENT_COUNT];
+static EthernetDiagConnectionRuntimeType EthernetDiag_Connections[8u];
+static EthernetDiagServiceRuntimeType EthernetDiag_Services[4u];
+static uint8 EthernetDiag_Initialized;
+static uint8 EthernetDiag_LinkUp;
+static uint8 EthernetDiag_LinkUpSeen;
+static uint32 EthernetDiag_RxWindowStartMs;
+static uint32 EthernetDiag_TxWindowStartMs;
+static uint16 EthernetDiag_RxWindowErrors;
+static uint16 EthernetDiag_TxWindowErrors;
+static uint32 EthernetDiag_RxErrorCounter;
+static uint32 EthernetDiag_TxErrorCounter;
+static uint32 EthernetDiag_DmaErrorCounter;
+static uint32 EthernetDiag_TcpUnexpectedCloseCounter;
+static uint32 EthernetDiag_SocketOpenFailCounter;
+static uint32 EthernetDiag_LinkDownTransitionCounter;
+static uint8 EthernetDiag_DoipActive;
+static uint8 EthernetDiag_DoipTimedOut;
+
+static void EthernetDiag_StoreU16(uint8 *buffer, uint16 offset, uint16 value)
+{
+    buffer[offset] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)(value & 0xFFu);
+}
+
+static void EthernetDiag_StoreU32(uint8 *buffer, uint16 offset, uint32 value)
+{
+    buffer[offset] = (uint8)((value >> 24u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)((value >> 16u) & 0xFFu);
+    buffer[(uint16)(offset + 2u)] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 3u)] = (uint8)(value & 0xFFu);
+}
+
+static uint32 EthernetDiag_NowMs(void)
+{
+    return (uint32)(TimeBase_PlatformGetCounterNs() / TIMEBASE_NS_PER_MS);
+}
+
+static boolean EthernetDiag_Elapsed(uint32 nowMs, uint32 startMs, uint32 durationMs)
+{
+    return ((uint32)(nowMs - startMs) >= durationMs) ? TRUE : FALSE;
+}
+
+static boolean EthernetDiag_DeadlineReached(uint32 nowMs, uint32 deadlineMs)
+{
+    return (((sint32)(nowMs - deadlineMs)) >= 0) ? TRUE : FALSE;
+}
+
+static void EthernetDiag_SetupEvent(EthernetDiagEventType eventType,
+        Dem_EventIdType eventId,
+        uint32 debounceMs,
+        uint32 healingMs)
+{
+    EthernetDiag_Events[eventType].eventId = eventId;
+    EthernetDiag_Events[eventType].debounceMs = debounceMs;
+    EthernetDiag_Events[eventType].healingMs = healingMs;
+    EthernetDiag_Events[eventType].failedInput = FALSE;
+    EthernetDiag_Events[eventType].reportedFailed = FALSE;
+    EthernetDiag_Events[eventType].failStartMs = 0u;
+    EthernetDiag_Events[eventType].passStartMs = 0u;
+}
+
+static void EthernetDiag_SetEventInput(EthernetDiagEventType eventType, boolean failed)
+{
+    if (eventType < ETHERNETDIAG_EVENT_COUNT)
+    {
+        EthernetDiag_Events[eventType].failedInput = failed;
+    }
+}
+
+static void EthernetDiag_EvaluateEvent(EthernetDiagEventRuntimeType *event, uint32 nowMs, boolean allowed)
+{
+    if ((event == NULL_PTR) || (event->eventId == 0u) || (Dem_IsReady() == FALSE))
+    {
+        return;
+    }
+
+    if ((allowed != FALSE) && (event->failedInput != FALSE))
+    {
+        event->passStartMs = 0u;
+        if (event->failStartMs == 0u)
+        {
+            event->failStartMs = nowMs;
+        }
+
+        (void)Dem_ReportErrorStatus(event->eventId, DEM_EVENT_STATUS_PREFAILED);
+        if ((event->reportedFailed == FALSE) &&
+                (EthernetDiag_Elapsed(nowMs, event->failStartMs, event->debounceMs) != FALSE))
+        {
+            (void)Dem_ReportErrorStatus(event->eventId, DEM_EVENT_STATUS_FAILED);
+            event->reportedFailed = TRUE;
+        }
+    }
+    else
+    {
+        event->failStartMs = 0u;
+        if (event->passStartMs == 0u)
+        {
+            event->passStartMs = nowMs;
+        }
+
+        if (EthernetDiag_Elapsed(nowMs, event->passStartMs, event->healingMs) != FALSE)
+        {
+            (void)Dem_ReportErrorStatus(event->eventId, DEM_EVENT_STATUS_PASSED);
+            event->reportedFailed = FALSE;
+        }
+    }
+}
+
+static const EthernetDiagConnectionConfigType *EthernetDiag_GetConnectionConfig(EthernetDiagConnectionId id)
+{
+    uint8 i;
+
+    for (i = 0u; i < EthernetDiag_Config.connectionCount; i++)
+    {
+        if (EthernetDiag_Config.connections[i].connectionId == id)
+        {
+            return &EthernetDiag_Config.connections[i];
+        }
+    }
+
+    return NULL_PTR;
+}
+
+static boolean EthernetDiag_IsConnectionInGrace(const EthernetDiagConnectionConfigType *cfg,
+        const EthernetDiagConnectionRuntimeType *rt,
+        uint32 nowMs)
+{
+    if ((cfg == NULL_PTR) || (rt == NULL_PTR))
+    {
+        return TRUE;
+    }
+
+    return (EthernetDiag_DeadlineReached(nowMs, rt->startupUntilMs) == FALSE) ? TRUE : FALSE;
+}
+
+void EthernetDiag_Init(void)
+{
+    uint8 i;
+    uint32 nowMs;
+
+    nowMs = EthernetDiag_NowMs();
+    memset(EthernetDiag_Connections, 0, sizeof(EthernetDiag_Connections));
+    memset(EthernetDiag_Services, 0, sizeof(EthernetDiag_Services));
+
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_LINK_LOST, DEM_EVENT_ID_ETH_LINK_LOST,
+            ETHERNETDIAG_LINK_DEBOUNCE_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_CTRL_DMA_FAILURE, DEM_EVENT_ID_ETH_CTRL_DMA_FAILURE,
+            ETHERNETDIAG_CTRL_DEBOUNCE_MS, 60000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_RX_COMM_FAILURE, DEM_EVENT_ID_ETH_RX_COMM_FAILURE,
+            ETHERNETDIAG_ERROR_WINDOW_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_TX_COMM_FAILURE, DEM_EVENT_ID_ETH_TX_COMM_FAILURE,
+            ETHERNETDIAG_ERROR_WINDOW_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_TCP_UNEXPECTED_TERMINATION, DEM_EVENT_ID_ETH_TCP_UNEXPECTED_TERMINATION,
+            25000u, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_TCP_ESTABLISHMENT_FAILURE, DEM_EVENT_ID_ETH_TCP_ESTABLISHMENT_FAILURE,
+            25000u, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_UDP_SUPERVISION_TIMEOUT, DEM_EVENT_ID_ETH_UDP_SUPERVISION_TIMEOUT,
+            25000u, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_SERVICE_AVAILABILITY_FAILURE, DEM_EVENT_ID_ETH_SERVICE_AVAILABILITY_FAILURE,
+            25000u, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_DOIP_COMM_FAILURE, DEM_EVENT_ID_ETH_DOIP_COMM_FAILURE,
+            ETHERNETDIAG_DOIP_DEBOUNCE_MS, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_PARTNER_COMM_TERMINATED, DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED,
+            25000u, 45000u);
+
+    for (i = 0u; (i < EthernetDiag_Config.connectionCount) && (i < 8u); i++)
+    {
+        EthernetDiag_Connections[i].state = ETHERNETDIAG_CONN_STARTUP_GRACE;
+        EthernetDiag_Connections[i].startupUntilMs = nowMs + EthernetDiag_Config.connections[i].startupGraceMs;
+        EthernetDiag_Connections[i].lastAliveMs = nowMs;
+        EthernetDiag_Connections[i].lastRxMs = nowMs;
+        EthernetDiag_Connections[i].lastTxMs = nowMs;
+    }
+
+    for (i = 0u; (i < EthernetDiag_Config.serviceCount) && (i < 4u); i++)
+    {
+        EthernetDiag_Services[i].startupUntilMs = nowMs + EthernetDiag_Config.services[i].startupGraceMs;
+    }
+
+    EthernetDiag_RxWindowStartMs = nowMs;
+    EthernetDiag_TxWindowStartMs = nowMs;
+    EthernetDiag_Initialized = TRUE;
+}
+
+boolean EthernetDiag_IsMonitoringAllowed(void)
+{
+    EthSM_ComModeType requestedMode;
+
+    if ((EthernetDiag_Initialized == FALSE) || (Dem_IsReady() == FALSE))
+    {
+        return FALSE;
+    }
+
+    if (EthSM_GetRequestedComMode(0u, &requestedMode) != E_OK)
+    {
+        return FALSE;
+    }
+
+    if (requestedMode == ETHSM_NO_COMMUNICATION)
+    {
+        return FALSE;
+    }
+
+    if (EthSM_IsStackInitialized(0u) == FALSE)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+void EthernetDiag_MainFunction(void)
+{
+    uint8 i;
+    uint32 nowMs;
+    boolean allowed;
+    boolean tcpUnexpected;
+    boolean tcpEstFail;
+    boolean udpTimeout;
+    boolean serviceLost;
+    boolean partnerLost;
+
+    if (EthernetDiag_Initialized == FALSE)
+    {
+        EthernetDiag_Init();
+    }
+
+    nowMs = EthernetDiag_NowMs();
+    allowed = EthernetDiag_IsMonitoringAllowed();
+    tcpUnexpected = FALSE;
+    tcpEstFail = FALSE;
+    udpTimeout = FALSE;
+    serviceLost = FALSE;
+    partnerLost = FALSE;
+
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_LINK_LOST,
+            ((allowed != FALSE) && (EthernetDiag_LinkUpSeen != FALSE) && (EthernetDiag_LinkUp == FALSE)) ? TRUE : FALSE);
+
+    if (EthernetDiag_Elapsed(nowMs, EthernetDiag_RxWindowStartMs, ETHERNETDIAG_ERROR_WINDOW_MS) != FALSE)
+    {
+        EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_RX_COMM_FAILURE,
+                (EthernetDiag_RxWindowErrors >= ETHERNETDIAG_RX_ERROR_THRESHOLD) ? TRUE : FALSE);
+        EthernetDiag_RxWindowErrors = 0u;
+        EthernetDiag_RxWindowStartMs = nowMs;
+    }
+
+    if (EthernetDiag_Elapsed(nowMs, EthernetDiag_TxWindowStartMs, ETHERNETDIAG_ERROR_WINDOW_MS) != FALSE)
+    {
+        EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_TX_COMM_FAILURE,
+                (EthernetDiag_TxWindowErrors >= ETHERNETDIAG_TX_ERROR_THRESHOLD) ? TRUE : FALSE);
+        EthernetDiag_TxWindowErrors = 0u;
+        EthernetDiag_TxWindowStartMs = nowMs;
+    }
+
+    for (i = 0u; (i < EthernetDiag_Config.connectionCount) && (i < 8u); i++)
+    {
+        const EthernetDiagConnectionConfigType *cfg = &EthernetDiag_Config.connections[i];
+        EthernetDiagConnectionRuntimeType *rt = &EthernetDiag_Connections[i];
+
+        if ((cfg->mandatory == FALSE) || (EthernetDiag_IsConnectionInGrace(cfg, rt, nowMs) != FALSE))
+        {
+            continue;
+        }
+
+        if ((cfg->protocol == TCPIP_PROTOCOL_TCP) &&
+                (rt->state == ETHERNETDIAG_CONN_FAULT_PENDING))
+        {
+            tcpUnexpected = TRUE;
+            partnerLost = TRUE;
+        }
+
+        if ((cfg->protocol == TCPIP_PROTOCOL_TCP) &&
+                (rt->openFailCount >= cfg->retryLimit) &&
+                (cfg->retryLimit > 0u))
+        {
+            tcpEstFail = TRUE;
+            partnerLost = TRUE;
+        }
+
+        if ((cfg->protocol == TCPIP_PROTOCOL_UDP) &&
+                (cfg->supervisionTimeoutMs > 0u) &&
+                (EthernetDiag_Elapsed(nowMs, rt->lastRxMs, cfg->supervisionTimeoutMs) != FALSE))
+        {
+            udpTimeout = TRUE;
+            partnerLost = TRUE;
+        }
+    }
+
+    for (i = 0u; (i < EthernetDiag_Config.serviceCount) && (i < 4u); i++)
+    {
+        const EthernetDiagServiceConfigType *cfg = &EthernetDiag_Config.services[i];
+        EthernetDiagServiceRuntimeType *rt = &EthernetDiag_Services[i];
+
+        if ((cfg->mandatory != FALSE) &&
+                (rt->availableOnce != FALSE) &&
+                (rt->available == FALSE) &&
+                (EthernetDiag_DeadlineReached(nowMs, rt->startupUntilMs) != FALSE))
+        {
+            serviceLost = TRUE;
+        }
+    }
+
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_TCP_UNEXPECTED_TERMINATION, tcpUnexpected);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_TCP_ESTABLISHMENT_FAILURE, tcpEstFail);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_UDP_SUPERVISION_TIMEOUT, udpTimeout);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_SERVICE_AVAILABILITY_FAILURE, serviceLost);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_DOIP_COMM_FAILURE,
+            ((EthernetDiag_DoipTimedOut != FALSE) ||
+             ((EthernetDiag_DoipActive != FALSE) && (tcpUnexpected != FALSE))) ? TRUE : FALSE);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_PARTNER_COMM_TERMINATED,
+            ((EthernetDiag_LinkUp == FALSE) ||
+             (EthernetDiag_Events[ETHERNETDIAG_EVENT_CTRL_DMA_FAILURE].reportedFailed != FALSE)) ? FALSE : partnerLost);
+
+    for (i = 0u; i < ETHERNETDIAG_EVENT_COUNT; i++)
+    {
+        EthernetDiag_EvaluateEvent(&EthernetDiag_Events[i], nowMs, allowed);
+    }
+
+    if (EthernetDiag_Events[ETHERNETDIAG_EVENT_DOIP_COMM_FAILURE].reportedFailed == FALSE)
+    {
+        EthernetDiag_DoipTimedOut = FALSE;
+    }
+}
+
+void EthernetDiag_ReportPhyLink(boolean linkUp)
+{
+    if ((EthernetDiag_LinkUp != FALSE) && (linkUp == FALSE) &&
+            (EthernetDiag_LinkDownTransitionCounter < 0xFFFFFFFFu))
+    {
+        EthernetDiag_LinkDownTransitionCounter++;
+    }
+
+    EthernetDiag_LinkUp = (linkUp != FALSE) ? TRUE : FALSE;
+    if (linkUp != FALSE)
+    {
+        EthernetDiag_LinkUpSeen = TRUE;
+    }
+}
+
+void EthernetDiag_ReportDmaError(uint32 errorFlags)
+{
+    if (errorFlags != 0u)
+    {
+        if (EthernetDiag_DmaErrorCounter < 0xFFFFFFFFu)
+        {
+            EthernetDiag_DmaErrorCounter++;
+        }
+        EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_CTRL_DMA_FAILURE, TRUE);
+    }
+}
+
+void EthernetDiag_ReportRxError(uint32 errorFlags)
+{
+    if (errorFlags != 0u)
+    {
+        if (EthernetDiag_RxWindowErrors < 0xFFFFu)
+        {
+            EthernetDiag_RxWindowErrors++;
+        }
+        if (EthernetDiag_RxErrorCounter < 0xFFFFFFFFu)
+        {
+            EthernetDiag_RxErrorCounter++;
+        }
+    }
+}
+
+void EthernetDiag_ReportTxError(uint32 errorFlags)
+{
+    if (errorFlags != 0u)
+    {
+        if (EthernetDiag_TxWindowErrors < 0xFFFFu)
+        {
+            EthernetDiag_TxWindowErrors++;
+        }
+        if (EthernetDiag_TxErrorCounter < 0xFFFFFFFFu)
+        {
+            EthernetDiag_TxErrorCounter++;
+        }
+    }
+}
+
+void EthernetDiag_ReportSocketConnected(EthernetDiagConnectionId id)
+{
+    const EthernetDiagConnectionConfigType *cfg;
+    EthernetDiagConnectionRuntimeType *rt;
+    uint32 nowMs;
+
+    cfg = EthernetDiag_GetConnectionConfig(id);
+    if ((cfg == NULL_PTR) || (id >= 8u))
+    {
+        return;
+    }
+
+    nowMs = EthernetDiag_NowMs();
+    rt = &EthernetDiag_Connections[id];
+    rt->state = ETHERNETDIAG_CONN_CONNECTED;
+    rt->intentionalClosePending = FALSE;
+    rt->connectedOnce = TRUE;
+    rt->openFailCount = 0u;
+    rt->lastAliveMs = nowMs;
+    rt->lastRxMs = nowMs;
+    rt->lastTxMs = nowMs;
+    rt->lossStartMs = 0u;
+}
+
+void EthernetDiag_ReportSocketOpenFailed(EthernetDiagConnectionId id)
+{
+    EthernetDiagConnectionRuntimeType *rt;
+
+    if (id >= 8u)
+    {
+        return;
+    }
+
+    rt = &EthernetDiag_Connections[id];
+    if (rt->openFailCount < 0xFFu)
+    {
+        rt->openFailCount++;
+    }
+    if (EthernetDiag_SocketOpenFailCounter < 0xFFFFFFFFu)
+    {
+        EthernetDiag_SocketOpenFailCounter++;
+    }
+    rt->state = ETHERNETDIAG_CONN_CONNECTING;
+}
+
+void EthernetDiag_ReportSocketCloseRequested(EthernetDiagConnectionId id)
+{
+    if (id < 8u)
+    {
+        EthernetDiag_Connections[id].intentionalClosePending = TRUE;
+        EthernetDiag_Connections[id].state = ETHERNETDIAG_CONN_INTENTIONAL_CLOSE_PENDING;
+    }
+}
+
+void EthernetDiag_ReportSocketClosed(EthernetDiagConnectionId id, EthernetDiagCloseReasonType reason)
+{
+    EthernetDiagConnectionRuntimeType *rt;
+
+    if (id >= 8u)
+    {
+        return;
+    }
+
+    rt = &EthernetDiag_Connections[id];
+    if ((rt->intentionalClosePending != FALSE) ||
+            (reason == ETHERNETDIAG_CLOSE_INTENTIONAL) ||
+            (reason == ETHERNETDIAG_CLOSE_NORMAL) ||
+            (reason == ETHERNETDIAG_CLOSE_PEER_FIN))
+    {
+        rt->state = ETHERNETDIAG_CONN_DISCONNECTED;
+        rt->intentionalClosePending = FALSE;
+        return;
+    }
+
+    if (rt->connectedOnce != FALSE)
+    {
+        rt->state = ETHERNETDIAG_CONN_FAULT_PENDING;
+        if (EthernetDiag_TcpUnexpectedCloseCounter < 0xFFFFFFFFu)
+        {
+            EthernetDiag_TcpUnexpectedCloseCounter++;
+        }
+        if (rt->lossStartMs == 0u)
+        {
+            rt->lossStartMs = EthernetDiag_NowMs();
+        }
+    }
+}
+
+void EthernetDiag_ReportRxActivity(EthernetDiagConnectionId id)
+{
+    if (id < 8u)
+    {
+        EthernetDiag_Connections[id].lastRxMs = EthernetDiag_NowMs();
+        EthernetDiag_ReportPartnerAlive(id);
+    }
+}
+
+void EthernetDiag_ReportTxActivity(EthernetDiagConnectionId id)
+{
+    if (id < 8u)
+    {
+        EthernetDiag_Connections[id].lastTxMs = EthernetDiag_NowMs();
+    }
+}
+
+void EthernetDiag_ReportPartnerAlive(EthernetDiagConnectionId id)
+{
+    if (id < 8u)
+    {
+        EthernetDiag_Connections[id].lastAliveMs = EthernetDiag_NowMs();
+        if (EthernetDiag_Connections[id].state == ETHERNETDIAG_CONN_FAULT_PENDING)
+        {
+            EthernetDiag_Connections[id].state = ETHERNETDIAG_CONN_CONNECTED;
+        }
+    }
+}
+
+void EthernetDiag_ReportServiceAvailable(EthernetDiagServiceId id, boolean available)
+{
+    if (id < 4u)
+    {
+        EthernetDiag_Services[id].available = (available != FALSE) ? TRUE : FALSE;
+        if (available != FALSE)
+        {
+            EthernetDiag_Services[id].availableOnce = TRUE;
+        }
+    }
+}
+
+void EthernetDiag_ReportDoipActive(boolean active)
+{
+    EthernetDiag_DoipActive = (active != FALSE) ? TRUE : FALSE;
+}
+
+void EthernetDiag_ReportDoipTimeout(void)
+{
+    EthernetDiag_DoipTimedOut = TRUE;
+}
+
+EthernetDiagConnectionId EthernetDiag_GetConnectionIdForSoCon(uint8 soConId)
+{
+    uint8 i;
+
+    for (i = 0u; i < EthernetDiag_Config.connectionCount; i++)
+    {
+        if (EthernetDiag_Config.connections[i].soConId == soConId)
+        {
+            return EthernetDiag_Config.connections[i].connectionId;
+        }
+    }
+
+    return ETHERNETDIAG_CONNECTION_INVALID;
+}
+
+Std_ReturnType EthernetDiag_CaptureSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length)
+{
+    uint8 i;
+    uint8 selectedIndex;
+    SoAd_DiagSnapshotType soAdSnapshot;
+
+    if ((buffer == NULL_PTR) || (length == NULL_PTR) ||
+            (*length < ETHERNETDIAG_SNAPSHOT_DATA_SIZE))
+    {
+        return E_NOT_OK;
+    }
+
+    if ((eventId < DEM_EVENT_ID_ETH_LINK_LOST) ||
+            (eventId > DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED))
+    {
+        return E_NOT_OK;
+    }
+
+    if (Dem_Cfg_CaptureTimestampTemperatureData(buffer, length,
+            DEM_SNAPSHOT_KIND_ETHERNET) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    selectedIndex = 0u;
+    for (i = 0u; (i < EthernetDiag_Config.connectionCount) && (i < 8u); i++)
+    {
+        const EthernetDiagConnectionConfigType *cfg = &EthernetDiag_Config.connections[i];
+
+        if (((eventId == cfg->tcpTerminationEventId) ||
+                (eventId == cfg->tcpEstablishmentEventId) ||
+                (eventId == cfg->udpTimeoutEventId) ||
+                (eventId == cfg->partnerLostEventId)) &&
+                (cfg->connectionId < 8u))
+        {
+            selectedIndex = i;
+            break;
+        }
+    }
+
+    (void)memset(&soAdSnapshot, 0, sizeof(soAdSnapshot));
+    soAdSnapshot.listenSock = TCPIP_INVALID_SOCKET;
+    soAdSnapshot.activeSock = TCPIP_INVALID_SOCKET;
+    if ((selectedIndex < EthernetDiag_Config.connectionCount) &&
+            (SoAd_GetDiagSnapshot(EthernetDiag_Config.connections[selectedIndex].soConId,
+                    &soAdSnapshot) == E_OK))
+    {
+        EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_LOCAL_IP_OFFSET, soAdSnapshot.localAddr.addr);
+        EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_REMOTE_IP_OFFSET, soAdSnapshot.remoteAddr.addr);
+        EthernetDiag_StoreU16(buffer, ETHERNETDIAG_SNAPSHOT_LOCAL_PORT_OFFSET, soAdSnapshot.localAddr.port);
+        EthernetDiag_StoreU16(buffer, ETHERNETDIAG_SNAPSHOT_REMOTE_PORT_OFFSET, soAdSnapshot.remoteAddr.port);
+        buffer[ETHERNETDIAG_SNAPSHOT_SOAD_STATE_OFFSET] = (uint8)soAdSnapshot.state;
+    }
+
+    buffer[ETHERNETDIAG_SNAPSHOT_SOCON_ID_OFFSET] = EthernetDiag_Config.connections[selectedIndex].soConId;
+    buffer[ETHERNETDIAG_SNAPSHOT_CONNECTION_ID_OFFSET] = EthernetDiag_Config.connections[selectedIndex].connectionId;
+    buffer[ETHERNETDIAG_SNAPSHOT_PROTOCOL_OFFSET] = EthernetDiag_Config.connections[selectedIndex].protocol;
+    buffer[ETHERNETDIAG_SNAPSHOT_LINK_UP_OFFSET] = EthernetDiag_LinkUp;
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_RX_ERRORS_OFFSET, EthernetDiag_RxErrorCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_TX_ERRORS_OFFSET, EthernetDiag_TxErrorCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_DMA_ERRORS_OFFSET, EthernetDiag_DmaErrorCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_TCP_CLOSES_OFFSET, EthernetDiag_TcpUnexpectedCloseCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_OPEN_FAILS_OFFSET, EthernetDiag_SocketOpenFailCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_LINK_DOWNS_OFFSET, EthernetDiag_LinkDownTransitionCounter);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_LISTEN_SOCKET_OFFSET, (uint32)soAdSnapshot.listenSock);
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_ACTIVE_SOCKET_OFFSET, (uint32)soAdSnapshot.activeSock);
+
+    *length = ETHERNETDIAG_SNAPSHOT_DATA_SIZE;
+    return E_OK;
+}

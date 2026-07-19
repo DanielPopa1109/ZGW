@@ -65,7 +65,7 @@
  * SCR software, so valid-frame detection is used as the CAN FD fallback while WUF remains the ID-filtered classic CAN
  * path. SYNC requires a CAN frame without a decode error and avoids waking on raw RXD disturbances/error frames.
  */
-#define WCAN_WAKE_ON_FD_FRAME          (1u)
+#define WCAN_WAKE_ON_FD_FRAME          (0u)
 #define WCAN_WAKE_ON_SYNC_FRAME        (1u)
 
 #define WCAN_WAKE_REASON_WUF           SCR_TIME_WAKE_REASON_WCAN_WUF
@@ -195,30 +195,30 @@ static void SCR_TimeStoreU32(uint8 offset, uint32 value)
     SCR_TimeStoreU8((uint8)(offset + 3u), (uint8)value);
 }
 
-static void SCR_TimeStoreBasePlusElapsedNs(
+static void SCR_TimeStoreBasePlusElapsedNs( // @suppress("Unused static function")
         uint8 offset,
         uint32 baseHigh,
         uint32 baseLow,
         uint32 elapsedTicks)
 {
-    SCR_TimeProductLow = (elapsedTicks & 0xFFFFu) * (uint32)SCR_TIME_RTC_TICK_NS;
-    SCR_TimeProductHigh = (elapsedTicks >> 16u) * (uint32)SCR_TIME_RTC_TICK_NS;
-    SCR_TimeElapsedLow = SCR_TimeProductLow + (SCR_TimeProductHigh << 16u);
-    SCR_TimeElapsedHigh = (SCR_TimeProductHigh >> 16u);
-    if (SCR_TimeElapsedLow < SCR_TimeProductLow)
+    SCR_TimeProductLow = (elapsedTicks & 0xFFFFu) * (uint32)SCR_TIME_RTC_TICK_NS; // @suppress("Symbol is not resolved")
+    SCR_TimeProductHigh = (elapsedTicks >> 16u) * (uint32)SCR_TIME_RTC_TICK_NS; // @suppress("Symbol is not resolved")
+    SCR_TimeElapsedLow = SCR_TimeProductLow + (SCR_TimeProductHigh << 16u); // @suppress("Symbol is not resolved")
+    SCR_TimeElapsedHigh = (SCR_TimeProductHigh >> 16u); // @suppress("Symbol is not resolved")
+    if (SCR_TimeElapsedLow < SCR_TimeProductLow) // @suppress("Symbol is not resolved")
     {
-        SCR_TimeElapsedHigh++;
+        SCR_TimeElapsedHigh++; // @suppress("Symbol is not resolved")
     }
 
-    SCR_TimeCurrentLow = baseLow + SCR_TimeElapsedLow;
-    SCR_TimeCurrentHigh = baseHigh + SCR_TimeElapsedHigh;
-    if (SCR_TimeCurrentLow < baseLow)
+    SCR_TimeCurrentLow = baseLow + SCR_TimeElapsedLow; // @suppress("Symbol is not resolved")
+    SCR_TimeCurrentHigh = baseHigh + SCR_TimeElapsedHigh; // @suppress("Symbol is not resolved")
+    if (SCR_TimeCurrentLow < baseLow) // @suppress("Symbol is not resolved")
     {
-        SCR_TimeCurrentHigh++;
+        SCR_TimeCurrentHigh++; // @suppress("Symbol is not resolved")
     }
 
-    SCR_TimeStoreU32(offset, SCR_TimeCurrentHigh);
-    SCR_TimeStoreU32((uint8)(offset + 4u), SCR_TimeCurrentLow);
+    SCR_TimeStoreU32(offset, SCR_TimeCurrentHigh); // @suppress("Symbol is not resolved")
+    SCR_TimeStoreU32((uint8)(offset + 4u), SCR_TimeCurrentLow); // @suppress("Symbol is not resolved")
 }
 
 #if (SCR_TIME_USE_WDT_FALLBACK != 0u)
@@ -233,7 +233,7 @@ static void SCR_WdtAccumUpdate(void)
 }
 #endif
 
-static uint32 SCR_RtcReadCounter(void)
+static uint32 SCR_RtcReadCounter(void) // @suppress("Unused static function")
 {
     uint8 cnt3Before;
     uint8 cnt3After;
@@ -275,7 +275,7 @@ static uint32 SCR_RtcReadCounter(void)
  * reduced to debug-register reads and must not write ELAPSED/UTC/VEHICLE_NS.
  */
 #if (SCR_TIME_USE_RTC_INTERRUPT != 0u)
-void SCR_RtcCompareIsr(void) __interrupt(XINTR13)
+void SCR_RtcCompareIsr(void) __interrupt(XINTR13) // @suppress("Unused function declaration")
 {
     uint8 flags;
     uint32 previousLow;
@@ -411,16 +411,16 @@ static void SCR_TimeInit(void)
     }
     else
     {
-        SCR_TimeBaseUtcHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_UTC_NS);
-        SCR_TimeBaseUtcLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_UTC_NS + 4u));
-        SCR_TimeBaseVehicleHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_VEHICLE_NS);
-        SCR_TimeBaseVehicleLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_VEHICLE_NS + 4u));
+        SCR_TimeBaseUtcHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_UTC_NS); // @suppress("Symbol is not resolved")
+        SCR_TimeBaseUtcLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_UTC_NS + 4u)); // @suppress("Symbol is not resolved")
+        SCR_TimeBaseVehicleHigh = SCR_TimeLoadU32(SCR_TIME_OFFSET_VEHICLE_NS); // @suppress("Symbol is not resolved")
+        SCR_TimeBaseVehicleLow = SCR_TimeLoadU32((uint8)(SCR_TIME_OFFSET_VEHICLE_NS + 4u)); // @suppress("Symbol is not resolved")
 
         SCR_TimeBaseActive = 1u;
 
 #if (SCR_TIME_USE_RTC_INTERRUPT != 0u)
-        SCR_TotalElapsedTicksLow = 0u;
-        SCR_TotalElapsedTicksHigh = 0u;
+        SCR_TotalElapsedTicksLow = 0u; // @suppress("Symbol is not resolved")
+        SCR_TotalElapsedTicksHigh = 0u; // @suppress("Symbol is not resolved")
 #elif (SCR_TIME_USE_WDT_FALLBACK != 0u)
         SCR_WdtAccumTicks = 0u;
         SCR_WdtPrevCount = ((uint16)SCR_WDT_H << 8) | (uint16)SCR_WDT_L;
@@ -751,16 +751,16 @@ char WCAN_Init(void)
     SCR_WCAN_PAGE = 0x0 ;
     SCR_WCAN_CFG = WCAN_CFG_CCE | WCAN_CFG_WCAN_EN; // CCE=1, SELWK_EN=0, WCAN_EN=1 --> according to UM
     SCR_WCAN_INTMRSLT = WCAN_INT_ENABLE_WUF_ONLY;
-    SCR_WCAN_FD_CTRL = 0x01 ; // Enable CAN FD tolerant mode
+    SCR_WCAN_FD_CTRL = 0x00 ; // Classic CAN wake path
     *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_CFG_WRITTEN;
 
     /*****************************************************************
      * 3. Configure CDR,CAN FD and Baud Rate Configuration registers
      *****************************************************************/
     SCR_WCAN_PAGE = 0x1;
-    SCR_WCAN_FRMERRCNT = (1<<6); // Do not count CAN FD frames as wake-up frame errors
+    SCR_WCAN_FRMERRCNT = 0x00u;
     SCR_WCAN_DLC_CTRL = WCAN_WAKE_DLC_VALUE ; // 8 bytes of wake data
-    SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure nominal Baud Rate of 500 kbit/s
+    SCR_WCAN_BTL1_CTRL = 0x64 ; // Configure classic CAN Baud Rate of 500 kbit/s
     SCR_WCAN_BTL2_CTRL = (1<<6) | (0x33<<0) ; // BRP=01(Divide by 2) and SP=0x33 represents ~80%SP
     WCAN_ClearEvents();
     *G_BOOT_STAGE_ADDR = BOOT_STAGE_WCAN_BITTIMING;

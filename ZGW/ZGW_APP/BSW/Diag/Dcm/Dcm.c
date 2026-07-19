@@ -33,7 +33,6 @@ typedef enum
 
 #define DCM_DTC_FORMAT_IDENTIFIER_UDS  0x01u
 #define DCM_RESET_INFO_ENTER_FBL       0xFCD0u
-#define DCM_ROUTINE_SELECT_FBL_INTERFACE 0x0205u
 /* UDS has no dedicated server-side operation timeout NRC. */
 #define DCM_PENDING_TIMEOUT_NRC        DCM_NRC_GENERAL_REJECT
 #define DCM_TX_CONFIRM_TIMEOUT_TICKS   400u
@@ -95,11 +94,21 @@ typedef struct
 
 
 long long Dcm_MainFunction_Counter = 0;
+#if DCM_DEBUG_INSTRUMENTATION
 volatile uint32 Dcm_DebugExtForwardRequests = 0u;
 volatile uint8 Dcm_DebugExtForwardLastExt = 0u;
 volatile uint8 Dcm_DebugExtForwardLastSid = 0u;
 volatile uint16 Dcm_DebugExtForwardLastLen = 0u;
 volatile uint8 Dcm_DebugExtForwardLastResult = DCM_E_NOT_OK;
+#endif
+
+#if DCM_DEBUG_INSTRUMENTATION
+#define DCM_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define DCM_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define DCM_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#define DCM_DEBUG_INC(lhs) do { (void)0; } while (0)
+#endif
 
 /* ===================== Static ===================== */
 
@@ -201,7 +210,7 @@ static Dcm_PduLengthType Dcm_GetTxPayloadLimit(uint8 connIdx)
 
     /* Lab deviation: classic CAN also allowed the full multi-frame length.
      * CanTp carries it via the ISO 15765-2 32-bit escape FirstFrame (see
-     * CanTp_CanUseExtendedFfLength). Capped by CANTP_MAX_PAYLOAD_LEN (8192). */
+     * CanTp_CanUseExtendedFfLength). Capped by CANTP_MAX_PAYLOAD_LEN. */
     if ((busType == DCM_BUS_CAN_CLASSIC) ||
             (busType == DCM_BUS_CAN_FD) ||
             (busType == DCM_BUS_ETHERNET))
@@ -458,13 +467,11 @@ static Dcm_ReturnType Dcm_DiagnosticSessionControl(uint8 connIdx, Dcm_OpStatusTy
 static Dcm_ReturnType Dcm_EcuReset(uint8 connIdx, Dcm_OpStatusType opStatus, uint8 resetType, uint8* respData, Dcm_PduLengthType* respLen);
 static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session);
 static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType);
-static uint8 Dcm_NormalizeFblInterface(uint8 requestedInterface);
 static void Dcm_ResetDelay(void);
 static Dcm_ReturnType Dcm_ClearDiagnosticInformation(uint8 connIdx, Dcm_OpStatusType opStatus, uint32 dtcGroup);
 static Dcm_ReturnType Dcm_ReadDtcInformation(uint8 connIdx, Dcm_OpStatusType opStatus, const uint8* reqData, Dcm_PduLengthType reqLen, uint8* respData, Dcm_PduLengthType* respLen);
 static Dcm_ReturnType Dcm_ReadDtcByStatusMask(uint8 subFunction, uint8 statusMask, uint8* respData, Dcm_PduLengthType* respLen);
 static Dcm_ReturnType Dcm_ReadDtcSnapshotDataByDtc(uint8 subFunction, Dem_DTCType dtc, uint8 recordNumber, uint8* respData, Dcm_PduLengthType* respLen);
-static Dcm_ReturnType Dcm_SelectFblInterfaceRoutine(uint8 routineControlType, const uint8* reqData, Dcm_PduLengthType reqLen, uint8* respData, Dcm_PduLengthType* respLen);
 
 /* Services */
 static Dcm_ReturnType Dcm_Service_0x10(uint8, Dcm_OpStatusType, const uint8*, Dcm_PduLengthType, uint8*, Dcm_PduLengthType*);
@@ -898,6 +905,34 @@ uint8 Dcm_GetActiveSession(uint8 connIdx)
     return Dcm_Conn[connIdx].session;
 }
 
+uint8 Dcm_HasActiveEthernetDiagnosticConnection(void)
+{
+    uint8 i;
+
+    if (Dcm_ConfigPtr == NULL_PTR)
+    {
+        return FALSE;
+    }
+
+    for (i = 0u; (i < Dcm_ConfigPtr->numConnections) && (i < DCM_MAX_CONNECTIONS); i++)
+    {
+        if (Dcm_ConfigPtr->connections[i].busType != DCM_BUS_ETHERNET)
+        {
+            continue;
+        }
+
+        if ((Dcm_Conn[i].session != DCM_SESSION_DEFAULT) ||
+            (Dcm_Conn[i].state != DCM_CONN_IDLE) ||
+            (Dcm_Conn[i].qCount != 0u) ||
+            (Dcm_Conn[i].rxInProgress != FALSE))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 void Dcm_TxConfirmation(PduIdType txPduId, Std_ReturnType result)
 {
     Dcm_TpTxConfirmation(
@@ -1072,9 +1107,10 @@ static uint8 Dcm_TryRelayForwardedResponse(uint8 connIdx)
         return TRUE;
     }
 
-    /* Shared LIN connection (0x712/0x71A) with no forward record falls through to
-     * normal request processing. */
-    return FALSE;
+    /* Shared LIN connection (0x712/0x71A) with no forward record is consumed here.
+     * LIN forwarding uses explicit master requests per NAD; do not let stray LIN
+     * diagnostic traffic fall through into local ZGW service handling. */
+    return TRUE;
 }
 
 void Dcm_TpRxIndication(Dcm_PduIdType id, Dcm_NotifResultType result)
@@ -1723,13 +1759,13 @@ static Dcm_ReturnType Dcm_Service_ExtendedAddressForward(
     Dcm_ReturnType result;
 
     extendedAddress = Dcm_Conn[connIdx].sid;
-    Dcm_DebugExtForwardRequests++;
-    Dcm_DebugExtForwardLastExt = extendedAddress;
-    Dcm_DebugExtForwardLastSid = ((req != NULL_PTR) && (len > 0u)) ? req[0] : 0u;
-    Dcm_DebugExtForwardLastLen = (uint16)len;
+    DCM_DEBUG_INC(Dcm_DebugExtForwardRequests);
+    DCM_DEBUG_ASSIGN(Dcm_DebugExtForwardLastExt, extendedAddress);
+    DCM_DEBUG_ASSIGN(Dcm_DebugExtForwardLastSid, ((req != NULL_PTR) && (len > 0u)) ? req[0] : 0u);
+    DCM_DEBUG_ASSIGN(Dcm_DebugExtForwardLastLen, (uint16)len);
 
     result = ParallelFlashSwc_ForwardCodingRequest(extendedAddress, opStatus, req, len, resp, respLen);
-    Dcm_DebugExtForwardLastResult = result;
+    DCM_DEBUG_ASSIGN(Dcm_DebugExtForwardLastResult, result);
     return result;
 }
 
@@ -1789,6 +1825,12 @@ static Dcm_ReturnType Dcm_PollNvMWriteAllBeforeDiagnosticReset(
         if (nvmStatus != NVM_IDLE)
         {
             return Dcm_NvMWriteAllPending(connIdx);
+        }
+
+        if (Dem_Shutdown() != E_OK)
+        {
+            Dcm_ResetNvMWriteAllState();
+            return DCM_NRC_GENERAL_PROGRAMMING_FAILURE;
         }
 
         if (NvM_WriteAll() != E_OK)
@@ -1918,12 +1960,16 @@ static Dcm_ReturnType Dcm_Service_0x11(
 
     ret = Dcm_EcuReset(connIdx, opStatus, resetType, &resp[1], respLen);
 
+    if ((ret == DCM_E_OK) && (resetType == 0x01u))
+    {
+        ret = Dcm_PollNvMWriteAllBeforeDiagnosticReset(
+                connIdx,
+                DCM_SID_ECU_RESET,
+                opStatus);
+    }
+
     if (ret == DCM_E_OK)
     {
-        /* Coding writes are explicitly committed before the tester sends ECUReset.
-         * Do not hold hardReset behind a global NvM_WriteAll: if Fee/NvM remains
-         * busy, DCM exhausts its pending-response budget, sends 7F 11 10, then
-         * still resets on TX confirmation of that negative response. */
         Dcm_Conn[connIdx].pendingResetAfterResponse = TRUE;
         Dcm_Conn[connIdx].resetAfterResponse = resetType;
         resp[0] = resetType;
@@ -1990,7 +2036,7 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
 
     if (session == DCM_SESSION_PROGRAMMING)
     {
-        McuSm_FBL_CommInterface = Dcm_NormalizeFblInterface(McuSm_FBL_CommInterface);
+        McuSm_FBL_CommInterface = MCUSM_FBL_COMM_ETHERNET;
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_ACTIVE;
         Dcm_ResetDelay();
         SysMgr_ClearMcuSmSwErrorTriggerData();
@@ -2020,17 +2066,6 @@ static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
         Dcm_HardResetCountdown = DCM_HARD_RESET_DELAY_TICKS;
         Dcm_HardResetNvMDrainCountdown = DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS;
     }
-}
-
-static uint8 Dcm_NormalizeFblInterface(uint8 requestedInterface)
-{
-    if ((requestedInterface == MCUSM_FBL_COMM_CANFD) ||
-            (requestedInterface == MCUSM_FBL_COMM_CAN_CLASSIC))
-    {
-        return requestedInterface;
-    }
-
-    return MCUSM_FBL_COMM_ETHERNET;
 }
 
 static void Dcm_ResetDelay(void)
@@ -2486,15 +2521,6 @@ static Dcm_ReturnType Dcm_Service_0x31(
                 &resp[3],
                 respLen);
     }
-    else if (routineId == DCM_ROUTINE_SELECT_FBL_INTERFACE)
-    {
-        ret = Dcm_SelectFblInterfaceRoutine(
-                routineControlType,
-                &req[3],
-                (Dcm_PduLengthType)(len - 3u),
-                &resp[3],
-                respLen);
-    }
     else
     {
         ret = DcmAppl_RoutineControl(
@@ -2517,35 +2543,6 @@ static Dcm_ReturnType Dcm_Service_0x31(
     }
 
     return ret;
-}
-
-static Dcm_ReturnType Dcm_SelectFblInterfaceRoutine(
-        uint8 routineControlType,
-        const uint8* reqData,
-        Dcm_PduLengthType reqLen,
-        uint8* respData,
-        Dcm_PduLengthType* respLen)
-{
-    if (routineControlType != 0x01u)
-    {
-        return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
-    }
-
-    if ((reqData == NULL_PTR) || (respData == NULL_PTR) || (respLen == NULL_PTR))
-    {
-        return DCM_NRC_GENERAL_REJECT;
-    }
-
-    if (reqLen != 1u)
-    {
-        return DCM_NRC_INCORRECT_LENGTH;
-    }
-
-    McuSm_FBL_CommInterface = Dcm_NormalizeFblInterface(reqData[0u]);
-    McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
-    respData[0u] = McuSm_FBL_CommInterface;
-    *respLen = 1u;
-    return DCM_E_OK;
 }
 
 static Dcm_ReturnType Dcm_Service_0x34(

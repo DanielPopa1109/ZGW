@@ -14,10 +14,11 @@
 #define PARALLELFLASHSWC_ERROR_BUSY                 2u
 #define PARALLELFLASHSWC_ERROR_TRANSPORT            3u
 #define PARALLELFLASHSWC_ERROR_ZGW_PREREQ_FAILED    4u
-#define PARALLELFLASHSWC_FORWARD_MAX_REQUEST        CANTP_MAX_PAYLOAD_LEN
-#define PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH        40u
-#define PARALLELFLASHSWC_FORWARD_QUEUE_PAYLOAD_LEN  320u
+#define PARALLELFLASHSWC_FORWARD_MAX_REQUEST        DCM_CLASSIC_ISOTP_MAX_LEN
+#define PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH        6u
+#define PARALLELFLASHSWC_FORWARD_QUEUE_PAYLOAD_LEN  DCM_CLASSIC_ISOTP_MAX_LEN
 #define PARALLELFLASHSWC_FORWARD_DISPATCH_BUDGET    12u
+#define PARALLELFLASHSWC_FORWARD_ACK_MAX_LEN         8u
 /* FCD dry-run forwarding must drain even when simulated targets do not send FC. */
 #define PARALLELFLASHSWC_FORWARD_ASSUME_CAN_FC      TRUE
 
@@ -41,10 +42,31 @@ typedef struct
     uint8 data[PARALLELFLASHSWC_FORWARD_QUEUE_PAYLOAD_LEN];
 } ParallelFlashSwc_ForwardQueueEntryType;
 
+typedef struct
+{
+    uint8 valid;
+    uint8 extendedAddress;
+    uint8 sid;
+    uint8 reqByte1;
+    uint8 reqByte2;
+    uint8 reqByte3;
+    Dcm_PduLengthType requestLength;
+} ParallelFlashSwc_ForwardTxAckContextType;
+
+typedef struct
+{
+    uint8 valid;
+    uint8 extendedAddress;
+    uint8 length;
+    uint8 data[PARALLELFLASHSWC_FORWARD_ACK_MAX_LEN];
+} ParallelFlashSwc_ForwardTxAckPendingType;
+
 static ParallelFlashSwc_RuntimeType ParallelFlashSwc_Runtime;
-static ParallelFlashSwc_ForwardQueueEntryType ParallelFlashSwc_ForwardQueue[PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH] AURIX_LMU_CACHED_BSS;
+static ParallelFlashSwc_ForwardQueueEntryType ParallelFlashSwc_ForwardQueue[PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH] AURIX_LMU_CPU0_CACHED_BSS;
 static uint32 ParallelFlashSwc_ForwardSequence = 0u;
 static uint8 ParallelFlashSwc_ForwardQueueProcessing = FALSE;
+static uint8 ParallelFlashSwc_LinForwardActive;
+static uint8 ParallelFlashSwc_LinForwardExt;
 
 /* Correlation map for the routed-response relay. Records the node extended address
  * last forwarded on each diagnostic TP PDU id (the DCM TX and RX PDU id spaces share
@@ -55,6 +77,8 @@ static uint8 ParallelFlashSwc_ForwardQueueProcessing = FALSE;
 #define PARALLELFLASHSWC_RESP_EXT_PDU_COUNT 12u
 static uint8 ParallelFlashSwc_RespExtByPdu[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 static uint8 ParallelFlashSwc_RespExtValid[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
+static ParallelFlashSwc_ForwardTxAckContextType ParallelFlashSwc_ForwardTxAckCtx[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
+static ParallelFlashSwc_ForwardTxAckPendingType ParallelFlashSwc_ForwardTxAckPending[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 
 /* The most recently forwarded node extended address. The two CanTp channels per CAN
  * bus share one diagnostic RX CAN-ID, so after a single-frame request the channel
@@ -64,6 +88,10 @@ static uint8 ParallelFlashSwc_RespExtValid[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
  * correct tag in that case. */
 static uint8 ParallelFlashSwc_LastForwardExt;
 static uint8 ParallelFlashSwc_LastForwardExtValid;
+
+extern Std_ReturnType PduR_DoIPRelayForwardedResponse(uint8 extendedAddress,
+                                                      const uint8* data,
+                                                      uint16 len);
 
 static const PduIdType ParallelFlashSwc_CanExtTxPdus[] =
 {
@@ -76,6 +104,7 @@ static const PduIdType ParallelFlashSwc_CanFdExtTxPdus[] =
     DCM_TX_CANFD_EXT_PHYS
 };
 
+#if PARALLELFLASHSWC_DEBUG_INSTRUMENTATION
 volatile uint8 ParallelFlashSwc_DebugActiveCan = 0u;
 volatile uint8 ParallelFlashSwc_DebugActiveCanFd = 0u;
 volatile uint8 ParallelFlashSwc_DebugActiveLin = 0u;
@@ -96,12 +125,20 @@ volatile uint32 ParallelFlashSwc_DebugForwardQueueDepth = 0u;
 volatile uint32 ParallelFlashSwc_DebugForwardQueueMaxDepth = 0u;
 volatile uint32 ParallelFlashSwc_DebugForwardLinBusy = 0u;
 volatile uint32 ParallelFlashSwc_DebugForwardLinDropped = 0u;
+volatile uint32 ParallelFlashSwc_DebugForwardLinFastFail = 0u;
+#define PARALLELFLASHSWC_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define PARALLELFLASHSWC_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define PARALLELFLASHSWC_DEBUG_ASSIGN(lhs, rhs) do { } while (0)
+#define PARALLELFLASHSWC_DEBUG_INC(lhs) do { } while (0)
+#endif
 
 static Std_ReturnType ParallelFlashSwc_ValidateBundle(const ParallelFlashSwc_JobBundleType *bundle);
 static void ParallelFlashSwc_ResetRuntime(void);
 static void ParallelFlashSwc_ResetForwardQueue(void);
 static void ParallelFlashSwc_UpdateDebug(void);
 static void ParallelFlashSwc_ProcessForwardQueue(void);
+static void ParallelFlashSwc_ProcessForwardAcks(void);
 static void ParallelFlashSwc_SchedulePhase(ParallelFlashSwc_PhaseType phase);
 static void ParallelFlashSwc_AdvanceActiveContexts(void);
 static boolean ParallelFlashSwc_PhaseComplete(ParallelFlashSwc_PhaseType phase);
@@ -135,6 +172,7 @@ static Std_ReturnType ParallelFlashSwc_MapLinExtendedAddressToNad(uint8 extended
 static uint8 ParallelFlashSwc_FindDispatchableForwardEntry(void);
 static uint8 ParallelFlashSwc_HasQueuedForwardEntryForAddress(uint8 extendedAddress);
 static uint8 ParallelFlashSwc_HasOlderForwardEntryForAddress(uint8 entryIndex);
+static uint8 ParallelFlashSwc_SelectDispatchableLinEntry(void);
 static Std_ReturnType ParallelFlashSwc_FindForwardBus(uint8 extendedAddress,
                                                       GatewaySwc_BusType *busType);
 static Std_ReturnType ParallelFlashSwc_SendDiagnosticFrame(const PduIdType *canTpTxSduIds,
@@ -148,6 +186,15 @@ static Dcm_ReturnType ParallelFlashSwc_BuildForwardNrc(uint8 extendedAddress,
                                                        uint8 *response,
                                                        Dcm_PduLengthType *responseLength);
 static void ParallelFlashSwc_RecordForwardResponseExt(PduIdType pduId, uint8 extendedAddress);
+static void ParallelFlashSwc_RecordForwardTxAck(PduIdType pduId,
+                                                uint8 extendedAddress,
+                                                const uint8 *udsRequest,
+                                                Dcm_PduLengthType udsRequestLength);
+static uint8 ParallelFlashSwc_HasFreeForwardQueueSlot(void);
+static void ParallelFlashSwc_BuildForwardTxAckResponse(const ParallelFlashSwc_ForwardTxAckContextType *context,
+                                                       Std_ReturnType result,
+                                                       uint8 *response,
+                                                       uint8 *responseLength);
 
 void ParallelFlashSwc_Init(void)
 {
@@ -165,6 +212,7 @@ void ParallelFlashSwc_MainFunction(void)
     }
 
     ParallelFlashSwc_ProcessForwardQueue();
+    ParallelFlashSwc_ProcessForwardAcks();
 
     ParallelFlashSwc_Runtime.status.mainCycles++;
 
@@ -277,6 +325,45 @@ Std_ReturnType ParallelFlashSwc_GetTargetContext(uint8 index, ParallelFlashSwc_T
     return E_OK;
 }
 
+uint8 ParallelFlashSwc_CanAcceptRoutedRequest(uint8 extendedAddress)
+{
+    GatewaySwc_BusType busType;
+    uint8 linNad;
+
+    if (ParallelFlashSwc_FindForwardBus(extendedAddress, &busType) != E_OK)
+    {
+        return FALSE;
+    }
+
+    if (busType != GATEWAYSWC_BUS_LIN)
+    {
+        return TRUE;
+    }
+
+    if (ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK)
+    {
+        return FALSE;
+    }
+
+    if ((ParallelFlashSwc_LinForwardActive != FALSE) ||
+        (ParallelFlashSwc_HasQueuedForwardEntryForAddress(extendedAddress) != FALSE))
+    {
+        return ParallelFlashSwc_HasFreeForwardQueueSlot();
+    }
+
+    return (LinTp_CanStartTransmitToNadNow(linNad) != FALSE) ? TRUE : ParallelFlashSwc_HasFreeForwardQueueSlot();
+}
+
+uint8 ParallelFlashSwc_IsForwardTxPending(PduIdType txPduId)
+{
+    if ((uint16)txPduId >= PARALLELFLASHSWC_RESP_EXT_PDU_COUNT)
+    {
+        return FALSE;
+    }
+
+    return ParallelFlashSwc_ForwardTxAckCtx[txPduId].valid;
+}
+
 Dcm_ReturnType ParallelFlashSwc_ForwardCodingRequest(uint8 extendedAddress,
                                                      Dcm_OpStatusType opStatus,
                                                      const uint8 *udsRequest,
@@ -294,9 +381,9 @@ Dcm_ReturnType ParallelFlashSwc_ForwardCodingRequest(uint8 extendedAddress,
                                                 responseLength);
     }
 
-    ParallelFlashSwc_DebugForwardRequests++;
-    ParallelFlashSwc_DebugForwardLastExt = extendedAddress;
-    ParallelFlashSwc_DebugForwardLastSid = udsRequest[0];
+    PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardRequests);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardLastExt, extendedAddress);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardLastSid, udsRequest[0]);
 
     if (opStatus == DCM_INITIAL)
     {
@@ -323,9 +410,9 @@ void ParallelFlashSwc_BroadcastTesterPresent(void)
      * forwarded to each node individually - the same path every routed request uses. */
     static const uint8 nodes[] =
     {
-        0x42u,                                                  /* CAN-FD: PDM1              */
-        0x50u, 0x51u, 0x52u,                                   /* LIN:    ALT, HVDCDC, PCU48 */
-        0x53u, 0x54u, 0x55u, 0x56u, 0x57u, 0x58u, 0x59u        /* CAN:    AGS..FRBE          */
+        0x42u,                                /* CAN-FD: PDM1              */
+        0x51u,                                /* LIN:    HVDCDC            */
+        0x54u, 0x56u, 0x58u, 0x59u          /* CAN:    CBM, DMU, ELC, FRBE */
     };
     /* 3E 80: TesterPresent, suppressPositiveResponse - the nodes refresh their session
      * timeout without replying, so no response relay traffic is generated. */
@@ -379,10 +466,14 @@ static void ParallelFlashSwc_ResetRuntime(void)
 static void ParallelFlashSwc_ResetForwardQueue(void)
 {
     (void)memset(ParallelFlashSwc_ForwardQueue, 0, sizeof(ParallelFlashSwc_ForwardQueue));
+    (void)memset(ParallelFlashSwc_ForwardTxAckCtx, 0, sizeof(ParallelFlashSwc_ForwardTxAckCtx));
+    (void)memset(ParallelFlashSwc_ForwardTxAckPending, 0, sizeof(ParallelFlashSwc_ForwardTxAckPending));
     ParallelFlashSwc_ForwardSequence = 0u;
     ParallelFlashSwc_ForwardQueueProcessing = FALSE;
-    ParallelFlashSwc_DebugForwardQueueDepth = 0u;
-    ParallelFlashSwc_DebugForwardQueueMaxDepth = 0u;
+    ParallelFlashSwc_LinForwardActive = FALSE;
+    ParallelFlashSwc_LinForwardExt = 0u;
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueDepth, 0u);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueMaxDepth, 0u);
 }
 
 static void ParallelFlashSwc_UpdateDebug(void)
@@ -390,12 +481,12 @@ static void ParallelFlashSwc_UpdateDebug(void)
     ParallelFlashSwc_Runtime.status.activeCan = ParallelFlashSwc_GetActiveBusCount(GATEWAYSWC_BUS_CAN);
     ParallelFlashSwc_Runtime.status.activeCanFd = ParallelFlashSwc_GetActiveBusCount(GATEWAYSWC_BUS_CANFD);
     ParallelFlashSwc_Runtime.status.activeLin = ParallelFlashSwc_GetActiveBusCount(GATEWAYSWC_BUS_LIN);
-    ParallelFlashSwc_DebugActiveCan = ParallelFlashSwc_Runtime.status.activeCan;
-    ParallelFlashSwc_DebugActiveCanFd = ParallelFlashSwc_Runtime.status.activeCanFd;
-    ParallelFlashSwc_DebugActiveLin = ParallelFlashSwc_Runtime.status.activeLin;
-    ParallelFlashSwc_DebugCompletedJobs = ParallelFlashSwc_Runtime.status.completedJobs;
-    ParallelFlashSwc_DebugFailedJobs = ParallelFlashSwc_Runtime.status.failedJobs;
-    ParallelFlashSwc_DebugLastError = ParallelFlashSwc_Runtime.status.lastError;
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugActiveCan, ParallelFlashSwc_Runtime.status.activeCan);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugActiveCanFd, ParallelFlashSwc_Runtime.status.activeCanFd);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugActiveLin, ParallelFlashSwc_Runtime.status.activeLin);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugCompletedJobs, ParallelFlashSwc_Runtime.status.completedJobs);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugFailedJobs, ParallelFlashSwc_Runtime.status.failedJobs);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugLastError, ParallelFlashSwc_Runtime.status.lastError);
 }
 
 static void ParallelFlashSwc_SchedulePhase(ParallelFlashSwc_PhaseType phase)
@@ -726,17 +817,21 @@ static Std_ReturnType ParallelFlashSwc_TransportForwardCodingRequest(uint8 exten
 
     if (busType == GATEWAYSWC_BUS_LIN)
     {
-        if ((ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK) ||
-            (LinTp_CanAcceptTransmitToNad(linNad) == FALSE))
+        if (ParallelFlashSwc_MapLinExtendedAddressToNad(extendedAddress, &linNad) != E_OK)
         {
-            ParallelFlashSwc_DebugForwardLinBusy++;
-            return E_OK;
+            return E_NOT_OK;
         }
     }
 
-    if ((busType != GATEWAYSWC_BUS_LIN) &&
-        (ParallelFlashSwc_HasQueuedForwardEntryForAddress(extendedAddress) != FALSE))
+    if (ParallelFlashSwc_HasQueuedForwardEntryForAddress(extendedAddress) != FALSE)
     {
+        return ParallelFlashSwc_QueueForwardRequest(extendedAddress, busType, udsRequest, udsRequestLength);
+    }
+
+    if ((busType == GATEWAYSWC_BUS_LIN) &&
+        (LinTp_CanStartTransmitToNadNow(linNad) == FALSE))
+    {
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardLinBusy);
         return ParallelFlashSwc_QueueForwardRequest(extendedAddress, busType, udsRequest, udsRequestLength);
     }
 
@@ -748,8 +843,9 @@ static Std_ReturnType ParallelFlashSwc_TransportForwardCodingRequest(uint8 exten
 
     if (busType == GATEWAYSWC_BUS_LIN)
     {
-        ParallelFlashSwc_DebugForwardLinBusy++;
-        return E_OK;
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardLinBusy);
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardLinFastFail);
+        return ParallelFlashSwc_QueueForwardRequest(extendedAddress, busType, udsRequest, udsRequestLength);
     }
 
     return ParallelFlashSwc_QueueForwardRequest(extendedAddress, busType, udsRequest, udsRequestLength);
@@ -802,9 +898,15 @@ static Std_ReturnType ParallelFlashSwc_SendForwardOnBus(GatewaySwc_BusType busTy
                                             (PduLengthType)udsRequestLength);
             if (linResult == E_OK)
             {
+                ParallelFlashSwc_LinForwardActive = TRUE;
+                ParallelFlashSwc_LinForwardExt = extendedAddress;
                 /* LIN slave responses are reassembled by the master onto
                  * DCM_RX_LIN_PHYS (== DCM_TX_LIN_PHYS numerically). */
                 ParallelFlashSwc_RecordForwardResponseExt(DCM_TX_LIN_PHYS, extendedAddress);
+                ParallelFlashSwc_RecordForwardTxAck(DCM_TX_LIN_PHYS,
+                                                    extendedAddress,
+                                                    udsRequest,
+                                                    udsRequestLength);
             }
             return linResult;
         }
@@ -852,19 +954,25 @@ static Std_ReturnType ParallelFlashSwc_QueueForwardRequest(uint8 extendedAddress
             ParallelFlashSwc_ForwardQueue[i].used = TRUE;
 
             depth++;
-            ParallelFlashSwc_DebugForwardQueued++;
-            ParallelFlashSwc_DebugForwardQueueDepth = depth;
+            PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardQueued);
+            PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueDepth, depth);
+#if PARALLELFLASHSWC_DEBUG_INSTRUMENTATION
             if (depth > ParallelFlashSwc_DebugForwardQueueMaxDepth)
             {
-                ParallelFlashSwc_DebugForwardQueueMaxDepth = depth;
+                PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueMaxDepth, depth);
             }
+#endif
 
             return E_OK;
         }
     }
 
-    ParallelFlashSwc_DebugForwardQueueFull++;
-    ParallelFlashSwc_DebugForwardQueueDepth = depth;
+    PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardQueueFull);
+    if (busType == GATEWAYSWC_BUS_LIN)
+    {
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardLinDropped);
+    }
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueDepth, depth);
     return E_NOT_OK;
 }
 
@@ -904,6 +1012,21 @@ static uint8 ParallelFlashSwc_HasOlderForwardEntryForAddress(uint8 entryIndex)
         if ((ParallelFlashSwc_ForwardQueue[i].used != FALSE) &&
             (ParallelFlashSwc_ForwardQueue[i].extendedAddress == extendedAddress) &&
             (ParallelFlashSwc_ForwardQueue[i].sequence < sequence))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static uint8 ParallelFlashSwc_HasFreeForwardQueueSlot(void)
+{
+    uint8 i;
+
+    for (i = 0u; i < PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH; i++)
+    {
+        if (ParallelFlashSwc_ForwardQueue[i].used == FALSE)
         {
             return TRUE;
         }
@@ -959,7 +1082,7 @@ static uint8 ParallelFlashSwc_BusCanAcceptForward(GatewaySwc_BusType busType,
             return FALSE;
         }
 
-        return LinTp_CanAcceptTransmitToNad(linNad);
+        return LinTp_CanStartTransmitToNadNow(linNad);
     }
 
     return TRUE;
@@ -975,21 +1098,11 @@ static Std_ReturnType ParallelFlashSwc_MapLinExtendedAddressToNad(uint8 extended
 
     switch (extendedAddress)
     {
-        case 0x50u:
-            *nad = LINIF_NAD_ALT;
-            return E_OK;
-
         case 0x51u:
             *nad = LINIF_NAD_HVDCDC;
             return E_OK;
 
-        case 0x52u:
-            *nad = LINIF_NAD_PCU48;
-            return E_OK;
-
-        case LINIF_NAD_ALT:
         case LINIF_NAD_HVDCDC:
-        case LINIF_NAD_PCU48:
             *nad = extendedAddress;
             return E_OK;
 
@@ -1007,10 +1120,53 @@ static uint8 ParallelFlashSwc_FindDispatchableForwardEntry(void)
     uint32 selectedSequence = 0xFFFFFFFFu;
     const ParallelFlashSwc_ForwardQueueEntryType *entry;
 
+    selected = ParallelFlashSwc_SelectDispatchableLinEntry();
+
     for (i = 0u; i < PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH; i++)
     {
         entry = &ParallelFlashSwc_ForwardQueue[i];
         if (entry->used == FALSE)
+        {
+            continue;
+        }
+
+        if (entry->busType == GATEWAYSWC_BUS_LIN)
+        {
+            continue;
+        }
+
+        if (ParallelFlashSwc_HasOlderForwardEntryForAddress(i) != FALSE)
+        {
+            continue;
+        }
+
+        if (ParallelFlashSwc_BusCanAcceptForward(entry->busType, entry->extendedAddress) == FALSE)
+        {
+            continue;
+        }
+
+        if ((selected == 0xFFu) || (entry->sequence < selectedSequence))
+        {
+            selected = i;
+            selectedSequence = entry->sequence;
+        }
+    }
+
+    return selected;
+}
+
+static uint8 ParallelFlashSwc_SelectDispatchableLinEntry(void)
+{
+    uint8 i;
+    uint8 selected = 0xFFu;
+    uint32 selectedSequence = 0xFFFFFFFFu;
+    const ParallelFlashSwc_ForwardQueueEntryType *entry;
+
+    for (i = 0u; i < PARALLELFLASHSWC_FORWARD_QUEUE_DEPTH; i++)
+    {
+        entry = &ParallelFlashSwc_ForwardQueue[i];
+        if ((entry->used == FALSE) ||
+            (entry->busType != GATEWAYSWC_BUS_LIN))
         {
             continue;
         }
@@ -1066,16 +1222,14 @@ static void ParallelFlashSwc_ProcessForwardQueue(void)
         {
             if (entry.busType == GATEWAYSWC_BUS_LIN)
             {
-                ParallelFlashSwc_ForwardQueue[index].used = FALSE;
-                ParallelFlashSwc_DebugForwardLinDropped++;
-                continue;
+                PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardLinBusy);
             }
 
             break;
         }
 
         ParallelFlashSwc_ForwardQueue[index].used = FALSE;
-        ParallelFlashSwc_DebugForwardDispatched++;
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardDispatched);
     }
 
     depth = 0u;
@@ -1086,8 +1240,28 @@ static void ParallelFlashSwc_ProcessForwardQueue(void)
             depth++;
         }
     }
-    ParallelFlashSwc_DebugForwardQueueDepth = depth;
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardQueueDepth, depth);
     ParallelFlashSwc_ForwardQueueProcessing = FALSE;
+}
+
+static void ParallelFlashSwc_ProcessForwardAcks(void)
+{
+    uint8 index;
+
+    for (index = 0u; index < PARALLELFLASHSWC_RESP_EXT_PDU_COUNT; index++)
+    {
+        if (ParallelFlashSwc_ForwardTxAckPending[index].valid == FALSE)
+        {
+            continue;
+        }
+
+        if (PduR_DoIPRelayForwardedResponse(ParallelFlashSwc_ForwardTxAckPending[index].extendedAddress,
+                                            ParallelFlashSwc_ForwardTxAckPending[index].data,
+                                            (uint16)ParallelFlashSwc_ForwardTxAckPending[index].length) == E_OK)
+        {
+            ParallelFlashSwc_ForwardTxAckPending[index].valid = FALSE;
+        }
+    }
 }
 
 static Std_ReturnType ParallelFlashSwc_FindForwardBus(uint8 extendedAddress,
@@ -1206,19 +1380,23 @@ static Std_ReturnType ParallelFlashSwc_SendDiagnosticFrame(const PduIdType *canT
         }
     }
 
-    ParallelFlashSwc_DebugForwardLastPdu = (uint16)usedCanTpTxSduId;
-    ParallelFlashSwc_DebugForwardLastResult = (uint8)result;
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardLastPdu, (uint16)usedCanTpTxSduId);
+    PARALLELFLASHSWC_DEBUG_ASSIGN(ParallelFlashSwc_DebugForwardLastResult, (uint8)result);
 
     if (result == E_OK)
     {
-        ParallelFlashSwc_DebugForwardCanOk++;
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardCanOk);
         /* Remember which node was addressed on this TP channel so its reply can be
          * tagged and relayed back to the tester (DCM TX/RX PDU ids share numbering). */
         ParallelFlashSwc_RecordForwardResponseExt(usedCanTpTxSduId, extendedAddress);
+        ParallelFlashSwc_RecordForwardTxAck(usedCanTpTxSduId,
+                                            extendedAddress,
+                                            udsRequest,
+                                            udsRequestLength);
     }
     else
     {
-        ParallelFlashSwc_DebugForwardCanFail++;
+        PARALLELFLASHSWC_DEBUG_INC(ParallelFlashSwc_DebugForwardCanFail);
     }
 
     return result;
@@ -1234,6 +1412,128 @@ static void ParallelFlashSwc_RecordForwardResponseExt(PduIdType pduId, uint8 ext
 
     ParallelFlashSwc_LastForwardExt = extendedAddress;
     ParallelFlashSwc_LastForwardExtValid = TRUE;
+}
+
+static void ParallelFlashSwc_RecordForwardTxAck(PduIdType pduId,
+                                                uint8 extendedAddress,
+                                                const uint8 *udsRequest,
+                                                Dcm_PduLengthType udsRequestLength)
+{
+    ParallelFlashSwc_ForwardTxAckContextType *context;
+
+    if (((uint16)pduId >= PARALLELFLASHSWC_RESP_EXT_PDU_COUNT) ||
+        (udsRequest == NULL_PTR) ||
+        (udsRequestLength == 0u))
+    {
+        return;
+    }
+
+    context = &ParallelFlashSwc_ForwardTxAckCtx[pduId];
+    context->valid = TRUE;
+    context->extendedAddress = extendedAddress;
+    context->sid = udsRequest[0u];
+    context->reqByte1 = (udsRequestLength > 1u) ? udsRequest[1u] : 0u;
+    context->reqByte2 = (udsRequestLength > 2u) ? udsRequest[2u] : 0u;
+    context->reqByte3 = (udsRequestLength > 3u) ? udsRequest[3u] : 0u;
+    context->requestLength = udsRequestLength;
+}
+
+static void ParallelFlashSwc_BuildForwardTxAckResponse(const ParallelFlashSwc_ForwardTxAckContextType *context,
+                                                       Std_ReturnType result,
+                                                       uint8 *response,
+                                                       uint8 *responseLength)
+{
+    if ((context == NULL_PTR) || (response == NULL_PTR) || (responseLength == NULL_PTR))
+    {
+        return;
+    }
+
+    if (result != E_OK)
+    {
+        *responseLength = 0u;
+        return;
+    }
+
+    switch (context->sid)
+    {
+        case DCM_SID_DIAGNOSTIC_SESSION_CONTROL:
+        case DCM_SID_ECU_RESET:
+        case DCM_SID_COMMUNICATION_CONTROL:
+        case DCM_SID_TESTER_PRESENT:
+        case DCM_SID_CONTROL_DTC_SETTING:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            response[1u] = context->reqByte1;
+            *responseLength = (context->requestLength > 1u) ? 2u : 1u;
+            break;
+
+        case DCM_SID_READ_DATA_BY_IDENTIFIER:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            response[1u] = context->reqByte1;
+            response[2u] = context->reqByte2;
+            *responseLength = (context->requestLength > 2u) ? 3u : 1u;
+            break;
+
+        case DCM_SID_ROUTINE_CONTROL:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            response[1u] = context->reqByte1;
+            response[2u] = context->reqByte2;
+            response[3u] = context->reqByte3;
+            *responseLength = (context->requestLength > 3u) ? 4u : 1u;
+            break;
+
+        case DCM_SID_REQUEST_DOWNLOAD:
+        case DCM_SID_REQUEST_UPLOAD:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            response[1u] = 0x20u;
+            response[2u] = 0x01u;
+            response[3u] = 0x00u;
+            *responseLength = 4u;
+            break;
+
+        case DCM_SID_TRANSFER_DATA:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            response[1u] = context->reqByte1;
+            *responseLength = (context->requestLength > 1u) ? 2u : 1u;
+            break;
+
+        case DCM_SID_REQUEST_TRANSFER_EXIT:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            *responseLength = 1u;
+            break;
+
+        default:
+            response[0u] = (uint8)(context->sid + 0x40u);
+            *responseLength = 1u;
+            break;
+    }
+}
+
+void ParallelFlashSwc_OnForwardTxConfirmation(PduIdType txPduId, Std_ReturnType result)
+{
+    uint8 responseLength = 0u;
+
+    if (((uint16)txPduId >= PARALLELFLASHSWC_RESP_EXT_PDU_COUNT) ||
+        (ParallelFlashSwc_ForwardTxAckCtx[txPduId].valid == FALSE))
+    {
+        return;
+    }
+
+    if (txPduId == DCM_TX_LIN_PHYS)
+    {
+        ParallelFlashSwc_LinForwardActive = FALSE;
+        ParallelFlashSwc_LinForwardExt = 0u;
+    }
+
+    ParallelFlashSwc_BuildForwardTxAckResponse(&ParallelFlashSwc_ForwardTxAckCtx[txPduId],
+                                               result,
+                                               ParallelFlashSwc_ForwardTxAckPending[txPduId].data,
+                                               &responseLength);
+    ParallelFlashSwc_ForwardTxAckPending[txPduId].extendedAddress =
+        ParallelFlashSwc_ForwardTxAckCtx[txPduId].extendedAddress;
+    ParallelFlashSwc_ForwardTxAckPending[txPduId].length = responseLength;
+    ParallelFlashSwc_ForwardTxAckPending[txPduId].valid = (responseLength > 0u) ? TRUE : FALSE;
+    ParallelFlashSwc_ForwardTxAckCtx[txPduId].valid = FALSE;
+    ParallelFlashSwc_ProcessForwardAcks();
 }
 
 Std_ReturnType ParallelFlashSwc_GetForwardResponseExt(PduIdType rxPduId, uint8 *extendedAddress)

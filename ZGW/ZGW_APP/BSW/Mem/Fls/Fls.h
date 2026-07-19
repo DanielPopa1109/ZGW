@@ -29,6 +29,5 @@ void Fls_SetMode(MemIf_ModeType Mode);
 void Fls_MainFunction(void);
 uint32 Fls_GetPhysicalAddress(Fls_AddressType Address);
 void Fls_ClearDmuStatus(void);
-void Fls_ClearDFlashSmuBusError(void);
 
 #endif /* FLS_H */

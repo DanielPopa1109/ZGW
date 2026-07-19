@@ -115,12 +115,10 @@ typedef u32_t  mem_ptr_t;
 
 #define LWIP_PROVIDE_ERRNO
 
-#define abort(void)
-
 #ifdef LWIP_DEBUG
 #define LWIP_PLATFORM_ASSERT(msg)                                                \
   printf("Assertion \"%s\" failed at line %d in %s\n", msg, __LINE__, __FILE__); \
-  abort()
+  while (1) {}
 #define LWIP_PLATFORM_DIAG(msg)   printf msg; printf("\r\n");
 #else
 #define LWIP_PLATFORM_ASSERT(msg) ((void)0)

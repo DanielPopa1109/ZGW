@@ -27,7 +27,6 @@
  */
 
 
-#include <stdlib.h>
 #include <stdint.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE_core2 prevents task_core2.h from redefining
@@ -50,6 +49,11 @@ extern void McuSm_PerformResetHook( uint32_t resetReason, uint32_t resetInformat
 #define FREERTOS_CORE2_LIST_CORRUPT_INFO_LOW_NEXT      3u
 #define FREERTOS_CORE2_LIST_CORRUPT_INFO_REINSERT      4u
 
+#ifndef FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION
+#define FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION      0
+#endif
+
+#if FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION
 volatile uint32_t FreeRTOS_core2_DebugListInsertFailReason;
 volatile uint32_t FreeRTOS_core2_DebugListInsertFailInfo;
 volatile uint32_t FreeRTOS_core2_DebugListInsertList;
@@ -61,6 +65,13 @@ volatile uint32_t FreeRTOS_core2_DebugListInsertWalkCount;
 volatile uint32_t FreeRTOS_core2_DebugListInsertIterator;
 volatile uint32_t FreeRTOS_core2_DebugListInsertNext;
 volatile uint32_t FreeRTOS_core2_DebugListInsertNextValue;
+#endif
+
+#if FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION
+#define FREERTOS_CORE2_LIST_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#else
+#define FREERTOS_CORE2_LIST_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#endif
 
 static void prvListInsertCorruptionReset_core2( const List_t_core2 * const pxList_core2,
                                                 const ListItem_t_core2 * const pxNewListItem_core2,
@@ -82,42 +93,50 @@ static void prvListInsertCorruptionReset_core2( const List_t_core2 * const pxLis
                                                 uint32_t failInfo_core2,
                                                 uint32_t walkCount_core2 )
 {
-    FreeRTOS_core2_DebugListInsertFailReason = MCUSM_RESET_REASON_C2_LIST_CORRUPT;
-    FreeRTOS_core2_DebugListInsertFailInfo = failInfo_core2;
-    FreeRTOS_core2_DebugListInsertList = ( uint32_t ) pxList_core2;
-    FreeRTOS_core2_DebugListInsertItem = ( uint32_t ) pxNewListItem_core2;
-    FreeRTOS_core2_DebugListInsertIterator = ( uint32_t ) pxIterator_core2;
-    FreeRTOS_core2_DebugListInsertNext = ( uint32_t ) pxNext_core2;
-    FreeRTOS_core2_DebugListInsertWalkCount = walkCount_core2;
-
+#if !FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION
+    ( void ) pxList_core2;
+    ( void ) pxNewListItem_core2;
+    ( void ) pxIterator_core2;
+    ( void ) pxNext_core2;
+    ( void ) walkCount_core2;
+#endif
+#if FREERTOS_CORE2_LIST_DEBUG_INSTRUMENTATION
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertFailReason, MCUSM_RESET_REASON_C2_LIST_CORRUPT);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertFailInfo, failInfo_core2);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertList, ( uint32_t ) pxList_core2);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertItem, ( uint32_t ) pxNewListItem_core2);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertIterator, ( uint32_t ) pxIterator_core2);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertNext, ( uint32_t ) pxNext_core2);
+    FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertWalkCount, walkCount_core2);
     if( pxList_core2 != NULL )
     {
-        FreeRTOS_core2_DebugListInsertListItems = ( uint32_t ) pxList_core2->uxNumberOfItems_core2;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertListItems, ( uint32_t ) pxList_core2->uxNumberOfItems_core2);
     }
     else
     {
-        FreeRTOS_core2_DebugListInsertListItems = 0u;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertListItems, 0u);
     }
 
     if( pxNewListItem_core2 != NULL )
     {
-        FreeRTOS_core2_DebugListInsertItemValue = ( uint32_t ) pxNewListItem_core2->xItemValue_core2;
-        FreeRTOS_core2_DebugListInsertItemContainer = ( uint32_t ) pxNewListItem_core2->pxContainer_core2;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertItemValue, ( uint32_t ) pxNewListItem_core2->xItemValue_core2);
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertItemContainer, ( uint32_t ) pxNewListItem_core2->pxContainer_core2);
     }
     else
     {
-        FreeRTOS_core2_DebugListInsertItemValue = 0u;
-        FreeRTOS_core2_DebugListInsertItemContainer = 0u;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertItemValue, 0u);
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertItemContainer, 0u);
     }
 
     if( ( pxNext_core2 != NULL ) && ( ( uint32_t ) pxNext_core2 >= 0x10000u ) )
     {
-        FreeRTOS_core2_DebugListInsertNextValue = ( uint32_t ) pxNext_core2->xItemValue_core2;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertNextValue, ( uint32_t ) pxNext_core2->xItemValue_core2);
     }
     else
     {
-        FreeRTOS_core2_DebugListInsertNextValue = 0u;
+        FREERTOS_CORE2_LIST_DEBUG_ASSIGN(FreeRTOS_core2_DebugListInsertNextValue, 0u);
     }
+#endif
 
     McuSm_PerformResetHook( MCUSM_RESET_REASON_C2_LIST_CORRUPT, failInfo_core2 );
 

@@ -1,7 +1,6 @@
 #include "Nm.h"
 #include "Nm_Cfg.h"
 
-#include "GatewaySwc.h"
 #include "../CanNm/CanNm.h"
 #include "../Com.h"
 #include "../ComM/ComM.h"
@@ -25,7 +24,7 @@ static uint8 Nm_Initialized;
 
 static void Nm_LinWriteNm3Signal(uint8 value)
 {
-    (void)GatewaySwc_RequestComSendSignal(COM_SIG_TX_LIN_ZGW_NM3_ZGW_NM3_PN1, &value);
+    (void)value;
 }
 
 static uint8 Nm_LinGetNm3SignalValue(void)

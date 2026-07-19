@@ -2,10 +2,8 @@
  *
  * RAM updater for AURIX TC375 FBL self-update.
  *
- * Supported receive transports while old FBL is still intact:
- *   1) Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
- *   2) CAN-FD + ISO-TP, request ID 0x710, response ID 0x711
- *   3) CAN classic + ISO-TP, request ID 0x710, response ID 0x711
+ * Supported receive transport while old FBL is still intact:
+ *   Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
  *
  * Ethernet payload is direct UDS payload over UDP, not DoIP/TCP.
  * This is intentional for RAM-updater safety: no lwIP dependency is used here.
@@ -39,6 +37,7 @@
 #define FBL_TRANSPORT_ETH_RAW_UDP        1u
 #define FBL_TRANSPORT_CANFD              2u
 #define FBL_TRANSPORT_CAN_CLASSIC        3u
+#define FBL_RAM_CAN_TRANSPORT_ENABLED    0u
 
 #define FBL_START_NCACHED                0xA0000000u
 #define FBL_END_NCACHED                  0xA002FFFFu
@@ -73,8 +72,8 @@
 #define FBL_CAN_CLASSIC_MAX_DL           8u
 #define FBL_CAN_EXT_ADDR_ZGW             0x41u
 #define FBL_CAN_EXT_ADDR_TESTER          0x41u
-#define FBL_CAN_CLASSIC_TRCV_STB_PORT    (&MODULE_P20)
-#define FBL_CAN_CLASSIC_TRCV_STB_PIN     6u
+#define FBL_CAN_ONBOARD_TRCV_STB_PORT    (&MODULE_P20)
+#define FBL_CAN_ONBOARD_TRCV_STB_PIN     6u
 #define FBL_ISOTP_MAX_PAYLOAD            4095u
 
 #define FBL_ETH_MTU                      1518u
@@ -227,15 +226,19 @@ volatile uint32 FblRam_EthDmaModeAfterInit;
 
 IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
-static void Ram_CanReleaseFdRxPinFromScr(void);
-static void Ram_CanClassicTrcvSetNormalMode(void);
+#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
+static void Ram_CanReleaseClassicRxPinFromScr(void);
+static void Ram_CanOnboardTrcvSetNormalMode(void);
 static void Ram_CanInit(uint8 transport);
+#endif
 static void Ram_CanSend(const uint8 *data, uint8 len);
 static uint8 Ram_CanPayloadLen(void);
 static uint8 Ram_DlcFromLen(uint8 len);
 static uint8 Ram_LenFromDlc(uint8 dlc);
 static void Ram_IsoRx(const uint8 *data, uint8 len);
+#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
 static void Ram_IsoSend(const uint8 *data, uint16 len);
+#endif
 static void Ram_IsoSendFc(void);
 static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len);
 
@@ -288,45 +291,25 @@ void FblRamUpdater_Entry(void)
     g_secSeedValid = 0u;
     memset((void *)FBL_IMAGE_RAM_ADDR, 0x36, FBL_IMAGE_RAM_SIZE);
 
-    if(g_FblTransportSelect == FBL_TRANSPORT_ETH_RAW_UDP)
-    {
-        Ram_EthInit();
-    }
-    else
-    {
-        if(g_FblTransportSelect != FBL_TRANSPORT_CAN_CLASSIC)
-        {
-            g_FblTransportSelect = FBL_TRANSPORT_CANFD;
-        }
-        Ram_CanInit((uint8)g_FblTransportSelect);
-    }
+    g_FblTransportSelect = FBL_TRANSPORT_ETH_RAW_UDP;
+    Ram_EthInit();
 
     IfxCpu_enableInterrupts();
 
     while(1)
     {
-        if(g_FblTransportSelect == FBL_TRANSPORT_ETH_RAW_UDP)
-        {
-            Ram_EthPoll();
+        Ram_EthPoll();
 
-            if(g_udsReqReady != 0u)
-            {
-                g_udsReqReady = 0u;
-                Ram_UdsHandle(g_udsReq, g_udsReqLen, FBL_TRANSPORT_ETH_RAW_UDP);
-            }
-        }
-        else
+        if(g_udsReqReady != 0u)
         {
-            if(g_iso.rxReady != 0u)
-            {
-                g_iso.rxReady = 0u;
-                Ram_UdsHandle(g_iso.rxBuf, g_iso.rxLen, (uint8)g_FblTransportSelect);
-            }
+            g_udsReqReady = 0u;
+            Ram_UdsHandle(g_udsReq, g_udsReqLen, FBL_TRANSPORT_ETH_RAW_UDP);
         }
     }
 }
 
-static void Ram_CanReleaseFdRxPinFromScr(void)
+#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
+static void Ram_CanReleaseClassicRxPinFromScr(void)
 {
     uint16 safetyWdtPw;
 
@@ -339,13 +322,13 @@ static void Ram_CanReleaseFdRxPinFromScr(void)
     IfxScuWdt_setSafetyEndinit(safetyWdtPw);
 }
 
-static void Ram_CanClassicTrcvSetNormalMode(void)
+static void Ram_CanOnboardTrcvSetNormalMode(void)
 {
-    IfxPort_setPinModeOutput(FBL_CAN_CLASSIC_TRCV_STB_PORT,
-            FBL_CAN_CLASSIC_TRCV_STB_PIN,
+    IfxPort_setPinModeOutput(FBL_CAN_ONBOARD_TRCV_STB_PORT,
+            FBL_CAN_ONBOARD_TRCV_STB_PIN,
             IfxPort_OutputMode_pushPull,
             IfxPort_OutputIdx_general);
-    IfxPort_setPinLow(FBL_CAN_CLASSIC_TRCV_STB_PORT, FBL_CAN_CLASSIC_TRCV_STB_PIN);
+    IfxPort_setPinLow(FBL_CAN_ONBOARD_TRCV_STB_PORT, FBL_CAN_ONBOARD_TRCV_STB_PIN);
 }
 
 static void Ram_CanInit(uint8 transport)
@@ -354,24 +337,24 @@ static void Ram_CanInit(uint8 transport)
 
     if(isClassic != 0u)
     {
-        can0_node0_init_pins();
+        Ram_CanReleaseClassicRxPinFromScr();
+        can1_node3_init_pins();
     }
     else
     {
-        Ram_CanReleaseFdRxPinFromScr();
-        can1_node3_init_pins();
+        can0_node0_init_pins();
     }
 
     IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN0 : &MODULE_CAN1);
+    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN1 : &MODULE_CAN0);
     IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
     IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
 
     IfxScuCcu_setMcanFrequency(40000000.0f);
 
-    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_0 : IfxCan_NodeId_3;
+    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_3 : IfxCan_NodeId_0;
     g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
     g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
     g_can.nodeConfig.baudRate.baudrate = 500000u;
@@ -432,19 +415,20 @@ static void Ram_CanInit(uint8 transport)
 
     if(isClassic != 0u)
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
-        Ram_CanClassicTrcvSetNormalMode();
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
     }
     else
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
+        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        Ram_CanOnboardTrcvSetNormalMode();
     }
 
     IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 }
+#endif
 
 void FblRam_CanRxIsr(void)
 {
@@ -628,6 +612,7 @@ static void Ram_IsoRx(const uint8 *data, uint8 len)
     }
 }
 
+#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
 static void Ram_IsoSend(const uint8 *data, uint16 len)
 {
     uint8 frame[64];
@@ -726,6 +711,7 @@ static void Ram_IsoSend(const uint8 *data, uint16 len)
         sn = (uint8)((sn + 1u) & 0x0Fu);
     }
 }
+#endif
 
 static void Ram_EthInit(void)
 {
@@ -1358,14 +1344,8 @@ static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
 
 static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport)
 {
-    if(transport == FBL_TRANSPORT_ETH_RAW_UDP)
-    {
-        Ram_EthSendUdp(res, len);
-    }
-    else
-    {
-        Ram_IsoSend(res, len);
-    }
+    (void)transport;
+    Ram_EthSendUdp(res, len);
 }
 
 static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)

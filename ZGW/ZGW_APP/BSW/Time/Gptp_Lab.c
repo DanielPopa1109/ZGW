@@ -42,8 +42,10 @@ static void Gptp_Lab_WriteTimestamp(uint8 *data, uint64 timestampNs);
 static void Gptp_Lab_WriteEthernetHeader(uint8 *frame);
 static void Gptp_Lab_WritePtpHeader(uint8 *frame, uint8 messageType, uint16 messageLength, uint16 sequenceId, uint8 controlField, sint8 logInterval);
 static void Gptp_Lab_InitLocalDataset(void);
+#if (TIMESYNC_GPTP_ENABLE == STD_ON)
 static void Gptp_Lab_SendSyncAndFollowUp(void);
 static void Gptp_Lab_SendAnnounce(void);
+#endif
 #if (TIMESYNC_GPTP_ENABLE == STD_ON)
 static void Gptp_Lab_UpdateNextDeadline(uint64 *deadlineNs, uint64 nowNs, uint64 periodNs);
 #endif
@@ -339,9 +341,9 @@ Std_ReturnType Gptp_Lab_ParseAnnounce(const uint8 *frame, uint16 frameLen, Gptp_
     return E_OK;
 }
 
+#if (TIMESYNC_GPTP_ENABLE == STD_ON)
 static void Gptp_Lab_SendSyncAndFollowUp(void)
 {
-#if (TIMESYNC_GPTP_ENABLE == STD_ON)
     uint8 frame[GPTP_LAB_FRAME_BUFFER_LENGTH];
     uint16 frameLength;
     uint16 sequenceId;
@@ -374,12 +376,12 @@ static void Gptp_Lab_SendSyncAndFollowUp(void)
             Gptp_Lab_Status.platformTxDropCounter++;
         }
     }
-#endif
 }
+#endif // @suppress("Unused static function")
 
+#if (TIMESYNC_GPTP_ENABLE == STD_ON)
 static void Gptp_Lab_SendAnnounce(void)
 {
-#if (TIMESYNC_GPTP_ENABLE == STD_ON)
     uint8 frame[GPTP_LAB_FRAME_BUFFER_LENGTH];
     uint16 frameLength;
     uint16 sequenceId;
@@ -399,8 +401,8 @@ static void Gptp_Lab_SendAnnounce(void)
             Gptp_Lab_Status.platformTxDropCounter++;
         }
     }
-#endif
 }
+#endif
 
 void Gptp_Lab_MainFunction(uint32 elapsedMs)
 {

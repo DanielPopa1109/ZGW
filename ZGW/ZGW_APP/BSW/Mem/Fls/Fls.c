@@ -4,8 +4,6 @@
 #include "IfxFlash.h"
 #include "IfxScuWdt.h"
 #include "IfxCpu.h"
-#include "IfxSmu.h"
-#include "IfxScu_reg.h"
 
 #define FLS_API_INIT               (0x00u)
 #define FLS_API_ERASE              (0x01u)
@@ -28,7 +26,6 @@
 #define FLS_DMU_ERASE_BUSY_POLL_LIMIT    (1000000u)
 #define FLS_DMU_D0_BUSY_MASK       (0x00000001u)
 #define FLS_MAIN_STEP_BUDGET       (32u)
-#define FLS_DFLASH_SMU_CLEAR_RETRIES (8u)
 
 /*
  * Compile-time guards binding the hand-written DFlash geometry to the
@@ -107,19 +104,6 @@ static Fls_StateType Fls_State =
 volatile uint32 Fls_LastDmuError = 0u;
 volatile uint32 Fls_InitClearDmuStatusCount = 0u;
 volatile uint32 Fls_InitDmuErrorAfterClear = 0u;
-volatile uint32 Fls_DFlashSmuBusErrorClearCounter = 0u;
-volatile uint32 Fls_DFlashSmuBusErrorPendingBeforeClear = 0u;
-volatile uint32 Fls_DFlashSpbBusErrorPendingBeforeClear = 0u;
-volatile uint32 Fls_DFlashTrapStatBeforeClear = 0u;
-volatile uint32 Fls_DFlashTrapStatAfterClear = 0u;
-volatile uint32 Fls_DFlashSmuBusErrorClearRetryCounter = 0u;
-volatile uint32 Fls_DFlashSmuBusErrorStillPendingAfterClear = 0u;
-/* Debug only: number of times the DFlash SMU-trap was suppressed (masked). */
-volatile uint32 Fls_DFlashSmuTrapSuppressCounter = 0u;
-/* Nesting depth of the SMU-trap suppression (mask once, unmask when back to 0). */
-static volatile sint32 Fls_DFlashSmuTrapDepth = 0;
-/* TRUE while the whole async write/erase job holds the trap masked. */
-static volatile boolean Fls_DFlashJobTrapHeld = FALSE;
 /* Debug only: last DFlash (logical) address successfully programmed by the async write path. */
 volatile uint32 Fls_LastWrittenDFlashAddress = 0u;
 /* Debug only: number of DFlash page writes successfully programmed */
@@ -257,177 +241,6 @@ static Std_ReturnType Fls_CheckDmuReadyForCommand(Fls_AddressType address)
     return E_OK;
 }
 
-void Fls_ClearDFlashSmuBusError(void)
-{
-    uint16 password;
-    boolean trapPending;
-
-    Fls_DFlashSmuBusErrorPendingBeforeClear =
-            (uint32)((MODULE_SMU.AG[7].U >> 17u) & 0x1u);
-    Fls_DFlashSpbBusErrorPendingBeforeClear =
-            (uint32)((MODULE_SMU.AG[7].U >> 20u) & 0x1u);
-    Fls_DFlashTrapStatBeforeClear = SCU_TRAPSTAT.U;
-    trapPending = (boolean)(SCU_TRAPSTAT.B.SMUT != 0u);
-
-    if ((Fls_DFlashSmuBusErrorPendingBeforeClear != 0u) ||
-            (Fls_DFlashSpbBusErrorPendingBeforeClear != 0u) ||
-            (trapPending != FALSE))
-    {
-        if (Fls_DFlashSmuBusErrorPendingBeforeClear != 0u)
-        {
-            (void)IfxSmu_clearAlarmStatus(IfxSmu_Alarm_XBAR0_SRI_BusErrorEvent);
-        }
-        if (Fls_DFlashSpbBusErrorPendingBeforeClear != 0u)
-        {
-            (void)IfxSmu_clearAlarmStatus(IfxSmu_Alarm_SPB_BusErrorEvent);
-        }
-
-        password = IfxScuWdt_getCpuWatchdogPassword();
-        IfxScuWdt_clearCpuEndinit(password);
-        SCU_TRAPCLR.B.SMUT = 1u;
-        IfxScuWdt_setCpuEndinit(password);
-
-        Fls_DFlashSmuBusErrorClearCounter++;
-    }
-
-    Fls_DFlashTrapStatAfterClear = SCU_TRAPSTAT.U;
-}
-
-static boolean Fls_IsDFlashSmuBusErrorPending(void)
-{
-    return (boolean)((((MODULE_SMU.AG[7].U >> 17u) & 0x1u) != 0u) ||
-            (((MODULE_SMU.AG[7].U >> 20u) & 0x1u) != 0u) ||
-            (SCU_TRAPSTAT.B.SMUT != 0u));
-}
-
-static void Fls_DrainDFlashSmuBusError(void)
-{
-    uint8 retry;
-
-    for (retry = 0u; retry < FLS_DFLASH_SMU_CLEAR_RETRIES; retry++)
-    {
-        __dsync();
-        Fls_ClearDFlashSmuBusError();
-        __dsync();
-
-        if (Fls_IsDFlashSmuBusErrorPending() == FALSE)
-        {
-            break;
-        }
-
-        Fls_DFlashSmuBusErrorClearRetryCounter++;
-    }
-
-    Fls_DFlashSmuBusErrorStillPendingAfterClear =
-            (uint32)Fls_IsDFlashSmuBusErrorPending();
-}
-
-/*
- * Scoped suppression of the DFlash SRI/SPB bus-error NMI.
- *
- * Reading blank / partially-programmed DFlash (Fee scan blank-checks, interrupted
- * writes) and some DMU command sequences make the DMU return an SRI error
- * response, which the SMU latches as ALM7[17] (XBAR0 SRI bus error) / ALM7[20]
- * (SPB bus error).  Those alarms are wired to an NMI (McuSm_TRAP7) and reset the
- * ECU *during* the access - the reactive "clear after the fact"
- * (Fls_ClearDFlashSmuBusError) can never win that race because the NMI preempts.
- *
- * So for the few microseconds of the access we mask delivery of the SMU trap to
- * the running core via SCU_TRAPDIS0, run the access, clear the (benign) DFlash
- * alarm + SMU trap latch while still masked, then re-arm.  Only trap *delivery*
- * to this core is masked, only for the access window; the SMU alarm stays
- * configured and every other alarm keeps its reaction, so the safety mechanism
- * is deviated around a known-benign DFlash error, not disabled.
- *
- * The mask MUST span the whole DFlash operation, not just the instant the
- * command is issued: a DFlash program/erase runs asynchronously in the DMU for
- * up to several ms AFTER the command call returns, and a corrupt cell raises
- * ALM7[1] (uncorrectable ECC) + ALM7[17] (SRI bus error) during that async
- * window.  So these calls are reference-counted (mask on 0->1, unmask on 1->0)
- * and the async state machine holds one count across the entire job.
- */
-static uint32 Fls_GetSmuTrapDisableMask(void)
-{
-    /*
-     * The SMU alarm trap is BROADCAST to all cores: ALM7[17] is raised by a
-     * core0 DFlash access, but the resulting NMI is delivered to CPU0, CPU1 and
-     * CPU2 alike (it was observed firing in the CPU1/CPU2 idle tasks once only
-     * CPU0 was masked).  So we must mask the SMU trap on every core for the
-     * duration of the access, not just the core issuing it.
-     * SCU_TRAPDIS0: CPU0SMUT=bit3, CPU1SMUT=bit11, CPU2SMUT=bit19.
-     */
-    return (uint32)((1u << 3u) | (1u << 11u) | (1u << 19u));
-}
-
-static void Fls_SuppressDFlashSmuTrap(void)
-{
-    uint16 password = IfxScuWdt_getCpuWatchdogPassword();
-    uint32 mask = Fls_GetSmuTrapDisableMask();
-
-    if (Fls_DFlashSmuTrapDepth <= 0)
-    {
-        IfxScuWdt_clearCpuEndinit(password);
-        SCU_TRAPDIS0.U |= mask;
-        IfxScuWdt_setCpuEndinit(password);
-        __dsync();
-        Fls_DFlashSmuTrapDepth = 0;
-    }
-    Fls_DFlashSmuTrapDepth++;
-    Fls_DFlashSmuTrapSuppressCounter++;
-}
-
-static void Fls_RestoreDFlashSmuTrap(void)
-{
-    uint16 password = IfxScuWdt_getCpuWatchdogPassword();
-    uint32 mask = Fls_GetSmuTrapDisableMask();
-
-    if (Fls_DFlashSmuTrapDepth > 0)
-    {
-        Fls_DFlashSmuTrapDepth--;
-    }
-    if (Fls_DFlashSmuTrapDepth > 0)
-    {
-        return;     /* still nested inside an outer suppression - stay masked */
-    }
-    Fls_DFlashSmuTrapDepth = 0;
-
-    /* Let any posted SRI bus error land in the SMU before we clear it - it can
-     * be latched slightly after the faulting access completes. */
-    __dsync();
-
-    /* Clear any delayed benign DFlash SRI/SPB alarm + SMU trap latch while the
-     * trap is still masked, so re-arming cannot deliver a just-posted ALM7[20]. */
-    Fls_DrainDFlashSmuBusError();
-
-    IfxScuWdt_clearCpuEndinit(password);
-    SCU_TRAPDIS0.U &= ~mask;
-    IfxScuWdt_setCpuEndinit(password);
-    __dsync();
-}
-
-/* Force the trap back to its armed/unmasked state regardless of nesting - used
- * at init to recover if a reset left the mask asserted mid-operation. */
-static void Fls_ForceReleaseDFlashSmuTrap(void)
-{
-    uint16 password = IfxScuWdt_getCpuWatchdogPassword();
-    uint32 mask = Fls_GetSmuTrapDisableMask();
-
-    Fls_DFlashSmuTrapDepth = 0;
-    Fls_DFlashJobTrapHeld = FALSE;
-
-    IfxScuWdt_clearCpuEndinit(password);
-    SCU_TRAPDIS0.U |= mask;
-    IfxScuWdt_setCpuEndinit(password);
-    __dsync();
-
-    Fls_DrainDFlashSmuBusError();
-
-    IfxScuWdt_clearCpuEndinit(password);
-    SCU_TRAPDIS0.U &= ~mask;
-    IfxScuWdt_setCpuEndinit(password);
-    __dsync();
-}
-
 static Fls_DmuPollResultType Fls_PollDmuReady(void)
 {
     uint32 status;
@@ -528,37 +341,19 @@ uint32 Fls_GetPhysicalAddress(Fls_AddressType Address)
 
 static Std_ReturnType Fls_CopyReadableRange(Fls_AddressType address, uint8 *target, Fls_LengthType length)
 {
-    /*
-     * Do not pre-blank-check pages here.  This helper is used for pages that
-     * Fee metadata has already selected as readable; issuing VerifyErasedPage
-     * on programmed record/data pages can itself raise DFlash bus-error alarms.
-     *
-     * Blank / interrupted-write pages still raise ALM7[17]/[20] on read, so mask
-     * the SMU NMI for the copy and re-arm afterwards.
-    */
     if (Fls_CheckDmuReadyForCommand(address) != E_OK)
     {
         return E_NOT_OK;
     }
 
-    Fls_SuppressDFlashSmuTrap();
-    Fls_DrainDFlashSmuBusError();
     Fls_ClearDmuStatus();
     memcpy(target, (const void *)Fls_GetPhysicalAddress(address), (size_t)length);
-    Fls_RestoreDFlashSmuTrap();
 
     return E_OK;
 }
 
 static void Fls_FinishJob(MemIf_JobResultType result)
 {
-    /* Release the job-wide SMU-trap hold taken across an async write/erase. */
-    if (Fls_DFlashJobTrapHeld != FALSE)
-    {
-        Fls_DFlashJobTrapHeld = FALSE;
-        Fls_RestoreDFlashSmuTrap();
-    }
-
     Fls_State.result = result;
     Fls_State.status = MEMIF_IDLE;
     Fls_State.job = FLS_JOB_NONE;
@@ -605,10 +400,6 @@ static Std_ReturnType Fls_StartProgramPage(Fls_AddressType address, const uint8 
         return E_NOT_OK;
     }
 
-    /* Suppress before the source memcpy too: during Fee GC the source pointer
-     * points directly into DFlash, so even reading it could raise ALM7. */
-    Fls_SuppressDFlashSmuTrap();
-    Fls_ClearDFlashSmuBusError();
     Fls_ClearDmuStatus();
 
     memcpy(&word0, &data[0], sizeof(word0));
@@ -631,8 +422,6 @@ static Std_ReturnType Fls_StartProgramPage(Fls_AddressType address, const uint8 
     IfxCpu_restoreInterrupts(interruptState);
 #endif
 
-    Fls_RestoreDFlashSmuTrap();
-
     return (enterResult == 0u) ? E_OK : E_NOT_OK;
 }
 
@@ -650,8 +439,6 @@ static Std_ReturnType Fls_StartEraseOneSector(Fls_AddressType address)
         return E_NOT_OK;
     }
 
-    Fls_SuppressDFlashSmuTrap();
-    Fls_ClearDFlashSmuBusError();
     Fls_ClearDmuStatus();
 
 #if (FLS_DISABLE_INTERRUPTS_FOR_COMMAND == STD_ON)
@@ -666,17 +453,12 @@ static Std_ReturnType Fls_StartEraseOneSector(Fls_AddressType address)
     IfxCpu_restoreInterrupts(interruptState);
 #endif
 
-    Fls_RestoreDFlashSmuTrap();
     return E_OK;
 }
 
 void Fls_Init(const Fls_ConfigType *ConfigPtr)
 {
     (void)ConfigPtr;
-    /* Recover the SMU trap to armed/unmasked in case a reset interrupted an
-     * async op while the job hold was active and left the mask asserted. */
-    Fls_ForceReleaseDFlashSmuTrap();
-    Fls_ClearDFlashSmuBusError();
     Fls_ClearDmuStatus();
     Fls_LastDmuError = (uint32)(Fls_ReadDmuErrorStatus() & FLS_DMU_ERR_MASK);
     Fls_InitDmuErrorAfterClear = Fls_LastDmuError;
@@ -922,20 +704,6 @@ static void Fls_MainFunctionStep(void)
     if (Fls_State.status != MEMIF_BUSY)
     {
         return;
-    }
-
-    /*
-     * Hold the SMU trap masked for the WHOLE async write/erase job, not just the
-     * command-issue instant: the DMU keeps operating for up to several ms after
-     * the command returns, and a corrupt cell raises ALM7[17] during that window
-     * (outside any per-command guard).  Read jobs are single-step and stay
-     * covered by Fls_CopyReadableRange's own guard.
-     */
-    if (((Fls_State.job == FLS_JOB_WRITE) || (Fls_State.job == FLS_JOB_ERASE)) &&
-            (Fls_DFlashJobTrapHeld == FALSE))
-    {
-        Fls_SuppressDFlashSmuTrap();
-        Fls_DFlashJobTrapHeld = TRUE;
     }
 
     current = Fls_State.start + Fls_State.progress;

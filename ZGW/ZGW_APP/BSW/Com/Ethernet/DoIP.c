@@ -1,7 +1,9 @@
 #include "DoIP.h"
 #include "GatewaySwc.h"
+#include "EthernetDiag.h"
 #include <string.h>
 
+#if DOIP_DEBUG_INSTRUMENTATION
 volatile uint32 DoIP_DebugUdpRxCounter = 0u;
 volatile uint32 DoIP_DebugVehicleIdReqCounter = 0u;
 volatile uint32 DoIP_DebugVehicleIdTxCounter = 0u;
@@ -17,6 +19,15 @@ volatile uint32 DoIP_DebugTcpDisconnectCounter = 0u;
 volatile uint32 DoIP_DebugTcpState = 0u;
 volatile uint32 DoIP_DebugAliveTimerMs = 0u;
 volatile uint32 DoIP_DebugInactivityTimerMs = 0u;
+#endif
+
+#if DOIP_DEBUG_INSTRUMENTATION
+#define DOIP_DEBUG_ASSIGN(lhs, rhs) do { (lhs) = (rhs); } while (0)
+#define DOIP_DEBUG_INC(lhs) do { (lhs)++; } while (0)
+#else
+#define DOIP_DEBUG_ASSIGN(lhs, rhs) do { (void)0; } while (0)
+#define DOIP_DEBUG_INC(lhs) do { (void)0; } while (0)
+#endif
 
 typedef struct
 {
@@ -218,11 +229,10 @@ static void DoIP_SendVehicleId(const TcpIp_SockAddrType *remoteAddr)
     tx[idx++] = 0x00u;
 
     DoIP_Rt.vehicleIdReqCnt++;
-    DoIP_DebugVehicleIdTxCounter++;
-
+    DOIP_DEBUG_INC(DoIP_DebugVehicleIdTxCounter);
     if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->udpSoConId, remoteAddr, tx, idx) != SOAD_OK)
     {
-        DoIP_DebugVehicleIdTxFailCounter++;
+        DOIP_DEBUG_INC(DoIP_DebugVehicleIdTxFailCounter);
     }
 }
 
@@ -275,10 +285,10 @@ static void DoIP_SendRoutingActivationRes(uint16_t testerAddr, uint8_t code)
     tx[idx++] = 0x00u;
     tx[idx++] = 0x00u;
 
-    DoIP_DebugRoutingActivationTxCounter++;
+    DOIP_DEBUG_INC(DoIP_DebugRoutingActivationTxCounter);
     if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx) != SOAD_OK)
     {
-        DoIP_DebugRoutingActivationTxFailCounter++;
+        DOIP_DEBUG_INC(DoIP_DebugRoutingActivationTxFailCounter);
     }
     else
     {
@@ -304,6 +314,7 @@ static void DoIP_SendAliveRes(void)
     }
 }
 
+#if (DOIP_LAB_DISABLE_SERVER_ALIVE_REQ != STD_ON) // @suppress("Unused static function")
 static void DoIP_SendAliveReq(void)
 {
     uint8_t tx[DOIP_HEADER_LEN];
@@ -312,10 +323,10 @@ static void DoIP_SendAliveReq(void)
     idx = DoIP_MakeHeader(tx, DOIP_PAYLOAD_ALIVE_CHECK_REQ, 0u);
 
     DoIP_Rt.aliveCheckCnt++;
-    DoIP_DebugAliveReqTxCounter++;
-
+    DOIP_DEBUG_INC(DoIP_DebugAliveReqTxCounter);
     (void)GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, tx, idx);
 }
+#endif
 
 static void DoIP_SendDiagAck(uint16_t testerAddr, uint16_t ecuAddr)
 {
@@ -391,10 +402,11 @@ static void DoIP_HandleRoutingActivation(const uint8_t *p, uint32_t len)
     DoIP_Rt.testerLogicalAddress = testerAddr;
     DoIP_Rt.routingActive = 1u;
     DoIP_Rt.tcpState = DOIP_TCP_ROUTING_ACTIVE;
+    EthernetDiag_ReportDoipActive(TRUE);
     DoIP_Rt.routingActivationCnt++;
     DoIP_ResetTcpActivityTimers();
 
-    DoIP_DebugRoutingActivationReqCounter++;
+    DOIP_DEBUG_INC(DoIP_DebugRoutingActivationReqCounter);
     DoIP_SendRoutingActivationRes(testerAddr, DOIP_RA_RES_OK);
 }
 
@@ -489,7 +501,7 @@ static void DoIP_HandleTcpPayload(uint16_t type, const uint8_t *payload, uint32_
             if (len >= 2u)
             {
                 DoIP_MarkTcpActivity();
-                DoIP_DebugAliveResRxCounter++;
+                DOIP_DEBUG_INC(DoIP_DebugAliveResRxCounter);
             }
             else
             {
@@ -580,9 +592,9 @@ void DoIP_MainFunction(uint32 elapsedMs)
 
     if (DoIP_Rt.tcpState == DOIP_TCP_OFFLINE)
     {
-        DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
-        DoIP_DebugAliveTimerMs = DoIP_Rt.aliveTimerMs;
-        DoIP_DebugInactivityTimerMs = DoIP_Rt.inactivityTimerMs;
+        DOIP_DEBUG_ASSIGN(DoIP_DebugTcpState, (uint32)DoIP_Rt.tcpState);
+        DOIP_DEBUG_ASSIGN(DoIP_DebugAliveTimerMs, DoIP_Rt.aliveTimerMs);
+        DOIP_DEBUG_ASSIGN(DoIP_DebugInactivityTimerMs, DoIP_Rt.inactivityTimerMs);
         DoIP_MainFunction_Counter++;
         return;
     }
@@ -619,7 +631,8 @@ void DoIP_MainFunction(uint32 elapsedMs)
     if (DoIP_Rt.inactivityTimerMs >= DOIP_INACTIVITY_TIMEOUT_MS)
     {
         DoIP_Rt.tcpTimeoutCnt++;
-        DoIP_DebugTcpTimeoutCounter++;
+        EthernetDiag_ReportDoipTimeout();
+        DOIP_DEBUG_INC(DoIP_DebugTcpTimeoutCounter);
         DoIP_Rt.tcpState = DOIP_TCP_OFFLINE;
         DoIP_Rt.routingActive = 0u;
         DoIP_Rt.tcpStreamLen = 0u;
@@ -642,9 +655,9 @@ void DoIP_MainFunction(uint32 elapsedMs)
     }
 #endif
 
-    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
-    DoIP_DebugAliveTimerMs = DoIP_Rt.aliveTimerMs;
-    DoIP_DebugInactivityTimerMs = DoIP_Rt.inactivityTimerMs;
+    DOIP_DEBUG_ASSIGN(DoIP_DebugTcpState, (uint32)DoIP_Rt.tcpState);
+    DOIP_DEBUG_ASSIGN(DoIP_DebugAliveTimerMs, DoIP_Rt.aliveTimerMs);
+    DOIP_DEBUG_ASSIGN(DoIP_DebugInactivityTimerMs, DoIP_Rt.inactivityTimerMs);
     DoIP_MainFunction_Counter++;
 }
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
@@ -667,8 +680,7 @@ void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
 
     (void)soConId;
 
-    DoIP_DebugUdpRxCounter++;
-
+    DOIP_DEBUG_INC(DoIP_DebugUdpRxCounter);
     if ((DoIP_Rt.cfg == 0) || (remoteAddr == 0) || (data == 0))
     {
         return;
@@ -689,7 +701,7 @@ void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
     switch (payloadType)
     {
         case DOIP_PAYLOAD_VEHICLE_ID_REQ:
-            DoIP_DebugVehicleIdReqCounter++;
+            DOIP_DEBUG_INC(DoIP_DebugVehicleIdReqCounter);
             if (payloadLen == 0u)
             {
                 DoIP_SendVehicleId(remoteAddr);
@@ -715,7 +727,7 @@ void DoIP_SoAdTcpRxIndication(SoAd_SoConIdType soConId,
         return;
     }
 
-    DoIP_DebugTcpRxCounter++;
+    DOIP_DEBUG_INC(DoIP_DebugTcpRxCounter);
     DoIP_MarkTcpActivity();
 
     if ((uint32_t)DoIP_Rt.tcpStreamLen + len > DOIP_TCP_RX_STREAM_LEN)
@@ -738,7 +750,8 @@ void DoIP_SoAdTcpConnected(SoAd_SoConIdType soConId)
     (void)soConId;
 
     DoIP_Rt.tcpState = DOIP_TCP_CONNECTED;
-    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
+    EthernetDiag_ReportDoipActive(FALSE);
+    DOIP_DEBUG_ASSIGN(DoIP_DebugTcpState, (uint32)DoIP_Rt.tcpState);
     DoIP_Rt.routingActive = 0u;
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
@@ -762,10 +775,11 @@ void DoIP_SoAdTcpDisconnected(SoAd_SoConIdType soConId)
     (void)soConId;
 
     DoIP_Rt.tcpDisconnectCnt++;
-    DoIP_DebugTcpDisconnectCounter++;
+    DOIP_DEBUG_INC(DoIP_DebugTcpDisconnectCounter);
     DoIP_Rt.tcpState = DOIP_TCP_OFFLINE;
-    DoIP_DebugTcpState = (uint32)DoIP_Rt.tcpState;
+    DOIP_DEBUG_ASSIGN(DoIP_DebugTcpState, (uint32)DoIP_Rt.tcpState);
     DoIP_Rt.routingActive = 0u;
+    EthernetDiag_ReportDoipActive(FALSE);
     DoIP_Rt.tcpStreamLen = 0u;
     DoIP_Rt.testerLogicalAddress = 0u;
     DoIP_ResetTcpActivityTimers();

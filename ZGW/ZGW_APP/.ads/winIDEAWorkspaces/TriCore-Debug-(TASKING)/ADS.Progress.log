@@ -3,7 +3,31 @@ LOADING	App
 LOADING	App
 EMULATION	Probe - System; Root
 EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	END - Without cleanup
+EMULATION	Initial debug frequency set
 EMULATION	Asserting reset
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+  Read error: Item: 0   Address: F000'0494   Num: 4
+initSoC(Debug) FAILED
+EMULATION	Initial debug frequency set
+EMULATION	Finished connecting to SoC
+EMULATION	Releasing reset
+EMULATION	Unexpected boot core state after debug entry
+EMULATION	END - Without cleanup
+The device features of TC375TP are not fully unlocked. See https://kb.tasking.com/KB/76/Article/521
+LOADING	App
+LOADING	App
+EMULATION	Probe - System; Root
+EMULATION	Initial debug frequency set
 EMULATION	Finished connecting to SoC
 EMULATION	Releasing reset
 EMULATION	Initialization script (if any) done
@@ -11,6 +35,8 @@ EMULATION	Final debug frequency set
 EMULATION	SoC identification match OK
 SoC	Detected device: TC370 series, rev. AA
 EMULATION	STARTED
+SoC	Detected device: TC370 series, rev. AA
+SoC	Detected device: TC370 series, rev. AA
 SoC	Detected device: TC370 series, rev. AA
 SoC	Detected device: TC370 series, rev. AA
 EMULATION	END - Without cleanup

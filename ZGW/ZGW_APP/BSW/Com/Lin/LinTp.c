@@ -5,8 +5,11 @@
 
 #define LINTP_TIMER_N_CR 200u
 #define LINTP_TIMER_N_AS 200u
-#define LINTP_CONFIGURED_NODE_COUNT 4u
-#define LINTP_PENDING_TX_DEPTH 4u
+#define LINTP_CONFIGURED_NODE_COUNT 2u
+#define LINTP_MAIN_FUNCTION_PERIOD_MS 5u
+#define LINTP_MS_TO_TICKS(delayMs) \
+    ((uint16)(((delayMs) + LINTP_MAIN_FUNCTION_PERIOD_MS - 1u) / LINTP_MAIN_FUNCTION_PERIOD_MS))
+#define LINTP_DIAG_START_GAP_TICKS LINTP_MS_TO_TICKS(15u)
 
 typedef enum
 {
@@ -35,6 +38,7 @@ typedef struct
 
     LinTp_InternalStateType state;
     uint16 timer;
+    uint16 startDelay;
 } LinTp_StateType;
 
 typedef struct
@@ -45,30 +49,17 @@ typedef struct
     uint16 functionId;
 } LinTp_NodeType;
 
-typedef struct
-{
-    uint8 valid;
-    PduIdType txPduId;
-    uint8 targetNad;
-    PduLengthType len;
-    uint8 data[LINTP_MAX_PAYLOAD];
-} LinTp_PendingTxType;
-
 static LinTp_StateType LinTp_State;
 static LinTp_NodeType LinTp_ConfiguredNodes[LINTP_CONFIGURED_NODE_COUNT];
-static LinTp_PendingTxType LinTp_PendingTx[LINTP_PENDING_TX_DEPTH];
 
 long long LinTp_MainFunction_Counter = 0;
 
 static Std_ReturnType LinTp_StartTransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len);
-static void LinTp_StartNextPendingTx(void);
 
 static void LinTp_InitConfiguredNodes(uint8 configuredNad)
 {
     if ((configuredNad == 0u) ||
         (configuredNad >= LINTP_NAD_FUNCTIONAL) ||
-        (configuredNad == LINIF_NAD_ALT) ||
-        (configuredNad == LINIF_NAD_PCU48) ||
         (configuredNad == LINIF_NAD_HVDCDC))
     {
         configuredNad = LINTP_NAD_ZGW_DEFAULT;
@@ -79,20 +70,10 @@ static void LinTp_InitConfiguredNodes(uint8 configuredNad)
     LinTp_ConfiguredNodes[0u].supplierId = LINTP_SUPPLIER_ID;
     LinTp_ConfiguredNodes[0u].functionId = LINTP_FUNCTION_ID;
 
-    LinTp_ConfiguredNodes[1u].initialNad = LINIF_NAD_ALT;
-    LinTp_ConfiguredNodes[1u].currentNad = LINIF_NAD_ALT;
+    LinTp_ConfiguredNodes[1u].initialNad = LINIF_NAD_HVDCDC;
+    LinTp_ConfiguredNodes[1u].currentNad = LINIF_NAD_HVDCDC;
     LinTp_ConfiguredNodes[1u].supplierId = LINTP_SUPPLIER_ID;
     LinTp_ConfiguredNodes[1u].functionId = LINTP_FUNCTION_ID;
-
-    LinTp_ConfiguredNodes[2u].initialNad = LINIF_NAD_PCU48;
-    LinTp_ConfiguredNodes[2u].currentNad = LINIF_NAD_PCU48;
-    LinTp_ConfiguredNodes[2u].supplierId = LINTP_SUPPLIER_ID;
-    LinTp_ConfiguredNodes[2u].functionId = LINTP_FUNCTION_ID;
-
-    LinTp_ConfiguredNodes[3u].initialNad = LINIF_NAD_HVDCDC;
-    LinTp_ConfiguredNodes[3u].currentNad = LINIF_NAD_HVDCDC;
-    LinTp_ConfiguredNodes[3u].supplierId = LINTP_SUPPLIER_ID;
-    LinTp_ConfiguredNodes[3u].functionId = LINTP_FUNCTION_ID;
 }
 
 static sint16 LinTp_FindConfiguredNad(uint8 nad)
@@ -118,7 +99,6 @@ uint8 LinTp_IsConfiguredNad(uint8 nad)
 void LinTp_Init(uint8 configuredNad)
 {
     memset(&LinTp_State, 0, sizeof(LinTp_State));
-    memset(LinTp_PendingTx, 0, sizeof(LinTp_PendingTx));
     LinTp_InitConfiguredNodes(configuredNad);
     LinTp_State.activeTargetNad = LinTp_ConfiguredNodes[0u].currentNad;
     LinTp_State.txNad = LinTp_State.activeTargetNad;
@@ -205,6 +185,11 @@ static uint8 LinTp_CanStartTransmitNow(void)
         return FALSE;
     }
 
+    if (LinTp_State.startDelay > 0u)
+    {
+        return FALSE;
+    }
+
     diagState = LinIf_GetDiagState();
     if ((diagState != LINIF_DIAG_IDLE) &&
         (diagState != LINIF_DIAG_DONE) &&
@@ -218,82 +203,22 @@ static uint8 LinTp_CanStartTransmitNow(void)
 
 uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad)
 {
-    uint8 idx;
-
     if (LinTp_IsConfiguredNad(targetNad) == FALSE)
     {
         return FALSE;
     }
 
-    if (LinTp_CanStartTransmitNow() != FALSE)
-    {
-        return TRUE;
-    }
-
-    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
-    {
-        if (LinTp_PendingTx[idx].valid == FALSE)
-        {
-            return TRUE;
-        }
-    }
-
-    return FALSE;
+    return LinTp_CanStartTransmitNow();
 }
 
-static Std_ReturnType LinTp_StorePendingTx(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len)
+uint8 LinTp_CanStartTransmitToNadNow(uint8 targetNad)
 {
-    uint8 idx;
-
-    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
+    if (LinTp_IsConfiguredNad(targetNad) == FALSE)
     {
-        if (LinTp_PendingTx[idx].valid == FALSE)
-        {
-            LinTp_PendingTx[idx].txPduId = TxPduId;
-            LinTp_PendingTx[idx].targetNad = targetNad;
-            LinTp_PendingTx[idx].len = len;
-            memcpy(LinTp_PendingTx[idx].data, data, len);
-            LinTp_PendingTx[idx].valid = TRUE;
-            return E_OK;
-        }
+        return FALSE;
     }
 
-    return E_NOT_OK;
-}
-
-static void LinTp_StartNextPendingTx(void)
-{
-    uint8 idx;
-    PduIdType txPduId;
-    uint8 targetNad;
-    PduLengthType len;
-
-    if (LinTp_CanStartTransmitNow() == FALSE)
-    {
-        return;
-    }
-
-    for (idx = 0u; idx < LINTP_PENDING_TX_DEPTH; idx++)
-    {
-        if (LinTp_PendingTx[idx].valid != FALSE)
-        {
-            txPduId = LinTp_PendingTx[idx].txPduId;
-            targetNad = LinTp_PendingTx[idx].targetNad;
-            len = LinTp_PendingTx[idx].len;
-
-            if (LinTp_StartTransmitToNad(txPduId, targetNad, LinTp_PendingTx[idx].data, len) == E_OK)
-            {
-                LinTp_PendingTx[idx].valid = FALSE;
-            }
-            else
-            {
-                LinTp_PendingTx[idx].valid = FALSE;
-                PduR_LinTpTxConfirmation(txPduId, E_NOT_OK);
-            }
-
-            return;
-        }
-    }
+    return LinTp_CanStartTransmitNow();
 }
 
 static void LinTp_BuildNextCf(uint8 frame[8])
@@ -379,7 +304,7 @@ Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uin
 
     if (LinTp_CanStartTransmitNow() == FALSE)
     {
-        return LinTp_StorePendingTx(TxPduId, targetNad, data, len);
+        return E_NOT_OK;
     }
 
     return LinTp_StartTransmitToNad(TxPduId, targetNad, data, len);
@@ -403,7 +328,7 @@ void LinTp_TxFrameConfirmation(uint8 success)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
-        LinTp_StartNextPendingTx();
+        LinTp_State.startDelay = LINTP_DIAG_START_GAP_TICKS;
         return;
     }
 
@@ -411,25 +336,30 @@ void LinTp_TxFrameConfirmation(uint8 success)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_OK);
         LinTp_State.state = LINTP_IDLE;
-        LinTp_StartNextPendingTx();
+        LinTp_State.startDelay = LINTP_DIAG_START_GAP_TICKS;
         return;
     }
 
+    LinIf_ResetDiagnostic();
     LinTp_BuildNextCf(frame);
 
     if (LinTp_QueueFrame(frame) != E_OK)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
-        LinTp_StartNextPendingTx();
+        LinTp_State.startDelay = LINTP_DIAG_START_GAP_TICKS;
     }
 }
 
 void LinTp_MainFunction(void)
 {
+    if (LinTp_State.startDelay > 0u)
+    {
+        LinTp_State.startDelay--;
+    }
+
     if (LinTp_State.state == LINTP_IDLE)
     {
-        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -443,13 +373,11 @@ void LinTp_MainFunction(void)
     {
         PduR_LinTpTxConfirmation(LinTp_State.txPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
-        LinTp_StartNextPendingTx();
     }
     else if (LinTp_State.state == LINTP_RX_IN_PROGRESS)
     {
         PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
         LinTp_State.state = LINTP_IDLE;
-        LinTp_StartNextPendingTx();
     }
 
     LinTp_MainFunction_Counter++;
@@ -509,7 +437,6 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         }
 
         PduR_LinTpRxIndication(pduRId, E_OK);
-        LinTp_StartNextPendingTx();
         return;
     }
 
@@ -562,7 +489,6 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
-            LinTp_StartNextPendingTx();
             return;
         }
 
@@ -573,7 +499,6 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_NOT_OK);
             LinTp_State.state = LINTP_IDLE;
-            LinTp_StartNextPendingTx();
             return;
         }
 
@@ -585,7 +510,6 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
         {
             PduR_LinTpRxIndication(LinTp_State.rxPduId, E_OK);
             LinTp_State.state = LINTP_IDLE;
-            LinTp_StartNextPendingTx();
         }
     }
 }

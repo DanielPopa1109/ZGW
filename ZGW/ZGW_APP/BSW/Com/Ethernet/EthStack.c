@@ -3,6 +3,7 @@
 #include "DoIP.h"
 #include "SomeIp.h"
 #include "SomeIpSd.h"
+#include "EthernetDiag.h"
 #include "Dcm_EthTpBridge.h"
 #include "PduR.h"
 
@@ -24,6 +25,7 @@ void EthStack_Init(void)
     }
 
     TcpIp_Init();
+    EthernetDiag_Init();
 
     SoAd_Init(&SoAd_Config);
 

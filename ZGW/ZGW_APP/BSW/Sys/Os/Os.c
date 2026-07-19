@@ -45,6 +45,7 @@
 #include "ComM.h"
 #include "UdpNm.h"
 #include "EthSM.h"
+#include "EthernetDiag.h"
 #include "BSW/Time/TimeBase.h"
 #include "BSW/Time/EthTimeSync.h"
 #include "BSW/Time/Gptp_Lab.h"
@@ -97,21 +98,10 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_PRIO_CORE2_APPL        28u
 #define OS_CORE2_MAIN_PERIOD_TICKS     pdMS_TO_TICKS_core2(5u)
 /*
- * Max Fls/Fee/NvM stack cycles the (lowest-priority) ASIL_NVM task runs per 5ms
- * activation.  It was 1, which capped the whole NvM stack to ONE cycle every
- * 5ms (200 cycles/s) and forced the task to sleep for 5ms between cycles even
- * when the core was otherwise idle.  A single WriteAll of the redundant 16 KiB
- * Dem block (plus a possible garbage collection that re-copies it and erases two
- * 128 KiB sectors) needs hundreds-to-thousands of cycles, so NvM stayed busy for
- * 10+ seconds.  The do/while loop already exits as soon as
- * Os_NvMStackHasPendingJobs() is FALSE, so this value is just a safety cap: NvM
- * now drains its active job using idle CPU instead of trickling one cycle per
- * tick (req: 100% CPU is acceptable to finish as soon as possible).  This cannot
- * starve the watchdog or comms - ASIL_NVM is the lowest-priority core0 task
- * (prio 20 vs ASIL_BSW/watchdog 28, comms 21-26) and yields every cycle, so any
- * higher-priority task preempts it immediately.
+ * Max Fls/Fee/NvM stack cycles ASIL_NVM runs per 5ms activation. Keep the batch
+ * bounded to avoid monopolizing core0 while allowing QM tasks to run first.
  */
-#define OS_NVM_MAIN_CYCLES_PER_ACTIVATION 20000u
+#define OS_NVM_MAIN_CYCLES_PER_ACTIVATION 256u
 #define OS_CPU_LOAD_MAX_PERCENT        100u
 #define OS_CPU_LOAD_MAX_PERMILLE       1000u
 #define OS_CPU_LOAD_SAMPLE_TICKS       ((uint32)configTICK_RATE_HZ_core0)
@@ -1112,6 +1102,7 @@ void QM_BSW_Task_C2(void *pvParameters)
 
             lwip_geth_Lwip_pollTimerFlags();
             lwip_geth_Lwip_pollReceiveFlags();
+            lwip_geth_Lwip_watchRxProgress();
             TcpIp_MainFunction();
             SoAd_MainFunction();
             GatewaySwc_EthernetMainFunction();
@@ -1120,6 +1111,7 @@ void QM_BSW_Task_C2(void *pvParameters)
             SomeIp_MainFunction(5);
 
             EthSM_MainFunction();
+            EthernetDiag_MainFunction();
         }
 
         Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);

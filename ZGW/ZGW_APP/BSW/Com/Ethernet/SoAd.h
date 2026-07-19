@@ -6,6 +6,10 @@
 
 #define SOAD_MAX_CONNECTIONS 8u
 
+#ifndef SOAD_DEBUG_INSTRUMENTATION
+#define SOAD_DEBUG_INSTRUMENTATION 0
+#endif
+
 typedef uint8 SoAd_SoConIdType;
 
 typedef enum
@@ -68,6 +72,18 @@ typedef struct
     uint8 numConnections;
 } SoAd_ConfigType;
 
+typedef struct
+{
+    SoAd_StateType state;
+    TcpIp_SocketIdType listenSock;
+    TcpIp_SocketIdType activeSock;
+    TcpIp_SockAddrType localAddr;
+    TcpIp_SockAddrType remoteAddr;
+    uint8 requestedOpen;
+    uint8 protocol;
+    uint8 upperLayer;
+} SoAd_DiagSnapshotType;
+
 void SoAd_Init(const SoAd_ConfigType *cfg);
 void SoAd_MainFunction(void);
 
@@ -75,6 +91,7 @@ uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
 void SoAd_CloseSoCon(SoAd_SoConIdType id);
 void SoAd_AbortTcpConnection(SoAd_SoConIdType id);
 sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
+Std_ReturnType SoAd_GetDiagSnapshot(SoAd_SoConIdType id, SoAd_DiagSnapshotType *snapshot);
 
 extern volatile uint32 SoAd_OpenFailNoLinkCounter;
 extern volatile uint32 SoAd_OpenFailCreateCounter;
@@ -83,6 +100,7 @@ extern volatile uint32 SoAd_ApiLockCreateFailCounter;
 extern volatile uint32 SoAd_ApiLockTakeFailCounter;
 extern volatile uint32 SoAd_ApiLockGiveFailCounter;
 extern volatile uint8 SoAd_DebugState[SOAD_MAX_CONNECTIONS];
+#if SOAD_DEBUG_INSTRUMENTATION
 extern volatile uint8 SoAd_DebugRequestedOpen[SOAD_MAX_CONNECTIONS];
 extern volatile sint32 SoAd_DebugSocket[SOAD_MAX_CONNECTIONS];
 extern volatile uint8 SoAd_DebugLastOpenResult[SOAD_MAX_CONNECTIONS];
@@ -103,6 +121,7 @@ extern volatile uint32 SoAd_DebugTcpStaleReplaceCounter;
 extern volatile uint32 SoAd_DebugSocketLossCounter;
 extern volatile SoAd_SoConIdType SoAd_DebugLastSocketLossSoConId;
 extern volatile sint32 SoAd_DebugTcpLastAcceptedSocket[SOAD_MAX_CONNECTIONS];
+#endif
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
                                 const TcpIp_SockAddrType *remoteAddr,

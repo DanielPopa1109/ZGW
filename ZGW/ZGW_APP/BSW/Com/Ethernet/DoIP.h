@@ -14,7 +14,7 @@
 #define DOIP_MAX_VIN_LEN                      17u
 #define DOIP_MAX_EID_LEN                      6u
 #define DOIP_MAX_GID_LEN                      6u
-#define DOIP_MAX_UDS_PAYLOAD_LEN              4095u
+#define DOIP_MAX_UDS_PAYLOAD_LEN              256u
 #define DOIP_HEADER_LEN                       8u
 #define DOIP_TCP_RX_STREAM_LEN                12288u
 
@@ -24,6 +24,10 @@
 #define DOIP_LAB_DISABLE_SERVER_ALIVE_REQ     STD_ON
 #define DOIP_VEHICLE_ANNOUNCE_INTERVAL_MS     1000u
 #define DOIP_VEHICLE_ANNOUNCE_COUNT           5u
+
+#ifndef DOIP_DEBUG_INSTRUMENTATION
+#define DOIP_DEBUG_INSTRUMENTATION            0
+#endif
 
 #define DOIP_PAYLOAD_GENERIC_NACK             0x0000u
 #define DOIP_PAYLOAD_VEHICLE_ID_REQ           0x0001u
@@ -120,6 +124,7 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16 sourceAddress,
 
 DoIP_TcpStateType DoIP_GetTcpState(void);
 
+#if DOIP_DEBUG_INSTRUMENTATION
 extern volatile uint32 DoIP_DebugAliveReqTxCounter;
 extern volatile uint32 DoIP_DebugAliveResRxCounter;
 extern volatile uint32 DoIP_DebugTcpTimeoutCounter;
@@ -127,5 +132,6 @@ extern volatile uint32 DoIP_DebugTcpDisconnectCounter;
 extern volatile uint32 DoIP_DebugTcpState;
 extern volatile uint32 DoIP_DebugAliveTimerMs;
 extern volatile uint32 DoIP_DebugInactivityTimerMs;
+#endif
 
 #endif
