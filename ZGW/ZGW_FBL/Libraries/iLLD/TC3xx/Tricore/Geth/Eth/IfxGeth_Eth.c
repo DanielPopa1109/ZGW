@@ -59,9 +59,9 @@
 /*-----------------------Exported Variables/Constants-------------------------*/
 /******************************************************************************/
 
-IFX_ALIGN(32) AURIX_ETH_DMA_NC IfxGeth_RxDescrList IfxGeth_Eth_rxDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_RX_CHANNELS];
+IFX_ALIGN(32) AURIX_ETH_DMA IfxGeth_RxDescrList IfxGeth_Eth_rxDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_RX_CHANNELS];
 
-IFX_ALIGN(32) AURIX_ETH_DMA_NC IfxGeth_TxDescrList IfxGeth_Eth_txDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_TX_CHANNELS];
+IFX_ALIGN(32) AURIX_ETH_DMA IfxGeth_TxDescrList IfxGeth_Eth_txDescrList[IFXGETH_NUM_MODULES][IFXGETH_NUM_TX_CHANNELS];
 
 /******************************************************************************/
 /*-------------------------Function Implementations---------------------------*/
@@ -408,7 +408,7 @@ void IfxGeth_Eth_freeReceiveBuffer(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel chann
     rdes3.U        = 0;
     rdes3.R.BUF1V  = 1; /* buffer 1 valid */
     rdes3.R.BUF2V  = 0; /* buffer 2 not valid */
-    rdes3.R.IOC    = 1; /* interrupt enabled */
+    rdes3.R.IOC    = 0; /* polling mode */
     rdes3.R.OWN    = 1; /* owned by DMA */
     descr->RDES3.U = rdes3.U;
     IfxGeth_Eth_shuffleRxDescriptor(geth, channelId);
@@ -804,7 +804,7 @@ void IfxGeth_Eth_initReceiveDescriptors(IfxGeth_Eth *geth, const IfxGeth_Eth_RxC
 
         descr->RDES3.R.BUF1V = 1; /* buffer 1 valid */
         descr->RDES3.R.BUF2V = 0; /* buffer 2 not valid */
-        descr->RDES3.R.IOC   = 1; /* interrupt enabled */
+        descr->RDES3.R.IOC   = 0; /* polling mode */
         descr->RDES3.R.OWN   = 1; /* owned by DMA */
 
         descr                = &descr[1];
@@ -898,7 +898,7 @@ void IfxGeth_Eth_sendTransmitBuffer(IfxGeth_Eth *geth, uint32 packetLength, IfxG
         if (i == (numOfDescriptors - 1))
         {
             descr->TDES3.R.LD  = 1;                                              /* last descriptor of the frame */
-            descr->TDES2.R.IOC = 1;                                              /* last descriptor of the frame set IOC */
+            descr->TDES2.R.IOC = 0;                                              /* polling mode */
             descr->TDES3.R.FD  = 0;
             descr->TDES2.R.B1L = packetLength;
         }

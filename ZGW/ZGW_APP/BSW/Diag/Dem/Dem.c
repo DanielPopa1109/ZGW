@@ -28,6 +28,7 @@ static Dem_FilterType Dem_Filter;
 static boolean Dem_Dirty = FALSE;
 static boolean Dem_OperationCycleActive = FALSE;
 static uint32 Dem_OperationCycleCounter = 0u;
+static volatile boolean Dem_DtcSettingEnabled = TRUE;
 
 static Dem_ClearDTCStatusType Dem_ClearStatus = DEM_CLEAR_IDLE;
 static IfxCpu_spinLock Dem_CriticalSpinLock;
@@ -1110,6 +1111,7 @@ void Dem_PreInit(void)
     Dem_Dirty = FALSE;
     Dem_OperationCycleActive = FALSE;
     Dem_OperationCycleCounter = 0u;
+    Dem_DtcSettingEnabled = TRUE;
     Dem_ChangeCounter = 0u;
     Dem_ClearStatus = DEM_CLEAR_IDLE;
 
@@ -1197,6 +1199,17 @@ boolean Dem_IsReady(void)
     return (Dem_InitState == DEM_INITIALIZED) ? TRUE : FALSE;
 }
 
+Std_ReturnType Dem_SetDtcSetting(boolean enabled)
+{
+    Dem_DtcSettingEnabled = (enabled != FALSE) ? TRUE : FALSE;
+    return E_OK;
+}
+
+boolean Dem_IsDtcSettingEnabled(void)
+{
+    return Dem_DtcSettingEnabled;
+}
+
 void Dem_MainFunction(void)
 {
 #if (DEM_NVM_ENABLED == 1u)
@@ -1269,6 +1282,11 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
     if (Dem_RuntimeEvents[eventIndex].available == FALSE)
     {
         return E_NOT_OK;
+    }
+
+    if (Dem_DtcSettingEnabled == FALSE)
+    {
+        return E_OK;
     }
 
     if (Dem_GetEventConfig(eventIndex, &eventConfig) != E_OK)

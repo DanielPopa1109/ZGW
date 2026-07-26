@@ -29,20 +29,46 @@
 #ifndef IFX_CFG_H
 #define IFX_CFG_H 1
 
+#include "Platform_Types.h"
+
+#define DEVICE_TC375DP                  1
+#define DEVICE_TC37X                    1
+#define IFX_PIN_PACKAGE_LQFP176         1
+#define IFX_CFG_ZGW_CPU0_ONLY           1
+#define IFXCPU_NUM_MODULES              (1)
+
 /*********************************************************************************************************************/
 /*------------------------------------------Explicit DLMU placement--------------------------------------------------*/
 /*********************************************************************************************************************/
-/* The legacy *_NC macro names are kept so generated/vendor code does not need to change, but they now select cached
- * DLMU sections. */
+/* Ethernet DMA memory is a single explicit non-cached CPU0 DLMU window.
+ * Legacy *_CACHED section names remain accepted for source compatibility, but
+ * Ethernet DMA users must use AURIX_ETH_DMA so the linker can keep the whole
+ * ring/buffer block non-cached. */
+#define AURIX_CPU0_DLMU_NC_BASE         (0xB0000000u)
+#define AURIX_CPU0_DLMU_NC_SIZE         (64u * 1024u)
+#define AURIX_ETH_DMA_BASE              (AURIX_CPU0_DLMU_NC_BASE)
+#define AURIX_ETH_DMA_END               (AURIX_CPU0_DLMU_NC_BASE + AURIX_CPU0_DLMU_NC_SIZE)
+#define AURIX_ETH_DMA_WINDOW_BYTES      (AURIX_CPU0_DLMU_NC_SIZE)
+#define AURIX_ETH_DMA_ALIGNMENT         (32u)
+
 #define AURIX_LMU_CACHED_BSS            __attribute__((section(".bss.lmu_cached")))
 #define AURIX_LMU_CACHED_DATA           __attribute__((section(".data.lmu_cached")))
-#define AURIX_ETH_DMA_CACHED            __attribute__((section(".bss.eth_dma_cached")))
+#define AURIX_ETH_DMA                   __attribute__((section(".bss.eth_dma")))
+#define AURIX_ETH_DMA_CACHED            AURIX_ETH_DMA
 #define AURIX_SHARED_CACHED             __attribute__((section(".bss.shared_cached")))
 
-#define AURIX_LMU_NC_BSS                AURIX_LMU_CACHED_BSS
-#define AURIX_LMU_NC_DATA               AURIX_LMU_CACHED_DATA
-#define AURIX_ETH_DMA_NC                AURIX_ETH_DMA_CACHED
-#define AURIX_SHARED_NC                 AURIX_SHARED_CACHED
+#define AURIX_LMU_NC_BSS                __attribute__((section(".bss.lmu_nc")))
+#define AURIX_LMU_NC_DATA               __attribute__((section(".data.lmu_nc")))
+#define AURIX_ETH_DMA_NC                AURIX_ETH_DMA
+#define AURIX_SHARED_NC                 __attribute__((section(".bss.shared_nc")))
+
+/* APP uses 16/16 descriptors, but the FBL's fixed non-cached DMA linker window
+ * is only 64 KiB at 0xb0000000..0xb0010000. With 2592-byte RX/TX buffers,
+ * 16/16 descriptors require ~82 KiB and do not link. Use the largest depth
+ * that still fits the FBL DMA window while increasing headroom beyond the iLLD
+ * default 8/8. */
+#define IFXGETH_MAX_TX_DESCRIPTORS      (12)
+#define IFXGETH_MAX_RX_DESCRIPTORS      (12)
 
 #if defined(__TASKING__) && !defined(Ifx__dsync)
 #define Ifx__dsync()                    __dsync()
@@ -81,11 +107,5 @@
 /*********************************************************************************************************************/
 /*---------------------------------Configuration for Device and Pin package------------------------------------------*/
 /*********************************************************************************************************************/
-
-#define DEVICE_TC37X			        1
-
-/* #define IFX_PIN_PACKAGE_516          1 */
-/* #define IFX_PIN_PACKAGE_LFBGA292     1 */
-#define IFX_PIN_PACKAGE_LQFP176         1
 
 #endif /* IFX_CFG_H */

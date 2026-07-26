@@ -29,11 +29,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import zlib
 import json
+from collections import deque
 
 
-AURIX_DEFAULT_IP = "192.168.1.255"
+AURIX_SOURCE_DEFAULT_IP = "192.168.1.10"
+BROADCAST_DEFAULT_IP = "192.168.1.255"
 UDP_PORT = 30600
 TCP_PORT = 30600
+DEFAULT_RX_PORTS = "30600, 35000, 35001, 54088"
 HEARTBEAT_PAYLOAD = b"PCHeartbeat"
 HEARTBEAT_INTERVAL_S = 1.0
 MAGIC = b"ZGW"
@@ -48,6 +51,10 @@ STATUS_UPDATE_INTERVAL_S = 0.200
 TEXT_FLUSH_MAX_LINES = 500
 LOG_BUFFER_BYTES = 1024 * 1024
 SOCKET_RCVBUF_BYTES = 4 * 1024 * 1024
+MAX_TRACE_ROWS = 12000
+MAX_GRAPH_POINTS = 600
+GRAPH_WINDOW_S = 30.0
+GRAPH_COLORS = ("#005a9e", "#c2410c", "#15803d", "#7c3aed", "#b45309", "#be123c", "#0369a1", "#4d7c0f")
 
 
 BUS_NAMES = {
@@ -57,11 +64,19 @@ BUS_NAMES = {
 }
 
 FRAME_TYPES = {
-    0x01: "Gateway summary",
-    0x02: "Command signal",
-    0x03: "Command block",
-    0x04: "DTC transition",
+    0x02: "CommandSignal",
+    0x03: "CommandBlock",
+    0x04: "DTCTransition",
 }
+
+ZGW_DATA_FRAME_BY_BUS = {
+    "CANFD": "CANFDData",
+    "LIN": "LINData",
+}
+
+NETWORK_MANAGEMENT_STATUS_PAYLOAD = bytes.fromhex("4E 4D 01 02 00")
+TIME_SYNC_MAGIC = b"ZTS1"
+MCU_DATA_MAGIC = b"ZMCU"
 
 _SIGNAL_DB_B64 = """
 eNrlvV1TI0mStv1f5vTd97F0D4+vPVMJUWANqFaI6qk5wegqVRXWFPRS0LO9a/vfH0kZKZxEUkqKSPex9z2YbhAMNJflh193huL+
@@ -412,6 +427,20 @@ def u32_be(data, offset):
             data[offset + 3])
 
 
+def u64_be(data, offset):
+    value = 0
+    for i in range(8):
+        value = (value << 8) | data[offset + i]
+    return value
+
+
+def s16_be(data, offset):
+    value = u16_be(data, offset)
+    if value >= 0x8000:
+        value -= 0x10000
+    return value
+
+
 def format_number(value):
     if isinstance(value, float):
         if abs(value - round(value)) < 1e-9:
@@ -482,6 +511,201 @@ def signal_plain_text(signal_id, entry_bus, raw):
     }
 
 
+def packet_payload_preview(data, limit=5):
+    if len(data) <= limit:
+        return data.hex(" ").upper()
+    return data[:limit].hex(" ").upper() + " ..."
+
+
+def tx_frame_name(payload):
+    if payload == HEARTBEAT_PAYLOAD:
+        return "PCHeartbeat"
+    return "UserTxPayload"
+
+
+def format_ns_seconds(ns):
+    return f"{ns / 1_000_000_000.0:.6f}s"
+
+
+def format_utc_ns(ns):
+    if ns <= 0:
+        return "0"
+    try:
+        dt = _dt.datetime.fromtimestamp(ns / 1_000_000_000.0, tz=_dt.timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S.%f UTC")[:-3]
+    except Exception:
+        return f"{ns} ns"
+
+
+def scalar_event(frame_name, signal, raw, value_text=None, bus="ETH", message=None, unit=""):
+    text_value = value_text if value_text is not None else str(raw)
+    if unit and text_value and not str(text_value).endswith(unit):
+        text_value = f"{text_value}{unit}"
+    return {
+        "kind": "scalar",
+        "frame_name": frame_name,
+        "bus": bus,
+        "message": message or frame_name,
+        "signal": signal,
+        "signal_key": f"{bus}:{frame_name}:{message or frame_name}:{signal}",
+        "raw": raw,
+        "value_text": text_value,
+        "text": f"{bus} {message or frame_name}: {signal} = {text_value}",
+    }
+
+
+def decode_time_sync_event(data):
+    if len(data) < 40:
+        return {
+            "kind": "time_sync",
+            "frame_name": "TimeSync",
+            "length": len(data),
+            "info": f"malformed len={len(data)} expected=40 payload={packet_payload_preview(data, 8)}",
+            "text": f"TimeSync: malformed payload, {len(data)} bytes",
+        }
+    version = data[4]
+    message_type = data[5]
+    packet_length = u16_be(data, 6)
+    sequence = u32_be(data, 8)
+    vehicle_time_ns = u64_be(data, 12)
+    utc_time_ns = u64_be(data, 20)
+    utc_valid = data[28]
+    time_source = data[29]
+    sync_status = u32_be(data, 32)
+    crc = u32_be(data, 36)
+    info = (
+        f"seq={sequence} vehicle={format_ns_seconds(vehicle_time_ns)} "
+        f"utc={format_utc_ns(utc_time_ns)} valid={utc_valid} "
+        f"source={time_source} status=0x{sync_status:08X}"
+    )
+    return {
+        "kind": "time_sync",
+        "frame_name": "TimeSync",
+        "length": len(data),
+        "info": info,
+        "text": (
+            f"TimeSync: version={version}, type={message_type}, length={packet_length}, "
+            f"sequence={sequence}, vehicleTimeNs={vehicle_time_ns}, utcTimeNs={utc_time_ns}, "
+            f"utcValid={utc_valid}, timeSource={time_source}, syncStatus=0x{sync_status:08X}, crc=0x{crc:08X}"
+        ),
+        "signals": [
+            scalar_event("TimeSync", "Version", version),
+            scalar_event("TimeSync", "MessageType", message_type),
+            scalar_event("TimeSync", "Length", packet_length),
+            scalar_event("TimeSync", "SequenceCounter", sequence),
+            scalar_event("TimeSync", "VehicleTimeNs", vehicle_time_ns),
+            scalar_event("TimeSync", "VehicleTimeSeconds", vehicle_time_ns / 1_000_000_000.0, format_ns_seconds(vehicle_time_ns)),
+            scalar_event("TimeSync", "UtcTimeNs", utc_time_ns),
+            scalar_event("TimeSync", "UtcTimeSeconds", utc_time_ns / 1_000_000_000.0, format_utc_ns(utc_time_ns)),
+            scalar_event("TimeSync", "UtcValid", utc_valid),
+            scalar_event("TimeSync", "TimeSource", time_source),
+            scalar_event("TimeSync", "SyncStatus", sync_status, f"0x{sync_status:08X}"),
+            scalar_event("TimeSync", "Crc", crc, f"0x{crc:08X}"),
+        ],
+    }
+
+
+def decode_mcu_data_event(data):
+    if len(data) < 64:
+        return {
+            "kind": "mcu_data",
+            "frame_name": "MCUData",
+            "length": len(data),
+            "info": f"malformed len={len(data)} expected=64 payload={packet_payload_preview(data, 8)}",
+            "text": f"MCUData: malformed payload, {len(data)} bytes",
+        }
+    version = data[4]
+    message_type = data[5]
+    packet_length = u16_be(data, 6)
+    sequence = u32_be(data, 8)
+    vehicle_time_ns = u64_be(data, 12)
+    init_done = data[20]
+    wakeup_standby = data[21]
+    reset_type = u16_be(data, 22)
+    reset_trigger = u16_be(data, 24)
+    reset_reason = u16_be(data, 26)
+    vext_mv = u16_be(data, 28)
+    vddp3_mv = u16_be(data, 30)
+    core_mv = u16_be(data, 32)
+    core_high_mv = u16_be(data, 34)
+    core_low_mv = u16_be(data, 36)
+    uv_limit_mv = u16_be(data, 38)
+    temp_pms_c = s16_be(data, 40) / 100.0
+    temp_core_c = s16_be(data, 42) / 100.0
+    temp_diff_c = s16_be(data, 44) / 100.0
+    temp_high_c = s16_be(data, 46) / 100.0
+    temp_low_c = s16_be(data, 48) / 100.0
+    crc = u32_be(data, 60)
+    info = (
+        f"seq={sequence} init={init_done} wake={wakeup_standby} "
+        f"Vext={vext_mv}mV Vddp3={vddp3_mv}mV Core={core_mv}mV "
+        f"TempCore={temp_core_c:g}C Reset={reset_type}/{reset_trigger}/{reset_reason}"
+    )
+    return {
+        "kind": "mcu_data",
+        "frame_name": "MCUData",
+        "length": len(data),
+        "info": info,
+        "text": (
+            f"MCUData: version={version}, type={message_type}, length={packet_length}, "
+            f"sequence={sequence}, vehicleTimeNs={vehicle_time_ns} ({format_ns_seconds(vehicle_time_ns)}), "
+            f"initDone={init_done}, wakeupFromStandby={wakeup_standby}, "
+            f"resetType={reset_type}, resetTrigger={reset_trigger}, resetReason={reset_reason}, "
+            f"vext={vext_mv}mV, vddp3={vddp3_mv}mV, core={core_mv}mV, "
+            f"coreHigh={core_high_mv}mV, coreLow={core_low_mv}mV, uvLimit={uv_limit_mv}mV, "
+            f"tempPms={temp_pms_c:g}C, tempCore={temp_core_c:g}C, tempDiff={temp_diff_c:g}C, "
+            f"tempHigh={temp_high_c:g}C, tempLow={temp_low_c:g}C, crc=0x{crc:08X}"
+        ),
+        "signals": [
+            scalar_event("MCUData", "Version", version),
+            scalar_event("MCUData", "MessageType", message_type),
+            scalar_event("MCUData", "Length", packet_length),
+            scalar_event("MCUData", "SequenceCounter", sequence),
+            scalar_event("MCUData", "VehicleTimeNs", vehicle_time_ns),
+            scalar_event("MCUData", "VehicleTimeSeconds", vehicle_time_ns / 1_000_000_000.0, format_ns_seconds(vehicle_time_ns)),
+            scalar_event("MCUData", "SafetyKitInitDone", init_done),
+            scalar_event("MCUData", "WakeupFromStandby", wakeup_standby),
+            scalar_event("MCUData", "ResetType", reset_type),
+            scalar_event("MCUData", "ResetTrigger", reset_trigger),
+            scalar_event("MCUData", "ResetReason", reset_reason),
+            scalar_event("MCUData", "Vext", vext_mv, f"{vext_mv}", unit="mV"),
+            scalar_event("MCUData", "Vddp3", vddp3_mv, f"{vddp3_mv}", unit="mV"),
+            scalar_event("MCUData", "CoreVoltage", core_mv, f"{core_mv}", unit="mV"),
+            scalar_event("MCUData", "CoreHighVoltage", core_high_mv, f"{core_high_mv}", unit="mV"),
+            scalar_event("MCUData", "CoreLowVoltage", core_low_mv, f"{core_low_mv}", unit="mV"),
+            scalar_event("MCUData", "UvLimit", uv_limit_mv, f"{uv_limit_mv}", unit="mV"),
+            scalar_event("MCUData", "TempPms", temp_pms_c, f"{temp_pms_c:g}", unit="C"),
+            scalar_event("MCUData", "TempCore", temp_core_c, f"{temp_core_c:g}", unit="C"),
+            scalar_event("MCUData", "TempDiff", temp_diff_c, f"{temp_diff_c:g}", unit="C"),
+            scalar_event("MCUData", "TempHigh", temp_high_c, f"{temp_high_c:g}", unit="C"),
+            scalar_event("MCUData", "TempLow", temp_low_c, f"{temp_low_c:g}", unit="C"),
+            scalar_event("MCUData", "Crc", crc, f"0x{crc:08X}"),
+        ],
+    }
+
+
+def non_gateway_event(data):
+    if data == NETWORK_MANAGEMENT_STATUS_PAYLOAD:
+        return {
+            "kind": "network_management",
+            "frame_name": "Networkmanagement3_Status",
+            "length": len(data),
+            "info": "NM index=3 state=0x02 flags=0x00",
+            "text": "Networkmanagement3_Status: NM index=3 state=0x02 flags=0x00",
+        }
+    if data.startswith(TIME_SYNC_MAGIC):
+        return decode_time_sync_event(data)
+    if data.startswith(MCU_DATA_MAGIC):
+        return decode_mcu_data_event(data)
+    return {
+        "kind": "network_payload",
+        "frame_name": "NetworkPayload",
+        "length": len(data),
+        "info": f"payload={packet_payload_preview(data)} len={len(data)}",
+        "text": f"NetworkPayload: {len(data)} bytes, payload={packet_payload_preview(data)}",
+    }
+
+
 def decode_gateway_payload(data):
     """
     Returns list of event dictionaries.
@@ -494,14 +718,13 @@ def decode_gateway_payload(data):
         return events
 
     if data[0:3] != MAGIC:
-        events.append({
-            "kind": "unknown",
-            "text": f"Non-Gateway payload: {len(data)} bytes, first bytes={data[:16].hex(' ')}"
-        })
+        event = non_gateway_event(data)
+        events.append(event)
+        events.extend(event.get("signals", ()))
         return events
 
     frame_type = data[3]
-    frame_name = FRAME_TYPES.get(frame_type, f"Unknown frame type 0x{frame_type:02X}")
+    frame_name = FRAME_TYPES.get(frame_type, f"ZGWFrame0x{frame_type:02X}")
 
     if frame_type == 0x01:
         if len(data) < 12:
@@ -511,6 +734,7 @@ def decode_gateway_payload(data):
         main_cycles = u32_be(data, 4)
         header_bus = data[8]
         header_bus_name = BUS_NAMES.get(header_bus, f"bus{header_bus}")
+        frame_name = ZGW_DATA_FRAME_BY_BUS.get(header_bus_name, f"{header_bus_name}Data")
         entry_count = max(0, (len(data) - 12) // 7)
         trailing = (len(data) - 12) % 7
 
@@ -523,8 +747,7 @@ def decode_gateway_payload(data):
             "entry_count": entry_count,
             "length": len(data),
             "trailing": trailing,
-            "text": f"Gateway summary: bus={header_bus_name}, mainCycles={main_cycles}, "
-                    f"signals={entry_count}, payload={len(data)} bytes"
+            "text": f"{frame_name}: mainCycles={main_cycles}, signals={entry_count}, payload={len(data)} bytes"
         })
 
         offset = 12
@@ -603,8 +826,11 @@ def decode_gateway_payload(data):
         return events
 
     events.append({
-        "kind": "unknown",
-        "text": f"Unknown GatewaySwc frame 0x{frame_type:02X}: {len(data)} bytes, data={data[:64].hex(' ')}"
+        "kind": "zgw_frame",
+        "frame_name": frame_name,
+        "length": len(data),
+        "info": f"type=0x{frame_type:02X} payload={packet_payload_preview(data)}",
+        "text": f"{frame_name}: type=0x{frame_type:02X}, payload={packet_payload_preview(data)}"
     })
     return events
 
@@ -654,7 +880,7 @@ class UdpListener(threading.Thread):
             now = _dt.datetime.now()
             events = decode_gateway_payload(data)
             try:
-                self.out_queue.put_nowait(("packet", now, "UDP", src_ip, src_port, data, events))
+                self.out_queue.put_nowait(("packet", now, "UDP", src_ip, src_port, self.port, data, events))
             except queue.Full:
                 pass
 
@@ -666,12 +892,13 @@ class UdpListener(threading.Thread):
 
 
 class TcpClientWorker(threading.Thread):
-    def __init__(self, out_queue, stop_event, conn, addr):
+    def __init__(self, out_queue, stop_event, conn, addr, local_port):
         super().__init__(daemon=True)
         self.out_queue = out_queue
         self.stop_event = stop_event
         self.conn = conn
         self.addr = addr
+        self.local_port = local_port
 
     def run(self):
         src_ip, src_port = self.addr
@@ -697,7 +924,7 @@ class TcpClientWorker(threading.Thread):
                 now = _dt.datetime.now()
                 events = decode_gateway_payload(data)
                 try:
-                    self.out_queue.put_nowait(("packet", now, "TCP", src_ip, src_port, data, events))
+                    self.out_queue.put_nowait(("packet", now, "TCP", src_ip, src_port, self.local_port, data, events))
                 except queue.Full:
                     pass
         finally:
@@ -755,7 +982,7 @@ class TcpListener(threading.Thread):
                     pass
                 continue
 
-            worker = TcpClientWorker(self.out_queue, self.stop_event, conn, addr)
+            worker = TcpClientWorker(self.out_queue, self.stop_event, conn, addr, self.port)
             self.workers.append(worker)
             worker.start()
 
@@ -766,8 +993,8 @@ class TcpListener(threading.Thread):
         self.out_queue.put(("status", "TCP listener stopped."))
 
 
-class HeartbeatSender(threading.Thread):
-    def __init__(self, out_queue, stop_event, target_ip, port, protocol, interval_s, payload):
+class PacketSender(threading.Thread):
+    def __init__(self, out_queue, stop_event, target_ip, port, protocol, interval_s, payload, count=0, label="TX generator"):
         super().__init__(daemon=True)
         self.out_queue = out_queue
         self.stop_event = stop_event
@@ -776,10 +1003,13 @@ class HeartbeatSender(threading.Thread):
         self.protocol = protocol.strip().upper()
         self.interval_s = max(0.05, float(interval_s))
         self.payload = payload
+        self.count = max(0, int(count))
+        self.label = label
         self.udp_sock = None
         self.tcp_sock = None
         self.last_error_text = None
         self.last_error_time = 0.0
+        self.sent = 0
 
     def _uses_udp(self):
         return self.protocol in ("UDP", "UDP+TCP", "BOTH")
@@ -811,7 +1041,7 @@ class HeartbeatSender(threading.Thread):
         sock.connect((self.target_ip, self.port))
         sock.settimeout(0.8)
         self.tcp_sock = sock
-        self._put_status(f"TCP heartbeat connected to {self.target_ip}:{self.port}")
+        self._put_status(f"TCP {self.label} connected to {self.target_ip}:{self.port}")
 
     def _send_tcp(self):
         self._connect_tcp()
@@ -827,26 +1057,31 @@ class HeartbeatSender(threading.Thread):
 
     def run(self):
         if not self.target_ip:
-            self._put_status("Heartbeat disabled: no target IP.")
+            self._put_status(f"{self.label} disabled: no target IP.")
             return
 
         self._put_status(
-            f"Heartbeat started: {self.protocol} -> {self.target_ip}:{self.port}, "
-            f"payload={self.payload.decode('ascii', errors='replace')!r}, interval={self.interval_s:g}s"
+            f"{self.label} started: {self.protocol} -> {self.target_ip}:{self.port}, "
+            f"payload={self.payload.hex(' ')}, interval={self.interval_s:g}s, "
+            f"count={'continuous' if self.count == 0 else self.count}"
         )
 
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set() and (self.count == 0 or self.sent < self.count):
             if self._uses_udp():
                 try:
                     self._send_udp()
+                    self.sent += 1
+                    self.out_queue.put(("tx", _dt.datetime.now(), self.protocol, self.target_ip, self.port, self.payload, self.sent, self.count, self.label))
                 except Exception as exc:
-                    self._put_limited_error(f"UDP heartbeat send failed: {exc}")
+                    self._put_limited_error(f"UDP {self.label} send failed: {exc}")
 
-            if self._uses_tcp():
+            if self._uses_tcp() and (self.count == 0 or self.sent < self.count):
                 try:
                     self._send_tcp()
+                    self.sent += 1
+                    self.out_queue.put(("tx", _dt.datetime.now(), self.protocol, self.target_ip, self.port, self.payload, self.sent, self.count, self.label))
                 except Exception as exc:
-                    self._put_limited_error(f"TCP heartbeat send failed: {exc}")
+                    self._put_limited_error(f"TCP {self.label} send failed: {exc}")
                     self._close_tcp()
 
             deadline = time.time() + self.interval_s
@@ -859,7 +1094,10 @@ class HeartbeatSender(threading.Thread):
         except Exception:
             pass
         self._close_tcp()
-        self._put_status("Heartbeat stopped.")
+        self._put_status(f"{self.label} stopped. Sent {self.sent} packet(s).")
+
+
+HeartbeatSender = PacketSender
 
 
 class App(tk.Tk):
@@ -872,6 +1110,8 @@ class App(tk.Tk):
         self.stop_event = threading.Event()
         self.listeners = []
         self.heartbeat_sender = None
+        self.tx_senders = []
+        self.tx_packets = []
         self.log_file = None
         self.csv_file = None
         self.csv_writer = None
@@ -880,20 +1120,41 @@ class App(tk.Tk):
         self.signal_count = 0
         self.dropped_packets = 0
         self.preview_lines = 0
+        self.trace_rows = 0
+        self.trace_start_time = None
+        self.trace_last_time = None
+        self.trace_last_time_by_key = {}
+        self.trace_details = {}
+        self.fixed_trace_items = {}
+        self.signal_history = {}
+        self.signal_names = {}
+        self.signal_value_text = {}
+        self.graph_selected_keys = []
+        self.graph_hover_items = []
+        self.graph_latest_visible = {}
         self._last_file_flush = time.time()
         self._last_status_update = 0.0
         self._text_buffer = []
 
         self.bind_ip = tk.StringVar(value="0.0.0.0")
-        self.port = tk.IntVar(value=UDP_PORT)
-        self.source_ip = tk.StringVar(value=AURIX_DEFAULT_IP)
+        self.ports = tk.StringVar(value=DEFAULT_RX_PORTS)
+        self.source_ip = tk.StringVar(value=AURIX_SOURCE_DEFAULT_IP)
         self.rx_protocol = tk.StringVar(value="UDP")
         self.heartbeat_enabled = tk.BooleanVar(value=True)
         self.heartbeat_protocol = tk.StringVar(value="UDP")
-        self.heartbeat_target_ip = tk.StringVar(value=AURIX_DEFAULT_IP)
+        self.heartbeat_target_ip = tk.StringVar(value=BROADCAST_DEFAULT_IP)
         self.heartbeat_port = tk.IntVar(value=UDP_PORT)
         self.heartbeat_interval = tk.DoubleVar(value=HEARTBEAT_INTERVAL_S)
         self.heartbeat_payload = tk.StringVar(value=HEARTBEAT_PAYLOAD.decode("ascii"))
+        self.tx_count = tk.IntVar(value=0)
+        self.tx_payload_format = tk.StringVar(value="ASCII")
+        self.tx_name = tk.StringVar(value="PCHeartbeat")
+        self.trace_mode = tk.StringVar(value="Fixed")
+        self.time_mode = tk.StringVar(value="Relative")
+        self.auto_scroll = tk.BooleanVar(value=True)
+        self.graph_signal = tk.StringVar(value="")
+        self.graph_window_s = tk.DoubleVar(value=GRAPH_WINDOW_S)
+        self.graph_view_mode = tk.StringVar(value="Stacked")
         self.only_changes = tk.BooleanVar(value=True)
         self.show_packet_summary = tk.BooleanVar(value=True)
         self.show_signals = tk.BooleanVar(value=False)
@@ -910,11 +1171,11 @@ class App(tk.Tk):
         top = ttk.LabelFrame(frm, text="Receiver")
         top.pack(fill=tk.X)
 
-        ttk.Label(top, text="Bind IP").grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(top, text="Bind IP (0.0.0.0 for broadcast)").grid(row=0, column=0, sticky="w", padx=4, pady=4)
         ttk.Entry(top, textvariable=self.bind_ip, width=16).grid(row=0, column=1, padx=4, pady=4)
 
-        ttk.Label(top, text="Port").grid(row=0, column=2, sticky="w", padx=4, pady=4)
-        ttk.Entry(top, textvariable=self.port, width=8).grid(row=0, column=3, padx=4, pady=4)
+        ttk.Label(top, text="Ports").grid(row=0, column=2, sticky="w", padx=4, pady=4)
+        ttk.Entry(top, textvariable=self.ports, width=18).grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(top, text="AURIX source IP filter").grid(row=0, column=4, sticky="w", padx=4, pady=4)
         ttk.Entry(top, textvariable=self.source_ip, width=18).grid(row=0, column=5, padx=4, pady=4)
@@ -928,20 +1189,63 @@ class App(tk.Tk):
         self.stop_btn = ttk.Button(top, text="Stop", command=self.stop, state=tk.DISABLED)
         self.stop_btn.grid(row=0, column=9, padx=4, pady=4)
 
-        hb = ttk.LabelFrame(frm, text="PC heartbeat sender")
+        hb = ttk.LabelFrame(frm, text="Transmit generator")
         hb.pack(fill=tk.X, pady=(6, 0))
 
         ttk.Checkbutton(hb, text="Enable", variable=self.heartbeat_enabled).grid(row=0, column=0, padx=4, pady=4)
-        ttk.Label(hb, text="Target IP").grid(row=0, column=1, sticky="w", padx=4, pady=4)
-        ttk.Entry(hb, textvariable=self.heartbeat_target_ip, width=18).grid(row=0, column=2, padx=4, pady=4)
-        ttk.Label(hb, text="Port").grid(row=0, column=3, sticky="w", padx=4, pady=4)
-        ttk.Entry(hb, textvariable=self.heartbeat_port, width=8).grid(row=0, column=4, padx=4, pady=4)
-        ttk.Label(hb, text="Protocol").grid(row=0, column=5, sticky="w", padx=4, pady=4)
-        ttk.Combobox(hb, textvariable=self.heartbeat_protocol, values=("UDP", "TCP", "UDP+TCP"), width=8, state="readonly").grid(row=0, column=6, padx=4, pady=4)
-        ttk.Label(hb, text="Interval s").grid(row=0, column=7, sticky="w", padx=4, pady=4)
-        ttk.Entry(hb, textvariable=self.heartbeat_interval, width=8).grid(row=0, column=8, padx=4, pady=4)
-        ttk.Label(hb, text="Payload").grid(row=0, column=9, sticky="w", padx=4, pady=4)
-        ttk.Entry(hb, textvariable=self.heartbeat_payload, width=18).grid(row=0, column=10, padx=4, pady=4)
+        ttk.Label(hb, text="Name").grid(row=0, column=1, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.tx_name, width=18).grid(row=0, column=2, padx=4, pady=4)
+        ttk.Label(hb, text="Target IP").grid(row=0, column=3, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.heartbeat_target_ip, width=16).grid(row=0, column=4, padx=4, pady=4)
+        ttk.Label(hb, text="Port").grid(row=0, column=5, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.heartbeat_port, width=8).grid(row=0, column=6, padx=4, pady=4)
+        ttk.Label(hb, text="Protocol").grid(row=0, column=7, sticky="w", padx=4, pady=4)
+        ttk.Combobox(hb, textvariable=self.heartbeat_protocol, values=("UDP", "TCP", "UDP+TCP"), width=8, state="readonly").grid(row=0, column=8, padx=4, pady=4)
+        ttk.Label(hb, text="Interval s").grid(row=0, column=9, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.heartbeat_interval, width=8).grid(row=0, column=10, padx=4, pady=4)
+        ttk.Label(hb, text="Format").grid(row=0, column=11, sticky="w", padx=4, pady=4)
+        ttk.Combobox(hb, textvariable=self.tx_payload_format, values=("ASCII", "HEX"), width=7, state="readonly").grid(row=0, column=12, padx=4, pady=4)
+        ttk.Label(hb, text="Count").grid(row=0, column=13, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.tx_count, width=8).grid(row=0, column=14, padx=4, pady=4)
+
+        ttk.Label(hb, text="Payload").grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        ttk.Entry(hb, textvariable=self.heartbeat_payload).grid(row=1, column=1, columnspan=10, sticky="ew", padx=4, pady=4)
+        ttk.Button(hb, text="Add packet", command=self.add_tx_packet).grid(row=1, column=11, padx=4, pady=4)
+        ttk.Button(hb, text="Update selected", command=self.update_selected_tx_packet).grid(row=1, column=12, columnspan=2, padx=4, pady=4)
+        ttk.Button(hb, text="Remove selected", command=self.remove_tx_packet).grid(row=1, column=14, columnspan=2, padx=4, pady=4)
+
+        tx_columns = ("enabled", "name", "target", "port", "protocol", "interval", "format", "count", "payload")
+        self.tx_table = ttk.Treeview(hb, columns=tx_columns, show="headings", height=4, selectmode="browse")
+        tx_headings = {
+            "enabled": "On",
+            "name": "Name",
+            "target": "Target",
+            "port": "Port",
+            "protocol": "Proto",
+            "interval": "Interval",
+            "format": "Fmt",
+            "count": "Count",
+            "payload": "Payload",
+        }
+        tx_widths = {
+            "enabled": 45,
+            "name": 130,
+            "target": 125,
+            "port": 65,
+            "protocol": 65,
+            "interval": 70,
+            "format": 55,
+            "count": 70,
+            "payload": 420,
+        }
+        for name in tx_columns:
+            self.tx_table.heading(name, text=tx_headings[name])
+            self.tx_table.column(name, width=tx_widths[name], minwidth=40, stretch=(name == "payload"))
+        self.tx_table.grid(row=2, column=0, columnspan=16, sticky="ew", padx=4, pady=(0, 4))
+        self.tx_table.bind("<Double-1>", self.toggle_selected_tx_packet)
+        self.tx_table.bind("<<TreeviewSelect>>", self._on_tx_packet_select)
+        hb.columnconfigure(10, weight=1)
+        self._ensure_default_tx_packet()
 
         opts = ttk.Frame(frm)
         opts.pack(fill=tk.X, pady=(6, 0))
@@ -949,18 +1253,119 @@ class App(tk.Tk):
         ttk.Checkbutton(opts, text="Text: packet summary", variable=self.show_packet_summary).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(opts, text="Preview: signal entries (heavy)", variable=self.show_signals).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(opts, text="Preview only changed values", variable=self.only_changes).pack(side=tk.LEFT, padx=4)
+        ttk.Label(opts, text="Trace").pack(side=tk.LEFT, padx=(12, 4))
+        trace_mode_combo = ttk.Combobox(opts, textvariable=self.trace_mode, values=("Fixed", "Chronological"), width=13, state="readonly")
+        trace_mode_combo.pack(side=tk.LEFT, padx=4)
+        trace_mode_combo.bind("<<ComboboxSelected>>", self._on_trace_mode_change)
+        ttk.Label(opts, text="Time").pack(side=tk.LEFT, padx=(12, 4))
+        ttk.Combobox(opts, textvariable=self.time_mode, values=("Relative", "Real-time"), width=10, state="readonly").pack(side=tk.LEFT, padx=4)
+        ttk.Checkbutton(opts, text="Auto scroll", variable=self.auto_scroll).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(opts, text="Write .csv", variable=self.write_csv).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(opts, text="Write .log", variable=self.write_text).pack(side=tk.LEFT, padx=4)
 
-        mid = ttk.Frame(frm)
+        mid = ttk.PanedWindow(frm, orient=tk.VERTICAL)
         mid.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
 
-        self.text = tk.Text(mid, wrap="none", font=("Consolas", 10))
-        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        trace_frame = ttk.Frame(mid)
+        mid.add(trace_frame, weight=4)
 
-        yscroll = ttk.Scrollbar(mid, orient=tk.VERTICAL, command=self.text.yview)
-        yscroll.pack(side=tk.RIGHT, fill=tk.Y)
+        columns = ("no", "time", "delta", "dir", "proto", "source", "src_port", "rx_port", "type", "bus", "len", "info")
+        self.trace = ttk.Treeview(trace_frame, columns=columns, show="headings", selectmode="browse")
+        headings = {
+            "no": "No.",
+            "time": "Time",
+            "delta": "Delta ms",
+            "dir": "Dir",
+            "proto": "Proto",
+            "source": "Source",
+            "src_port": "Src Port",
+            "rx_port": "Rx Port",
+            "type": "Frame",
+            "bus": "Bus",
+            "len": "Len",
+            "info": "Info",
+        }
+        widths = {
+            "no": 70,
+            "time": 110,
+            "delta": 90,
+            "dir": 45,
+            "proto": 65,
+            "source": 125,
+            "src_port": 70,
+            "rx_port": 70,
+            "type": 130,
+            "bus": 70,
+            "len": 55,
+            "info": 620,
+        }
+        anchors = {"no": tk.E, "delta": tk.E, "src_port": tk.E, "rx_port": tk.E, "len": tk.E}
+        for name in columns:
+            self.trace.heading(name, text=headings[name])
+            self.trace.column(name, width=widths[name], minwidth=45, anchor=anchors.get(name, tk.W), stretch=(name == "info"))
+
+        self.trace.tag_configure("rx", foreground="#003f7f")
+        self.trace.tag_configure("tx", foreground="#7a007a")
+        self.trace.tag_configure("signal", foreground="#406000")
+        self.trace.tag_configure("warning", foreground="#9a5b00")
+        self.trace.tag_configure("error", foreground="#9a0000")
+        self.trace.bind("<<TreeviewSelect>>", self._on_trace_select)
+
+        trace_y = ttk.Scrollbar(trace_frame, orient=tk.VERTICAL, command=self.trace.yview)
+        trace_x = ttk.Scrollbar(trace_frame, orient=tk.HORIZONTAL, command=self.trace.xview)
+        self.trace.configure(yscrollcommand=trace_y.set, xscrollcommand=trace_x.set)
+        self.trace.grid(row=0, column=0, sticky="nsew")
+        trace_y.grid(row=0, column=1, sticky="ns")
+        trace_x.grid(row=1, column=0, sticky="ew")
+        trace_frame.rowconfigure(0, weight=1)
+        trace_frame.columnconfigure(0, weight=1)
+
+        lower_panes = ttk.PanedWindow(mid, orient=tk.HORIZONTAL)
+        mid.add(lower_panes, weight=1)
+
+        detail_frame = ttk.Frame(lower_panes)
+        lower_panes.add(detail_frame, weight=1)
+        detail_frame.columnconfigure(0, weight=1)
+        detail_frame.rowconfigure(1, weight=1)
+
+        ttk.Label(detail_frame, text="Selected row detail").grid(row=0, column=0, sticky="w")
+
+        graph_frame = ttk.Frame(lower_panes)
+        lower_panes.add(graph_frame, weight=1)
+        graph_frame.columnconfigure(0, weight=1)
+        graph_frame.rowconfigure(1, weight=1)
+
+        graph_bar = ttk.Frame(graph_frame)
+        graph_bar.grid(row=0, column=0, sticky="ew")
+        ttk.Label(graph_bar, text="Signal graph").pack(side=tk.LEFT)
+        self.graph_combo = ttk.Combobox(graph_bar, textvariable=self.graph_signal, values=(), width=42, state="readonly")
+        self.graph_combo.pack(side=tk.LEFT, padx=6)
+        self.graph_combo.bind("<<ComboboxSelected>>", lambda _event: self._redraw_graph())
+        ttk.Button(graph_bar, text="Add", command=self.add_graph_signal).pack(side=tk.LEFT, padx=2)
+        ttk.Button(graph_bar, text="Remove", command=self.remove_graph_signal).pack(side=tk.LEFT, padx=2)
+        ttk.Button(graph_bar, text="Clear", command=self.clear_graph_signals).pack(side=tk.LEFT, padx=2)
+        ttk.Button(graph_bar, text="Zoom +", command=self.zoom_graph_in).pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Button(graph_bar, text="Zoom -", command=self.zoom_graph_out).pack(side=tk.LEFT, padx=2)
+        ttk.Label(graph_bar, text="Window s").pack(side=tk.LEFT, padx=(10, 4))
+        ttk.Entry(graph_bar, textvariable=self.graph_window_s, width=7).pack(side=tk.LEFT)
+        ttk.Label(graph_bar, text="View").pack(side=tk.LEFT, padx=(10, 4))
+        graph_view_combo = ttk.Combobox(graph_bar, textvariable=self.graph_view_mode, values=("Stacked", "Shared axis"), width=11, state="readonly")
+        graph_view_combo.pack(side=tk.LEFT)
+        graph_view_combo.bind("<<ComboboxSelected>>", lambda _event: self._redraw_graph())
+
+        self.text = tk.Text(detail_frame, height=8, wrap="none", font=("Consolas", 10))
+        self.text.grid(row=1, column=0, sticky="nsew")
+
+        yscroll = ttk.Scrollbar(detail_frame, orient=tk.VERTICAL, command=self.text.yview)
+        yscroll.grid(row=1, column=0, sticky="nse")
         self.text.configure(yscrollcommand=yscroll.set)
+
+        self.graph = tk.Canvas(graph_frame, height=150, background="white", highlightthickness=1, highlightbackground="#a0a0a0")
+        self.graph.grid(row=1, column=0, sticky="nsew")
+        self.graph.bind("<Configure>", lambda _event: self._redraw_graph())
+        self.graph.bind("<MouseWheel>", self._on_graph_mousewheel)
+        self.graph.bind("<Motion>", self._on_graph_motion)
+        self.graph.bind("<Leave>", self._clear_graph_hover)
 
         bottom = ttk.Frame(frm)
         bottom.pack(fill=tk.X, pady=(6, 0))
@@ -998,6 +1403,193 @@ class App(tk.Tk):
         self.csv_file = None
         self.csv_writer = None
 
+    def _parse_ports(self):
+        text = self.ports.get().strip()
+        if not text:
+            raise ValueError("At least one receiver port is required.")
+        ports = []
+        for chunk in text.replace(";", ",").split(","):
+            part = chunk.strip()
+            if not part:
+                continue
+            if "-" in part:
+                start_text, end_text = [piece.strip() for piece in part.split("-", 1)]
+                start_port = int(start_text)
+                end_port = int(end_text)
+                if start_port > end_port:
+                    raise ValueError(f"Invalid port range: {part}")
+                ports.extend(range(start_port, end_port + 1))
+            else:
+                ports.append(int(part))
+        unique_ports = []
+        for port in ports:
+            if port < 1 or port > 65535:
+                raise ValueError(f"Port out of range: {port}")
+            if port not in unique_ports:
+                unique_ports.append(port)
+        if not unique_ports:
+            raise ValueError("At least one receiver port is required.")
+        return unique_ports
+
+    def _parse_payload_text(self, payload_text, payload_format):
+        payload_text = str(payload_text).strip()
+        if not payload_text:
+            return HEARTBEAT_PAYLOAD
+        if str(payload_format).upper() == "HEX":
+            compact = payload_text.replace(" ", "").replace(",", "").replace("0x", "").replace("0X", "")
+            if len(compact) % 2:
+                raise ValueError("HEX payload must contain an even number of hex digits.")
+            try:
+                return bytes.fromhex(compact)
+            except ValueError:
+                raise ValueError("HEX payload contains non-hex characters.")
+        return payload_text.encode("utf-8")
+
+    def _tx_packet_values(self, cfg):
+        return (
+            "yes" if cfg.get("enabled", True) else "no",
+            cfg.get("name", ""),
+            cfg.get("target_ip", ""),
+            cfg.get("port", ""),
+            cfg.get("protocol", ""),
+            cfg.get("interval", ""),
+            cfg.get("format", ""),
+            cfg.get("count", ""),
+            cfg.get("payload", ""),
+        )
+
+    def _tx_config_from_inputs(self):
+        name = self.tx_name.get().strip() or "UserTxPayload"
+        target_ip = self.heartbeat_target_ip.get().strip()
+        if not target_ip:
+            raise ValueError("Target IP is required.")
+
+        try:
+            port = int(self.heartbeat_port.get())
+        except ValueError:
+            raise ValueError("Port must be a number.")
+        if port < 1 or port > 65535:
+            raise ValueError("Port must be between 1 and 65535.")
+
+        protocol = self.heartbeat_protocol.get().strip().upper()
+        if protocol not in ("UDP", "TCP", "UDP+TCP"):
+            raise ValueError("Protocol must be UDP, TCP, or UDP+TCP.")
+
+        try:
+            interval = float(self.heartbeat_interval.get())
+        except ValueError:
+            raise ValueError("Interval must be a number.")
+        if interval <= 0:
+            raise ValueError("Interval must be greater than 0.")
+
+        payload_format = self.tx_payload_format.get().strip().upper() or "ASCII"
+        if payload_format not in ("ASCII", "HEX"):
+            raise ValueError("Format must be ASCII or HEX.")
+        self._parse_payload_text(self.heartbeat_payload.get(), payload_format)
+
+        try:
+            count = int(self.tx_count.get())
+        except ValueError:
+            raise ValueError("Count must be a whole number.")
+        if count < 0:
+            raise ValueError("Count must be 0 or greater.")
+
+        return {
+            "enabled": True,
+            "name": name,
+            "target_ip": target_ip,
+            "port": port,
+            "protocol": protocol,
+            "interval": interval,
+            "payload": self.heartbeat_payload.get(),
+            "format": payload_format,
+            "count": count,
+        }
+
+    def _refresh_tx_table(self):
+        if not hasattr(self, "tx_table"):
+            return
+        for item in self.tx_table.get_children():
+            self.tx_table.delete(item)
+        for index, cfg in enumerate(self.tx_packets):
+            self.tx_table.insert("", tk.END, iid=str(index), values=self._tx_packet_values(cfg))
+
+    def add_tx_packet(self):
+        try:
+            cfg = self._tx_config_from_inputs()
+        except ValueError as exc:
+            messagebox.showerror("Transmit packet error", str(exc))
+            return
+        self.tx_packets.append(cfg)
+        self._refresh_tx_table()
+
+    def update_selected_tx_packet(self):
+        selected = self.tx_table.selection()
+        if not selected:
+            return
+        try:
+            cfg = self._tx_config_from_inputs()
+        except ValueError as exc:
+            messagebox.showerror("Transmit packet error", str(exc))
+            return
+        index = int(selected[0])
+        if 0 <= index < len(self.tx_packets):
+            cfg["enabled"] = self.tx_packets[index].get("enabled", True)
+            self.tx_packets[index] = cfg
+            self._refresh_tx_table()
+            self.tx_table.selection_set(str(index))
+
+    def _on_tx_packet_select(self, _event=None):
+        selected = self.tx_table.selection()
+        if not selected:
+            return
+        index = int(selected[0])
+        if not (0 <= index < len(self.tx_packets)):
+            return
+        cfg = self.tx_packets[index]
+        self.tx_name.set(str(cfg.get("name", "")))
+        self.heartbeat_target_ip.set(str(cfg.get("target_ip", "")))
+        self.heartbeat_port.set(str(cfg.get("port", "")))
+        self.heartbeat_protocol.set(str(cfg.get("protocol", "UDP")))
+        self.heartbeat_interval.set(str(cfg.get("interval", "")))
+        self.heartbeat_payload.set(str(cfg.get("payload", "")))
+        self.tx_payload_format.set(str(cfg.get("format", "ASCII")))
+        self.tx_count.set(str(cfg.get("count", 0)))
+
+    def remove_tx_packet(self):
+        selected = self.tx_table.selection()
+        if not selected:
+            return
+        indexes = sorted((int(item) for item in selected), reverse=True)
+        for index in indexes:
+            if 0 <= index < len(self.tx_packets):
+                self.tx_packets.pop(index)
+        self._refresh_tx_table()
+
+    def toggle_selected_tx_packet(self, _event=None):
+        selected = self.tx_table.selection()
+        if not selected:
+            return
+        index = int(selected[0])
+        if 0 <= index < len(self.tx_packets):
+            self.tx_packets[index]["enabled"] = not self.tx_packets[index].get("enabled", True)
+            self._refresh_tx_table()
+
+    def _ensure_default_tx_packet(self):
+        if not self.tx_packets:
+            self.tx_packets.append({
+                "enabled": True,
+                "name": self.tx_name.get().strip() or "PCHeartbeat",
+                "target_ip": self.heartbeat_target_ip.get().strip(),
+                "port": int(self.heartbeat_port.get()),
+                "protocol": self.heartbeat_protocol.get().strip().upper(),
+                "interval": float(self.heartbeat_interval.get()),
+                "payload": self.heartbeat_payload.get(),
+                "format": self.tx_payload_format.get().strip().upper(),
+                "count": int(self.tx_count.get()),
+            })
+            self._refresh_tx_table()
+
     def start(self):
         if any(listener.is_alive() for listener in self.listeners):
             return
@@ -1005,40 +1597,66 @@ class App(tk.Tk):
         self.last_values.clear()
         self.packet_count = 0
         self.signal_count = 0
+        self.trace_start_time = None
+        self.trace_last_time = None
+        self.trace_last_time_by_key.clear()
         self._open_files()
 
         bind_ip = self.bind_ip.get().strip() or "0.0.0.0"
-        port = int(self.port.get())
+        try:
+            ports = self._parse_ports()
+        except ValueError as exc:
+            messagebox.showerror("Receiver port error", str(exc))
+            self.stop()
+            return
         source_ip = self.source_ip.get().strip()
         rx_protocol = self.rx_protocol.get().strip().upper()
 
         self.listeners = []
-        if rx_protocol in ("UDP", "UDP+TCP", "BOTH"):
-            self.listeners.append(UdpListener(self.q, self.stop_event, bind_ip, port, source_ip))
-        if rx_protocol in ("TCP", "UDP+TCP", "BOTH"):
-            self.listeners.append(TcpListener(self.q, self.stop_event, bind_ip, port, source_ip))
+        for port in ports:
+            if rx_protocol in ("UDP", "UDP+TCP", "BOTH"):
+                self.listeners.append(UdpListener(self.q, self.stop_event, bind_ip, port, source_ip))
+            if rx_protocol in ("TCP", "UDP+TCP", "BOTH"):
+                self.listeners.append(TcpListener(self.q, self.stop_event, bind_ip, port, source_ip))
 
         for listener in self.listeners:
             listener.start()
 
         self.heartbeat_sender = None
+        self.tx_senders = []
         if self.heartbeat_enabled.get():
-            payload_text = self.heartbeat_payload.get()
-            payload = payload_text.encode("utf-8") if payload_text else HEARTBEAT_PAYLOAD
-            self.heartbeat_sender = HeartbeatSender(
-                self.q,
-                self.stop_event,
-                self.heartbeat_target_ip.get().strip(),
-                int(self.heartbeat_port.get()),
-                self.heartbeat_protocol.get().strip(),
-                float(self.heartbeat_interval.get()),
-                payload,
-            )
-            self.heartbeat_sender.start()
+            self._ensure_default_tx_packet()
+            try:
+                tx_configs = [cfg for cfg in self.tx_packets if cfg.get("enabled", True)]
+                sender_specs = []
+                for cfg in tx_configs:
+                    sender_specs.append((
+                        cfg,
+                        self._parse_payload_text(cfg.get("payload", ""), cfg.get("format", "ASCII")),
+                    ))
+            except ValueError as exc:
+                messagebox.showerror("Transmit payload error", str(exc))
+                self.stop()
+                return
+            for cfg, payload in sender_specs:
+                sender = HeartbeatSender(
+                    self.q,
+                    self.stop_event,
+                    cfg.get("target_ip", "").strip(),
+                    int(cfg.get("port", UDP_PORT)),
+                    cfg.get("protocol", "UDP"),
+                    float(cfg.get("interval", HEARTBEAT_INTERVAL_S)),
+                    payload,
+                    int(cfg.get("count", 0)),
+                    cfg.get("name", "TX packet") or "TX packet",
+                )
+                self.tx_senders.append(sender)
+                sender.start()
+            self.heartbeat_sender = self.tx_senders[0] if self.tx_senders else None
 
         self.start_btn.configure(state=tk.DISABLED)
         self.stop_btn.configure(state=tk.NORMAL)
-        self._append_line("Logger started.")
+        self.status.set("Logger started.")
 
     def stop(self):
         self.stop_event.set()
@@ -1051,6 +1669,31 @@ class App(tk.Tk):
         self._text_buffer.clear()
         self.text.delete("1.0", tk.END)
         self.preview_lines = 0
+        self._clear_trace_view()
+
+    def _clear_trace_view(self):
+        for item in self.trace.get_children():
+            self.trace.delete(item)
+        self.trace_details.clear()
+        self.fixed_trace_items.clear()
+        self.signal_history.clear()
+        self.signal_names.clear()
+        self.signal_value_text.clear()
+        self.graph_selected_keys.clear()
+        self.graph_combo.configure(values=())
+        self.graph_signal.set("")
+        self.trace_rows = 0
+        self.trace_start_time = None
+        self.trace_last_time = None
+        self.trace_last_time_by_key.clear()
+
+    def _on_trace_mode_change(self, _event=None):
+        self._clear_trace_view()
+        self.text.delete("1.0", tk.END)
+        self.status.set(f"Trace mode changed to {self.trace_mode.get()}.")
+
+    def _parse_tx_payload(self):
+        return self._parse_payload_text(self.heartbeat_payload.get(), self.tx_payload_format.get())
 
     def open_log_folder(self):
         folder = os.path.dirname(os.path.abspath(__file__))
@@ -1103,7 +1746,378 @@ class App(tk.Tk):
             event.get("macro", ""),
         ])
 
-    def _handle_packet(self, now, protocol, src_ip, src_port, data, events):
+    def _packet_signal_info(self, events, max_items=3):
+        parts = []
+        for ev in events:
+            if ev.get("kind") not in ("signal", "scalar"):
+                continue
+            message = ev.get("message", "")
+            signal = ev.get("signal", "")
+            value = ev.get("value_text", "")
+            signal_id = ev.get("signal_id")
+            if message and signal:
+                parts.append(f"{message}.{signal}={value}")
+            elif signal_id is not None:
+                parts.append(f"COM 0x{int(signal_id):04X}={value}")
+            if len(parts) >= max_items:
+                break
+        signal_total = sum(1 for ev in events if ev.get("kind") in ("signal", "scalar"))
+        if signal_total > max_items:
+            parts.append(f"+{signal_total - max_items} signals")
+        return "; ".join(parts)
+
+    def _time_text(self, now):
+        if self.trace_start_time is None:
+            self.trace_start_time = now
+        if self.time_mode.get() == "Real-time":
+            return now.strftime("%H:%M:%S.%f")[:-3]
+        return f"{(now - self.trace_start_time).total_seconds():.6f}"
+
+    def _delta_text(self, now, fixed_key=None):
+        use_key_delta = self.trace_mode.get() == "Fixed" and fixed_key is not None
+        previous = self.trace_last_time_by_key.get(fixed_key) if use_key_delta else self.trace_last_time
+        if previous is None:
+            delta_ms = 0.0
+        else:
+            delta_ms = (now - previous).total_seconds() * 1000.0
+        if use_key_delta:
+            self.trace_last_time_by_key[fixed_key] = now
+        else:
+            self.trace_last_time = now
+        return f"{delta_ms:.3f}"
+
+    def _insert_trace_row(self, now, protocol, source_ip, src_port, rx_port, direction, frame_type, bus, length, info, detail, tag, fixed_key=None):
+        self.trace_rows += 1
+        row_no = self.trace_rows
+        values = (
+            row_no,
+            self._time_text(now),
+            self._delta_text(now, fixed_key),
+            direction,
+            protocol,
+            source_ip,
+            src_port,
+            rx_port,
+            frame_type,
+            bus,
+            length,
+            info,
+        )
+        item_id = None
+        if self.trace_mode.get() == "Fixed" and fixed_key:
+            item_id = self.fixed_trace_items.get(fixed_key)
+            if item_id and self.trace.exists(item_id):
+                self.trace.item(item_id, values=values, tags=(tag,))
+            else:
+                item_id = self.trace.insert("", tk.END, values=values, tags=(tag,))
+                self.fixed_trace_items[fixed_key] = item_id
+        else:
+            item_id = self.trace.insert("", tk.END, values=values, tags=(tag,))
+        self.trace_details[item_id] = detail
+
+        children = self.trace.get_children()
+        if len(children) > MAX_TRACE_ROWS:
+            old_id = children[0]
+            self.trace.delete(old_id)
+            self.trace_details.pop(old_id, None)
+            for key, value in list(self.fixed_trace_items.items()):
+                if value == old_id:
+                    self.fixed_trace_items.pop(key, None)
+        if self.auto_scroll.get():
+            self.trace.see(item_id)
+
+    def _on_trace_select(self, _event=None):
+        selected = self.trace.selection()
+        if not selected:
+            return
+        detail = self.trace_details.get(selected[0], "")
+        self.text.delete("1.0", tk.END)
+        self.text.insert(tk.END, detail)
+
+    def _signal_graph_label(self, ev):
+        signal_id = ev.get("signal_id")
+        bus = ev.get("entry_bus") or ev.get("header_bus") or ev.get("bus") or ""
+        message = ev.get("message") or "unknown message"
+        if ev.get("signal"):
+            signal = ev.get("signal")
+        elif signal_id is not None:
+            signal = f"COM_{signal_id}"
+        else:
+            signal = "value"
+        if signal_id is not None:
+            return f"{bus} | COM 0x{int(signal_id):04X} | {message} | {signal}"
+        frame_name = ev.get("frame_name") or message
+        return f"{bus} | {frame_name} | {message} | {signal}"
+
+    def _refresh_graph_signal_list(self):
+        values = [self.signal_names[k] for k in sorted(self.signal_names)]
+        current = self.graph_signal.get()
+        self.graph_combo.configure(values=values)
+        if values and current not in values:
+            self.graph_signal.set(values[0])
+
+    def _graph_key_from_label(self, label):
+        for key, name in self.signal_names.items():
+            if name == label:
+                return key
+        return None
+
+    def add_graph_signal(self):
+        key = self._graph_key_from_label(self.graph_signal.get())
+        if key and key not in self.graph_selected_keys:
+            self.graph_selected_keys.append(key)
+            self._redraw_graph()
+
+    def remove_graph_signal(self):
+        key = self._graph_key_from_label(self.graph_signal.get())
+        if key in self.graph_selected_keys:
+            self.graph_selected_keys.remove(key)
+            self._redraw_graph()
+
+    def clear_graph_signals(self):
+        self.graph_selected_keys.clear()
+        self._redraw_graph()
+
+    def zoom_graph_in(self):
+        try:
+            value = float(self.graph_window_s.get())
+        except Exception:
+            value = GRAPH_WINDOW_S
+        self.graph_window_s.set(max(0.1, value / 2.0))
+        self._redraw_graph()
+
+    def zoom_graph_out(self):
+        try:
+            value = float(self.graph_window_s.get())
+        except Exception:
+            value = GRAPH_WINDOW_S
+        self.graph_window_s.set(min(3600.0, value * 2.0))
+        self._redraw_graph()
+
+    def _on_graph_mousewheel(self, event):
+        if event.delta > 0:
+            self.zoom_graph_in()
+        elif event.delta < 0:
+            self.zoom_graph_out()
+        return "break"
+
+    def _clear_graph_hover(self, _event=None):
+        for item in self.graph_hover_items:
+            try:
+                self.graph.delete(item)
+            except Exception:
+                pass
+        self.graph_hover_items = []
+
+    def _on_graph_motion(self, event):
+        nearest = None
+        nearest_dist = None
+        for item in self.graph_latest_visible.values():
+            for sample in item.get("samples", ()):
+                dx = sample["px"] - event.x
+                dy = sample["py"] - event.y
+                dist = dx * dx + dy * dy
+                if nearest_dist is None or dist < nearest_dist:
+                    nearest = sample
+                    nearest_dist = dist
+        self._clear_graph_hover()
+        if nearest is None or nearest_dist is None or nearest_dist > 400:
+            return
+        x = nearest["px"]
+        y = nearest["py"]
+        text = f"{nearest['name']}\nt={nearest['time']:.3f}s  y={nearest['value']:g}"
+        tooltip_x = min(max(8, x + 12), max(8, self.graph.winfo_width() - 220))
+        tooltip_y = max(8, y - 44)
+        self.graph_hover_items.append(self.graph.create_line(x, 18, x, self.graph.winfo_height() - 30, fill="#a0a0a0", dash=(2, 2)))
+        self.graph_hover_items.append(self.graph.create_rectangle(x - 5, y - 5, x + 5, y + 5, outline=nearest["color"], width=2))
+        box = self.graph.create_rectangle(tooltip_x, tooltip_y, tooltip_x + 210, tooltip_y + 38, fill="#ffffe8", outline="#808080")
+        label = self.graph.create_text(tooltip_x + 6, tooltip_y + 5, anchor="nw", text=text, fill="#202020")
+        self.graph_hover_items.extend((box, label))
+
+    def _record_signal_point(self, now, ev):
+        signal_id = ev.get("signal_id")
+        raw = ev.get("raw")
+        if signal_id is None or raw is None:
+            if not ev.get("signal_key") or raw is None:
+                return
+        key = ev.get("signal_key") or f"{ev.get('entry_bus', '')}:{signal_id}:{ev.get('message', '')}:{ev.get('signal', '')}"
+        label = self._signal_graph_label(ev)
+        known_label = self.signal_names.get(key)
+        self.signal_names[key] = label
+        self.signal_value_text[key] = ev.get("value_text", str(raw))
+        if key not in self.signal_history:
+            self.signal_history[key] = deque(maxlen=MAX_GRAPH_POINTS)
+            self._refresh_graph_signal_list()
+        elif known_label != label:
+            self._refresh_graph_signal_list()
+        t = 0.0 if self.trace_start_time is None else (now - self.trace_start_time).total_seconds()
+        self.signal_history[key].append((t, float(raw)))
+        if not self.graph_selected_keys:
+            self.graph_selected_keys.append(key)
+        if key in self.graph_selected_keys:
+            self._redraw_graph()
+
+    def _redraw_graph(self):
+        self.graph.delete("all")
+        self.graph_hover_items = []
+        self.graph_latest_visible = {}
+        keys = [key for key in self.graph_selected_keys if key in self.signal_history]
+        if not keys:
+            self.graph.create_text(12, 12, anchor="nw", text="No graph signals added", fill="#606060")
+            return
+
+        width = max(1, self.graph.winfo_width())
+        height = max(1, self.graph.winfo_height())
+        table_width = min(360, max(240, int(width * 0.28)))
+        pad_left = table_width + 12
+        pad_right = 12
+        pad_top = 18
+        pad_bottom = 30
+
+        all_points = []
+        latest_t = 0.0
+        for key in keys:
+            points = list(self.signal_history[key])
+            if points:
+                latest_t = max(latest_t, points[-1][0])
+                all_points.extend(points)
+        if not all_points:
+            self.graph.create_text(12, 12, anchor="nw", text="Waiting for graph samples", fill="#606060")
+            return
+
+        try:
+            window_s = max(1.0, float(self.graph_window_s.get()))
+        except Exception:
+            window_s = GRAPH_WINDOW_S
+        xmax = latest_t
+        xmin = max(0.0, xmax - window_s)
+        visible_by_key = {}
+        visible_points = []
+        for key in keys:
+            visible = [(x, y) for x, y in self.signal_history[key] if x >= xmin]
+            if visible:
+                visible_by_key[key] = visible
+                visible_points.extend(visible)
+        if not visible_points:
+            visible_points = all_points[-1:]
+        if xmax <= xmin:
+            xmax = xmin + window_s
+
+        plot_left = pad_left
+        plot_right = width - pad_right
+        plot_top = pad_top
+        plot_bottom = height - pad_bottom
+        if plot_right <= plot_left + 20 or plot_bottom <= plot_top + 20:
+            return
+
+        self.graph.create_rectangle(0, 0, table_width, height, fill="#f7f7f7", outline="#c8c8c8")
+        header_y = 5
+        self.graph.create_text(18, header_y, anchor="nw", text="Type", fill="#303030", font=("TkDefaultFont", 8, "bold"))
+        self.graph.create_text(88, header_y, anchor="nw", text="Name", fill="#303030", font=("TkDefaultFont", 8, "bold"))
+        self.graph.create_text(table_width - 8, header_y, anchor="ne", text="Y", fill="#303030", font=("TkDefaultFont", 8, "bold"))
+        self.graph.create_line(0, 24, table_width, 24, fill="#d0d0d0")
+
+        for i in range(6):
+            x = plot_left + i * (plot_right - plot_left) / 5
+            self.graph.create_line(x, plot_top, x, plot_bottom, fill="#d9d9d9")
+        self.graph.create_line(plot_left, plot_bottom, plot_right, plot_bottom, fill="#909090")
+        self.graph.create_line(plot_left, plot_top, plot_left, plot_bottom, fill="#909090")
+
+        def short_graph_name(label):
+            parts = [part.strip() for part in label.split("|")]
+            return parts[-1] if parts else label
+
+        def draw_table_row(index, key, color, latest_value):
+            y = 29 + index * 17
+            if y > height - 18:
+                return
+            label = self.signal_names.get(key, key)
+            name = short_graph_name(label)
+            if len(name) > 26:
+                name = name[:23] + "..."
+            self.graph.create_rectangle(8, y + 3, 18, y + 13, outline=color, fill=color)
+            self.graph.create_text(24, y + 2, anchor="nw", text="ETH", fill="#202020")
+            self.graph.create_text(58, y + 2, anchor="nw", text=name, fill=color)
+            value_text = self.signal_value_text.get(key, f"{latest_value:g}")
+            self.graph.create_text(table_width - 8, y + 2, anchor="ne", text=value_text, fill="#202020")
+
+        def map_shared_point(x, y, ymin, ymax):
+            px = plot_left + ((x - xmin) / (xmax - xmin)) * (plot_right - plot_left)
+            py = plot_bottom - ((y - ymin) / (ymax - ymin)) * (plot_bottom - plot_top)
+            return px, py
+
+        stacked = self.graph_view_mode.get() != "Shared axis"
+        if stacked:
+            lane_count = max(1, len(keys))
+            for i in range(lane_count + 1):
+                y = plot_top + i * (plot_bottom - plot_top) / lane_count
+                self.graph.create_line(plot_left, y, plot_right, y, fill="#d9d9d9")
+        else:
+            ys = [p[1] for p in visible_points]
+            ymin, ymax = min(ys), max(ys)
+            if ymax == ymin:
+                ymax = ymin + 1.0
+            y_margin = (ymax - ymin) * 0.08
+            ymin -= y_margin
+            ymax += y_margin
+            for i in range(5):
+                y = plot_top + i * (plot_bottom - plot_top) / 4
+                self.graph.create_line(plot_left, y, plot_right, y, fill="#d9d9d9")
+            self.graph.create_text(table_width + 4, plot_top, anchor="nw", text=f"{ymax:g}", fill="#606060")
+            self.graph.create_text(table_width + 4, plot_bottom, anchor="sw", text=f"{ymin:g}", fill="#606060")
+
+        for index, key in enumerate(keys):
+            points = visible_by_key.get(key, [])
+            if not points:
+                continue
+            color = GRAPH_COLORS[index % len(GRAPH_COLORS)]
+            draw_table_row(index, key, color, points[-1][1])
+
+            if stacked:
+                lane_top = plot_top + index * (plot_bottom - plot_top) / len(keys)
+                lane_bottom = plot_top + (index + 1) * (plot_bottom - plot_top) / len(keys)
+                lane_mid = (lane_top + lane_bottom) / 2
+                lane_pad = min(10, max(3, (lane_bottom - lane_top) * 0.20))
+                local_values = [p[1] for p in points]
+                local_min, local_max = min(local_values), max(local_values)
+                if local_max == local_min:
+                    local_min -= 0.5
+                    local_max += 0.5
+
+                def map_point(x, y):
+                    px = plot_left + ((x - xmin) / (xmax - xmin)) * (plot_right - plot_left)
+                    py = (lane_bottom - lane_pad) - ((y - local_min) / (local_max - local_min)) * (lane_bottom - lane_top - 2 * lane_pad)
+                    return px, py
+
+                self.graph.create_line(plot_left, lane_mid, plot_right, lane_mid, fill="#efefef")
+            else:
+                def map_point(x, y):
+                    return map_shared_point(x, y, ymin, ymax)
+
+            coords = []
+            mapped_samples = []
+            for x, y in points:
+                px, py = map_point(x, y)
+                coords.extend((px, py))
+                mapped_samples.append({
+                    "px": px,
+                    "py": py,
+                    "time": x,
+                    "value": y,
+                    "name": short_graph_name(self.signal_names.get(key, key)),
+                    "color": color,
+                })
+            if len(coords) >= 4:
+                self.graph.create_line(*coords, fill=color, width=2)
+            for x, y in points[-80:]:
+                px, py = map_point(x, y)
+                self.graph.create_rectangle(px - 3, py - 3, px + 3, py + 3, outline=color, fill="white")
+            self.graph_latest_visible[key] = {"samples": mapped_samples}
+
+        self.graph.create_text(plot_left, height - 12, anchor="sw", text=f"-{window_s:g}s", fill="#606060")
+        self.graph.create_text(plot_right, height - 12, anchor="se", text="now", fill="#606060")
+
+    def _handle_packet(self, now, protocol, src_ip, src_port, rx_port, data, events):
         self.packet_count += 1
         ts = now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
@@ -1111,28 +2125,66 @@ class App(tk.Tk):
             kind = ev.get("kind")
 
             if kind == "packet":
+                signal_info = self._packet_signal_info(events)
+                info = signal_info or f"mainCycles={ev.get('main_cycles', '')}; signals={ev.get('entry_count', '')}"
                 line = f"[{ts}] {protocol} {src_ip}:{src_port} - {ev['text']}"
-                if self.show_packet_summary.get():
-                    self._append_line(line)
+                self._insert_trace_row(
+                    now, protocol, src_ip, src_port, rx_port, "Rx",
+                    ev.get("frame_name", "Packet"),
+                    ev.get("bus", ""),
+                    ev.get("length", len(data)),
+                    info,
+                    line + "\n\nPayload:\n" + data.hex(" "),
+                    "rx",
+                    ("packet", protocol, src_ip, rx_port, ev.get("frame_name", "Packet"), ev.get("bus")),
+                )
                 self._write_text_line(line)
                 continue
 
-            if kind == "signal":
+            if kind in ("signal", "scalar"):
                 self.signal_count += 1
-                key = ev.get("signal_id")
+                key = ev.get("signal_key") or ev.get("signal_id")
                 raw = ev.get("raw")
                 changed = (self.last_values.get(key) != raw)
                 self.last_values[key] = raw
 
                 line = f"[{ts}]   {ev['text']}"
+                self._record_signal_point(now, ev)
                 if self.show_signals.get() and ((not self.only_changes.get()) or changed):
-                    self._append_line(line)
+                    signal_id = ev.get("signal_id")
+                    if signal_id is None:
+                        info = f"{ev.get('message', '')}.{ev.get('signal', '')} = {ev.get('value_text', '')}"
+                    else:
+                        info = (
+                            f"{ev.get('message', '')}.{ev.get('signal', '')} = "
+                            f"{ev.get('value_text', '')} "
+                            f"(COM 0x{int(signal_id):04X})"
+                        )
+                    self._insert_trace_row(
+                        now, protocol, src_ip, src_port, rx_port, "Rx",
+                        "Signal",
+                        ev.get("entry_bus") or ev.get("bus", ""),
+                        "",
+                        info,
+                        line,
+                        "signal",
+                        ("signal", key),
+                    )
                 self._write_text_line(line)
                 self._write_csv_event(ts, protocol, src_ip, src_port, ev)
                 continue
 
             line = f"[{ts}] {protocol} {src_ip}:{src_port} - {ev.get('text', str(ev))}"
-            self._append_line(line)
+            self._insert_trace_row(
+                now, protocol, src_ip, src_port, rx_port, "Rx",
+                ev.get("frame_name") or (kind.title() if kind else "Event"),
+                ev.get("bus", ""),
+                ev.get("length", len(data)),
+                ev.get("info") or ev.get("text", str(ev)),
+                line + "\n\nPayload:\n" + data.hex(" "),
+                "warning" if kind == "warning" else "rx",
+                ("event", protocol, src_ip, rx_port, ev.get("frame_name", kind)),
+            )
             self._write_text_line(line)
 
         now_mono = time.time()
@@ -1166,7 +2218,6 @@ class App(tk.Tk):
             typ = item[0]
             if typ == "status":
                 self.status.set(item[1])
-                self._append_line(item[1])
             elif typ == "error":
                 self.status.set(item[1])
                 self._append_line("ERROR: " + item[1])
@@ -1174,8 +2225,22 @@ class App(tk.Tk):
                 messagebox.showerror("Logger error", item[1])
                 self.stop()
             elif typ == "packet":
-                _, now, protocol, src_ip, src_port, data, events = item
-                self._handle_packet(now, protocol, src_ip, src_port, data, events)
+                _, now, protocol, src_ip, src_port, rx_port, data, events = item
+                self._handle_packet(now, protocol, src_ip, src_port, rx_port, data, events)
+            elif typ == "tx":
+                _, now, protocol, target_ip, port, payload, sent, count, label = item
+                total = "continuous" if count == 0 else str(count)
+                frame_name = label or tx_frame_name(payload)
+                info = f"sent={sent}/{total} data={payload.hex(' ')}"
+                detail = (
+                    f"[{now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] TX {protocol} -> "
+                    f"{target_ip}:{port} - {frame_name}\n\nPayload:\n{payload.hex(' ')}"
+                )
+                self._insert_trace_row(
+                    now, protocol, target_ip, "", port, "Tx", frame_name, "",
+                    len(payload), info, detail, "tx",
+                    ("tx", frame_name, protocol, target_ip, port),
+                )
 
         self.after(GUI_POLL_MS, self._poll_queue)
 

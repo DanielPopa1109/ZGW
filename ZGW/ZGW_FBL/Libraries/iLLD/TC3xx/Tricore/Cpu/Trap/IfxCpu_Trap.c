@@ -47,10 +47,15 @@
 #include "IfxCpu_Trap.h"
 #include "Cpu/Std/IfxCpu.h"
 #include "Cpu/Std/IfxCpu_Intrinsics.h"
+#include "Scu/Std/IfxScuRcu.h"
 #include "IfxCpu_reg.h"
 #include "Ifx_Cfg.h"
 #ifdef IFX_CFG_EXTEND_TRAP_HOOKS
 #include "Ifx_Cfg_Trap.h"
+#endif
+
+#ifndef IFX_TRAP_RAM_CODE
+#define IFX_TRAP_RAM_CODE __attribute__((section(".ram_code")))
 #endif
 
 /******************************************************************************/
@@ -103,15 +108,205 @@
 #endif
 
 #ifndef IFX_CFG_CPU_TRAP_DEBUG
- #define IFX_CFG_CPU_TRAP_DEBUG __debug()
+ #define IFX_CFG_CPU_TRAP_DEBUG
 #endif
+
+#define FBL_TRAP_PFLASH_CACHED_START       0x80000000u
+#define FBL_TRAP_PFLASH_CACHED_END         0x80600000u
+#define FBL_TRAP_PFLASH_NONCACHED_START    0xA0000000u
+#define FBL_TRAP_PFLASH_NONCACHED_END      0xA0600000u
+#define FBL_TRAP_CPU0_DSPR_START           0x70000000u
+#define FBL_TRAP_CPU0_DSPR_END             0x7003C000u
+#define FBL_TRAP_CPU0_PSPR_START           0x70100000u
+#define FBL_TRAP_CPU0_PSPR_END             0x70110000u
+#define FBL_TRAP_A11_SNAPSHOT_BACK_BYTES   8u
 /*******************************************************************************
 **                      variables                                     **
 *******************************************************************************/
+extern volatile uint32 g_LwipRxStage;
+extern volatile uint32 g_LwipRxCurrentNetifPtr;
+extern volatile uint32 g_LwipRxCurrentNetifStatePtr;
+extern volatile uint32 g_LwipRxExpectedNetifPtr;
+extern volatile uint32 g_LwipRxExpectedStatePtr;
+extern volatile uint32 g_LwipRxCurrentDescrListPtr;
+extern volatile uint32 g_LwipRxExpectedDescrListPtr;
+extern volatile uint32 g_LwipRxHandleDescrPtr;
+extern volatile uint32 g_LwipRxHardwareCurrentDescPtr;
+extern volatile uint32 g_LwipRxCurrentDescIndex;
+extern volatile uint32 g_LwipRxCurrentDescAddr;
+extern volatile uint32 g_LwipRxCurrentBufferAddr;
+extern volatile uint32 g_LwipRxCurrentPbufPtr;
+extern volatile uint32 g_LwipRxCurrentPbufPayloadPtr;
+extern volatile uint32 g_LwipRxCurrentPbufLen;
+extern volatile uint32 g_LwipRxCurrentPbufTotLen;
+extern volatile uint32 g_LwipRxCurrentPbufRef;
+extern volatile uint32 g_FblEthRxStage;
+extern volatile uint32 g_FblEthTcpRecvCbStage;
+extern volatile uint32 g_FblEthTcpReceiveStage;
+//extern volatile uint32 FblRam_ResetStage;
+//extern volatile uint32 g_FblStartRamUpdater;
+
+volatile uint32 g_FblTrapClass;
+volatile uint32 g_FblTrapTin;
+volatile uint32 g_FblTrapCpu;
+volatile uint32 g_FblTrapBtv;
+volatile uint32 g_FblTrapPcxi;
+volatile uint32 g_FblTrapPsw;
+volatile uint32 g_FblTrapA11;
+volatile uint32 g_FblTrapDstr;
+volatile uint32 g_FblTrapDatr;
+volatile uint32 g_FblTrapFaultAddress;
+volatile uint32 g_FblTrapLwipRxStage;
+volatile uint32 g_FblTrapFblEthRxStage;
+volatile uint32 g_FblTrapFblEthTcpRecvCbStage;
+volatile uint32 g_FblTrapFblEthTcpReceiveStage;
+volatile uint32 g_FblTrapRamResetStage;
+volatile uint32 g_FblTrapRxNetifPtr;
+volatile uint32 g_FblTrapRxNetifStatePtr;
+volatile uint32 g_FblTrapRxExpectedNetifPtr;
+volatile uint32 g_FblTrapRxExpectedStatePtr;
+volatile uint32 g_FblTrapRxDescrListPtr;
+volatile uint32 g_FblTrapRxExpectedDescrListPtr;
+volatile uint32 g_FblTrapRxHandleDescrPtr;
+volatile uint32 g_FblTrapRxHardwareCurrentDescPtr;
+volatile uint32 g_FblTrapRxDescIndex;
+volatile uint32 g_FblTrapRxDescAddr;
+volatile uint32 g_FblTrapRxBufferAddr;
+volatile uint32 g_FblTrapPbufPtr;
+volatile uint32 g_FblTrapPbufPayloadPtr;
+volatile uint32 g_FblTrapPbufLen;
+volatile uint32 g_FblTrapPbufTotLen;
+volatile uint32 g_FblTrapPbufRef;
+volatile uint32 g_FblTrapStartRamUpdater;
+volatile uint32 g_FblTrapA11SnapshotValid;
+volatile uint32 g_FblTrapA11SnapshotBase;
+volatile uint32 g_FblTrapA11Bytes0;
+volatile uint32 g_FblTrapA11Bytes4;
+volatile uint32 g_FblTrapA11Bytes8;
+volatile uint32 g_FblTrapA11Bytes12;
 
 /*******************************************************************************
 **                      Function definitions                          **
 *******************************************************************************/
+static uint8 FblTrap_IsReadableAddress(uint32 address)
+{
+    if((address >= FBL_TRAP_PFLASH_CACHED_START) && (address < FBL_TRAP_PFLASH_CACHED_END))
+    {
+        return 1u;
+    }
+
+    if((address >= FBL_TRAP_PFLASH_NONCACHED_START) && (address < FBL_TRAP_PFLASH_NONCACHED_END))
+    {
+        return 1u;
+    }
+
+    if((address >= FBL_TRAP_CPU0_DSPR_START) && (address < FBL_TRAP_CPU0_DSPR_END))
+    {
+        return 1u;
+    }
+
+    if((address >= FBL_TRAP_CPU0_PSPR_START) && (address < FBL_TRAP_CPU0_PSPR_END))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
+static uint8 FblTrap_IsReadableRange(uint32 address, uint32 length)
+{
+    uint32 end = address + length;
+
+    if((length == 0u) || (end < address))
+    {
+        return 0u;
+    }
+
+    return (FblTrap_IsReadableAddress(address) != 0u) &&
+           (FblTrap_IsReadableAddress(end - 1u) != 0u);
+}
+
+static uint32 FblTrap_ReadPackedBytes(uint32 address)
+{
+    volatile const uint8 *p = (volatile const uint8 *)address;
+
+    return ((uint32)p[0u]) |
+           ((uint32)p[1u] << 8u) |
+           ((uint32)p[2u] << 16u) |
+           ((uint32)p[3u] << 24u);
+}
+
+static void FblTrap_Record(uint8 trapClass, uint32 tin, volatile const IfxCpu_Trap *trapWatch)
+{
+    uint32 a11;
+    uint32 snapshotBase;
+
+    g_FblTrapClass = (uint32)trapClass;
+    g_FblTrapTin = tin;
+    g_FblTrapCpu = (trapWatch != 0) ? trapWatch->tCpu : (uint32)IfxCpu_getCoreId();
+    g_FblTrapBtv = (uint32)__mfcr(CPU_BTV);
+    g_FblTrapPcxi = (uint32)__mfcr(CPU_PCXI);
+    g_FblTrapPsw = (uint32)__mfcr(CPU_PSW);
+    a11 = (trapWatch != 0) ? trapWatch->tAddr : (uint32)__getA11();
+    g_FblTrapA11 = a11;
+    g_FblTrapDstr = (uint32)__mfcr(CPU_DSTR);
+    g_FblTrapDatr = (uint32)__mfcr(CPU_DATR);
+    g_FblTrapFaultAddress = (uint32)__mfcr(CPU_DEADD);
+
+    g_FblTrapLwipRxStage = g_LwipRxStage;
+    g_FblTrapFblEthRxStage = g_FblEthRxStage;
+    g_FblTrapFblEthTcpRecvCbStage = g_FblEthTcpRecvCbStage;
+    g_FblTrapFblEthTcpReceiveStage = g_FblEthTcpReceiveStage;
+    //g_FblTrapRamResetStage = FblRam_ResetStage;
+//    g_FblTrapStartRamUpdater = g_FblStartRamUpdater;
+    g_FblTrapRxNetifPtr = g_LwipRxCurrentNetifPtr;
+    g_FblTrapRxNetifStatePtr = g_LwipRxCurrentNetifStatePtr;
+    g_FblTrapRxExpectedNetifPtr = g_LwipRxExpectedNetifPtr;
+    g_FblTrapRxExpectedStatePtr = g_LwipRxExpectedStatePtr;
+    g_FblTrapRxDescrListPtr = g_LwipRxCurrentDescrListPtr;
+    g_FblTrapRxExpectedDescrListPtr = g_LwipRxExpectedDescrListPtr;
+    g_FblTrapRxHandleDescrPtr = g_LwipRxHandleDescrPtr;
+    g_FblTrapRxHardwareCurrentDescPtr = g_LwipRxHardwareCurrentDescPtr;
+    g_FblTrapRxDescIndex = g_LwipRxCurrentDescIndex;
+    g_FblTrapRxDescAddr = g_LwipRxCurrentDescAddr;
+    g_FblTrapRxBufferAddr = g_LwipRxCurrentBufferAddr;
+    g_FblTrapPbufPtr = g_LwipRxCurrentPbufPtr;
+    g_FblTrapPbufPayloadPtr = g_LwipRxCurrentPbufPayloadPtr;
+    g_FblTrapPbufLen = g_LwipRxCurrentPbufLen;
+    g_FblTrapPbufTotLen = g_LwipRxCurrentPbufTotLen;
+    g_FblTrapPbufRef = g_LwipRxCurrentPbufRef;
+
+    g_FblTrapA11SnapshotValid = 0u;
+    g_FblTrapA11SnapshotBase = 0u;
+    g_FblTrapA11Bytes0 = 0u;
+    g_FblTrapA11Bytes4 = 0u;
+    g_FblTrapA11Bytes8 = 0u;
+    g_FblTrapA11Bytes12 = 0u;
+
+    if(a11 >= FBL_TRAP_A11_SNAPSHOT_BACK_BYTES)
+    {
+        snapshotBase = a11 - FBL_TRAP_A11_SNAPSHOT_BACK_BYTES;
+
+        if(FblTrap_IsReadableRange(snapshotBase, 16u) != 0u)
+        {
+            g_FblTrapA11SnapshotBase = snapshotBase;
+            g_FblTrapA11Bytes0 = FblTrap_ReadPackedBytes(snapshotBase);
+            g_FblTrapA11Bytes4 = FblTrap_ReadPackedBytes(snapshotBase + 4u);
+            g_FblTrapA11Bytes8 = FblTrap_ReadPackedBytes(snapshotBase + 8u);
+            g_FblTrapA11Bytes12 = FblTrap_ReadPackedBytes(snapshotBase + 12u);
+            g_FblTrapA11SnapshotValid = 1u;
+        }
+    }
+}
+
+static void FblTrap_FatalReset(void)
+{
+    IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+    for(;;)
+    {
+    }
+}
+
 IFX_INLINE IfxCpu_Trap IfxCpu_Trap_extractTrapInfo(uint8 trapClass, uint32 tin)
 {
 	/* Extracts trap information for a given trap class and ID */
@@ -124,7 +319,7 @@ IFX_INLINE IfxCpu_Trap IfxCpu_Trap_extractTrapInfo(uint8 trapClass, uint32 tin)
     return trapInfo;
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_memoryManagementError(uint32 tin)
 {
 	/* Handles memory management traps */
@@ -132,13 +327,12 @@ void IfxCpu_Trap_memoryManagementError(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about the memory management trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_memoryManagement, tin);
-    /* Invokes the configured hook for memory management trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_memoryManagement, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_MME_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_internalProtectionError(uint32 tin)
 {
 	/* Handles internal protection traps */
@@ -146,13 +340,12 @@ void IfxCpu_Trap_internalProtectionError(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about internal protection trap event*/
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_internalProtection, tin);
-    /* Invokes the configured hook for internal protection trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_internalProtection, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_IPE_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_instructionError(uint32 tin)
 {
     /* Handles instruction errors traps */
@@ -160,13 +353,12 @@ void IfxCpu_Trap_instructionError(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about instruction errors trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_instructionErrors, tin);
-    /* Invokes the configured hook for instruction errors trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_instructionErrors, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_IE_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_contextManagementError(uint32 tin)
 {
     /* Handles context management traps */
@@ -174,16 +366,12 @@ void IfxCpu_Trap_contextManagementError(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about context management trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_contextManagement, tin);
-    /* Invokes the configured hook for context management trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_contextManagement, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_CME_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-	#if defined(__HIGHTEC__) && defined(__clang__)
-    #else
-    __asm("rfe");
-    #endif
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_busError(uint32 tin)
 {
     /* Handles bus errors traps */
@@ -191,13 +379,12 @@ void IfxCpu_Trap_busError(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about bus errors trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_bus, tin);
-    /* Invokes the configured hook for bus errors trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_bus, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_BE_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_assertion(uint32 tin)
 {
     /* Handles assertion traps */
@@ -205,13 +392,12 @@ void IfxCpu_Trap_assertion(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about assertion trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_assertion, tin);
-    /* Invokes the configured hook for assertion trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_assertion, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_ASSERT_HOOK(trapWatch);
-    IFX_CFG_CPU_TRAP_DEBUG;
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu0(uint32 tin)
 {
     /* Handles system call traps for CPU0 */
@@ -219,13 +405,13 @@ void IfxCpu_Trap_systemCall_Cpu0(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU0 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU0_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
 #if IFXCPU_NUM_MODULES >= 2
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu1(uint32 tin)
 {
     /* Handles system call traps for CPU1 */
@@ -233,14 +419,14 @@ void IfxCpu_Trap_systemCall_Cpu1(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU1 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU1_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 3
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu2(uint32 tin)
 {
     /* Handles system call traps for CPU2 */
@@ -248,14 +434,14 @@ void IfxCpu_Trap_systemCall_Cpu2(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU2 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU2_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 4
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu3(uint32 tin)
 {
     /* Handles system call traps for CPU3 */
@@ -263,14 +449,14 @@ void IfxCpu_Trap_systemCall_Cpu3(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU3 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU3_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 5
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu4(uint32 tin)
 {
     /* Handles system call traps for CPU4 */
@@ -278,14 +464,14 @@ void IfxCpu_Trap_systemCall_Cpu4(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU4 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU4_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 #endif
 
 #if IFXCPU_NUM_MODULES >= 6
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_systemCall_Cpu5(uint32 tin)
 {
     /* Handles system call traps for CPU5 */
@@ -293,13 +479,13 @@ void IfxCpu_Trap_systemCall_Cpu5(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about system call trap event for CPU5 */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_systemCall, tin);
-    /* Invokes the configured hook for system call trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_systemCall, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_SYSCALL_CPU5_HOOK(trapWatch);
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 #endif
 
-IFX_TRAP_HANDLER
+IFX_TRAP_RAM_CODE IFX_TRAP_HANDLER
 void IfxCpu_Trap_nonMaskableInterrupt(uint32 tin)
 {
     /* Handles non-maskable interrupt traps */
@@ -307,9 +493,9 @@ void IfxCpu_Trap_nonMaskableInterrupt(uint32 tin)
     volatile IfxCpu_Trap trapWatch;
     /* Retrieves details about non-maskable interrupt trap event */
     trapWatch = IfxCpu_Trap_extractTrapInfo(IfxCpu_Trap_Class_nonMaskableInterrupt, tin);
-    /* Invokes the configured hook for non-maskable interrupt trap handling */
+    FblTrap_Record(IfxCpu_Trap_Class_nonMaskableInterrupt, tin, &trapWatch);
     IFX_CFG_CPU_TRAP_NMI_HOOK(trapWatch);    
-    IFX_TRAP_RET;
+    FblTrap_FatalReset();
 }
 
 
@@ -321,7 +507,7 @@ void IfxCpu_Trap_nonMaskableInterrupt(uint32 tin)
 #pragma section ".traptab_cpu0" ax
 #elif defined(__HIGHTEC__) && defined(__clang__)
 #pragma clang section text=".traptab_cpu0"
-IFX_USED void IfxCpu_Trap_vectorTable0(void) __attribute__((naked,aligned(256)));
+IFX_USED void IfxCpu_Trap_vectorTable0(void);
 #elif defined(__GNUC__) && !defined(__HIGHTEC__)
 #pragma section
 #pragma section ".traptab_cpu0" ax
@@ -333,6 +519,7 @@ IFX_USED void IfxCpu_Trap_vectorTable0(void) __attribute__((naked,aligned(256)))
 #pragma ghs section
 #pragma ghs section text=".traptab_cpu0"
 #endif
+IFX_TRAP_RAM_CODE IFX_USED void IfxCpu_Trap_vectorTable0(void);
 void IfxCpu_Trap_vectorTable0(void)
 {
 	/* Sets up the trap service routines for CPU0 */

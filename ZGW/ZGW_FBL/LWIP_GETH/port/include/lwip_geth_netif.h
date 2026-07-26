@@ -43,6 +43,7 @@
 #define LWIP_GETH_NETIF_H
 
 #include "Ifx_Types.h"
+#include "IfxGeth_Eth.h"
 
 extern volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 extern volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
@@ -87,5 +88,12 @@ extern volatile uint32 lwip_geth_DebugLastRxBufferAddr;
 err_t lwip_geth_netif_init(struct netif *netif);
 uint8 lwip_geth_netif_input_once(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
+uint8 lwip_geth_RamClosureIsValid(void);
+void FblRamGeth_ShuffleRxDescriptor(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId);
+void FblRamGeth_FreeReceiveBuffer(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId);
+void *FblRamGeth_GetTransmitBuffer(IfxGeth_Eth *geth, IfxGeth_TxDmaChannel channelId);
+void FblRamGeth_WakeupReceiver(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId);
+void FblRamGeth_WakeupTransmitter(IfxGeth_Eth *geth, IfxGeth_TxDmaChannel channelId);
+void FblRamGeth_SetLineSpeed(Ifx_GETH *gethSFR, IfxGeth_LineSpeed speed);
 
 #endif

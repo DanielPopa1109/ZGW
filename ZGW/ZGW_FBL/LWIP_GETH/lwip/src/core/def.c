@@ -258,7 +258,7 @@ lwip_itoa(char *result, size_t bufsize, int number)
     return;
   }
   /* move from temporary buffer to output buffer (sign is not moved) */
-  memmove(res, tmp, (size_t)((result + bufsize) - tmp));
+  MEMMOVE(res, tmp, (size_t)((result + bufsize) - tmp));
 }
 #endif
 

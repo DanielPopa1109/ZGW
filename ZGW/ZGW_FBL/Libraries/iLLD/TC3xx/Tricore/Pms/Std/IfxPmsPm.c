@@ -423,10 +423,10 @@ void IfxPmsPm_startStandbySequenceInFlash(IfxPmsPm_StandbyConfig *standbyConfig,
 /*Disabling interrupts for all CPUs except the Master CPU, a designation assigned to current CPU using IfxPmsPm_setMasterCpu(). This is to avoid wakeup
  * of the CPUs once they are put into IDLE state.*/
 #ifndef DEVICE_TC33X
-    IfxCpu_disableInterruptsAllExceptMaster(IfxCpu_getCoreIndex());
+//    IfxCpu_disableInterruptsAllExceptMaster(IfxCpu_getCoreIndex());
 
 /*Placing all CPUs to Idle state except the Master CPU, a designation assigned to current CPU using IfxPmsPm_setMasterCpu().*/
-    IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
+//    IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
 #endif
 
     endinitSfty_pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
@@ -718,7 +718,7 @@ void IfxPmsPm_startSleepSequenceinFlash(IfxPmsPm_SleepConfig *sleepConfig, IfxSc
 
 /*Placing all CPUs to Idle state except the Master CPU, a designation assigned to current CPU using IfxPmsPm_setMasterCpu().*/
 #ifndef DEVICE_TC33X
-    IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
+//    IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
 #endif
     IFXPMS_DISABLE_MODULES_DURING_SLEEP
 

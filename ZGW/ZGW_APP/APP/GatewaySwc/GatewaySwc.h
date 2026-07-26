@@ -3,6 +3,7 @@
 
 #include "Com.h"
 #include "ComStack_Types.h"
+#include "Dcm.h"
 #include "Dem_Types.h"
 #include "SoAd.h"
 #include "TcpIpH.h"
@@ -205,6 +206,7 @@ extern volatile uint32 GatewaySwc_DebugCrossCoreLockTimeout;
 void GatewaySwc_Init(void);
 void GatewaySwc_MainFunction(void);
 void GatewaySwc_EthernetMainFunction(void);
+Dcm_ReturnType GatewaySwc_SetDiagnosticCommunicationControl(uint8 controlType, uint8 communicationType);
 Std_ReturnType GatewaySwc_RequestComSendSignal(Com_SignalIdType signalId, const void *data);
 void GatewaySwc_RequestComMainFunctionTx(void);
 Std_ReturnType GatewaySwc_RequestCanIfTransmit(PduIdType txPduId, const uint8 *data, PduLengthType len);

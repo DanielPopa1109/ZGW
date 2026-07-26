@@ -47,11 +47,53 @@
  **********************************************************************************************************************/
 /* Function to get the TIMER_STM APP version */
 
+static uint32 TIMER_STM_TicksToUs(uint64 ticks, uint32 frequency)
+{
+  if (frequency == 0u)
+  {
+    return 0u;
+  }
+
+  return (uint32)((ticks * 1000000ull) / (uint64)frequency);
+}
+
+static Ifx_STM *TIMER_STM_GetSafeStm(const TIMER_STM_t *handle)
+{
+  if ((handle != NULL) &&
+      (handle->app_config != NULL) &&
+      (handle->app_config->stm != NULL))
+  {
+    return handle->app_config->stm;
+  }
+
+  return &MODULE_STM0;
+}
+
+static uint32 TIMER_STM_GetSafeFrequency(const TIMER_STM_t *handle, Ifx_STM *stm)
+{
+  if ((handle != NULL) &&
+      (handle->app_config != NULL) &&
+      (handle->app_config->frequency != 0u))
+  {
+    return handle->app_config->frequency;
+  }
+
+  return (uint32)IfxStm_getFrequency(stm);
+}
+
 /* Function to initialize the STM timer */
 TIMER_STM_STATUS_t TIMER_STM_Init(TIMER_STM_t *handle)
 {
   IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, (handle != NULL));
   TIMER_STM_STATUS_t status = TIMER_STM_STATUS_SUCCESS;
+
+  if ((handle == NULL) ||
+      (handle->app_config == NULL) ||
+      (handle->app_config->stm == NULL) ||
+      (handle->app_config->frequency == 0u))
+  {
+    return TIMER_STM_STATUS_FAILURE;
+  }
 
   if (!handle->app_is_initialized)
   {
@@ -82,7 +124,12 @@ TIMER_STM_STATUS_t TIMER_STM_SetTimeInterval(TIMER_STM_t *handle, TIMER_STM_COMP
   TIMER_STM_STATUS_t status = TIMER_STM_STATUS_SUCCESS;
 
   /* Specified user interval is out of range, or specified compare channel is already active */
-  if ((comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) || (user_interval < 100))
+  if ((handle == NULL) ||
+      (handle->app_config == NULL) ||
+      (handle->app_config->stm == NULL) ||
+      (handle->app_config->frequency == 0u) ||
+      (comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
+      (user_interval < 100))
   {
     status = TIMER_STM_STATUS_FAILURE;
   }
@@ -124,7 +171,11 @@ TIMER_STM_STATUS_t TIMER_STM_Start(TIMER_STM_t *handle, TIMER_STM_COMP_CHANNEL_t
   TIMER_STM_STATUS_t status = TIMER_STM_STATUS_SUCCESS;
 
   /* Specified user interval is out of range, or specified compare channel is already active */
-  if ((comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
+  if ((handle == NULL) ||
+      (handle->app_config == NULL) ||
+      (handle->app_config->stm == NULL) ||
+      (handle->app_config->frequency == 0u) ||
+      (comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_0) && (handle->app_config->stm->ICR.B.CMP0EN == 1U)) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_1) && (handle->app_config->stm->ICR.B.CMP1EN == 1U)) ||
       (handle->ch[comp_channel].config.ticks == 0))
@@ -137,7 +188,8 @@ TIMER_STM_STATUS_t TIMER_STM_Start(TIMER_STM_t *handle, TIMER_STM_COMP_CHANNEL_t
     if (IfxStm_initCompare(handle->app_config->stm, &handle->ch[comp_channel].config))
     {
       /* Log the starting of the interval */
-      handle->ch[comp_channel].start_time = (uint32)((double)(IfxStm_get(handle->app_config->stm) / IfxStm_getFrequency(handle->app_config->stm)) * 1000000);
+      handle->ch[comp_channel].start_time =
+          TIMER_STM_TicksToUs(IfxStm_get(handle->app_config->stm), handle->app_config->frequency);
     }
     else
     {
@@ -155,7 +207,10 @@ TIMER_STM_STATUS_t TIMER_STM_SetNextInterval(TIMER_STM_t *handle, TIMER_STM_COMP
   IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, (handle != NULL));
 
   /* Specified user interval is out of range, or specified compare channel is already active */
-  if ((comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
+  if ((handle == NULL) ||
+      (handle->app_config == NULL) ||
+      (handle->app_config->stm == NULL) ||
+      (comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_0) && (handle->app_config->stm->ICR.B.CMP0EN == 0U)) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_1) && (handle->app_config->stm->ICR.B.CMP1EN == 0U)) ||
       (handle->ch[comp_channel].config.ticks == 0))
@@ -173,10 +228,11 @@ TIMER_STM_STATUS_t TIMER_STM_SetNextInterval(TIMER_STM_t *handle, TIMER_STM_COMP
 /* Function to get the total time since the start of STM timer */
 uint32 TIMER_STM_GetTotalTime(TIMER_STM_t *handle)
 {
-  IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, (handle != NULL));
+  Ifx_STM *stm = TIMER_STM_GetSafeStm(handle);
+  uint32 frequency = TIMER_STM_GetSafeFrequency(handle, stm);
 
   /* Get the total time in microseconds since the start of the timer */
-  return (uint32)((double)(IfxStm_get(handle->app_config->stm) / IfxStm_getFrequency(handle->app_config->stm)) * 1000000);
+  return TIMER_STM_TicksToUs(IfxStm_get(stm), frequency);
 }
 
 /* Function to get the time elapsed within the current user interval */
@@ -187,7 +243,11 @@ TIMER_STM_STATUS_t TIMER_STM_GetTime(TIMER_STM_t *handle, TIMER_STM_COMP_CHANNEL
   IFX_ASSERT(IFX_VERBOSE_LEVEL_FAILURE, (handle != NULL));
 
   /* Check if the user timer is already active for specified compare channel */
-  if ((comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
+  if ((handle == NULL) ||
+      (handle->app_config == NULL) ||
+      (handle->app_config->stm == NULL) ||
+      (handle->app_config->frequency == 0u) ||
+      (comp_channel >= TIMER_STM_COMP_CHANNEL_MAX) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_0) && (handle->app_config->stm->ICR.B.CMP0EN == 0U)) ||
       ((comp_channel == TIMER_STM_COMP_CHANNEL_1) && (handle->app_config->stm->ICR.B.CMP1EN == 0U)))
   {
@@ -195,7 +255,9 @@ TIMER_STM_STATUS_t TIMER_STM_GetTime(TIMER_STM_t *handle, TIMER_STM_COMP_CHANNEL
   }
   else
   {
-    uint32 current_time = (uint32)((double)(IfxStm_get(handle->app_config->stm) / IfxStm_getFrequency(handle->app_config->stm)) * 1000000);
+    uint32 current_time = TIMER_STM_TicksToUs(
+        IfxStm_get(handle->app_config->stm),
+        handle->app_config->frequency);
     handle->ch[comp_channel].user_time = current_time - handle->ch[comp_channel].start_time;
   }
   return status;

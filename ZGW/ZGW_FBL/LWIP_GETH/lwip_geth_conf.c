@@ -47,6 +47,9 @@
  * HEADER FILES
  **********************************************************************************************************************/
 #include "lwip_geth_conf.h"
+#include <aurix_pin_mappings.h>
+#include "IfxGeth.h"
+#include <_PinMap/IfxGeth_PinMap.h>
 
 /*======================================================================================================================
  = CONFIGURATION FOR  LWIP_GETH_0
@@ -54,27 +57,17 @@
 /***********************************************************************************************************************
  * DATA STRUCTURES
  **********************************************************************************************************************/
-const IfxGeth_Crsdv_In      ETH_CRSDIV_PIN  = {&MODULE_GETH, {&MODULE_P11, 11}, Ifx_RxSel_a};
-const IfxGeth_Refclk_In     ETH_REFCLK_PIN  = {&MODULE_GETH, {&MODULE_P11, 12}, Ifx_RxSel_a};
-const IfxGeth_Rxd_In        ETH_RXD0_PIN    = {&MODULE_GETH, {&MODULE_P11, 10}, Ifx_RxSel_a};
-const IfxGeth_Rxd_In        ETH_RXD1_PIN    = {&MODULE_GETH, {&MODULE_P11, 9}, Ifx_RxSel_a};
-const IfxGeth_Mdc_Out       ETH_MDC_PIN     = {&MODULE_GETH, {&MODULE_P21, 2}, IfxPort_OutputIdx_alt5};
-const IfxGeth_Mdio_InOut    ETH_MDIO_PIN    = {&MODULE_GETH, {&MODULE_P21, 3}, Ifx_RxSel_d, IfxPort_OutputIdx_general};
-const IfxGeth_Txd_Out       ETH_TXD0_PIN    = {&MODULE_GETH, {&MODULE_P11, 3}, IfxPort_OutputIdx_alt6};
-const IfxGeth_Txd_Out       ETH_TXD1_PIN    = {&MODULE_GETH, {&MODULE_P11, 2}, IfxPort_OutputIdx_alt6};
-const IfxGeth_Txen_Out      ETH_TXEN_PIN    = {&MODULE_GETH, {&MODULE_P11, 6}, IfxPort_OutputIdx_alt6};
-
-const IfxGeth_Eth_RmiiPins rmii_pins =
+static const IfxGeth_Eth_RmiiPins LWIP_GETH_0_rmii_pins =
 {
-  .crsDiv                                   = &ETH_CRSDIV_PIN,  /* CRSDIV */
-  .refClk                                   = &ETH_REFCLK_PIN,  /* REFCLK */
-  .rxd0                                     = &ETH_RXD0_PIN,    /* RXD0 */
-  .rxd1                                     = &ETH_RXD1_PIN,    /* RXD1 */
-  .mdc                                      = &ETH_MDC_PIN,     /* MDC */
-  .mdio                                     = &ETH_MDIO_PIN,    /* MDIO */
-  .txd0                                     = &ETH_TXD0_PIN,    /* TXD0 */
-  .txd1                                     = &ETH_TXD1_PIN,    /* TXD1 */
-  .txEn                                     = &ETH_TXEN_PIN     /* TXEN */
+  .txd0                                     = &IfxGeth_TXD0_P11_3_OUT,
+  .txd1                                     = &IfxGeth_TXD1_P11_2_OUT,
+  .txEn                                     = &IfxGeth_TXEN_P11_6_OUT,
+  .refClk                                   = &IfxGeth_REFCLKA_P11_12_IN,
+  .crsDiv                                   = &IfxGeth_CRSDVA_P11_11_IN,
+  .rxd0                                     = &IfxGeth_RXD0A_P11_10_IN,
+  .rxd1                                     = &IfxGeth_RXD1A_P11_9_IN,
+  .mdc                                      = &IfxGeth_MDC_P21_2_OUT,
+  .mdio                                     = &IfxGeth_MDIO_P21_3_INOUT
 };
 
 /* GETH module configuration  */
@@ -84,7 +77,7 @@ const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config =
   .phyInterfaceMode                         = IfxGeth_PhyInterfaceMode_rmii,
   .pins =
   {
-    .rmiiPins =&rmii_pins,
+    .rmiiPins = &LWIP_GETH_0_rmii_pins,
     .rgmiiPins = NULL_PTR,
     .miiPins = NULL_PTR,
   },
@@ -127,7 +120,7 @@ const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config =
     .interrupt =
     {
       .serviceRequest                       = IfxGeth_ServiceRequest_1,
-      .priority                             = 1,
+      .priority                             = 0,
       .provider                             = IfxSrc_Tos_cpu0
     }
   },
@@ -165,7 +158,7 @@ const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config =
     {
       {
         .channelId                          = IfxGeth_DmaChannel_0,
-        .priority                           = 10,
+        .priority                           = 0,
         .provider                           = IfxSrc_Tos_cpu0,
       }
     },
@@ -173,7 +166,7 @@ const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config =
     {
       {
         .channelId                          = IfxGeth_DmaChannel_0,
-        .priority                           = 100,
+        .priority                           = 0,
         .provider                           = IfxSrc_Tos_cpu0,
       }
     }
@@ -200,7 +193,7 @@ IfxGeth_Eth LWIP_GETH_0_lld_handle;
 LWIP_GETH_t LWIP_GETH_0 =
 {
   .app_config                               = &LWIP_GETH_0_config,
-  .geth_module                              = &LWIP_GETH_0_lld_handle,
+  .geth_module                              = &g_IfxGeth,
 #if NO_SYS
   .stm_module                               = &TIMER_STM_0,
 #endif

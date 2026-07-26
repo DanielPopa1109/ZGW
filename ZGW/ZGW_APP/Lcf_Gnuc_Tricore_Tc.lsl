@@ -72,9 +72,9 @@ LCF_HEAP0_OFFSET =   (LCF_USTACK0_OFFSET - LCF_HEAP_SIZE);
 LCF_HEAP1_OFFSET =   (LCF_USTACK1_OFFSET - LCF_HEAP_SIZE);
 LCF_HEAP2_OFFSET =   (LCF_USTACK2_OFFSET - LCF_HEAP_SIZE);
 
-LCF_INTVEC0_START = 0xA02FE000;
-LCF_INTVEC1_START = 0xA05FC000;
-LCF_INTVEC2_START = 0xA05FE000;
+LCF_INTVEC0_START = 0x802FE000;
+LCF_INTVEC1_START = 0x805FC000;
+LCF_INTVEC2_START = 0x805FE000;
 
 __INTTAB_CPU0 = LCF_INTVEC0_START;
 __INTTAB_CPU1 = LCF_INTVEC1_START;
@@ -88,11 +88,7 @@ LCF_STARTPTR_CPU0 = 0x80000000;
 LCF_STARTPTR_CPU1 = 0x80300200;
 LCF_STARTPTR_CPU2 = 0x80300220;
 
-LCF_STARTPTR_NC_CPU0 = 0xA0000000;
-LCF_STARTPTR_NC_CPU1 = 0xA0300200;
-LCF_STARTPTR_NC_CPU2 = 0xA0300220;
-
-RESET = LCF_STARTPTR_NC_CPU0;
+RESET = LCF_STARTPTR_CPU0;
 
 MEMORY
 {
@@ -111,23 +107,18 @@ MEMORY
     psram_local (w!xp): org = 0xc0000000, len = 64K
     
     pfls0 (rx!p): org = 0x80000000, len = 3M
-    pfls0_nc (rx!p): org = 0xa0000000, len = 3M
     
     pfls1 (rx!p): org = 0x80300000, len = 3M
-    pfls1_nc (rx!p): org = 0xa0300000, len = 3M
     
     dfls0 (rx!p): org = 0xaf000000, len = 256K
     
     ucb (rx!p): org = 0xaf400000, len = 24K
     
-    cpu0_dlmu (w!xp): org = 0xb0000000, len = 64K
-    cpu0_dlmu_nc (w!xp): org = 0x90000000, len = 64K
+    cpu0_dlmu (w!xp): org = 0xB0000000, len = 64K
 
-    cpu1_dlmu (w!xp): org = 0xb0010000, len = 64K
-    cpu1_dlmu_nc (w!xp): org = 0x90010000, len = 64K
+    cpu1_dlmu (w!xp): org = 0xB0010000, len = 64K
 
-    cpu2_dlmu (w!xp): org = 0xb0020000, len = 64K
-    cpu2_dlmu_nc (w!xp): org = 0x90020000, len = 64K
+    cpu2_dlmu (w!xp): org = 0xB0020000, len = 64K
     
 }
 
@@ -135,13 +126,6 @@ MEMORY
 REGION_MAP( CPU0 , ORIGIN(dsram0_local), LENGTH(dsram0_local), ORIGIN(dsram0))
 REGION_MAP( CPU1 , ORIGIN(dsram1_local), LENGTH(dsram1_local), ORIGIN(dsram1))
 REGION_MAP( CPU2 , ORIGIN(dsram2_local), LENGTH(dsram2_local), ORIGIN(dsram2))
-/* map cached and non cached addresses */
-REGION_MIRROR("pfls0", "pfls0_nc")
-REGION_MIRROR("pfls1", "pfls1_nc")
-REGION_MIRROR("cpu0_dlmu", "cpu0_dlmu_nc")
-REGION_MIRROR("cpu1_dlmu", "cpu1_dlmu_nc")
-REGION_MIRROR("cpu2_dlmu", "cpu2_dlmu_nc")
-
 /*Un comment one of the below statement groups to enable CpuX DMI RAM to hold global variables*/
 
 REGION_ALIAS( default_ram , dsram0)
@@ -200,9 +184,9 @@ REGION_ALIAS( default_ram , dsram2)
     CORE_ID = GLOBAL ;
     SECTIONS
     {
-        .start_tc0 (LCF_STARTPTR_NC_CPU0) : FLAGS(rxl) { KEEP (*(.start)); } > pfls0_nc
+        .start_tc0 (LCF_STARTPTR_CPU0) : FLAGS(rxl) { KEEP (*(.start)); } > pfls0
         .interface_const (0x80000020) : { __IF_CONST = .; KEEP (*(.interface_const)); } > pfls0
-        PROVIDE(__START0 = LCF_STARTPTR_NC_CPU0);
+        PROVIDE(__START0 = LCF_STARTPTR_CPU0);
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU0 = 0); /* Not used */
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU1 = 0);
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU2 = 0);
@@ -221,10 +205,10 @@ REGION_ALIAS( default_ram , dsram2)
     CORE_ID = GLOBAL ;
     SECTIONS
     {
-        .start_tc1 (LCF_STARTPTR_NC_CPU1) : FLAGS(rxl) { KEEP (*(.start_cpu1)); } > pfls1_nc
-        .start_tc2 (LCF_STARTPTR_NC_CPU2) : FLAGS(rxl) { KEEP (*(.start_cpu2)); } > pfls1_nc
-        PROVIDE(__START1 = LCF_STARTPTR_NC_CPU1);
-        PROVIDE(__START2 = LCF_STARTPTR_NC_CPU2);
+        .start_tc1 (LCF_STARTPTR_CPU1) : FLAGS(rxl) { KEEP (*(.start_cpu1)); } > pfls1
+        .start_tc2 (LCF_STARTPTR_CPU2) : FLAGS(rxl) { KEEP (*(.start_cpu2)); } > pfls1
+        PROVIDE(__START1 = LCF_STARTPTR_CPU1);
+        PROVIDE(__START2 = LCF_STARTPTR_CPU2);
     }
     
     /*Fixed memory Allocations for Interrupt Vector Table*/

@@ -62,7 +62,13 @@
 
 /** \brief CPU count
  */
+#ifndef IFXCPU_NUM_MODULES
+#if defined(IFX_CFG_ZGW_CPU0_ONLY)
+#define IFXCPU_NUM_MODULES            (1)
+#else
 #define IFXCPU_NUM_MODULES            (3)
+#endif
+#endif
 
 /** \brief Segment number of cachable flash region
  */

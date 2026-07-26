@@ -50,6 +50,14 @@
  **********************************************************************************************************************/
 /* Get the LWIP_GETH APP version */
 
+#if LWIP_GETH_RTOS_ENABLED
+static void lwip_geth_Lwip_init_done(void *arg)
+{
+  (void)arg;
+  lwip_geth_Lwip_init();
+}
+#endif
+
 /* Function to initialize the GETH module by the configuration made in GUI */
 LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
 {
@@ -65,8 +73,15 @@ LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
     }
 #endif
     IfxGeth_enableModule(handle->app_config->geth_lld_config->gethSFR);
+#if NO_SYS
+    if (TIMER_STM_Init(handle->stm_module) != TIMER_STM_STATUS_SUCCESS)
+    {
+      status = LWIP_GETH_STATUS_FAILURE;
+      return status;
+    }
+#endif
 #if LWIP_GETH_RTOS_ENABLED
-    tcpip_init(lwip_geth_Lwip_init,(void *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress);
+    tcpip_init(lwip_geth_Lwip_init_done, NULL_PTR);
 #else
     lwip_geth_Lwip_init();
     if (g_LwipNetifAddFailed != 0u)
@@ -74,7 +89,6 @@ LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
       status = LWIP_GETH_STATUS_FAILURE;
       return status;
     }
-    TIMER_STM_Init(handle->stm_module);
 #endif
     handle->app_is_initialized = TRUE;
   }

@@ -91,11 +91,9 @@
  *
  * @param p the mem element to check
  * @param size allocated size of the element
- * @param descr1 description of the element source shown on error
- * @param descr2 description of the element source shown on error
  */
 void
-mem_overflow_check_raw(void *p, size_t size, const char *descr1, const char *descr2)
+mem_overflow_check_raw(void *p, size_t size)
 {
 #if MEM_SANITY_REGION_AFTER_ALIGNED || MEM_SANITY_REGION_BEFORE_ALIGNED
   u16_t k;
@@ -105,9 +103,7 @@ mem_overflow_check_raw(void *p, size_t size, const char *descr1, const char *des
   m = (u8_t *)p + size;
   for (k = 0; k < MEM_SANITY_REGION_AFTER_ALIGNED; k++) {
     if (m[k] != 0xcd) {
-      char errstr[128];
-      snprintf(errstr, sizeof(errstr), "detected mem overflow in %s%s", descr1, descr2);
-      LWIP_ASSERT(errstr, 0);
+      LWIP_ASSERT("memory overflow", 0);
     }
   }
 #endif /* MEM_SANITY_REGION_AFTER_ALIGNED > 0 */
@@ -116,16 +112,13 @@ mem_overflow_check_raw(void *p, size_t size, const char *descr1, const char *des
   m = (u8_t *)p - MEM_SANITY_REGION_BEFORE_ALIGNED;
   for (k = 0; k < MEM_SANITY_REGION_BEFORE_ALIGNED; k++) {
     if (m[k] != 0xcd) {
-      char errstr[128];
-      snprintf(errstr, sizeof(errstr), "detected mem underflow in %s%s", descr1, descr2);
-      LWIP_ASSERT(errstr, 0);
+      LWIP_ASSERT("memory underflow", 0);
     }
   }
 #endif /* MEM_SANITY_REGION_BEFORE_ALIGNED > 0 */
 #else
   LWIP_UNUSED_ARG(p);
-  LWIP_UNUSED_ARG(desc);
-  LWIP_UNUSED_ARG(descr);
+  LWIP_UNUSED_ARG(size);
 #endif
 }
 
@@ -139,11 +132,11 @@ mem_overflow_init_raw(void *p, size_t size)
   u8_t *m;
 #if MEM_SANITY_REGION_BEFORE_ALIGNED > 0
   m = (u8_t *)p - MEM_SANITY_REGION_BEFORE_ALIGNED;
-  memset(m, 0xcd, MEM_SANITY_REGION_BEFORE_ALIGNED);
+  MEMSET(m, 0xcd, MEM_SANITY_REGION_BEFORE_ALIGNED);
 #endif
 #if MEM_SANITY_REGION_AFTER_ALIGNED > 0
   m = (u8_t *)p + size;
-  memset(m, 0xcd, MEM_SANITY_REGION_AFTER_ALIGNED);
+  MEMSET(m, 0xcd, MEM_SANITY_REGION_AFTER_ALIGNED);
 #endif
 #else /* MEM_SANITY_REGION_BEFORE_ALIGNED > 0 || MEM_SANITY_REGION_AFTER_ALIGNED > 0 */
   LWIP_UNUSED_ARG(p);
@@ -279,7 +272,7 @@ mem_malloc(mem_size_t size)
 #endif /* MEMP_OVERFLOW_CHECK || (LWIP_STATS && MEM_STATS) */
 #if MEMP_OVERFLOW_CHECK
   /* initialize unused memory (diff between requested size and selected pool's size) */
-  memset((u8_t *)ret + size, 0xcd, memp_pools[poolnr]->size - size);
+  MEMSET((u8_t *)ret + size, 0xcd, memp_pools[poolnr]->size - size);
 #endif /* MEMP_OVERFLOW_CHECK */
   return ret;
 }
@@ -427,7 +420,7 @@ static void
 mem_overflow_check_element(struct mem *mem)
 {
   void *p = (u8_t *)mem + SIZEOF_STRUCT_MEM + MEM_SANITY_OFFSET;
-  mem_overflow_check_raw(p, mem->user_size, "heap", "");
+  mem_overflow_check_raw(p, mem->user_size);
 }
 #else /* MEM_OVERFLOW_CHECK */
 #define mem_overflow_init_element(mem, size)
@@ -997,7 +990,7 @@ mem_calloc(mem_size_t count, mem_size_t size)
   p = mem_malloc((mem_size_t)alloc_size);
   if (p) {
     /* zero the memory */
-    memset(p, 0, alloc_size);
+    MEMSET(p, 0, alloc_size);
   }
   return p;
 }

@@ -905,7 +905,7 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
   }
 #if LWIP_TCP_PCB_NUM_EXT_ARGS
   /* copy over ext_args to listening pcb  */
-  memcpy(&lpcb->ext_args, &pcb->ext_args, sizeof(pcb->ext_args));
+  MEMCPY(&lpcb->ext_args, &pcb->ext_args, sizeof(pcb->ext_args));
 #endif
   tcp_free(pcb);
 #if LWIP_CALLBACK_API
@@ -1891,7 +1891,7 @@ tcp_alloc(u8_t prio)
   }
   if (pcb != NULL) {
     /* zero out the whole pcb, so there is no need to initialize members to zero */
-    memset(pcb, 0, sizeof(struct tcp_pcb));
+    MEMSET(pcb, 0, sizeof(struct tcp_pcb));
     pcb->prio = prio;
     pcb->snd_buf = TCP_SND_BUF;
     /* Start with a window that does not need scaling. When window scaling is
@@ -2399,7 +2399,7 @@ tcp_free_ooseq(struct tcp_pcb *pcb)
     tcp_segs_free(pcb->ooseq);
     pcb->ooseq = NULL;
 #if LWIP_TCP_SACK_OUT
-    memset(pcb->rcv_sacks, 0, sizeof(pcb->rcv_sacks));
+    MEMSET(pcb->rcv_sacks, 0, sizeof(pcb->rcv_sacks));
 #endif /* LWIP_TCP_SACK_OUT */
   }
 }

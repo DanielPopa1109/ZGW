@@ -1,30 +1,26 @@
-#include <string.h>
 #include "Ifx_Types.h"
 #include "IfxCpu.h"
 #include "IfxScuWdt.h"
 #include "IfxScuRcu.h"
-#include "IfxFlash.h"
-#include "IfxCan_Can.h"
+#include "IfxStm_reg.h"
 #include "IfxPort.h"
 #include "IfxPort_reg.h"
 #include "aurix_pin_mappings.h"
+#include "FblBlu.h"
+#include "FblTransport_Cfg.h"
 
 #define FBL_TRANSPORT_ETH                1u
-#define FBL_TRANSPORT_CANFD              2u
-#define FBL_TRANSPORT_CAN_CLASSIC        3u
-#define FBL_CAN_TRANSPORT_ENABLED        0u
 
 #define FBL_RESET_INFO_ENTER_DOIP        0xFCD0u
 
 /* Application -> FBL programming handoff.
  *
- * The handoff used to live in the LMU "NCR" region (0xB00000F0...), but LBIST
+ * The handoff used to live in the cached LMU "NCR" region, but LBIST
  * clears that on every reset, so it was dropped.  The application now publishes
  * the request in the SCR XRAM mailbox (PMS standby RAM at 0xF0240000), which
  * survives the application reset that enters the FBL.  Layout mirrors the
  * SCR_FBL_* record in ZGW_APP/SCR/scr_time_shared.h and the writer
  * McuSm_ArmFblProgrammingRequest() in ZGW_APP/BSW/Sys/McuSm/McuSm.c. */
-#define FBL_SCR_XRAM_ADDR                0xF0240000u   /* PMS_XRAM base (TC375) */
 #define FBL_SCR_FBL_BASE                 0x17E0u
 #define FBL_SCR_FBL_MAGIC                0x46424C31u   /* "FBL1" */
 #define FBL_SCR_FBL_VERSION              1u
@@ -37,8 +33,8 @@
 #define FBL_SCR_OFF_RESET_COUNTER        8u
 #define FBL_SCR_OFF_CHECKSUM             12u
 
-/* Retained NCR diag-session marker (write-only breadcrumb; nothing reads it). */
-#define FBL_NCR_DIAG_SESSION_ADDR        0xB00000F0u
+/* Retained NCR diag-session marker in non-cached CPU0 DLMU (write-only breadcrumb; nothing reads it). */
+#define FBL_NCR_DIAG_SESSION_ADDR        0x900000F0u
 #define FBL_PROGRAMMING_REQUEST_ACTIVE   1u
 #define FBL_DIAG_SESSION_PROGRAMMING     0x02u
 #define FBL_RESET_COUNTER_FORCE_MIN      49u
@@ -49,20 +45,15 @@
 #define FBL_SIZE_BYTES                   0x00030000u
 
 #define APP_START_NCACHED                0xA0030000u
-/* TC375DP has 6 MB PFLASH (0xA0000000..0xA05FFFFF). The APP window must end at
- * the last physical byte; using 0xA07FFFFF erased/accepted 2 MB of non-existent
- * bank-B sectors. */
-#define APP_END_NCACHED                  0xA05FFFFFu
+#define APP_END_NCACHED                  0xA05CFFFFu
+#define APP_SIZE_BYTES                   ((APP_END_NCACHED - APP_START_NCACHED) + 1u)
 
 #define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
 #define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
 
 /* PFLASH alias bases.
- * The same physical PFLASH is visible through a cached segment-8 alias (used for
- * normal code execution) and a non-cached segment-A alias (required by the iLLD
- * IfxFlash erase/program/verify primitives). Application code is linked/executed
- * from the cached 0x8 alias; the FBL converts every download/erase/verify target
- * to the non-cached 0xA alias before touching the flash controller. */
+ * The same physical PFLASH is visible through cached segment 8 and non-cached
+ * segment A. Direct erase/program/verify operations always use segment A. */
 #define PFLASH_CACHED_BASE               0x80000000u
 #define PFLASH_NONCACHED_BASE            0xA0000000u
 #define PFLASH_ALIAS_MASK                0x1FFFFFFFu
@@ -74,10 +65,11 @@
 #define FBL_PFLASH_END_CACHED            0x8002FFFFu
 
 #define APP_PFLASH_START_CACHED          0x80030000u
-#define APP_PFLASH_END_CACHED            0x805FFFFFu
+#define APP_PFLASH_END_CACHED            0x805CFFFFu
 
 #define APP_PFLASH_START_NC              0xA0030000u
-#define APP_PFLASH_END_NC                0xA05FFFFFu // @suppress("Unused static function")
+#define APP_PFLASH_END_NC                0xA05CFFFFu // @suppress("Unused static function")
+#define APP_PFLASH_SIZE_BYTES            ((APP_PFLASH_END_NC - APP_PFLASH_START_NC) + 1u)
 
 /* APP reset/start execution address (cached alias). The FBL jumps here. */
 #define APP_START_CACHED                 APP_PFLASH_START_CACHED
@@ -99,42 +91,18 @@ typedef enum
     FBL_ADDR_ERR_PROTECTED
 } Fbl_AddressStatus;
 
-static inline uint32 Fbl_ToCachedPflash(uint32 addr) // @suppress("Unused static function")
-{
-    return (addr & PFLASH_ALIAS_MASK) | PFLASH_CACHED_BASE;
-}
-
 static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 {
     return (addr & PFLASH_ALIAS_MASK) | PFLASH_NONCACHED_BASE;
 }
 
-#define PFLASH_BANK_A_START              0xA0000000u
-#define PFLASH_BANK_A_END                0xA03FFFFFu
-#define PFLASH_BANK_B_START              0xA0400000u
-#define PFLASH_BANK_B_END                0xA07FFFFFu
-
 #define PFLASH_PAGE_SIZE                 32u
 #define PFLASH_SECTOR_SIZE               0x4000u
-
-#define FLASH_MODULE                     0u
-#define PROGRAM_FLASH_BANK_A             IfxFlash_FlashType_P0
-#define PROGRAM_FLASH_BANK_B             IfxFlash_FlashType_P1
-
-#define FBL_CAN_REQ_ID                   0x710u
-#define FBL_CAN_RES_ID                   0x711u
-#define FBL_CAN_RX_PRIO                  1u
-#define FBL_CAN_MAX_DL                   64u
-#define FBL_CAN_CLASSIC_MAX_DL           8u
-#define FBL_CAN_EXT_ADDR_ZGW             0x41u
-#define FBL_CAN_EXT_ADDR_TESTER          0x41u
-#define FBL_CAN_ONBOARD_TRCV_STB_PORT    (&MODULE_P20)
-#define FBL_CAN_ONBOARD_TRCV_STB_PIN     6u
-
-#define FBL_ISOTP_MAX_PAYLOAD            4095u
-#define FBL_ISOTP_FC_TIMEOUT_LOOPS       1000000u
-#define FBL_ISOTP_FC_WFT_MAX             8u
-#define FBL_CAN_TX_BUSY_RETRY_MAX        100000u
+#define FBL_BOOT_CRITICAL_SIZE           PFLASH_PAGE_SIZE
+#define FBL_FLASH_PAD_BYTE               0xFFu
+#define FBL_FLASH_NO_PAGE_ADDR           0xFFFFFFFFu
+#define FBL_TX_DRAIN_POLLS               2000u
+#define FBL_FINAL_TX_DRAIN_POLLS         10000u
 
 #define UDS_SID_SESSION                  0x10u
 #define UDS_SID_RESET                    0x11u
@@ -159,18 +127,28 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
 #define UDS_NRC_RESPONSE_PENDING         0x78u
 
-/* The whole-application erase blocks for seconds. Erase it in sector batches and
- * emit a 7F xx 78 (responsePending) between batches so the tester's P2* timer is
- * refreshed and (over DoIP) the TCP connection stays serviced. */
-#define FBL_ERASE_BATCH_SECTORS          8u
+/* The whole-application erase is issued as one logical operation. The RAM flash
+ * primitive splits only where the request crosses a physical PFLASH bank. */
+#define FBL_BLU_REJECT_NONE                         0u
+#define FBL_BLU_REJECT_SELECT_TARGET_CONFLICT       1u
+#define FBL_BLU_REJECT_FBL_ERASE_STATE              2u
+#define FBL_BLU_REJECT_APP_ERASE_FBL_NOT_STARTED    3u
+#define FBL_BLU_REJECT_FBL_CRC_STATE                4u
+#define FBL_BLU_REJECT_DOWNLOAD_FBL_TARGET          5u
+#define FBL_BLU_REJECT_DOWNLOAD_NO_TARGET           6u
+#define FBL_BLU_REJECT_DOWNLOAD_APP_SWITCH          7u
+#define FBL_BLU_REJECT_DOWNLOAD_FBL_STATE           8u
+#define FBL_BLU_REJECT_RESET_FBL_ACTIVE             9u
 
 #define UDS_RID_ERASE_APP                0x0001u
 #define UDS_RID_CRC_CHECK                0x0002u
 #define UDS_RID_START_FBL_RAM_UPDATER    0x0155u
+#define UDS_RID_SELECT_SW_BLOCK          0x0200u
 #define UDS_DID_ACTIVE_SOFTWARE_BLOCK    0xF100u
 #define UDS_DID_SOFTWARE_VERSION         0xF101u
 #define UDS_DID_ACTIVE_SESSION           0xF186u
-#define FBL_ACTIVE_SOFTWARE_BLOCK        0x01u
+#define FBL_ACTIVE_SOFTWARE_BLOCK_APP    0x01u
+#define FBL_ACTIVE_SOFTWARE_BLOCK_FBL    0x02u
 #define APP_SW_VERSION_MAJOR             1u
 #define APP_SW_VERSION_MINOR             0u
 #define APP_SW_VERSION_PATCH             0u
@@ -194,12 +172,21 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define DOIP_PT_DIAG_NACK                0x8003u
 #define DOIP_TESTER_ADDR                 0x0710u
 #define DOIP_ECU_ADDR                    0x1001u
-#define DOIP_HEADER_LEN                  8u
+#define DOIP_HEADER_LEN                  FBL_DOIP_HEADER_SIZE
 #define DOIP_VID_RES_LEN                 33u
 #define DOIP_RA_RES_LEN                  13u
 #define DOIP_ALIVE_RES_LEN               2u
 #define DOIP_DIAG_ACK_LEN                5u
-#define DOIP_TCP_RX_STREAM_SIZE          8192u
+/* The Ethernet layer owns the TCP reassembly stream.
+ * Cpu0_Main owns only one same-sized complete-frame buffer.
+ * A full transfer frame is 8-byte DoIP header + 4-byte diagnostic addresses +
+ * 4098-byte UDS TransferData request = 4110 bytes. */
+#define DOIP_DIAG_ADDRESS_BYTES          FBL_DOIP_DIAG_ADDRESS_SIZE
+#define DOIP_TCP_RX_STREAM_SIZE          FBL_DOIP_TCP_RX_STREAM_SIZE
+
+#if DOIP_TCP_RX_STREAM_SIZE < (DOIP_HEADER_LEN + DOIP_DIAG_ADDRESS_BYTES + FBL_UDS_MAX_BLOCK_LENGTH)
+#error "DOIP_TCP_RX_STREAM_SIZE is smaller than the advertised maximum diagnostic frame"
+#endif
 #define DOIP_RA_RES_DENIED_UNKNOWN_SRC   0x00u
 #define DOIP_RA_RES_UNSUPPORTED_ACT      0x05u
 #define DOIP_RA_RES_OK                   0x10u
@@ -214,135 +201,126 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define DOIP_SEND_UDP                    0u
 #define DOIP_SEND_TCP                    1u
 
-#define FBL_FLASH_FUNC_BASE              0x70100000u
-#define FBL_FLASH_FUNC_LEN               192u
-#define FBL_FLASH_ERASE_ADDR             (FBL_FLASH_FUNC_BASE)
-#define FBL_FLASH_WAIT_ADDR              (FBL_FLASH_ERASE_ADDR + FBL_FLASH_FUNC_LEN)
-#define FBL_FLASH_ENTER_ADDR             (FBL_FLASH_WAIT_ADDR + FBL_FLASH_FUNC_LEN)
-#define FBL_FLASH_LOAD_ADDR              (FBL_FLASH_ENTER_ADDR + FBL_FLASH_FUNC_LEN)
-#define FBL_FLASH_WRITE_ADDR             (FBL_FLASH_LOAD_ADDR + FBL_FLASH_FUNC_LEN)
-
-extern void FblRamUpdater_Entry(void); // @suppress("Unused variable declaration in file scope")
+#define FBL_RAM_CODE                     FBL_RAM_BLU_CODE
 
 extern void FblEth_Init(void);
 extern void FblEth_MainFunction(void);
+extern void FblEth_PollReceiveOnly(void);
+extern void FblEth_PollTimerOnly(void);
 extern uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len);
 extern uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len);
+extern uint8 FblEth_HasPendingTcpData(void);
 extern void FblEth_TcpSend(const uint8 *buf, uint16 len);
 extern void FblEth_UdpSend(const uint8 *buf, uint16 len);
+extern uint8 FblEth_TcpDrain(uint32 pollBudget);
+extern void FblEth_SetDoIpCallbacks(void (*connectedCb)(void),
+                                    void (*disconnectedCb)(void),
+                                    void (*rxOverflowCb)(void));
+extern uint8 FblEth_RuntimeClosureOk(void);
 
 volatile uint32 g_FblTransportSelect = FBL_TRANSPORT_ETH;
 volatile uint32 g_FblStayInBoot = 1u;
-volatile uint32 g_FblStartRamUpdater = 0u;
 volatile uint16 g_FblLastResetReason = 0u;
 volatile uint8 g_FblDiagBootRequestSeen = 0u;
 
 typedef struct
 {
-    IfxCan_Can_Config canConfig;
-    IfxCan_Can canModule;
-    IfxCan_Can_Node canNode;
-    IfxCan_Can_NodeConfig nodeConfig;
-    IfxCan_Filter filter;
-    IfxCan_Message rxMsg;
-    IfxCan_Message txMsg;
-    uint8 rxData[FBL_CAN_MAX_DL];
-    uint8 txData[FBL_CAN_MAX_DL];
-} FblCan_Type;
-
-typedef struct
-{
-    uint8 rxBuf[FBL_ISOTP_MAX_PAYLOAD];
-    uint8 txBuf[FBL_ISOTP_MAX_PAYLOAD];
-    uint16 rxLen;
-    uint16 rxIdx;
-    uint16 txLen;
-    uint16 txIdx;
-    uint8 nextSn;
-    uint8 txSn;
-    uint8 rxReady;
-    uint8 txActive;
-    volatile uint8 waitFc;
-    volatile uint8 fcStatus;
-    volatile uint8 fcBlockSize;
-    volatile uint8 fcStMin;
-    uint8 addrOffset;
-    uint8 txAddrOffset;
-} FblIsoTp_Type;
-
-typedef struct
-{
-    void (*eraseSectors)(uint32 sectorAddr, uint32 numSector);
-    uint8 (*waitUnbusy)(uint32 flash, IfxFlash_FlashType flashType);
-    uint8 (*enterPageMode)(uint32 pageAddr);
-    void (*load2X32)(uint32 pageAddr, uint32 wordL, uint32 wordU);
-    void (*writePage)(uint32 pageAddr);
-} FblFlashCmd_Type;
-
-typedef struct
-{
     uint8 active;
-    uint32 logicalAddr;   /* cached 0x8 address as requested by the tester (for diagnostics) */
+    uint8 imageKind;
     uint32 startAddr;     /* internal non-cached 0xA flash address */
     uint32 curAddr;       /* internal non-cached 0xA running flash address */
     uint32 length;
     uint32 received;
     uint8 nextBlock;
+    uint8 lastBlock;
 } FblDownload_Type;
 
-static FblCan_Type g_can;
-static FblIsoTp_Type g_iso;
-static FblFlashCmd_Type g_flash;
+typedef union
+{
+    uint8 bytes[PFLASH_PAGE_SIZE];
+    uint32 words[PFLASH_PAGE_SIZE / sizeof(uint32)];
+} FblPageBuffer_Type;
+
 static FblDownload_Type g_dl;
-static uint32 g_secSeed;
-static uint8 g_secSeedValid;
-static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
-static uint32 g_pageAddr = 0xFFFFFFFFu;
+static FblBlu_RecordType g_blu;
+static FblPageBuffer_Type IFX_ALIGN(32) g_pageBuf;
+static FblPageBuffer_Type IFX_ALIGN(32) g_fblBootCriticalPage;
+static uint32 g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
 static uint32 g_pageFill = 0u;
-static uint8 g_doipTcpStream[DOIP_TCP_RX_STREAM_SIZE];
-static uint16 g_doipTcpStreamLen;
+static uint32 g_fblBootCriticalMask = 0u;
+/* One receive buffer only. FblEth owns TCP stream reassembly and returns a
+ * complete DoIP frame, so Cpu0_Main does not maintain a second TCP stream
+ * accumulation stream. The same buffer is reused for UDP datagrams. */
+static uint8 IFX_ALIGN(32) g_doipRxScratch[DOIP_TCP_RX_STREAM_SIZE];
+static uint16 g_doipRxLenScratch;
+static uint8 g_doipTcpOverflowPending;
+volatile uint32 g_FblDoIpLastTcpReceiveBufPtr;
+volatile uint32 g_FblDoIpLastTcpReceiveLenPtr;
+volatile uint32 g_FblDoIpLastUdpReceiveBufPtr;
+volatile uint32 g_FblDoIpLastUdpReceiveLenPtr;
+volatile uint32 g_FblTransferAdvertisedBlockLength;
+volatile uint32 g_FblTransferLastUdsLength;
+volatile uint32 g_FblTransferLastDataLength;
+volatile uint32 g_FblTransferLastDoipPayloadLength;
+volatile uint32 g_FblTransferLastFrameLength;
+volatile uint32 g_FblTransferTcpStreamHighWatermark;
+volatile uint32 g_FblTransferTcpCallbackCount;
+volatile uint32 g_FblTransferOverflowCount;
+volatile uint32 g_FblTransferProgrammedPageCount;
+volatile uint32 g_FblBluLastRejectReason;
+volatile uint32 g_FblBluLastRejectState;
+volatile uint32 g_FblBluLastRejectFailure;
+volatile uint32 g_FblBluLastRejectImageKind;
+volatile uint32 g_FblBluLastRejectFlags;
+volatile uint32 g_FblBluLastRejectImageLen;
+volatile uint32 g_FblBluLastRejectImageCrc;
+volatile uint32 g_FblBluLastTransition;
+volatile uint32 g_FblBluLastTcpDrainResult;
+volatile uint32 g_FblBluLastResetStage;
+volatile uint32 g_FblBluScrReadValid;
+volatile uint32 g_FblBluLastEraseFailAddr;
+volatile uint32 g_FblBluLastEraseFailLen;
+volatile uint32 g_FblBluLastEraseFailDmu;
+volatile uint32 g_FblEraseLogicalCallCount;
+volatile uint32 g_FblEraseLogicalLastStart;
+volatile uint32 g_FblEraseLogicalLastLength;
+volatile uint32 g_FblEraseLogicalLastResult;
+volatile uint32 g_FblEraseLogicalStartTick;
+volatile uint32 g_FblEraseLogicalEndTick;
+volatile uint32 g_FblEraseLogicalTicks;
+volatile uint32 g_FblEraseDoIpDrainStartTick;
+volatile uint32 g_FblEraseDoIpDrainEndTick;
+volatile uint32 g_FblEraseDoIpDrainTicks;
 static uint16 g_doipTesterAddr;
 static uint8 g_doipRoutingActive;
-
-static const uint8 Fbl_DoIpVin[17] = "LABTC375DOIP0001";
-static const uint8 Fbl_DoIpEid[6] = {0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
-static const uint8 Fbl_DoIpGid[6] = {0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x01u};
-
-IFX_INTERRUPT(Fbl_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
 
 static void Fbl_WriteNcrU8(uint32 addr, uint8 value);
 static uint32 Fbl_ScrFblChecksum(uint8 progRequest, uint8 commInterface, uint8 resetCounter);
 static uint8 Fbl_ScrReadFblHandoff(uint8 *progRequest, uint8 *commInterface, uint8 *resetCounter);
 static void Fbl_ScrInvalidateFblHandoff(void);
+static uint8 Fbl_ScrReadBluState(FblBlu_RecordType *record);
+static void Fbl_ScrWriteBluState(const FblBlu_RecordType *record);
+static void Fbl_ScrClearBluState(void);
+static void Fbl_BluResetRuntime(void);
+static uint8 Fbl_BluSelectTarget(uint8 imageKind);
+static uint8 Fbl_BluCanSwitchFromBootloaderToApplication(void);
+static void Fbl_BluSetFailure(uint8 failure);
+static uint8 Fbl_BluActiveSoftwareBlock(void);
 static uint8 Fbl_NormalizeTransport(uint8 transport);
 static uint8 Fbl_ResetCounterForcesProgramming(uint8 resetCounter);
 static uint8 Fbl_IsAppValid(void);
 static void Fbl_PlatformInit(void);
-#if (FBL_CAN_TRANSPORT_ENABLED != 0u)
-static void Fbl_CanReleaseClassicRxPinFromScr(void);
-static void Fbl_CanOnboardTrcvSetNormalMode(void);
-static void Fbl_CanInit(uint8 transport);
-#endif
-static void Fbl_CanSend(const uint8 *data, uint8 len);
-static uint8 Fbl_CanDlcFromLen(uint8 len);
-static uint8 Fbl_CanLenFromDlc(uint8 dlc);
-static uint8 Fbl_CanPayloadLen(void);
-static void Fbl_IsoTpInit(void);
-static void Fbl_IsoTpRx(const uint8 *data, uint8 len);
-static void Fbl_IsoTpSend(const uint8 *data, uint16 len);
-static void Fbl_IsoTpSendFc(void);
-static uint8 Fbl_IsoTpDetectAddrOffset(const uint8 *data, uint8 len);
-static uint8 Fbl_IsoTpWaitFc(void);
-static void Fbl_IsoTpDelayStMin(uint8 stMin);
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
 static void Fbl_UdsSend(const uint8 *res, uint16 len, uint8 transport);
 static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
+static void Fbl_UdsNegSequence(uint8 sid, uint8 transport, uint32 reason);
 static void Fbl_UdsKeepAlive(uint8 sid, uint8 transport);
+static void Fbl_ServiceCommsDuringLongOp(void);
+static uint8 Fbl_SendAndDrainFinalPositive(const uint8 *res, uint16 len, uint8 transport);
+static uint8 Fbl_SendAndDrainPositive(const uint8 *res, uint16 len, uint8 transport);
 static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport);
-static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level);
 static void Fbl_DoIpMain(void);
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len);
-static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len);
 static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len);
 static void Fbl_DoIpResetTcpState(void);
 static void Fbl_DoIpSendGenericNack(uint8 viaTcp, uint8 code);
@@ -352,21 +330,35 @@ static void Fbl_DoIpSendAliveRes(void);
 static void Fbl_DoIpSendDiagAck(uint16 testerAddr, uint16 ecuAddr);
 static void Fbl_DoIpSendDiagNack(uint16 testerAddr, uint16 ecuAddr, uint8 nack);
 static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen);
+void Fbl_DoIpTcpConnected(void);
+void Fbl_DoIpTcpDisconnected(void);
+void Fbl_DoIpTcpRxOverflow(void);
 static void Fbl_FlashInit(void);
-static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len);
-static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len);
-static uint32 Fbl_FlashFlush(void);
-static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data);
-static IfxFlash_FlashType Fbl_FlashBank(uint32 addr);
-static uint32 Fbl_Crc32(uint32 addr, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_FlashProgramFblPayload(uint32 addr, const uint8 *data, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_FlashFlush(void);
+FBL_RAM_CODE static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data);
+FBL_RAM_CODE static uint8 Fbl_FlashVerifyPage(uint32 addr, const uint8 *data);
+FBL_RAM_CODE static uint32 Fbl_BluEraseFblRange(uint32 addr, uint32 len);
+FBL_RAM_CODE static uint8 Fbl_BootCriticalPageComplete(void);
+FBL_RAM_CODE static uint32 Fbl_CommitBootCriticalPage(void);
+FBL_RAM_CODE static uint32 Fbl_Crc32(uint32 addr, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_Crc32FblWithDelayedBootPage(uint32 addr, uint32 len);
+FBL_RAM_CODE static uint32 Fbl_Crc32UpdateByte(uint32 crc, uint8 value);
 static uint8 Fbl_IsExplicitlyRejectedProgrammingAddress(uint32 addr);
+static uint8 Fbl_IsFullFblLogicalRange(uint32 logicalAddr, uint32 length);
 static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 length);
 static uint32 Fbl_Rd32(const uint8 *p);
 static uint16 Fbl_Rd16(const uint8 *p);
 static void Fbl_Wr16(uint8 *p, uint16 v);
 static void Fbl_Wr32(uint8 *p, uint32 v);
 static void Fbl_JumpToApp(void);
-static void Fbl_CopyAndJumpRamUpdater(void);
+static uint32 Fbl_ActiveDownloadPhysicalStart(uint32 logicalAddr);
+static uint8 Fbl_RuntimeClosureOk(void);
+static uint8 Fbl_EnterDirectUpdateRuntime(void);
+static uint8 Fbl_BluHasVerifiedFblEvidence(void);
+static void Fbl_BluCaptureReject(uint32 reason);
 
 static void Fbl_WriteNcrU8(uint32 addr, uint8 value)
 {
@@ -439,6 +431,216 @@ static void Fbl_ScrInvalidateFblHandoff(void)
     rec[FBL_SCR_OFF_VALID] = 0u;
 }
 
+static uint8 Fbl_ScrReadBluState(FblBlu_RecordType *record)
+{
+    volatile const uint8 *rec = &((volatile const uint8 *)FBL_SCR_XRAM_ADDR)[FBL_SCR_BLU_BASE];
+    uint8 framed[18];
+    uint32 magic;
+    uint32 stored;
+    uint32 checksum = 0x811C9DC5u;
+    uint8 i;
+
+    magic = Fbl_Rd32((const uint8 *)&rec[FBL_SCR_BLU_OFF_MAGIC]);
+    if((magic != FBL_SCR_BLU_MAGIC) ||
+       (rec[FBL_SCR_BLU_OFF_VERSION] != FBL_SCR_BLU_VERSION) ||
+       (rec[FBL_SCR_BLU_OFF_VALID] != FBL_SCR_BLU_VALID))
+    {
+        return 0u;
+    }
+
+    FblRam_CopyBytes(&framed[0u], (const uint8 *)&rec[FBL_SCR_BLU_OFF_STATE], sizeof(framed));
+    stored = Fbl_Rd32((const uint8 *)&rec[FBL_SCR_BLU_OFF_CHECKSUM]);
+
+    for(i = 0u; i < sizeof(framed); i++)
+    {
+        checksum ^= (uint32)framed[i];
+        checksum *= 16777619u;
+    }
+
+    if(stored != checksum)
+    {
+        return 0u;
+    }
+
+    record->state = rec[FBL_SCR_BLU_OFF_STATE];
+    record->failure = rec[FBL_SCR_BLU_OFF_FAILURE];
+    record->imageKind = rec[FBL_SCR_BLU_OFF_IMAGE_KIND];
+    record->imageLen = Fbl_Rd32((const uint8 *)&rec[FBL_SCR_BLU_OFF_IMAGE_LEN]);
+    record->imageCrc = Fbl_Rd32((const uint8 *)&rec[FBL_SCR_BLU_OFF_IMAGE_CRC]);
+    record->flags = Fbl_Rd32((const uint8 *)&rec[FBL_SCR_BLU_OFF_FLAGS]);
+
+    return 1u;
+}
+
+static void Fbl_ScrWriteBluState(const FblBlu_RecordType *record)
+{
+    volatile uint8 *rec = &((volatile uint8 *)FBL_SCR_XRAM_ADDR)[FBL_SCR_BLU_BASE];
+    uint8 framed[18];
+    uint32 checksum = 0x811C9DC5u;
+    uint8 i;
+
+    rec[FBL_SCR_BLU_OFF_VALID] = 0u;
+    rec[FBL_SCR_BLU_OFF_MAGIC + 0u] = (uint8)(FBL_SCR_BLU_MAGIC >> 24u);
+    rec[FBL_SCR_BLU_OFF_MAGIC + 1u] = (uint8)(FBL_SCR_BLU_MAGIC >> 16u);
+    rec[FBL_SCR_BLU_OFF_MAGIC + 2u] = (uint8)(FBL_SCR_BLU_MAGIC >> 8u);
+    rec[FBL_SCR_BLU_OFF_MAGIC + 3u] = (uint8)FBL_SCR_BLU_MAGIC;
+    rec[FBL_SCR_BLU_OFF_VERSION] = FBL_SCR_BLU_VERSION;
+    rec[FBL_SCR_BLU_OFF_STATE] = record->state;
+    rec[FBL_SCR_BLU_OFF_FAILURE] = record->failure;
+    rec[FBL_SCR_BLU_OFF_IMAGE_KIND] = record->imageKind;
+    rec[FBL_SCR_BLU_OFF_RESERVED] = 0u;
+    Fbl_Wr32((uint8 *)&rec[FBL_SCR_BLU_OFF_IMAGE_LEN], record->imageLen);
+    Fbl_Wr32((uint8 *)&rec[FBL_SCR_BLU_OFF_IMAGE_CRC], record->imageCrc);
+    Fbl_Wr32((uint8 *)&rec[FBL_SCR_BLU_OFF_FLAGS], record->flags);
+
+    FblRam_CopyBytes(&framed[0u], (const uint8 *)&rec[FBL_SCR_BLU_OFF_STATE], sizeof(framed));
+    for(i = 0u; i < sizeof(framed); i++)
+    {
+        checksum ^= (uint32)framed[i];
+        checksum *= 16777619u;
+    }
+
+    Fbl_Wr32((uint8 *)&rec[FBL_SCR_BLU_OFF_CHECKSUM], checksum);
+    __dsync();
+    rec[FBL_SCR_BLU_OFF_VALID] = FBL_SCR_BLU_VALID;
+    __dsync();
+}
+
+static void Fbl_ScrClearBluState(void)
+{
+    volatile uint8 *rec = &((volatile uint8 *)FBL_SCR_XRAM_ADDR)[FBL_SCR_BLU_BASE];
+
+    rec[FBL_SCR_BLU_OFF_VALID] = 0u;
+    __dsync();
+}
+
+static void Fbl_BluResetRuntime(void)
+{
+    g_blu.state = FBL_BLU_STATE_IDLE;
+    g_blu.failure = FBL_BLU_FAILURE_NONE;
+    g_blu.imageKind = FBL_BLU_IMAGE_KIND_NONE;
+    g_blu.imageLen = 0u;
+    g_blu.imageCrc = 0u;
+    g_blu.flags = 0u;
+}
+
+static uint8 Fbl_BluHasVerifiedFblEvidence(void)
+{
+    if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+       (g_blu.imageLen == FBL_SIZE_BYTES) &&
+       (g_blu.imageCrc != 0u) &&
+       (g_blu.failure == FBL_BLU_FAILURE_NONE) &&
+       ((g_blu.flags & FBL_BLU_FLAG_DIRECT_UPDATE) != 0u))
+    {
+        return 1u;
+    }
+
+    return 0u;
+}
+
+static void Fbl_BluCaptureReject(uint32 reason)
+{
+    g_FblBluLastRejectReason = reason;
+    g_FblBluLastRejectState = g_blu.state;
+    g_FblBluLastRejectFailure = g_blu.failure;
+    g_FblBluLastRejectImageKind = g_blu.imageKind;
+    g_FblBluLastRejectFlags = g_blu.flags;
+    g_FblBluLastRejectImageLen = g_blu.imageLen;
+    g_FblBluLastRejectImageCrc = g_blu.imageCrc;
+}
+
+static uint8 Fbl_BluSelectTarget(uint8 imageKind)
+{
+    if((imageKind != FBL_BLU_IMAGE_KIND_APPLICATION) &&
+       (imageKind != FBL_BLU_IMAGE_KIND_BOOTLOADER))
+    {
+        return 0u;
+    }
+
+    if((g_blu.imageKind != FBL_BLU_IMAGE_KIND_NONE) &&
+       (g_blu.imageKind != imageKind) &&
+       !((imageKind == FBL_BLU_IMAGE_KIND_APPLICATION) &&
+         (Fbl_BluCanSwitchFromBootloaderToApplication() != 0u)))
+    {
+        return 0u;
+    }
+
+    g_blu.imageKind = imageKind;
+    if(imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+    {
+        g_blu.state = FBL_BLU_STATE_ENTER_REQUESTED;
+    }
+    else
+    {
+        g_blu.state = FBL_BLU_STATE_PREPARE;
+    }
+    g_blu.failure = FBL_BLU_FAILURE_NONE;
+    g_blu.flags |= FBL_BLU_FLAG_TARGET_LOCKED;
+    Fbl_ScrWriteBluState(&g_blu);
+    return 1u;
+}
+
+static uint8 Fbl_BluCanSwitchFromBootloaderToApplication(void)
+{
+    if(g_blu.imageKind != FBL_BLU_IMAGE_KIND_BOOTLOADER)
+    {
+        return 0u;
+    }
+
+    if((g_blu.state == FBL_BLU_STATE_FBL_STARTED) &&
+       (Fbl_BluHasVerifiedFblEvidence() != 0u))
+    {
+        return 1u;
+    }
+
+    if((g_blu.state == FBL_BLU_STATE_ERASING) ||
+       (g_blu.state == FBL_BLU_STATE_ERASE_COMPLETE) ||
+       (g_blu.state == FBL_BLU_STATE_DOWNLOAD_ACTIVE) ||
+       (g_blu.state == FBL_BLU_STATE_PROGRAMMING) ||
+       (g_blu.state == FBL_BLU_STATE_VERIFYING) ||
+       (g_blu.state == FBL_BLU_STATE_TRANSFER_COMPLETE) ||
+       (g_blu.state == FBL_BLU_STATE_FINAL_VERIFY) ||
+       (g_blu.state == FBL_BLU_STATE_COMMITTING) ||
+       (g_blu.state == FBL_BLU_STATE_FBL_VERIFIED) ||
+       (g_blu.state == FBL_BLU_STATE_REBOOT_PENDING) ||
+       (g_blu.state == FBL_BLU_STATE_FAILED) ||
+       (g_blu.state == FBL_BLU_STATE_RECOVERY_WAIT))
+    {
+        return 0u;
+    }
+
+    return 0u;
+}
+
+static void Fbl_BluSetFailure(uint8 failure)
+{
+    g_blu.state = FBL_BLU_STATE_FAILED;
+    g_blu.failure = failure;
+    Fbl_ScrWriteBluState(&g_blu);
+}
+
+FBL_RAM_CODE void Fbl_BluEnterRecoveryWaitFromTrap(void)
+{
+    g_blu.state = FBL_BLU_STATE_RECOVERY_WAIT;
+    g_blu.failure = FBL_BLU_FAILURE_FLASH;
+    Fbl_ScrWriteBluState(&g_blu);
+}
+
+static uint8 Fbl_BluActiveSoftwareBlock(void)
+{
+    if(g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+    {
+        return FBL_ACTIVE_SOFTWARE_BLOCK_FBL;
+    }
+
+    return FBL_ACTIVE_SOFTWARE_BLOCK_APP;
+}
+
+static uint32 Fbl_ActiveDownloadPhysicalStart(uint32 logicalAddr)
+{
+    return Fbl_ToNonCachedPflash(logicalAddr);
+}
+
 static uint8 Fbl_NormalizeTransport(uint8 transport)
 {
     (void)transport;
@@ -469,6 +671,8 @@ static uint8 Fbl_IsAppValid(void)
     return 0u;
 }
 
+volatile uint32 loopCounter = 0u;
+
 void core0_main(void)
 {
     IfxScuRcu_ResetCode resetCode;
@@ -476,6 +680,7 @@ void core0_main(void)
     uint8 programmingRequest;
     uint8 requestedTransport;
     uint8 resetCounter;
+    Fbl_BluResetRuntime();
 
     resetCode = IfxScuRcu_evaluateReset();
     resetInfo = MODULE_SCU.RSTCON2.B.USRINFO;
@@ -499,6 +704,21 @@ void core0_main(void)
             requestedTransport = FBL_TRANSPORT_ETH;
             resetCounter = 0u;
         }
+    }
+
+    g_FblBluScrReadValid = (uint32)Fbl_ScrReadBluState(&g_blu);
+
+    /* A direct FBL update reaches REBOOT_PENDING only after the complete live
+     * image was programmed and CRC-verified. Reaching this code proves the new
+     * FBL has started; normalize the durable record instead of clearing it. */
+    if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+       (g_blu.state == FBL_BLU_STATE_REBOOT_PENDING) &&
+       (Fbl_BluHasVerifiedFblEvidence() != 0u))
+    {
+        g_blu.state = FBL_BLU_STATE_FBL_STARTED;
+        g_blu.failure = FBL_BLU_FAILURE_NONE;
+        Fbl_ScrWriteBluState(&g_blu);
+        g_FblBluLastTransition = 0x00060001u;
     }
 
     if(Fbl_ResetCounterForcesProgramming(resetCounter) != 0u)
@@ -527,6 +747,14 @@ void core0_main(void)
         g_FblDiagBootRequestSeen = 0u;
     }
 
+    if((g_blu.state != FBL_BLU_STATE_IDLE) &&
+       (g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER))
+    {
+        g_FblTransportSelect = FBL_TRANSPORT_ETH;
+        g_FblStayInBoot = 0u;
+        g_FblDiagBootRequestSeen = 1u;
+    }
+
     if(programmingRequest == FBL_PROGRAMMING_REQUEST_ACTIVE)
     {
         Fbl_ScrInvalidateFblHandoff();
@@ -534,12 +762,14 @@ void core0_main(void)
 
     Fbl_PlatformInit();
     Fbl_FlashInit();
-    Fbl_IsoTpInit();
-
     if(g_FblStayInBoot == 1u)
     {
         if(Fbl_IsAppValid() != 0u)
         {
+            if((g_blu.state == FBL_BLU_STATE_IDLE) && (g_blu.failure == FBL_BLU_FAILURE_NONE))
+            {
+                Fbl_ScrClearBluState();
+            }
             Fbl_JumpToApp();
         }
 
@@ -551,22 +781,17 @@ void core0_main(void)
     g_FblTransportSelect = Fbl_NormalizeTransport((uint8)g_FblTransportSelect);
 
     g_FblTransportSelect = FBL_TRANSPORT_ETH;
+    FblEth_SetDoIpCallbacks(Fbl_DoIpTcpConnected,
+                            Fbl_DoIpTcpDisconnected,
+                            Fbl_DoIpTcpRxOverflow);
     FblEth_Init();
 
     while(1)
     {
-        if(g_FblStartRamUpdater != 0u)
-        {
-            Fbl_CopyAndJumpRamUpdater();
-        }
+      loopCounter++;
 
         Fbl_DoIpMain();
 
-        if(g_iso.rxReady != 0u)
-        {
-            g_iso.rxReady = 0u;
-            Fbl_UdsHandle(g_iso.rxBuf, g_iso.rxLen, (uint8)g_FblTransportSelect);
-        }
     }
 }
 
@@ -576,526 +801,8 @@ static void Fbl_PlatformInit(void)
     IfxScuWdt_disableCpuWatchdog(IfxScuWdt_getCpuWatchdogPassword());
     IfxScuWdt_disableSafetyWatchdog(IfxScuWdt_getSafetyWatchdogPassword());
     gpio_init_pins();
+    rmii0_init_pins();
     IfxCpu_enableInterrupts();
-}
-
-#if (FBL_CAN_TRANSPORT_ENABLED != 0u)
-static void Fbl_CanReleaseClassicRxPinFromScr(void)
-{
-    uint16 safetyWdtPw;
-
-    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
-    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
-    while(P33_PCSR.B.LCK)
-    {
-    }
-    P33_PCSR.B.SEL5 = 0u;
-    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
-}
-
-static void Fbl_CanOnboardTrcvSetNormalMode(void)
-{
-    IfxPort_setPinModeOutput(FBL_CAN_ONBOARD_TRCV_STB_PORT,
-            FBL_CAN_ONBOARD_TRCV_STB_PIN,
-            IfxPort_OutputMode_pushPull,
-            IfxPort_OutputIdx_general);
-    IfxPort_setPinLow(FBL_CAN_ONBOARD_TRCV_STB_PORT, FBL_CAN_ONBOARD_TRCV_STB_PIN);
-}
-
-static void Fbl_CanInit(uint8 transport)
-{
-    uint8 isClassic = (transport == FBL_TRANSPORT_CAN_CLASSIC) ? 1u : 0u;
-
-    if(isClassic != 0u)
-    {
-        Fbl_CanReleaseClassicRxPinFromScr();
-        can1_node3_init_pins();
-    }
-    else
-    {
-        can0_node0_init_pins();
-    }
-
-    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN1 : &MODULE_CAN0);
-    IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
-    IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
-
-    IfxScuCcu_setMcanFrequency(40000000.0f);
-
-    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_3 : IfxCan_NodeId_0;
-    g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
-    g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
-    g_can.nodeConfig.baudRate.baudrate = 500000u;
-
-    if(isClassic == 0u)
-    {
-        g_can.nodeConfig.baudRate.prescaler = 3u;
-        g_can.nodeConfig.baudRate.timeSegment1 = 14u;
-        g_can.nodeConfig.baudRate.timeSegment2 = 3u;
-        g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
-        g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-        g_can.nodeConfig.fastBaudRate.prescaler = 0u;
-        g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-        g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
-        g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
-    }
-
-    g_can.nodeConfig.calculateBitTimingValues = TRUE;
-
-    g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
-    g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
-    g_can.nodeConfig.txConfig.txBufferDataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
-
-    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_fifo0;
-    g_can.nodeConfig.rxConfig.rxFifo0DataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
-    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
-    g_can.nodeConfig.rxConfig.rxFifo0Size = (isClassic != 0u) ? 32u : 12u;
-
-    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
-    g_can.nodeConfig.filterConfig.standardListSize = 1u;
-    g_can.nodeConfig.filterConfig.extendedListSize = 0u;
-    g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
-    g_can.nodeConfig.filterConfig.extendedFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
-    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
-    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
-
-    g_can.nodeConfig.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
-    g_can.nodeConfig.interruptConfig.rxf0n.priority = FBL_CAN_RX_PRIO;
-    g_can.nodeConfig.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_0;
-
-    g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = (isClassic != 0u) ? 0x000u : 0x800u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = (isClassic != 0u) ? 0x080u : 0x880u;
-    g_can.nodeConfig.messageRAM.rxFifo0StartAddress = (isClassic != 0u) ? 0x180u : 0x980u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = (isClassic != 0u) ? 0x400u : 0xD00u;
-
-    IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
-
-    g_can.filter.number = 0u;
-    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
-    g_can.filter.type = IfxCan_FilterType_classic;
-    g_can.filter.id1 = FBL_CAN_REQ_ID;
-    g_can.filter.id2 = FBL_CAN_REQ_ID;
-    IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
-
-    if(isClassic != 0u)
-    {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
-    }
-    else
-    {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
-        Fbl_CanOnboardTrcvSetNormalMode();
-    }
-
-    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-}
-#endif
-
-void Fbl_CanRxIsr(void)
-{
-    uint8 len;
-
-    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_rxFifo0NewMessage);
-
-    while(IfxCan_Can_getRxFifo0FillLevel(&g_can.canNode) > 0u)
-    {
-        IfxCan_Can_initMessage(&g_can.rxMsg);
-        g_can.rxMsg.readFromRxFifo0 = TRUE;
-        memset(g_can.rxData, 0u, sizeof(g_can.rxData));
-        IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32 *)g_can.rxData);
-
-        if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
-        {
-            len = Fbl_CanLenFromDlc((uint8)g_can.rxMsg.dataLengthCode);
-            if(len > Fbl_CanPayloadLen())
-            {
-                len = Fbl_CanPayloadLen();
-            }
-            Fbl_IsoTpRx(g_can.rxData, len);
-        }
-    }
-}
-
-static void Fbl_CanSend(const uint8 *data, uint8 len)
-{
-    uint32 retry = FBL_CAN_TX_BUSY_RETRY_MAX;
-    uint8 maxLen = Fbl_CanPayloadLen();
-
-    if(len > maxLen)
-    {
-        len = maxLen;
-    }
-
-    memset(g_can.txData, 0u, sizeof(g_can.txData));
-    memcpy(g_can.txData, data, len);
-
-    IfxCan_Can_initMessage(&g_can.txMsg);
-    g_can.txMsg.messageId = FBL_CAN_RES_ID;
-    g_can.txMsg.frameMode = (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
-            IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
-    g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
-    g_can.txMsg.dataLengthCode = Fbl_CanDlcFromLen(len);
-    g_can.txMsg.bufferNumber = 0u;
-
-    while((retry > 0u) &&
-          (IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32 *)g_can.txData) == IfxCan_Status_notSentBusy))
-    {
-        retry--;
-    }
-}
-
-static uint8 Fbl_CanDlcFromLen(uint8 len)
-{
-    if(len <= 8u) { return len; }
-    if(len <= 12u) { return 9u; }
-    if(len <= 16u) { return 10u; }
-    if(len <= 20u) { return 11u; }
-    if(len <= 24u) { return 12u; }
-    if(len <= 32u) { return 13u; }
-    if(len <= 48u) { return 14u; }
-    return 15u;
-}
-
-static uint8 Fbl_CanLenFromDlc(uint8 dlc)
-{
-    static const uint8 map[16] = {0u,1u,2u,3u,4u,5u,6u,7u,8u,12u,16u,20u,24u,32u,48u,64u};
-    return map[dlc & 0x0Fu];
-}
-
-static uint8 Fbl_CanPayloadLen(void)
-{
-    return (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
-            FBL_CAN_CLASSIC_MAX_DL : FBL_CAN_MAX_DL;
-}
-
-static void Fbl_IsoTpInit(void)
-{
-    memset(&g_iso, 0u, sizeof(g_iso));
-}
-
-static void Fbl_IsoTpSendFc(void)
-{
-    uint8 fc[64];
-    uint8 addrOffset = g_iso.txAddrOffset;
-
-    memset(fc, 0u, sizeof(fc));
-    if(addrOffset != 0u)
-    {
-        fc[0u] = FBL_CAN_EXT_ADDR_TESTER;
-    }
-
-    fc[addrOffset] = 0x30u;
-    fc[addrOffset + 1u] = 0x00u;
-    fc[addrOffset + 2u] = 0x00u;
-    Fbl_CanSend(fc, Fbl_CanPayloadLen());
-}
-
-static uint8 Fbl_IsoTpDetectAddrOffset(const uint8 *data, uint8 len)
-{
-    if((len > 1u) && (data[0u] == FBL_CAN_EXT_ADDR_ZGW))
-    {
-        return 1u;
-    }
-
-    return 0u;
-}
-
-static void Fbl_IsoTpRx(const uint8 *data, uint8 len)
-{
-    uint8 pci;
-    uint8 pciIdx;
-    uint16 ffLen;
-    uint8 copy;
-    uint8 sn;
-
-    if(len == 0u) { return; }
-
-    g_iso.addrOffset = Fbl_IsoTpDetectAddrOffset(data, len);
-    if(len <= g_iso.addrOffset) { return; }
-
-    pciIdx = g_iso.addrOffset;
-    pci = data[pciIdx] & 0xF0u;
-
-    if(pci == 0x00u)
-    {
-        uint8 sfLen = data[pciIdx] & 0x0Fu;
-        uint8 offset = (uint8)(pciIdx + 1u);
-
-        if(sfLen == 0u)
-        {
-            if(len < (uint8)(pciIdx + 2u)) { return; }
-            sfLen = data[pciIdx + 1u];
-            offset = (uint8)(pciIdx + 2u);
-        }
-
-        if(sfLen == 0u) { return; }
-
-        if((sfLen <= (len - offset)) && (sfLen <= FBL_ISOTP_MAX_PAYLOAD))
-        {
-            memcpy(g_iso.rxBuf, &data[offset], sfLen);
-            g_iso.rxLen = sfLen;
-            g_iso.rxIdx = 0u;
-            g_iso.txAddrOffset = g_iso.addrOffset;
-            g_iso.rxReady = 1u;
-        }
-    }
-    else if(pci == 0x10u)
-    {
-        if(len < (uint8)(pciIdx + 3u)) { return; }
-
-        ffLen = (((uint16)(data[pciIdx] & 0x0Fu)) << 8u) | data[pciIdx + 1u];
-        if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
-
-        copy = (uint8)(len - (uint8)(pciIdx + 2u));
-        if(copy > ffLen) { copy = (uint8)ffLen; }
-
-        memcpy(g_iso.rxBuf, &data[pciIdx + 2u], copy);
-        g_iso.rxLen = ffLen;
-        g_iso.rxIdx = copy;
-        g_iso.nextSn = 1u;
-        g_iso.txAddrOffset = g_iso.addrOffset;
-        Fbl_IsoTpSendFc();
-    }
-    else if(pci == 0x20u)
-    {
-        if((len < (uint8)(pciIdx + 2u)) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
-
-        sn = data[pciIdx] & 0x0Fu;
-        if(sn != g_iso.nextSn) { return; }
-
-        copy = (uint8)(len - (uint8)(pciIdx + 1u));
-        if((g_iso.rxIdx + copy) > g_iso.rxLen)
-        {
-            copy = (uint8)(g_iso.rxLen - g_iso.rxIdx);
-        }
-
-        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[pciIdx + 1u], copy);
-        g_iso.rxIdx += copy;
-        g_iso.nextSn = (uint8)((g_iso.nextSn + 1u) & 0x0Fu);
-
-        if(g_iso.rxIdx >= g_iso.rxLen)
-        {
-            g_iso.txAddrOffset = g_iso.addrOffset;
-            g_iso.rxReady = 1u;
-        }
-    }
-    else if(pci == 0x30u)
-    {
-        if(len < (uint8)(pciIdx + 3u)) { return; }
-
-        g_iso.fcStatus = data[pciIdx] & 0x0Fu;
-        g_iso.fcBlockSize = data[pciIdx + 1u];
-        g_iso.fcStMin = data[pciIdx + 2u];
-        g_iso.waitFc = 0u;
-    }
-    else
-    {
-    }
-}
-
-static uint8 Fbl_IsoTpWaitFc(void)
-{
-    uint32 timeout;
-    uint8 waitFrames = 0u;
-
-    do
-    {
-        timeout = FBL_ISOTP_FC_TIMEOUT_LOOPS;
-
-        while((g_iso.waitFc != 0u) && (timeout > 0u))
-        {
-            timeout--;
-        }
-
-        if(timeout == 0u)
-        {
-            return 0u;
-        }
-
-        if(g_iso.fcStatus == 0u)
-        {
-            return 1u;
-        }
-
-        if(g_iso.fcStatus == 1u)
-        {
-            waitFrames++;
-            if(waitFrames > FBL_ISOTP_FC_WFT_MAX)
-            {
-                return 0u;
-            }
-            g_iso.waitFc = 1u;
-        }
-        else
-        {
-            return 0u;
-        }
-    } while(waitFrames <= FBL_ISOTP_FC_WFT_MAX);
-
-    return 0u;
-}
-
-static void Fbl_IsoTpDelayStMin(uint8 stMin)
-{
-    volatile uint32 loops;
-
-    if(stMin <= 0x7Fu)
-    {
-        loops = (uint32)stMin * 1000u;
-    }
-    else if((stMin >= 0xF1u) && (stMin <= 0xF9u))
-    {
-        loops = (uint32)(stMin - 0xF0u) * 100u;
-    }
-    else
-    {
-        loops = 0u;
-    }
-
-    while(loops > 0u)
-    {
-        loops--;
-    }
-}
-
-static void Fbl_IsoTpSend(const uint8 *data, uint16 len)
-{
-    uint8 frame[64];
-    uint8 chunk;
-    uint8 blockCounter;
-    uint8 payloadLen;
-    uint8 addrOffset;
-    uint8 pciIdx;
-    uint8 sfMax;
-    uint8 ffPayload;
-    uint8 cfPayload;
-
-    if(len > FBL_ISOTP_MAX_PAYLOAD)
-    {
-        return;
-    }
-
-    payloadLen = Fbl_CanPayloadLen();
-    addrOffset = g_iso.txAddrOffset;
-    pciIdx = addrOffset;
-
-    if(addrOffset != 0u)
-    {
-        if(payloadLen <= 2u)
-        {
-            return;
-        }
-    }
-
-    sfMax = (uint8)(payloadLen - addrOffset - 1u);
-    if((payloadLen > 8u) && (sfMax > 7u))
-    {
-        sfMax = (uint8)(payloadLen - addrOffset - 2u);
-    }
-
-    if(len <= sfMax)
-    {
-        memset(frame, 0u, sizeof(frame));
-        if(addrOffset != 0u)
-        {
-            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-        }
-
-        if((payloadLen > 8u) && (len > 7u))
-        {
-            frame[pciIdx] = 0x00u;
-            frame[pciIdx + 1u] = (uint8)len;
-            memcpy(&frame[pciIdx + 2u], data, len);
-        }
-        else
-        {
-            frame[pciIdx] = (uint8)len;
-            memcpy(&frame[pciIdx + 1u], data, len);
-        }
-
-        Fbl_CanSend(frame, payloadLen);
-        return;
-    }
-
-    memset(frame, 0u, sizeof(frame));
-    if(addrOffset != 0u)
-    {
-        frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-    }
-
-    frame[pciIdx] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
-    frame[pciIdx + 1u] = (uint8)(len & 0xFFu);
-    ffPayload = (uint8)(payloadLen - addrOffset - 2u);
-    chunk = ffPayload;
-    if(chunk > len) { chunk = (uint8)len; }
-    memcpy(&frame[pciIdx + 2u], data, chunk);
-    Fbl_CanSend(frame, payloadLen);
-
-    g_iso.txLen = len;
-    g_iso.txIdx = chunk;
-    g_iso.txSn = 1u;
-    g_iso.waitFc = 1u;
-    g_iso.fcStatus = 0xFFu;
-
-    if(Fbl_IsoTpWaitFc() == 0u)
-    {
-        g_iso.txLen = 0u;
-        g_iso.txIdx = 0u;
-        return;
-    }
-
-    blockCounter = 0u;
-
-    while(g_iso.txIdx < g_iso.txLen)
-    {
-        if((g_iso.fcBlockSize != 0u) && (blockCounter >= g_iso.fcBlockSize))
-        {
-            g_iso.waitFc = 1u;
-            g_iso.fcStatus = 0xFFu;
-
-            if(Fbl_IsoTpWaitFc() == 0u)
-            {
-                g_iso.txLen = 0u;
-                g_iso.txIdx = 0u;
-                return;
-            }
-
-            blockCounter = 0u;
-        }
-
-        Fbl_IsoTpDelayStMin(g_iso.fcStMin);
-
-        memset(frame, 0u, sizeof(frame));
-        if(addrOffset != 0u)
-        {
-            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-        }
-
-        frame[pciIdx] = (uint8)(0x20u | (g_iso.txSn & 0x0Fu));
-
-        cfPayload = (uint8)(payloadLen - addrOffset - 1u);
-        chunk = cfPayload;
-        if((g_iso.txIdx + chunk) > g_iso.txLen)
-        {
-            chunk = (uint8)(g_iso.txLen - g_iso.txIdx);
-        }
-
-        memcpy(&frame[pciIdx + 1u], &data[g_iso.txIdx], chunk);
-        Fbl_CanSend(frame, payloadLen);
-        g_iso.txIdx += chunk;
-        g_iso.txSn = (uint8)((g_iso.txSn + 1u) & 0x0Fu);
-        blockCounter++;
-    }
 }
 
 static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
@@ -1114,11 +821,7 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
 
     if(sid == UDS_SID_SESSION)
     {
-        if(len < 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
-        if((req[1u] & 0x7Fu) == 0x01u)
-        {
-            g_secSeedValid = 0u;
-        }
+        if(len != 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
 
         res[0u] = 0x50u;
         res[1u] = req[1u];
@@ -1130,6 +833,8 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     }
     else if(sid == UDS_SID_TESTER_PRESENT)
     {
+        if(len != 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
         res[0u] = 0x7Eu;
         res[1u] = 0x00u;
         Fbl_UdsSend(res, 2u, transport);
@@ -1155,7 +860,7 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         {
             res[0u] = 0x62u;
             Fbl_Wr16(&res[1u], did);
-            res[3u] = FBL_ACTIVE_SOFTWARE_BLOCK;
+            res[3u] = Fbl_BluActiveSoftwareBlock();
             Fbl_UdsSend(res, 4u, transport);
         }
         else if(did == UDS_DID_SOFTWARE_VERSION)
@@ -1192,53 +897,203 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         if(len < 4u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
 
         rid = Fbl_Rd16(&req[2u]);
-
-        if((req[1u] == 0x01u) && (rid == UDS_RID_START_FBL_RAM_UPDATER))
+        if((req[1u] == 0x01u) && (rid == UDS_RID_SELECT_SW_BLOCK))
         {
-            g_FblStartRamUpdater = 1u;
+            uint8 imageKind;
+
+            if(len != 5u)
+            {
+                Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+                return;
+            }
+
+            imageKind = req[4u];
+            if(Fbl_BluSelectTarget(imageKind) == 0u)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_SEQUENCE);
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_SELECT_TARGET_CONFLICT);
+                return;
+            }
+
+            res[0u] = 0x71u;
+            res[1u] = 0x01u;
+            res[2u] = 0x02u;
+            res[3u] = 0x00u;
+            res[4u] = imageKind;
+            Fbl_UdsSend(res, 5u, transport);
+        }
+        else if((req[1u] == 0x01u) && (rid == UDS_RID_START_FBL_RAM_UPDATER))
+        {
+            if(len != 4u)
+            {
+                Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+                return;
+            }
+
+            if(g_blu.imageKind != FBL_BLU_IMAGE_KIND_BOOTLOADER)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_SEQUENCE);
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_DOWNLOAD_FBL_TARGET);
+                return;
+            }
+
+            g_blu.state = FBL_BLU_STATE_ENTER_REQUESTED;
+            g_blu.failure = FBL_BLU_FAILURE_NONE;
+            Fbl_ScrWriteBluState(&g_blu);
+
+            if(Fbl_EnterDirectUpdateRuntime() == 0u)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_RAM_CLOSURE);
+                Fbl_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
+                return;
+            }
+
+            g_blu.state = FBL_BLU_STATE_RAM_READY;
+            g_blu.failure = FBL_BLU_FAILURE_NONE;
+            Fbl_ScrWriteBluState(&g_blu);
+
             res[0u] = 0x71u;
             res[1u] = 0x01u;
             res[2u] = 0x01u;
             res[3u] = 0x55u;
-            res[4u] = 0x00u;
-            Fbl_UdsSend(res, 5u, transport);
+            Fbl_UdsSend(res, 4u, transport);
+            return;
         }
         else if((req[1u] == 0x01u) && (rid == UDS_RID_ERASE_APP))
         {
-            uint32 eraseAddr = APP_START_NCACHED;
-            uint32 eraseEnd = APP_END_NCACHED + 1u;
-            uint32 batch = (uint32)FBL_ERASE_BATCH_SECTORS * PFLASH_SECTOR_SIZE;
-            uint8 eraseOk = 1u;
+            uint32 eraseLogicalAddr = APP_START_NCACHED;
+            uint32 eraseLen = APP_SIZE_BYTES;
+            uint32 eraseAddr;
+            uint8 eraseOk;
+            uint8 previousImageKind;
 
-            /* Tell the tester to wait before the first (already multi-ms) batch so
-             * the initial P2 window is not missed. */
-            Fbl_UdsKeepAlive(sid, transport);
-
-            while(eraseAddr < eraseEnd)
+            if(len == 12u)
             {
-                uint32 chunk = eraseEnd - eraseAddr;
-                if(chunk > batch) { chunk = batch; }
-
-                if(Fbl_FlashEraseRange(eraseAddr, chunk) != 0u)
-                {
-                    eraseOk = 0u;
-                    break;
-                }
-
-                eraseAddr += chunk;
-
-                if(eraseAddr < eraseEnd)
-                {
-                    Fbl_UdsKeepAlive(sid, transport);
-                }
+                eraseLogicalAddr = Fbl_Rd32(&req[4u]);
+                eraseLen = Fbl_Rd32(&req[8u]);
             }
+            else if(len != 4u)
+            {
+                Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+                return;
+            }
+
+            if(Fbl_IsFullFblLogicalRange(eraseLogicalAddr, eraseLen) != 0u)
+            {
+                uint32 erasePhysicalAddr;
+
+                g_blu.imageKind = FBL_BLU_IMAGE_KIND_BOOTLOADER;
+                if((g_blu.state != FBL_BLU_STATE_RAM_READY) &&
+                   (g_blu.state != FBL_BLU_STATE_ERASE_COMPLETE))
+                {
+                    Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_FBL_ERASE_STATE);
+                    return;
+                }
+
+                if(Fbl_RuntimeClosureOk() == 0u)
+                {
+                    Fbl_BluSetFailure(FBL_BLU_FAILURE_RAM_CLOSURE);
+                    Fbl_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
+                    return;
+                }
+
+                erasePhysicalAddr = Fbl_ActiveDownloadPhysicalStart(eraseLogicalAddr);
+                Fbl_UdsKeepAlive(sid, transport);
+                (void)FblEth_TcpDrain(FBL_TX_DRAIN_POLLS);
+
+                g_blu.state = FBL_BLU_STATE_ERASING;
+                g_blu.failure = FBL_BLU_FAILURE_NONE;
+                Fbl_ScrWriteBluState(&g_blu);
+                FblRamRuntime_SetDestructivePhase(1u);
+
+                if(Fbl_BluEraseFblRange(erasePhysicalAddr, eraseLen) != 0u)
+                {
+                    Fbl_BluSetFailure(FBL_BLU_FAILURE_FLASH);
+                    Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                    return;
+                }
+
+                g_blu.state = FBL_BLU_STATE_ERASE_COMPLETE;
+                g_blu.failure = FBL_BLU_FAILURE_NONE;
+                g_blu.imageLen = eraseLen;
+                g_blu.imageCrc = 0u;
+                Fbl_ScrWriteBluState(&g_blu);
+
+                res[0u] = 0x71u;
+                res[1u] = 0x01u;
+                res[2u] = 0x00u;
+                res[3u] = 0x01u;
+                res[4u] = 0x00u;
+                Fbl_UdsSend(res, 5u, transport);
+                return;
+            }
+
+            previousImageKind = g_blu.imageKind;
+            if((previousImageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+               (Fbl_BluCanSwitchFromBootloaderToApplication() == 0u))
+            {
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_APP_ERASE_FBL_NOT_STARTED);
+                return;
+            }
+
+            g_blu.imageKind = FBL_BLU_IMAGE_KIND_APPLICATION;
+            if(Fbl_ValidateDownloadRange(eraseLogicalAddr, eraseLen) != FBL_ADDR_OK)
+            {
+                g_blu.imageKind = previousImageKind;
+                Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+                return;
+            }
+
+            g_blu.state = FBL_BLU_STATE_PREPARE;
+            g_blu.failure = FBL_BLU_FAILURE_NONE;
+            g_blu.flags |= FBL_BLU_FLAG_TARGET_LOCKED;
+            Fbl_ScrWriteBluState(&g_blu);
+
+            eraseAddr = Fbl_ActiveDownloadPhysicalStart(eraseLogicalAddr);
+
+            /* Tell the tester to wait before the complete blocking erase command. */
+            Fbl_UdsKeepAlive(sid, transport);
+            g_FblEraseDoIpDrainStartTick = STM0_TIM0.U;
+            (void)FblEth_TcpDrain(FBL_TX_DRAIN_POLLS);
+            g_FblEraseDoIpDrainEndTick = STM0_TIM0.U;
+            g_FblEraseDoIpDrainTicks = g_FblEraseDoIpDrainEndTick - g_FblEraseDoIpDrainStartTick;
+
+            g_FblEraseLogicalCallCount = 0u;
+            g_FblEraseCommandCount = 0u;
+            g_FblEraseDmuCommandCount = 0u;
+            g_FblEraseBank0CommandCount = 0u;
+            g_FblEraseBank1CommandCount = 0u;
+            g_FblEraseLastError = 0u;
+            g_FblEraseLastChunkLength = 0u;
+            g_FblEraseLastSectorCount = 0u;
+            g_FblEraseLastPhysicalBoundary = 0u;
+            g_FblEraseErrorBeforeCommand = 0u;
+            g_FblEraseErrorAfterCommand = 0u;
+            g_FblEraseFailedCommandIndex = 0u;
+            g_FblEraseDmuStatusBeforeClear = 0u;
+            g_FblEraseDmuErrorBeforeClear = 0u;
+            g_FblEraseDmuStatusAfterCommand = 0u;
+            g_FblEraseDmuErrorAfterCommand = 0u;
+            g_FblEraseDmuStatusAfterWait = 0u;
+            g_FblEraseDmuErrorAfterWait = 0u;
+            g_FblEraseLogicalStartTick = STM0_TIM0.U;
+            eraseOk = (Fbl_FlashEraseRange(eraseAddr, eraseLen) == 0u) ? 1u : 0u;
+            g_FblEraseLogicalEndTick = STM0_TIM0.U;
+            g_FblEraseLogicalTicks = g_FblEraseLogicalEndTick - g_FblEraseLogicalStartTick;
+            g_FblEraseLogicalLastResult = (uint32)eraseOk;
 
             if(eraseOk == 0u)
             {
+                g_FblBluLastEraseFailAddr = eraseAddr;
+                g_FblBluLastEraseFailLen = eraseLen;
+                g_FblBluLastEraseFailDmu = g_FblRamRuntimeLastDmuError;
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_DOWNLOAD);
                 Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
                 return;
             }
 
+            g_blu.state = FBL_BLU_STATE_PREPARE;
+            Fbl_ScrWriteBluState(&g_blu);
             res[0u] = 0x71u;
             res[1u] = 0x01u;
             res[2u] = 0x00u;
@@ -1248,21 +1103,38 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
         }
         else if((req[1u] == 0x01u) && (rid == UDS_RID_CRC_CHECK))
         {
-            if(len < 16u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+            if(len != 16u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
 
             addr = Fbl_Rd32(&req[4u]);   /* logical address from tester, cached 0x8 alias */
             size = Fbl_Rd32(&req[8u]);
             crcExpected = Fbl_Rd32(&req[12u]);
 
-            if(Fbl_ValidateDownloadRange(addr, size) != FBL_ADDR_OK)
+            if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) ||
+               (g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER))
+            {
+                if(Fbl_IsFullFblLogicalRange(addr, size) == 0u)
+                {
+                    Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
+                    return;
+                }
+
+                if((g_dl.active != 0u) ||
+                   ((g_blu.state != FBL_BLU_STATE_TRANSFER_COMPLETE) &&
+                    (g_blu.state != FBL_BLU_STATE_FBL_VERIFIED)))
+                {
+                    Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_FBL_CRC_STATE);
+                    return;
+                }
+            }
+            else if(Fbl_ValidateDownloadRange(addr, size) != FBL_ADDR_OK)
             {
                 Fbl_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
                 return;
             }
 
             (void)Fbl_FlashFlush();
-            /* Verification reads use the non-cached 0xA alias so they never hit stale cache. */
-            crcCalc = Fbl_Crc32(Fbl_ToNonCachedPflash(addr), size);
+            FblRam_InvalidateProgramCache();
+            crcCalc = Fbl_Crc32(Fbl_ActiveDownloadPhysicalStart(addr), size);
 
             res[0u] = 0x71u;
             res[1u] = 0x01u;
@@ -1270,6 +1142,24 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             res[3u] = 0x02u;
             Fbl_Wr32(&res[4u], crcCalc);
             res[8u] = (crcCalc == crcExpected) ? 0x00u : 0x01u;
+
+            if((g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+               (crcCalc == crcExpected) &&
+               (g_dl.received == FBL_SIZE_BYTES) &&
+               (g_dl.length == FBL_SIZE_BYTES))
+            {
+                g_blu.state = FBL_BLU_STATE_FBL_VERIFIED;
+                g_blu.failure = FBL_BLU_FAILURE_NONE;
+                g_blu.imageLen = FBL_SIZE_BYTES;
+                g_blu.imageCrc = crcExpected;
+                Fbl_ScrWriteBluState(&g_blu);
+            }
+            else if((g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) ||
+                    (g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER))
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_VERIFY);
+            }
+
             Fbl_UdsSend(res, 9u, transport);
         }
         else
@@ -1279,14 +1169,47 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     }
     else if(sid == UDS_SID_REQ_DOWNLOAD)
     {
-        if((len < 12u) || (req[3u] != 0x44u))
+        /* UDS RequestDownload here is:
+         *   0x34 | dataFormatIdentifier | addressAndLengthFormatIdentifier | 4-byte addr | 4-byte size */
+        if((len != 11u) || (req[2u] != 0x44u))
         {
             Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
             return;
         }
 
-        addr = Fbl_Rd32(&req[4u]);   /* logical address from tester, cached 0x8 alias */
-        size = Fbl_Rd32(&req[8u]);
+        addr = Fbl_Rd32(&req[3u]);   /* logical address from tester, cached 0x8 alias */
+        size = Fbl_Rd32(&req[7u]);
+
+        if(Fbl_IsFullFblLogicalRange(addr, size) != 0u)
+        {
+            if(g_blu.imageKind != FBL_BLU_IMAGE_KIND_BOOTLOADER)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_SEQUENCE);
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_DOWNLOAD_FBL_TARGET);
+                return;
+            }
+        }
+        else if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_NONE) &&
+                (Fbl_BluSelectTarget(FBL_BLU_IMAGE_KIND_APPLICATION) == 0u))
+        {
+            Fbl_BluSetFailure(FBL_BLU_FAILURE_SEQUENCE);
+            Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_DOWNLOAD_NO_TARGET);
+            return;
+        }
+        else if(g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            if(Fbl_BluCanSwitchFromBootloaderToApplication() == 0u)
+            {
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_DOWNLOAD_APP_SWITCH);
+                return;
+            }
+
+            g_blu.imageKind = FBL_BLU_IMAGE_KIND_APPLICATION;
+            g_blu.state = FBL_BLU_STATE_PREPARE;
+            g_blu.failure = FBL_BLU_FAILURE_NONE;
+            g_blu.flags |= FBL_BLU_FLAG_TARGET_LOCKED;
+            Fbl_ScrWriteBluState(&g_blu);
+        }
 
         if(Fbl_ValidateDownloadRange(addr, size) != FBL_ADDR_OK)
         {
@@ -1294,28 +1217,70 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             return;
         }
 
+        if(g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            if((FblRamRuntime_IsActive() == 0u) ||
+               (g_blu.state != FBL_BLU_STATE_ERASE_COMPLETE))
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_SEQUENCE);
+                Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_DOWNLOAD_FBL_STATE);
+                return;
+            }
+        }
+
         g_dl.active = 1u;
-        g_dl.logicalAddr = addr;                        /* keep cached address for diagnostics */
-        g_dl.startAddr = Fbl_ToNonCachedPflash(addr);   /* program/verify via non-cached 0xA alias */
+        g_dl.imageKind = g_blu.imageKind;
+        g_dl.startAddr = Fbl_ActiveDownloadPhysicalStart(addr);
         g_dl.curAddr = g_dl.startAddr;
         g_dl.length = size;
         g_dl.received = 0u;
         g_dl.nextBlock = 1u;
-        g_pageAddr = 0xFFFFFFFFu;
+        g_dl.lastBlock = 0u;
+        g_blu.state = FBL_BLU_STATE_DOWNLOAD_ACTIVE;
+        g_blu.failure = FBL_BLU_FAILURE_NONE;
+        g_blu.imageLen = size;
+        g_blu.imageCrc = 0u;
+        Fbl_ScrWriteBluState(&g_blu);
+        g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
         g_pageFill = 0u;
-        memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+        FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
+        FblRam_SetBytes(g_fblBootCriticalPage.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_fblBootCriticalPage.bytes));
+        g_fblBootCriticalMask = 0u;
+        g_FblTransferAdvertisedBlockLength = FBL_UDS_MAX_BLOCK_LENGTH;
+        g_FblTransferLastUdsLength = 0u;
+        g_FblTransferLastDataLength = 0u;
+        g_FblTransferLastDoipPayloadLength = 0u;
+        g_FblTransferLastFrameLength = 0u;
+        g_FblTransferTcpStreamHighWatermark = 0u;
+        g_FblTransferTcpCallbackCount = 0u;
+        g_FblTransferOverflowCount = 0u;
+        g_FblTransferProgrammedPageCount = 0u;
 
         res[0u] = 0x74u;
         res[1u] = 0x20u;
-        res[2u] = 0x0Fu;
-        res[3u] = 0xFFu;
+        res[2u] = (uint8)(FBL_UDS_MAX_BLOCK_LENGTH >> 8u);
+        res[3u] = (uint8)FBL_UDS_MAX_BLOCK_LENGTH;
         Fbl_UdsSend(res, 4u, transport);
     }
     else if(sid == UDS_SID_TRANSFER_DATA)
     {
-        uint16 dataLen;
+        uint32 dataLen;
 
-        if((g_dl.active == 0u) || (len < 2u))
+        if((req == NULL_PTR) || (len < 2u))
+        {
+            Fbl_UdsNeg(UDS_SID_TRANSFER_DATA, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        g_FblTransferLastUdsLength = len;
+
+        if(len > FBL_UDS_MAX_BLOCK_LENGTH)
+        {
+            Fbl_UdsNeg(UDS_SID_TRANSFER_DATA, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        if(g_dl.active == 0u)
         {
             Fbl_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
             return;
@@ -1323,27 +1288,52 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
 
         if(req[1u] != g_dl.nextBlock)
         {
+            if((req[1u] == g_dl.lastBlock) && (g_dl.received != 0u))
+            {
+                res[0u] = 0x76u;
+                res[1u] = req[1u];
+                Fbl_UdsSend(res, 2u, transport);
+                return;
+            }
+
             Fbl_UdsNeg(sid, UDS_NRC_WRONG_BLOCK_SEQUENCE, transport);
             return;
         }
 
-        dataLen = (uint16)(len - 2u);
+        dataLen = (uint32)len - FBL_UDS_TRANSFER_OVERHEAD;
+        g_FblTransferLastDataLength = dataLen;
 
-        if((g_dl.received + dataLen) > g_dl.length)
+        if((dataLen == 0u) || (dataLen > FBL_TRANSFER_DATA_BYTES))
+        {
+            Fbl_UdsNeg(UDS_SID_TRANSFER_DATA, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        if(dataLen > (g_dl.length - g_dl.received))
         {
             Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
             return;
         }
 
-        if(Fbl_FlashProgram(g_dl.curAddr, &req[2u], dataLen) != 0u)
+        g_blu.state = FBL_BLU_STATE_PROGRAMMING;
+        Fbl_ScrWriteBluState(&g_blu);
+        g_FblTransferProgrammedPageCount = 0u;
+
+        if(((g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) ?
+                Fbl_FlashProgramFblPayload(g_dl.curAddr, &req[2u], dataLen) :
+                Fbl_FlashProgram(g_dl.curAddr, &req[2u], dataLen)) != 0u)
         {
+            Fbl_BluSetFailure(FBL_BLU_FAILURE_DOWNLOAD);
             Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
             return;
         }
 
         g_dl.curAddr += dataLen;
         g_dl.received += dataLen;
+        g_dl.lastBlock = g_dl.nextBlock;
         g_dl.nextBlock++;
+        g_blu.state = FBL_BLU_STATE_DOWNLOAD_ACTIVE;
+        Fbl_ScrWriteBluState(&g_blu);
 
         res[0u] = 0x76u;
         res[1u] = req[1u];
@@ -1357,37 +1347,125 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             return;
         }
 
+        if((g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) && (len != 5u))
+        {
+            Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
+        if((g_dl.imageKind != FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+           ((len != 1u) && (len != 5u)))
+        {
+            Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
+            return;
+        }
+
         if(Fbl_FlashFlush() != 0u)
         {
+            Fbl_BluSetFailure(FBL_BLU_FAILURE_DOWNLOAD);
             Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
             return;
         }
 
         /* Programming of this block is complete: drop any stale instructions for
          * the freshly written PFLASH before it can be executed. */
-        IfxCpu_invalidateProgramCache();
+        FblRam_InvalidateProgramCache();
 
         if(g_dl.received != g_dl.length)
         {
+            Fbl_BluSetFailure(FBL_BLU_FAILURE_DOWNLOAD);
             Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
             return;
         }
 
-        if(len >= 5u)
-        {
-            crcExpected = Fbl_Rd32(&req[1u]);
-            crcCalc = Fbl_Crc32(g_dl.startAddr, g_dl.length);
+        g_blu.state = FBL_BLU_STATE_TRANSFER_COMPLETE;
+        Fbl_ScrWriteBluState(&g_blu);
 
-            if(crcCalc != crcExpected)
+        if(g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            if(Fbl_BootCriticalPageComplete() == 0u)
             {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_DOWNLOAD);
                 Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
                 return;
             }
+
+            if(len == 5u)
+            {
+                crcExpected = Fbl_Rd32(&req[1u]);
+                crcCalc = Fbl_Crc32FblWithDelayedBootPage(g_dl.startAddr, g_dl.length);
+                if(crcCalc != crcExpected)
+                {
+                    g_blu.imageCrc = crcExpected;
+                    Fbl_ScrWriteBluState(&g_blu);
+                    Fbl_BluSetFailure(FBL_BLU_FAILURE_VERIFY);
+                    Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                    return;
+                }
+            }
+
+            g_blu.state = FBL_BLU_STATE_COMMITTING;
+            Fbl_ScrWriteBluState(&g_blu);
+            if(Fbl_CommitBootCriticalPage() != 0u)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_VERIFY);
+                Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                return;
+            }
+
+            FblRam_InvalidateProgramCache();
+        }
+
+        g_blu.state = FBL_BLU_STATE_FINAL_VERIFY;
+        Fbl_ScrWriteBluState(&g_blu);
+
+        if(len == 5u)
+        {
+            crcExpected = Fbl_Rd32(&req[1u]);
+            crcCalc = Fbl_Crc32(g_dl.startAddr, g_dl.length);
+            g_blu.imageCrc = crcExpected;
+            Fbl_ScrWriteBluState(&g_blu);
+
+            if(crcCalc != crcExpected)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_VERIFY);
+                Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+                return;
+            }
+
+        }
+        else if(g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            Fbl_BluSetFailure(FBL_BLU_FAILURE_VERIFY);
+            Fbl_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
+            return;
         }
 
         g_dl.active = 0u;
+        g_blu.failure = FBL_BLU_FAILURE_NONE;
+        if(g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            g_blu.state = FBL_BLU_STATE_FBL_VERIFIED;
+            g_blu.imageLen = FBL_SIZE_BYTES;
+        }
+        else
+        {
+            g_blu.state = FBL_BLU_STATE_COMPLETE;
+        }
+        Fbl_ScrWriteBluState(&g_blu);
+        FblRamRuntime_SetDestructivePhase(0u);
         res[0u] = 0x77u;
-        Fbl_UdsSend(res, 1u, transport);
+        if(g_dl.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
+        {
+            if(Fbl_SendAndDrainPositive(res, 1u, transport) == 0u)
+            {
+                Fbl_BluSetFailure(FBL_BLU_FAILURE_RESET);
+            }
+        }
+        else
+        {
+            Fbl_UdsSend(res, 1u, transport);
+        }
     }
     else if(sid == UDS_SID_CONTROL_DTC_SETTING)
     {
@@ -1408,15 +1486,42 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
     }
     else if(sid == UDS_SID_RESET)
     {
-        if(len < 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+        if(len != 2u) { Fbl_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
+
+        if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+           ((g_blu.state == FBL_BLU_STATE_ERASING) ||
+            (g_blu.state == FBL_BLU_STATE_ERASE_COMPLETE) ||
+            (g_blu.state == FBL_BLU_STATE_DOWNLOAD_ACTIVE) ||
+            (g_blu.state == FBL_BLU_STATE_PROGRAMMING) ||
+            (g_blu.state == FBL_BLU_STATE_TRANSFER_COMPLETE) ||
+            (g_blu.state == FBL_BLU_STATE_FINAL_VERIFY) ||
+            (g_blu.state == FBL_BLU_STATE_COMMITTING) ||
+            (g_blu.state == FBL_BLU_STATE_FAILED) ||
+            (g_blu.state == FBL_BLU_STATE_RECOVERY_WAIT)))
+        {
+            Fbl_UdsNegSequence(sid, transport, FBL_BLU_REJECT_RESET_FBL_ACTIVE);
+            return;
+        }
 
         res[0u] = 0x51u;
         res[1u] = req[1u];
-        Fbl_UdsSend(res, 2u, transport);
 
-        for(volatile uint32 i = 0u; i < 200000u; i++) {}
-        IfxCpu_disableInterrupts();
-        IfxScuRcu_performReset(2u, 0u);
+        if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+           (g_blu.state == FBL_BLU_STATE_FBL_VERIFIED) &&
+           (Fbl_BluHasVerifiedFblEvidence() != 0u))
+        {
+            g_blu.state = FBL_BLU_STATE_REBOOT_PENDING;
+            g_blu.failure = FBL_BLU_FAILURE_NONE;
+            Fbl_ScrWriteBluState(&g_blu);
+        }
+
+        g_FblBluLastResetStage = 1u;
+        (void)Fbl_SendAndDrainFinalPositive(res, 2u, transport);
+        g_FblBluLastResetStage = 2u;
+        FblRamRuntime_RequestReset();
+        g_FblBluLastResetStage = 3u;
+
+        Fbl_BluSetFailure(FBL_BLU_FAILURE_RESET);
     }
     else
     {
@@ -1426,14 +1531,8 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
 
 static void Fbl_UdsSend(const uint8 *res, uint16 len, uint8 transport)
 {
-    if(transport == FBL_TRANSPORT_ETH)
-    {
-        Fbl_DoIpSendDiag(res, len);
-    }
-    else
-    {
-        Fbl_IsoTpSend(res, len);
-    }
+    (void)transport;
+    Fbl_DoIpSendDiag(res, len);
 }
 
 static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
@@ -1447,27 +1546,44 @@ static void Fbl_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
     Fbl_UdsSend(res, 3u, transport);
 }
 
-/* Emit a responsePending (7F sid 78) during a long-running service and, over
- * Ethernet, run the lwIP main function so the segment is actually transmitted
- * and the DoIP/TCP connection is kept serviced while flash is busy. */
+static void Fbl_UdsNegSequence(uint8 sid, uint8 transport, uint32 reason)
+{
+    Fbl_BluCaptureReject(reason);
+    Fbl_UdsNeg(sid, UDS_NRC_SEQUENCE_ERROR, transport);
+}
+
+static void Fbl_ServiceCommsDuringLongOp(void)
+{
+    (void)FblEth_TcpDrain(FBL_TX_DRAIN_POLLS);
+    FblEth_PollReceiveOnly();
+    FblEth_PollTimerOnly();
+}
+
+static uint8 Fbl_SendAndDrainFinalPositive(const uint8 *res, uint16 len, uint8 transport)
+{
+    uint8 drainResult;
+
+    drainResult = Fbl_SendAndDrainPositive(res, len, transport);
+    g_FblBluLastTcpDrainResult = drainResult;
+    return drainResult;
+}
+
+static uint8 Fbl_SendAndDrainPositive(const uint8 *res, uint16 len, uint8 transport)
+{
+    Fbl_UdsSend(res, len, transport);
+    return FblEth_TcpDrain(FBL_FINAL_TX_DRAIN_POLLS);
+}
+
+/* Emit a responsePending (7F sid 78) during a long-running service. */
 static void Fbl_UdsKeepAlive(uint8 sid, uint8 transport)
 {
     Fbl_UdsNeg(sid, UDS_NRC_RESPONSE_PENDING, transport);
-
-    if(transport == FBL_TRANSPORT_ETH)
-    {
-        FblEth_MainFunction();
-        FblEth_MainFunction();
-    }
 }
 
 static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
 {
     uint8 res[6];
     uint8 sub;
-    uint8 level;
-    uint32 key;
-    uint32 expected;
 
     if(len < 2u)
     {
@@ -1483,8 +1599,6 @@ static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
         return;
     }
 
-    level = (uint8)((sub - 1u) / 2u);
-
     if((sub & 0x01u) != 0u)
     {
         if(len != 2u)
@@ -1493,12 +1607,9 @@ static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
             return;
         }
 
-        g_secSeed = 0x5A5A0000u ^ ((uint32)level << 8u) ^ g_dl.received ^ g_dl.curAddr;
-        g_secSeedValid = 1u;
-
         res[0u] = 0x67u;
         res[1u] = sub;
-        Fbl_Wr32(&res[2u], g_secSeed);
+        Fbl_Wr32(&res[2u], 0u);
         Fbl_UdsSend(res, 6u, transport);
         return;
     }
@@ -1509,92 +1620,104 @@ static void Fbl_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
         return;
     }
 
-    if(g_secSeedValid == 0u)
-    {
-        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_SEQUENCE_ERROR, transport);
-        return;
-    }
-
-    key = Fbl_Rd32(&req[2u]);
-    expected = Fbl_SecCalcKey(g_secSeed, level);
-
-    if(key != expected)
-    {
-        g_secSeedValid = 0u;
-        Fbl_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INVALID_KEY, transport);
-        return;
-    }
-
-    g_secSeedValid = 0u;
     res[0u] = 0x67u;
     res[1u] = sub;
     Fbl_UdsSend(res, 2u, transport);
 }
 
-static uint32 Fbl_SecCalcKey(uint32 seed, uint8 level)
-{
-    uint32 key;
-
-    key = seed ^ 0x6A09E667u;
-    key += 0x13572468u + ((uint32)level * 0x1F3D5B79u);
-    key = (key << 3u) | (key >> 29u);
-    key ^= ((seed << 16u) | (seed >> 16u));
-
-    return key;
-}
-
 static void Fbl_DoIpResetTcpState(void)
 {
-    g_doipTcpStreamLen = 0u;
+    g_doipTcpOverflowPending = 0u;
     g_doipTesterAddr = 0u;
     g_doipRoutingActive = 0u;
 
     g_dl.active = 0u;
-    g_dl.logicalAddr = 0u;
+    g_dl.imageKind = FBL_BLU_IMAGE_KIND_NONE;
     g_dl.startAddr = 0u;
     g_dl.curAddr = 0u;
     g_dl.length = 0u;
     g_dl.received = 0u;
     g_dl.nextBlock = 1u;
+    g_dl.lastBlock = 0u;
 
-    g_secSeedValid = 0u;
-    g_pageAddr = 0xFFFFFFFFu;
+    g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
     g_pageFill = 0u;
-    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+    FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
+    FblRam_SetBytes(g_fblBootCriticalPage.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_fblBootCriticalPage.bytes));
+    g_fblBootCriticalMask = 0u;
 }
 
 void Fbl_DoIpTcpConnected(void)
 {
+    if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+       (g_blu.state == FBL_BLU_STATE_RECOVERY_WAIT))
+    {
+        g_doipTcpOverflowPending = 0u;
+        return;
+    }
+
     Fbl_DoIpResetTcpState();
 }
 
 void Fbl_DoIpTcpDisconnected(void)
 {
+    if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+       ((g_blu.state == FBL_BLU_STATE_ERASING) ||
+        (g_blu.state == FBL_BLU_STATE_ERASE_COMPLETE) ||
+        (g_blu.state == FBL_BLU_STATE_DOWNLOAD_ACTIVE) ||
+        (g_blu.state == FBL_BLU_STATE_PROGRAMMING) ||
+        (g_blu.state == FBL_BLU_STATE_TRANSFER_COMPLETE) ||
+        (g_blu.state == FBL_BLU_STATE_FINAL_VERIFY) ||
+        (g_blu.state == FBL_BLU_STATE_COMMITTING)))
+    {
+        g_dl.active = 0u;
+        g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
+        g_pageFill = 0u;
+        FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
+        FblRam_SetBytes(g_fblBootCriticalPage.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_fblBootCriticalPage.bytes));
+        g_fblBootCriticalMask = 0u;
+        g_blu.state = FBL_BLU_STATE_RECOVERY_WAIT;
+        Fbl_ScrWriteBluState(&g_blu);
+        return;
+    }
+
     Fbl_DoIpResetTcpState();
 }
 
 void Fbl_DoIpTcpRxOverflow(void)
 {
-    g_doipTcpStreamLen = 0u;
-    Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
+    g_FblTransferOverflowCount++;
+    g_doipTcpOverflowPending = 1u;
 }
 
 static void Fbl_DoIpMain(void)
 {
-    uint8 buf[1600];
-    uint16 len;
+    FblEth_PollReceiveOnly();
 
-    FblEth_MainFunction();
-
-    while(FblEth_UdpReceive(buf, &len) != 0u)
+    if((g_doipRoutingActive == 0u) && (g_dl.active == 0u))
     {
-        Fbl_DoIpHandleUdp(buf, len);
+        g_FblDoIpLastUdpReceiveBufPtr = (uint32)g_doipRxScratch;
+        g_FblDoIpLastUdpReceiveLenPtr = (uint32)&g_doipRxLenScratch;
+        while(FblEth_UdpReceive(g_doipRxScratch, &g_doipRxLenScratch) != 0u)
+        {
+            Fbl_DoIpHandleUdp(g_doipRxScratch, g_doipRxLenScratch);
+        }
     }
 
-    while(FblEth_TcpReceive(buf, &len) != 0u)
+    g_FblDoIpLastTcpReceiveBufPtr = (uint32)g_doipRxScratch;
+    g_FblDoIpLastTcpReceiveLenPtr = (uint32)&g_doipRxLenScratch;
+    while((FblEth_HasPendingTcpData() != 0u) && (FblEth_TcpReceive(g_doipRxScratch, &g_doipRxLenScratch) != 0u))
     {
-        Fbl_DoIpHandleTcp(buf, len);
+        Fbl_DoIpHandleTcpFrame(g_doipRxScratch, g_doipRxLenScratch);
     }
+
+    if(g_doipTcpOverflowPending != 0u)
+    {
+        g_doipTcpOverflowPending = 0u;
+        Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
+    }
+
+    FblEth_PollTimerOnly();
 }
 
 static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len)
@@ -1632,61 +1755,6 @@ static void Fbl_DoIpHandleUdp(const uint8 *buf, uint16 len)
     else
     {
         Fbl_DoIpSendGenericNack(DOIP_SEND_UDP, DOIP_GEN_NACK_UNKNOWN_PAYLOAD);
-    }
-}
-
-static void Fbl_DoIpHandleTcp(const uint8 *buf, uint16 len)
-{
-    uint32 payloadLen;
-    uint16 frameLen;
-    uint16 remaining;
-
-    if((buf == NULL) || (len == 0u)) { return; }
-
-    if(len > (uint16)(sizeof(g_doipTcpStream) - g_doipTcpStreamLen))
-    {
-        g_doipTcpStreamLen = 0u;
-        Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
-        return;
-    }
-
-    memcpy(&g_doipTcpStream[g_doipTcpStreamLen], buf, len);
-    g_doipTcpStreamLen = (uint16)(g_doipTcpStreamLen + len);
-
-    while(g_doipTcpStreamLen >= DOIP_HEADER_LEN)
-    {
-        if((g_doipTcpStream[0u] != DOIP_PROTO_VER) ||
-           (g_doipTcpStream[1u] != DOIP_INV_PROTO_VER))
-        {
-            g_doipTcpStreamLen = 0u;
-            Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_INCORRECT_PATTERN);
-            return;
-        }
-
-        payloadLen = Fbl_Rd32(&g_doipTcpStream[4u]);
-
-        if(payloadLen > (uint32)(sizeof(g_doipTcpStream) - DOIP_HEADER_LEN))
-        {
-            g_doipTcpStreamLen = 0u;
-            Fbl_DoIpSendGenericNack(DOIP_SEND_TCP, DOIP_GEN_NACK_MESSAGE_TOO_LARGE);
-            return;
-        }
-
-        frameLen = (uint16)(payloadLen + DOIP_HEADER_LEN);
-
-        if(g_doipTcpStreamLen < frameLen)
-        {
-            return;
-        }
-
-        Fbl_DoIpHandleTcpFrame(g_doipTcpStream, frameLen);
-
-        remaining = (uint16)(g_doipTcpStreamLen - frameLen);
-        if(remaining > 0u)
-        {
-            memmove(g_doipTcpStream, &g_doipTcpStream[frameLen], remaining);
-        }
-        g_doipTcpStreamLen = remaining;
     }
 }
 
@@ -1765,15 +1833,19 @@ static void Fbl_DoIpHandleTcpFrame(const uint8 *buf, uint16 len)
             return;
         }
 
-        if((payloadLen - 4u) > FBL_ISOTP_MAX_PAYLOAD)
+        g_FblTransferLastDoipPayloadLength = payloadLen;
+        g_FblTransferLastFrameLength = payloadLen + DOIP_HEADER_LEN;
+
+        if((payloadLen < DOIP_DIAG_ADDRESS_BYTES) ||
+           ((payloadLen - DOIP_DIAG_ADDRESS_BYTES) > FBL_UDS_MAX_BLOCK_LENGTH))
         {
             Fbl_DoIpSendDiagNack(testerAddr, ecuAddr, DOIP_NACK_DIAG_MSG_TOO_LARGE);
             return;
         }
 
-        udsLen = (uint16)(payloadLen - 4u);
-        Fbl_DoIpSendDiagAck(testerAddr, ecuAddr);
+        udsLen = (uint16)(payloadLen - DOIP_DIAG_ADDRESS_BYTES);
         Fbl_UdsHandle(&buf[12u], udsLen, FBL_TRANSPORT_ETH);
+        Fbl_DoIpSendDiagAck(testerAddr, ecuAddr);
     }
     else
     {
@@ -1815,17 +1887,35 @@ static void Fbl_DoIpSendVehicleId(void)
     Fbl_Wr32(&res[4u], DOIP_VID_RES_LEN);
 
     idx = DOIP_HEADER_LEN;
-    memcpy(&res[idx], Fbl_DoIpVin, sizeof(Fbl_DoIpVin));
-    idx = (uint16)(idx + sizeof(Fbl_DoIpVin));
+
+    /* Encode the fixed 17-byte VIN directly into the response. This avoids
+     * separate .ram_rodata input sections competing for the same fixed DLMU
+     * address. Preserve the previous payload exactly: 16 ASCII bytes followed
+     * by one zero byte. */
+    Fbl_Wr32(&res[idx], 0x4C414254u); /* LABT */
+    idx = (uint16)(idx + 4u);
+    Fbl_Wr32(&res[idx], 0x43333735u); /* C375 */
+    idx = (uint16)(idx + 4u);
+    Fbl_Wr32(&res[idx], 0x444F4950u); /* DOIP */
+    idx = (uint16)(idx + 4u);
+    Fbl_Wr32(&res[idx], 0x30303031u); /* 0001 */
+    idx = (uint16)(idx + 4u);
+    res[idx++] = 0x00u;
 
     Fbl_Wr16(&res[idx], DOIP_ECU_ADDR);
     idx = (uint16)(idx + 2u);
 
-    memcpy(&res[idx], Fbl_DoIpEid, sizeof(Fbl_DoIpEid));
-    idx = (uint16)(idx + sizeof(Fbl_DoIpEid));
+    /* EID = 02:00:00:00:00:01. */
+    FblRam_SetBytes(&res[idx], 0u, 6u);
+    res[idx + 0u] = 0x02u;
+    res[idx + 5u] = 0x01u;
+    idx = (uint16)(idx + 6u);
 
-    memcpy(&res[idx], Fbl_DoIpGid, sizeof(Fbl_DoIpGid));
-    idx = (uint16)(idx + sizeof(Fbl_DoIpGid));
+    /* GID = 03:00:00:00:00:01. */
+    FblRam_SetBytes(&res[idx], 0u, 6u);
+    res[idx + 0u] = 0x03u;
+    res[idx + 5u] = 0x01u;
+    idx = (uint16)(idx + 6u);
 
     res[idx++] = 0x00u;
     res[idx++] = 0x00u;
@@ -1935,75 +2025,67 @@ static void Fbl_DoIpSendDiag(const uint8 *uds, uint16 udsLen)
     Fbl_Wr32(&buf[4u], (uint32)udsLen + 4u);
     Fbl_Wr16(&buf[8u], DOIP_ECU_ADDR);
     Fbl_Wr16(&buf[10u], targetAddr);
-    memcpy(&buf[12u], uds, udsLen);
+    FblRam_CopyBytes(&buf[12u], uds, udsLen);
 
     FblEth_TcpSend(buf, (uint16)(udsLen + 12u));
 }
 
 static void Fbl_FlashInit(void)
 {
-    memcpy((void *)FBL_FLASH_ERASE_ADDR, (const void *)IfxFlash_eraseMultipleSectors, FBL_FLASH_FUNC_LEN);
-    memcpy((void *)FBL_FLASH_WAIT_ADDR, (const void *)IfxFlash_waitUnbusy, FBL_FLASH_FUNC_LEN);
-    memcpy((void *)FBL_FLASH_ENTER_ADDR, (const void *)IfxFlash_enterPageMode, FBL_FLASH_FUNC_LEN);
-    memcpy((void *)FBL_FLASH_LOAD_ADDR, (const void *)IfxFlash_loadPage2X32, FBL_FLASH_FUNC_LEN);
-    memcpy((void *)FBL_FLASH_WRITE_ADDR, (const void *)IfxFlash_writePage, FBL_FLASH_FUNC_LEN);
-
-    g_flash.eraseSectors = (void *)FBL_FLASH_ERASE_ADDR;
-    g_flash.waitUnbusy = (void *)FBL_FLASH_WAIT_ADDR;
-    g_flash.enterPageMode = (void *)FBL_FLASH_ENTER_ADDR;
-    g_flash.load2X32 = (void *)FBL_FLASH_LOAD_ADDR;
-    g_flash.writePage = (void *)FBL_FLASH_WRITE_ADDR;
-
-    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
-    g_pageAddr = 0xFFFFFFFFu;
+    FblRamFlash_ClearStatus();
+    FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
+    g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
     g_pageFill = 0u;
 }
 
-static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len)
+FBL_RAM_CODE static uint32 Fbl_FlashEraseRange(uint32 addr, uint32 len)
 {
-    uint32 start;
-    uint32 end;
-    uint32 count;
-    uint16 pw;
-    boolean irq;
-    IfxFlash_FlashType bank;
+    uint32 current = addr;
+    uint32 remaining = len;
 
-    if(len == 0u) { return 1u; }
+    g_FblEraseLogicalCallCount++;
+    g_FblEraseLogicalLastStart = addr;
+    g_FblEraseLogicalLastLength = len;
+    g_FblEraseLogicalStartTick = STM0_TIM0.U;
 
-    start = addr & ~(PFLASH_SECTOR_SIZE - 1u);
-    end = (addr + len + PFLASH_SECTOR_SIZE - 1u) & ~(PFLASH_SECTOR_SIZE - 1u);
-
-    while(start < end)
+    while(remaining != 0u)
     {
-        uint32 subEnd = end;
+        uint32 erasedLength;
 
-        if((start <= PFLASH_BANK_A_END) && (subEnd > (PFLASH_BANK_A_END + 1u)))
+        if(FblRamFlash_EraseNextChunk(current, remaining, &erasedLength) != 0u)
         {
-            subEnd = PFLASH_BANK_A_END + 1u;
+            g_FblEraseLogicalEndTick = STM0_TIM0.U;
+            g_FblEraseLogicalTicks = g_FblEraseLogicalEndTick - g_FblEraseLogicalStartTick;
+            g_FblEraseLogicalLastResult = 0u;
+            return 1u;
         }
 
-        count = (subEnd - start) / PFLASH_SECTOR_SIZE;
-        bank = Fbl_FlashBank(start);
+        if((erasedLength == 0u) || (erasedLength > remaining))
+        {
+            g_FblEraseLogicalEndTick = STM0_TIM0.U;
+            g_FblEraseLogicalTicks = g_FblEraseLogicalEndTick - g_FblEraseLogicalStartTick;
+            g_FblEraseLogicalLastResult = 0u;
+            return 1u;
+        }
 
-        irq = IfxCpu_disableInterrupts();
-        pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
-        IfxScuWdt_clearSafetyEndinitInline(pw);
-        g_flash.eraseSectors(start, count);
-        IfxScuWdt_setSafetyEndinitInline(pw);
-        g_flash.waitUnbusy(FLASH_MODULE, bank);
-        IfxCpu_restoreInterrupts(irq);
+        current += erasedLength;
+        remaining -= erasedLength;
 
-        start = subEnd;
+        if(remaining != 0u)
+        {
+            Fbl_UdsKeepAlive(UDS_SID_ROUTINE, FBL_TRANSPORT_ETH);
+            Fbl_ServiceCommsDuringLongOp();
+        }
     }
 
-    /* TriCore has no range-granular program-cache invalidate; do a full program
-     * cache invalidate so no stale instructions remain for the just-erased range. */
-    IfxCpu_invalidateProgramCache();
-
+    FblRam_InvalidateProgramCache();
+    g_FblEraseLogicalEndTick = STM0_TIM0.U;
+    g_FblEraseLogicalTicks = g_FblEraseLogicalEndTick - g_FblEraseLogicalStartTick;
+    g_FblEraseLogicalLastResult = 1u;
     return 0u;
 }
 
-static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len)
+FBL_RAM_CODE static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len)
 {
     uint32 i;
     uint32 page;
@@ -2014,10 +2096,10 @@ static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len)
         page = (addr + i) & ~(PFLASH_PAGE_SIZE - 1u);
         off = (addr + i) - page;
 
-        if(g_pageAddr == 0xFFFFFFFFu)
+        if(g_pageAddr == FBL_FLASH_NO_PAGE_ADDR)
         {
             g_pageAddr = page;
-            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
             g_pageFill = 0u;
         }
         else if(g_pageAddr != page)
@@ -2025,16 +2107,12 @@ static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len)
             if(Fbl_FlashFlush() != 0u) { return 1u; }
 
             g_pageAddr = page;
-            memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+            FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
             g_pageFill = 0u;
         }
 
-        g_pageBuf[off] = data[i];
-
-        if((off + 1u) > g_pageFill)
-        {
-            g_pageFill = off + 1u;
-        }
+        g_pageBuf.bytes[off] = data[i];
+        if((off + 1u) > g_pageFill) { g_pageFill = off + 1u; }
 
         if(g_pageFill >= PFLASH_PAGE_SIZE)
         {
@@ -2045,84 +2123,218 @@ static uint32 Fbl_FlashProgram(uint32 addr, const uint8 *data, uint32 len)
     return 0u;
 }
 
-static uint32 Fbl_FlashFlush(void)
+FBL_RAM_CODE static uint32 Fbl_FlashProgramFblPayload(uint32 addr, const uint8 *data, uint32 len)
 {
-    uint32 ret = 0u;
+    uint32 bootStart = FBL_START_NCACHED;
+    uint32 bootEnd = FBL_START_NCACHED + FBL_BOOT_CRITICAL_SIZE;
+    uint32 end = addr + len;
+    uint32 pos = addr;
+    uint32 dataOffset = 0u;
 
-    if(g_pageAddr != 0xFFFFFFFFu)
+    if((data == NULL_PTR) || (len == 0u) || (end < addr))
     {
-        ret = Fbl_FlashProgramPage(g_pageAddr, g_pageBuf);
-        g_pageAddr = 0xFFFFFFFFu;
-        g_pageFill = 0u;
-        memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
+        return 1u;
     }
 
-    return ret;
-}
-
-static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data)
-{
-    uint32 w[8];
-    uint16 pw;
-    boolean irq;
-    IfxFlash_FlashType bank;
-
-    for(uint32 i = 0u; i < 8u; i++)
+    while(pos < end)
     {
-        w[i] = Fbl_Rd32(&data[i * 4u]);
+        if((pos >= bootStart) && (pos < bootEnd))
+        {
+            uint32 bootOffset = pos - bootStart;
+            g_fblBootCriticalPage.bytes[bootOffset] = data[dataOffset];
+            g_fblBootCriticalMask |= (1u << bootOffset);
+            pos++;
+            dataOffset++;
+        }
+        else
+        {
+            uint32 chunk = end - pos;
+            if((pos < bootStart) && ((pos + chunk) > bootStart))
+            {
+                chunk = bootStart - pos;
+            }
+            else if((pos < bootEnd) && ((pos + chunk) > bootEnd))
+            {
+                chunk = bootEnd - pos;
+            }
+
+            if(Fbl_FlashProgram(pos, &data[dataOffset], chunk) != 0u)
+            {
+                return 1u;
+            }
+
+            pos += chunk;
+            dataOffset += chunk;
+        }
     }
-
-    bank = Fbl_FlashBank(addr);
-
-    irq = IfxCpu_disableInterrupts();
-    pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
-    IfxScuWdt_clearSafetyEndinitInline(pw);
-
-    g_flash.enterPageMode(addr);
-    g_flash.waitUnbusy(FLASH_MODULE, bank);
-    g_flash.load2X32(addr, w[0u], w[1u]);
-    g_flash.load2X32(addr, w[2u], w[3u]);
-    g_flash.load2X32(addr, w[4u], w[5u]);
-    g_flash.load2X32(addr, w[6u], w[7u]);
-    g_flash.writePage(addr);
-    g_flash.waitUnbusy(FLASH_MODULE, bank);
-
-    IfxScuWdt_setSafetyEndinitInline(pw);
-    IfxCpu_restoreInterrupts(irq);
 
     return 0u;
 }
 
-static IfxFlash_FlashType Fbl_FlashBank(uint32 addr)
+FBL_RAM_CODE static uint32 Fbl_BluEraseFblRange(uint32 addr, uint32 len)
 {
-    if((addr >= PFLASH_BANK_B_START) && (addr <= PFLASH_BANK_B_END))
+    uint32 eraseStart;
+    uint32 eraseEnd;
+
+    if((len == 0u) ||
+       (addr < FBL_START_NCACHED) ||
+       (addr > FBL_END_NCACHED) ||
+       ((addr + len - 1u) < addr) ||
+       ((addr + len - 1u) > FBL_END_NCACHED))
     {
-        return PROGRAM_FLASH_BANK_B; // @suppress("Symbol is not resolved")
+        return 1u;
     }
 
-    return PROGRAM_FLASH_BANK_A; // @suppress("Symbol is not resolved")
+    eraseStart = addr & ~(PFLASH_SECTOR_SIZE - 1u);
+    eraseEnd = (addr + len + (PFLASH_SECTOR_SIZE - 1u)) & ~(PFLASH_SECTOR_SIZE - 1u);
+    if((eraseEnd < (addr + len)) || (eraseEnd > (FBL_END_NCACHED + 1u)))
+    {
+        eraseEnd = FBL_END_NCACHED + 1u;
+    }
+
+    if((eraseStart < FBL_START_NCACHED) ||
+       ((eraseStart & (PFLASH_SECTOR_SIZE - 1u)) != 0u) ||
+       (eraseStart >= eraseEnd))
+    {
+        return 1u;
+    }
+
+    g_blu.state = FBL_BLU_STATE_ERASE;
+    Fbl_ScrWriteBluState(&g_blu);
+
+    while(eraseStart < eraseEnd)
+    {
+        Fbl_UdsKeepAlive(UDS_SID_ROUTINE, FBL_TRANSPORT_ETH);
+        if(Fbl_FlashEraseRange(eraseStart, PFLASH_SECTOR_SIZE) != 0u)
+        {
+            return 1u;
+        }
+
+        eraseStart += PFLASH_SECTOR_SIZE;
+        Fbl_ServiceCommsDuringLongOp();
+    }
+
+    return 0u;
 }
 
-static uint32 Fbl_Crc32(uint32 addr, uint32 len)
+FBL_RAM_CODE static uint8 Fbl_BootCriticalPageComplete(void)
+{
+    return (g_fblBootCriticalMask == 0xFFFFFFFFu) ? 1u : 0u;
+}
+
+FBL_RAM_CODE static uint32 Fbl_CommitBootCriticalPage(void)
+{
+    if(Fbl_BootCriticalPageComplete() == 0u)
+    {
+        return 1u;
+    }
+
+    if(Fbl_FlashFlush() != 0u)
+    {
+        return 1u;
+    }
+
+    return Fbl_FlashProgramPage(FBL_START_NCACHED, g_fblBootCriticalPage.bytes);
+}
+
+FBL_RAM_CODE static uint32 Fbl_FlashFlush(void)
+{
+    uint32 result = 0u;
+
+    if(g_pageAddr != FBL_FLASH_NO_PAGE_ADDR)
+    {
+        result = Fbl_FlashProgramPage(g_pageAddr, g_pageBuf.bytes);
+        if(result == 0u)
+        {
+            g_FblTransferProgrammedPageCount++;
+        }
+        g_pageAddr = FBL_FLASH_NO_PAGE_ADDR;
+        g_pageFill = 0u;
+        FblRam_SetBytes(g_pageBuf.bytes, FBL_FLASH_PAD_BYTE, sizeof(g_pageBuf.bytes));
+    }
+
+    return result;
+}
+
+FBL_RAM_CODE static uint32 Fbl_FlashProgramPage(uint32 addr, const uint8 *data)
+{
+    if(FblRamFlash_ProgramPage(addr, data) != 0u)
+    {
+        return 1u;
+    }
+
+    return (Fbl_FlashVerifyPage(addr, data) != 0u) ? 0u : 1u;
+}
+
+FBL_RAM_CODE static uint8 Fbl_FlashVerifyPage(uint32 addr, const uint8 *data)
+{
+    volatile const uint8 *p = (volatile const uint8 *)addr;
+    uint32 i;
+
+    for(i = 0u; i < PFLASH_PAGE_SIZE; i++)
+    {
+        if(p[i] != data[i]) { return 0u; }
+    }
+
+    return 1u;
+}
+
+FBL_RAM_CODE static uint32 Fbl_Crc32UpdateByte(uint32 crc, uint8 value)
+{
+    uint8 b;
+
+    crc ^= value;
+    for(b = 0u; b < 8u; b++)
+    {
+        if((crc & 1u) != 0u)
+        {
+            crc = (crc >> 1u) ^ 0xEDB88320u;
+        }
+        else
+        {
+            crc >>= 1u;
+        }
+    }
+
+    return crc;
+}
+
+FBL_RAM_CODE static uint32 Fbl_Crc32(uint32 addr, uint32 len)
 {
     volatile const uint8 *p = (volatile const uint8 *)addr;
     uint32 crc = 0xFFFFFFFFu;
+    uint32 i;
 
-    for(uint32 i = 0u; i < len; i++)
+    for(i = 0u; i < len; i++)
     {
-        crc ^= p[i];
+        crc = Fbl_Crc32UpdateByte(crc, p[i]);
+    }
 
-        for(uint8 b = 0u; b < 8u; b++)
+    return crc ^ 0xFFFFFFFFu;
+}
+
+FBL_RAM_CODE static uint32 Fbl_Crc32FblWithDelayedBootPage(uint32 addr, uint32 len)
+{
+    volatile const uint8 *p = (volatile const uint8 *)addr;
+    uint32 crc = 0xFFFFFFFFu;
+    uint32 i;
+
+    for(i = 0u; i < len; i++)
+    {
+        uint32 absolute = addr + i;
+        uint8 value;
+
+        if((absolute >= FBL_START_NCACHED) &&
+           (absolute < (FBL_START_NCACHED + FBL_BOOT_CRITICAL_SIZE)))
         {
-            if((crc & 1u) != 0u)
-            {
-                crc = (crc >> 1u) ^ 0xEDB88320u;
-            }
-            else
-            {
-                crc >>= 1u;
-            }
+            value = g_fblBootCriticalPage.bytes[absolute - FBL_START_NCACHED];
         }
+        else
+        {
+            value = p[i];
+        }
+
+        crc = Fbl_Crc32UpdateByte(crc, value);
     }
 
     return crc ^ 0xFFFFFFFFu;
@@ -2140,6 +2352,37 @@ static uint8 Fbl_IsExplicitlyRejectedProgrammingAddress(uint32 addr)
     }
 
     return 0u;
+}
+
+static uint8 Fbl_IsFullFblLogicalRange(uint32 logicalAddr, uint32 length)
+{
+    uint32 seg;
+    uint32 offset;
+
+    if(length != FBL_SIZE_BYTES)
+    {
+        return 0u;
+    }
+
+    if((logicalAddr + length) < logicalAddr)
+    {
+        return 0u;
+    }
+
+    seg = logicalAddr & FLASH_ADDRESS_PREFIX_MASK;
+    if((seg != (PFLASH_CACHED_BASE & FLASH_ADDRESS_PREFIX_MASK)) &&
+       (seg != (PFLASH_NONCACHED_BASE & FLASH_ADDRESS_PREFIX_MASK)))
+    {
+        return 0u;
+    }
+
+    offset = logicalAddr & PFLASH_ALIAS_MASK;
+    if(offset != (FBL_START_NCACHED & PFLASH_ALIAS_MASK))
+    {
+        return 0u;
+    }
+
+    return 1u;
 }
 
 /* Validate a download/verify target supplied by the tester.
@@ -2182,16 +2425,28 @@ static Fbl_AddressStatus Fbl_ValidateDownloadRange(uint32 logicalAddr, uint32 le
     offset    = logicalAddr & PFLASH_ALIAS_MASK;
     endOffset = offset + length - 1u;
 
-    /* Reject writes into the FBL / BMHD / UCB / protected areas. */
-    if((offset <= fblEndOff) && (endOffset >= fblStartOff))
+    if(g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
     {
-        return FBL_ADDR_ERR_PROTECTED;
+        if((offset != fblStartOff) ||
+           (endOffset != fblEndOff) ||
+           (length != FBL_SIZE_BYTES))
+        {
+            return FBL_ADDR_ERR_NOT_APP;
+        }
     }
-
-    /* Must lie fully inside the configured APP PFLASH window. */
-    if((offset < appStartOff) || (endOffset > appEndOff))
+    else
     {
-        return FBL_ADDR_ERR_NOT_APP;
+        /* Reject writes into the FBL / BMHD / UCB / protected areas. */
+        if((offset <= fblEndOff) && (endOffset >= fblStartOff))
+        {
+            return FBL_ADDR_ERR_PROTECTED;
+        }
+
+        /* Must lie fully inside the configured APP PFLASH window. */
+        if((offset < appStartOff) || (endOffset > appEndOff))
+        {
+            return FBL_ADDR_ERR_NOT_APP;
+        }
     }
 
     /* TC3xx programs in 32-byte pages: the start must be page aligned. */
@@ -2227,32 +2482,77 @@ static void Fbl_Wr32(uint8 *p, uint32 v)
     p[3u] = (uint8)(v);
 }
 
+static uint8 Fbl_RuntimeClosureOk(void)
+{
+    g_FblRuntimeClosureFailStep = 0u;
+
+#define FBL_CLOSURE_CHECK(step, symbol) \
+    do { if(FblRamRuntime_IsExecutableAddress((uint32)(symbol)) == 0u) { g_FblRuntimeClosureFailStep = (step); return 0u; } } while(0)
+
+    FBL_CLOSURE_CHECK(1u, core0_main);
+    FBL_CLOSURE_CHECK(2u, Fbl_UdsHandle);
+    FBL_CLOSURE_CHECK(3u, Fbl_DoIpMain);
+    FBL_CLOSURE_CHECK(4u, Fbl_DoIpHandleTcpFrame);
+    FBL_CLOSURE_CHECK(5u, Fbl_FlashEraseRange);
+    FBL_CLOSURE_CHECK(6u, Fbl_FlashProgram);
+    FBL_CLOSURE_CHECK(7u, Fbl_FlashProgramFblPayload);
+    FBL_CLOSURE_CHECK(8u, Fbl_FlashFlush);
+    FBL_CLOSURE_CHECK(9u, Fbl_CommitBootCriticalPage);
+    FBL_CLOSURE_CHECK(10u, Fbl_Crc32);
+    FBL_CLOSURE_CHECK(11u, Fbl_Crc32FblWithDelayedBootPage);
+    FBL_CLOSURE_CHECK(12u, Fbl_Crc32UpdateByte);
+    FBL_CLOSURE_CHECK(13u, FblRam_DisableInterrupts);
+    FBL_CLOSURE_CHECK(14u, FblRam_RestoreInterrupts);
+    FBL_CLOSURE_CHECK(15u, FblRam_InvalidateProgramCache);
+    FBL_CLOSURE_CHECK(16u, FblRam_RequestSystemReset);
+    FBL_CLOSURE_CHECK(17u, FblRam_CopyBytes);
+    FBL_CLOSURE_CHECK(18u, FblRam_SetBytes);
+    FBL_CLOSURE_CHECK(19u, FblRam_MoveBytes);
+    FBL_CLOSURE_CHECK(20u, FblRam_CompareBytes);
+    FBL_CLOSURE_CHECK(21u, Fbl_ScrWriteBluState);
+    FBL_CLOSURE_CHECK(22u, FblRamRuntime_SetDestructivePhase);
+    FBL_CLOSURE_CHECK(23u, Fbl_BluEnterRecoveryWaitFromTrap);
+
+#undef FBL_CLOSURE_CHECK
+
+    if(FblEth_RuntimeClosureOk() == 0u)
+    {
+        g_FblRuntimeClosureFailStep = 1000u + g_FblEthRuntimeClosureFailStep;
+        return 0u;
+    }
+    return 1u;
+}
+
+static uint8 Fbl_EnterDirectUpdateRuntime(void)
+{
+    if(FblRamRuntime_IsActive() != 0u)
+    {
+        return 1u;
+    }
+
+    if(Fbl_RuntimeClosureOk() == 0u)
+    {
+        return 0u;
+    }
+
+    if(FblRamRuntime_EnterCritical() == 0u)
+    {
+        return 0u;
+    }
+
+    g_blu.flags |= FBL_BLU_FLAG_DIRECT_UPDATE;
+    Fbl_ScrWriteBluState(&g_blu);
+    return 1u;
+}
+
 static void Fbl_JumpToApp(void)
 {
-    IfxCpu_disableInterrupts();
+    (void)FblRam_DisableInterrupts();
 
     /* The updated application image was programmed through the non-cached alias.
      * Invalidate the program cache so the core fetches the fresh image, then jump
      * to the cached execution alias (0x8...). Never jump to the 0xA... alias. */
-    IfxCpu_invalidateProgramCache();
+    FblRam_InvalidateProgramCache();
     __asm("isync");
     __asm("ji %0" : : "a"(APP_START_CACHED));
-}
-
-static void Fbl_CopyAndJumpRamUpdater(void)
-{
-    void (*entry)(void);
-
-
-    IfxCpu_disableInterrupts();
-
-    entry = FblRamUpdater_Entry;
-
-    __asm("isync");
-
-    entry();
-
-    while(1)
-    {
-    }
 }

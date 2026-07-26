@@ -127,7 +127,7 @@ memp_sanity(const struct memp_desc *desc)
 static void
 memp_overflow_check_element(struct memp *p, const struct memp_desc *desc)
 {
-  mem_overflow_check_raw((u8_t *)p + MEMP_SIZE, desc->size, "pool ", desc->desc);
+  mem_overflow_check_raw((u8_t *)p + MEMP_SIZE, desc->size);
 }
 
 /**
@@ -184,7 +184,7 @@ memp_init_pool(const struct memp_desc *desc)
   memp = (struct memp *)LWIP_MEM_ALIGN(desc->base);
 #if MEMP_MEM_INIT
   /* force memset on pool memory */
-  memset(memp, 0, (size_t)desc->num * (MEMP_SIZE + desc->size
+  MEMSET(memp, 0, (size_t)desc->num * (MEMP_SIZE + desc->size
 #if MEMP_OVERFLOW_CHECK
                                        + MEM_SANITY_REGION_AFTER_ALIGNED
 #endif

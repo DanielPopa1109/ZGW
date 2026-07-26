@@ -45,24 +45,20 @@
 #define LCF_HEAP1_OFFSET    (LCF_USTACK1_OFFSET - LCF_HEAP_SIZE)
 #define LCF_HEAP2_OFFSET    (LCF_USTACK2_OFFSET - LCF_HEAP_SIZE)
 
-/* CPU0 application is linked/executed from the cached segment-8 PFLASH alias.
- * The same physical flash is programmed by the FBL through the non-cached
- * segment-A alias (0xA0030000); only execution uses the cached 0x8 alias. */
+/* The application is linked/executed from the cached segment-8 PFLASH alias.
+ * Flash programming paths may convert to segment-A internally, but the image
+ * itself is placed only at cached 0x8... PFLASH addresses. */
 #define LCF_INTVEC0_START       0x80032000
-#define LCF_INTVEC1_START       0xA03FC000
-#define LCF_INTVEC2_START       0xA03FE000
+#define LCF_INTVEC1_START       0x803FC000
+#define LCF_INTVEC2_START       0x803FE000
 
 #define LCF_TRAPVEC0_START      0x80030100
-#define LCF_TRAPVEC1_START      0xA0300000
-#define LCF_TRAPVEC2_START      0xA0300100
+#define LCF_TRAPVEC1_START      0x80300000
+#define LCF_TRAPVEC2_START      0x80300100
 
 #define LCF_STARTPTR_CPU0       0x80030000
-#define LCF_STARTPTR_CPU1       0xA0300200
-#define LCF_STARTPTR_CPU2       0xA0300220
-
-#define LCF_STARTPTR_NC_CPU0    0xA0030000
-#define LCF_STARTPTR_NC_CPU1    0xA0300200
-#define LCF_STARTPTR_NC_CPU2    0xA0300220
+#define LCF_STARTPTR_CPU1       0x80300200
+#define LCF_STARTPTR_CPU2       0x80300220
 
 #define INTTAB0                 LCF_INTVEC0_START
 #define INTTAB1                 LCF_INTVEC1_START
@@ -77,8 +73,8 @@
 #define RESET                   LCF_STARTPTR_CPU0
 
 #define APP_PFLASH0_START       0x80030000
-#define APP_PFLASH0_NC_START    0xA0030000
 #define APP_PFLASH0_SIZE        2880k
+#define APP_PFLASH1_SIZE        2880k
 
 #define FLASH_UNUSED_FILL_VALUE 0x36
 #include "tc1v1_6_2.lsl"
@@ -184,9 +180,8 @@ derivative tc37
     }
 
     /*
-     * APP PFLASH0 starts after the 192 KB FBL window. Normal code/const use the cached segment-8 alias for
-     * performance. The segment-A alias is present in the same memory object only so absolute reset/vector/startup
-     * sections can be located without creating a duplicate ROM memory object.
+     * APP PFLASH0 starts after the 192 KB FBL window. Link all APP code/const
+     * through the cached segment-8 alias.
      */
     memory pfls0
     {
@@ -196,18 +191,16 @@ derivative tc37
         fill = 0x36;
 
         map cached (dest=bus:sri, dest_offset=0x80030000, size=2880K);
-        map not_cached (dest=bus:sri, dest_offset=0xA0030000, size=2880K);
     }
 
     memory pfls1
     {
         mau = 8;
-        size = 3M;      /* 0x300000 bytes */
+        size = APP_PFLASH1_SIZE;      /* 0x2D0000 bytes; top 192 KiB reserved for FBL BLU staging */
         type = rom;
         fill = 0x36;
 
-        map cached (dest=bus:sri, dest_offset=0x80300000, size=3M);
-        map not_cached (dest=bus:sri, dest_offset=0xA0300000, size=3M);
+        map cached (dest=bus:sri, dest_offset=0x80300000, size=APP_PFLASH1_SIZE);
     }
 
     memory dfls0
@@ -231,17 +224,8 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Cached DLMU for normal LMU data; private data should stay in DSPR where possible. */
-        map cached (dest=bus:sri, dest_offset=0xb0000000, size=64k);
-    }
-
-    memory cpu0_dlmu_nc
-    {
-        mau = 8;
-        size = 64k;
-        type = ram;
-        /* Non-cached alias retained for address compatibility; normal DLMU sections are routed to cached aliases. */
-        map not_cached (dest=bus:sri, dest_offset=0x90000000, size=64k);
+        /* CPU0 DLMU is exposed only through the non-cached alias. */
+        map not_cached (dest=bus:sri, dest_offset=0xB0000000, size=64k);
     }
 
     memory cpu1_dlmu
@@ -249,17 +233,8 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Cached DLMU for normal LMU data. */
-        map cached (dest=bus:sri, dest_offset=0xb0010000, size=64k);
-    }
-
-    memory cpu1_dlmu_nc
-    {
-        mau = 8;
-        size = 64k;
-        type = ram;
-        /* Non-cached alias retained for address compatibility; normal DLMU sections are routed to cached aliases. */
-        map not_cached (dest=bus:sri, dest_offset=0x90010000, size=64k);
+        /* CPU1 DLMU is exposed only through the non-cached alias. */
+        map not_cached (dest=bus:sri, dest_offset=0xB0010000, size=64k);
     }
 
     memory cpu2_dlmu
@@ -267,17 +242,8 @@ derivative tc37
         mau = 8;
         size = 64k;
         type = ram;
-        /* Cached CPU2 DLMU for Ethernet/shared and explicit DLMU sections. */
-        map cached (dest=bus:sri, dest_offset=0xb0020000, size=64k);
-    }
-
-    memory cpu2_dlmu_nc
-    {
-        mau = 8;
-        size = 64k;
-        type = ram;
-        /* Non-cached CPU2 DLMU alias retained for address compatibility; no sections are routed here. */
-        map not_cached (dest=bus:sri, dest_offset=0x90020000, size=64k);
+        /* CPU2 DLMU is exposed only through the non-cached alias. */
+        map not_cached (dest=bus:sri, dest_offset=0xB0020000, size=64k);
     }
 
 #if (__VERSION__ >= 6003)
@@ -403,14 +369,14 @@ derivative tc37
                     select ".text.start";
                 }
             }
-            group interface_const (run_addr=APP_PFLASH0_NC_START + 0x0020)
+            group interface_const (run_addr=APP_PFLASH0_START + 0x0020)
             {
                 select "*.interface_const";
             }
             "__IF_CONST" := addressof(group:interface_const);
-            "__START0" := LCF_STARTPTR_NC_CPU0;
-            "__START1" := LCF_STARTPTR_NC_CPU1;
-            "__START2" := LCF_STARTPTR_NC_CPU2;
+            "__START0" := LCF_STARTPTR_CPU0;
+            "__START1" := LCF_STARTPTR_CPU1;
+            "__START2" := LCF_STARTPTR_CPU2;
         }
 
         group (ordered)
@@ -443,18 +409,18 @@ derivative tc37
 
         group (ordered)
         {
-            group start_tc0 (run_addr=LCF_STARTPTR_NC_CPU0)
+            group start_tc0 (run_addr=LCF_STARTPTR_CPU0)
             {
                 select "(.text.start_cpu0*)";
             }
-            group start_tc1 (run_addr=LCF_STARTPTR_NC_CPU1)
+            group start_tc1 (run_addr=LCF_STARTPTR_CPU1)
             {
                 section "start_tc1" (size=0x20, attributes=rx, fill=0x36)
                 {
                     select "(.text.start_cpu1*)";
                 }
             }
-            group start_tc2 (run_addr=LCF_STARTPTR_NC_CPU2)
+            group start_tc2 (run_addr=LCF_STARTPTR_CPU2)
             {
                 select "(.text.start_cpu2*)";
             }
@@ -707,8 +673,8 @@ derivative tc37
         }
 
         /*
-         * Explicit cached DLMU/LMU sections.
-         * Legacy *_nc input section names are accepted for compatibility and are routed to cached DLMU too.
+         * Explicit DLMU/LMU sections. Legacy *_cached input section names are
+         * accepted for compatibility, but all are routed to non-cached DLMU.
          */
         group data_lmu_cached (ordered, align = 32, attributes=rw, run_addr = mem:cpu2_dlmu)
         {
@@ -894,7 +860,7 @@ derivative tc37
         /**************************************************************************************************************
          * Large BSW RAM placement.
          * Fee work buffers are large and must not stay in CPU2 DSPR.
-         * Keep CAN runtime outside CPU2 DLMU, which is used by the explicit cached DLMU groups.
+         * Keep CAN runtime outside CPU2 DLMU, which is used by the explicit DLMU groups.
          *************************************************************************************************************/
 
         /**************************************************************************************************************

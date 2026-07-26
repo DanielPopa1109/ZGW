@@ -1546,7 +1546,7 @@ pbuf_strstr(const struct pbuf *p, const char *substr)
   if ((substr == NULL) || (substr[0] == 0) || (p->tot_len == 0xFFFF)) {
     return 0xFFFF;
   }
-  substr_len = strlen(substr);
+  substr_len = STRLEN(substr);
   if (substr_len >= 0xFFFF) {
     return 0xFFFF;
   }

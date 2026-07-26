@@ -87,6 +87,8 @@ volatile uint8 SysMgr_LastScrRstStatus = 0u;
 volatile uint8 SysMgr_ScrFaultPending = 0u;
 volatile uint32 SysMgr_ScrFaultWakeCounter = 0u;
 
+extern void getPmsVoltageMeasurements(void);
+
 void SysMgr_ProcessResetDtc(void);
 void SysMgr_EcuStateMachine(void);
 void SysMgr_MainFunction(void);
@@ -932,5 +934,6 @@ void SysMgr_MainFunction(void)
     SysMgr_EcuStateMachine();
 
     SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
+    getPmsVoltageMeasurements();
     SysMgr_MainCounter++;
 }

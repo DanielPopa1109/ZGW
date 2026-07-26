@@ -44,6 +44,7 @@
  **********************************************************************************************************************/
 #include <Cpu/Std/Ifx_Types.h>
 #include <Cpu/Std/IfxCpu.h>
+#include "Ifx_Cfg.h"
 #include "IfxGeth_Eth.h"
 #include "lwip_geth_lwip.h"
 #include "lwipopts.h"
@@ -77,7 +78,8 @@
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  ( ( portTickType ) 100 )
 #define LWIP_GETH_RX_POLL_BUDGET            (32U)
-#define LWIP_GETH_TIMER_US_PER_TICK         (1000U)
+#define LWIP_GETH_TIMER_HZ_PER_MS           (1000U)
+#define LWIP_GETH_TIMER_FALLBACK_FREQ_HZ    (100000000U)
 #define LWIP_GETH_TIMER_CATCHUP_LIMIT       (100U)
 #if LWIP_IPV4 && LWIP_ACD
 #define IFX_LWIP_ACD_PERIOD                 (ACD_TMR_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
@@ -103,27 +105,168 @@
   }                                           \
 }
 
+#define LWIP_GETH_STATIC_ASSERT(name, expression) typedef char name[(expression) ? 1 : -1]
+#define LWIP_GETH_RX_DESCRIPTOR_BYTES (IFXGETH_NUM_MODULES * IFXGETH_NUM_RX_CHANNELS * \
+                                       IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr))
+#define LWIP_GETH_TX_DESCRIPTOR_BYTES (IFXGETH_NUM_MODULES * IFXGETH_NUM_TX_CHANNELS * \
+                                       IFXGETH_MAX_TX_DESCRIPTORS * sizeof(IfxGeth_TxDescr))
+#define LWIP_GETH_RX_BUFFER_BYTES     (IFXGETH_MAX_RX_DESCRIPTORS * IFXGETH_MAX_RX_BUFFER_SIZE)
+#define LWIP_GETH_TX_BUFFER_BYTES     (IFXGETH_MAX_TX_DESCRIPTORS * IFXGETH_MAX_TX_BUFFER_SIZE)
+#define LWIP_GETH_DMA_BYTES           (LWIP_GETH_RX_DESCRIPTOR_BYTES + LWIP_GETH_TX_DESCRIPTOR_BYTES + \
+                                       LWIP_GETH_RX_BUFFER_BYTES + LWIP_GETH_TX_BUFFER_BYTES)
+
+LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_descriptor_count_nonzero, IFXGETH_MAX_RX_DESCRIPTORS > 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_descriptor_count_nonzero, IFXGETH_MAX_TX_DESCRIPTORS > 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_descriptor_size_word_aligned, (sizeof(IfxGeth_RxDescr) % 4u) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_descriptor_size_word_aligned, (sizeof(IfxGeth_TxDescr) % 4u) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_buffer_size_aligned, (IFXGETH_MAX_RX_BUFFER_SIZE % AURIX_ETH_DMA_ALIGNMENT) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_buffer_size_aligned, (IFXGETH_MAX_TX_BUFFER_SIZE % AURIX_ETH_DMA_ALIGNMENT) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_buffer_size_word_aligned, (IFXGETH_MAX_RX_BUFFER_SIZE % 4u) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_buffer_size_word_aligned, (IFXGETH_MAX_TX_BUFFER_SIZE % 4u) == 0u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_dma_memory_fits_window, LWIP_GETH_DMA_BYTES <= AURIX_ETH_DMA_WINDOW_BYTES);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_lwip_mem_alignment, (MEM_ALIGNMENT >= 4u) && ((MEM_ALIGNMENT % 4u) == 0u));
+LWIP_GETH_STATIC_ASSERT(lwip_geth_lwip_eth_pad_aligns_ip_header, ETH_PAD_SIZE == 2u);
+
+static void lwip_geth_CopyBytes(void *destination, const void *source, uint32 length)
+{
+  volatile uint8 *dst = (volatile uint8 *)destination;
+  const volatile uint8 *src = (const volatile uint8 *)source;
+  uint32 index;
+
+  for (index = 0u; index < length; index++)
+  {
+    dst[index] = src[index];
+  }
+}
+
 /***********************************************************************************************************************
  * PRIVATE VARIABLES
  **********************************************************************************************************************/
 volatile uint32 g_TickCount_1ms;
 Ifx_Lwip        g_Lwip;
 IfxGeth_Eth     g_IfxGeth;
-uint32          isrTxCount = 0;
-uint32          isrRxCount = 0;
-IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
-IFX_ALIGN(32) AURIX_ETH_DMA_NC uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA uint8 channel0TxBuffer1[IFXGETH_MAX_TX_DESCRIPTORS][IFXGETH_MAX_TX_BUFFER_SIZE];
+IFX_ALIGN(32) AURIX_ETH_DMA uint8 channel0RxBuffer1[IFXGETH_MAX_RX_DESCRIPTORS][IFXGETH_MAX_RX_BUFFER_SIZE];
 volatile uint32 g_LwipSoftwareTimerTickCounter;
 volatile uint32 g_LwipRxPollLoopCounter;
 volatile uint32 g_LwipRxPollPacketCounter;
 volatile uint32 g_LwipRxPollBudgetHitCounter;
-volatile uint32 g_LwipLastTimerUs;
+volatile uint32 g_LwipRxPollInProgress;
+volatile uint32 g_LwipRxPollReentryBlockedCounter;
+volatile uint32 g_LwipLastTimerTicks;
 volatile uint32 g_LwipNetifAddFailed;
+volatile uint32 g_LwipForcedMacConfigCounter;
+volatile uint32 g_LwipNetifLinkUp;
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
  **********************************************************************************************************************/
 void lwip_geth_UpdateTickCount(void);
+
+static TIMER_STM_t *lwip_geth_Lwip_getStmHandle(void)
+{
+  return (lwip_geth_handle != NULL_PTR) ? lwip_geth_handle->stm_module : NULL_PTR;
+}
+
+static Ifx_STM *lwip_geth_Lwip_getStmModule(TIMER_STM_t *stmHandle)
+{
+  if ((stmHandle != NULL_PTR) &&
+      (stmHandle->app_config != NULL_PTR) &&
+      (stmHandle->app_config->stm != NULL_PTR))
+  {
+    return stmHandle->app_config->stm;
+  }
+
+  return &MODULE_STM0;
+}
+
+static uint32 lwip_geth_Lwip_getTimerTicksPerLwipTick(TIMER_STM_t *stmHandle)
+{
+  uint32 frequency = LWIP_GETH_TIMER_FALLBACK_FREQ_HZ;
+
+  if ((stmHandle != NULL_PTR) &&
+      (stmHandle->app_config != NULL_PTR) &&
+      (stmHandle->app_config->frequency != 0u))
+  {
+    frequency = stmHandle->app_config->frequency;
+  }
+
+  return (frequency / LWIP_GETH_TIMER_HZ_PER_MS) * IFX_LWIP_TIMER_TICK_MS;
+}
+
+static void lwip_geth_Lwip_configureForcedMacMode(IfxGeth_Eth *ethernetif)
+{
+  if ((ethernetif == NULL_PTR) || (ethernetif->gethSFR == NULL_PTR))
+  {
+    return;
+  }
+
+  IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+  FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+  g_LwipForcedMacConfigCounter++;
+}
+
+static void lwip_geth_Lwip_forceNetifUp(void)
+{
+  netif_set_default(&g_Lwip.netif);
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+  g_Lwip.netif.flags |= (NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
+#else
+  netif_set_up(&g_Lwip.netif);
+  netif_set_link_up(&g_Lwip.netif);
+#endif
+}
+
+static void lwip_geth_Lwip_applyLinkStatus(void)
+{
+  Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
+  IfxGeth_Eth *ethernetif = g_Lwip.netif.state;
+
+  if (ethernetif == NULL_PTR)
+  {
+    return;
+  }
+
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+  lwip_geth_private_Phy_Dp83825i_mainFunction_100ms();
+  ctrl_status.U = lwip_geth_private_Phy_Dp83825i_link_status();
+#else
+  ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
+#endif
+
+  g_LwipNetifLinkUp = (uint32)ctrl_status.B.LNKSTS;
+
+  if (ctrl_status.B.LNKSTS == 0u)
+  {
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+    lwip_geth_Lwip_configureForcedMacMode(ethernetif);
+    lwip_geth_Lwip_forceNetifUp();
+#else
+    netif_set_link_down(&g_Lwip.netif);
+#endif
+    return;
+  }
+
+  if (ctrl_status.B.LNKMOD == 1u)
+  {
+    IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+  }
+  else
+  {
+    IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
+  }
+
+  if (ctrl_status.B.LNKSPEED == 0u)
+  {
+    FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+  }
+  else
+  {
+    FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+  }
+
+  lwip_geth_Lwip_forceNetifUp();
+}
 
 /** \brief Timer interrupt callback */
 void lwip_geth_Lwip_onTimerTick(void)
@@ -151,10 +294,19 @@ void lwip_geth_Lwip_onTimerTick(void)
 
 static void lwip_geth_Lwip_advanceElapsedTime(void)
 {
-  uint32 nowUs = TIMER_STM_GetTotalTime(lwip_geth_handle->stm_module);
-  uint32 elapsedUs = nowUs - g_LwipLastTimerUs;
-  uint32 ticks = elapsedUs / LWIP_GETH_TIMER_US_PER_TICK;
+  TIMER_STM_t *stmHandle = lwip_geth_Lwip_getStmHandle();
+  uint32 timerTicksPerLwipTick = lwip_geth_Lwip_getTimerTicksPerLwipTick(stmHandle);
+  uint32 nowTicks = IfxStm_getLower(lwip_geth_Lwip_getStmModule(stmHandle));
+  uint32 elapsedTicks = nowTicks - g_LwipLastTimerTicks;
+  uint32 ticks;
   uint32 tick;
+
+  if (timerTicksPerLwipTick == 0u)
+  {
+    return;
+  }
+
+  ticks = elapsedTicks / timerTicksPerLwipTick;
 
   if (ticks == 0u)
   {
@@ -163,12 +315,12 @@ static void lwip_geth_Lwip_advanceElapsedTime(void)
 
   if (ticks > LWIP_GETH_TIMER_CATCHUP_LIMIT)
   {
-    ticks = LWIP_GETH_TIMER_CATCHUP_LIMIT;
-    g_LwipLastTimerUs = nowUs;
+    g_LwipLastTimerTicks = nowTicks;
+    return;
   }
   else
   {
-    g_LwipLastTimerUs += ticks * LWIP_GETH_TIMER_US_PER_TICK;
+    g_LwipLastTimerTicks += ticks * timerTicksPerLwipTick;
   }
 
   for (tick = 0u; tick < ticks; tick++)
@@ -246,48 +398,7 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 
   if (timerFlags & IFX_LWIP_FLAG_LINK)
   {
-    Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
-    ctrl_status.U = GETH_MAC_PHYIF_CONTROL_STATUS.U;
-    if (ctrl_status.B.LNKSTS == 0)
-    {
-      /* Lab bring-up keeps lwIP administratively available even when the PHY
-       * helper reports link down while packets are visible on the wire.
-       */
-      netif_set_link_up(&g_Lwip.netif);
-    }
-    else
-    {
-      IfxGeth_Eth *ethernetif = g_Lwip.netif.state;
-      /* we set the correct duplexMode */
-      if (ctrl_status.B.LNKMOD == 1)
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
-      }
-      else
-      {
-        IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
-      }
-      /* we set the correct speed */
-      if (ctrl_status.B.LNKSPEED == 0)
-      {
-        /* 10MBit speed */
-        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
-      }
-      else
-      {
-        if (ctrl_status.B.LNKSPEED == 1)
-        {
-          /* 100MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
-        }
-        else
-        {
-          /* 1000MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
-        }
-      }
-      netif_set_link_up(&g_Lwip.netif);
-    }
+    lwip_geth_Lwip_applyLinkStatus();
   }
 #if LWIP_IPV4 && LWIP_ACD
   if (timerFlags & IFX_LWIP_FLAG_ACD)
@@ -306,6 +417,19 @@ void lwip_geth_Lwip_pollReceiveFlags(void)
 {
   uint8 processed;
   uint8 budget = LWIP_GETH_RX_POLL_BUDGET;
+  boolean interruptState;
+
+  interruptState = IfxCpu_disableInterrupts();
+
+  if (g_LwipRxPollInProgress != 0u)
+  {
+    g_LwipRxPollReentryBlockedCounter++;
+    IfxCpu_restoreInterrupts(interruptState);
+    return;
+  }
+
+  g_LwipRxPollInProgress = 1u;
+  IfxCpu_restoreInterrupts(interruptState);
 
   g_LwipRxPollLoopCounter++;
 
@@ -328,6 +452,10 @@ void lwip_geth_Lwip_pollReceiveFlags(void)
   {
     g_LwipRxPollBudgetHitCounter++;
   }
+
+  interruptState = IfxCpu_disableInterrupts();
+  g_LwipRxPollInProgress = 0u;
+  IfxCpu_restoreInterrupts(interruptState);
 }
 
 #if LWIP_GETH_RTOS_ENABLED
@@ -368,19 +496,19 @@ void lwip_geth_LinkStatus(void *pvParameter)
       if (ctrl_status.B.LNKSPEED == 0)
       {
         /* 10MBit speed */
-        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+        FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
       }
       else
       {
         if (ctrl_status.B.LNKSPEED == 1)
         {
           /* 100MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+          FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
         }
         else
         {
           /* 1000MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
+          FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
         }
       }
       netif_set_link_up(&g_Lwip.netif);
@@ -411,6 +539,7 @@ void netif_state_changed(struct netif* netif, netif_nsc_reason_t reason, const n
 void lwip_geth_Lwip_init(void)
 {
   ip_addr_t default_ipaddr, default_netmask, default_gw;
+  TIMER_STM_t *stmHandle;
 
   g_LwipNetifAddFailed = 0u;
 #if LWIP_DHCP
@@ -424,13 +553,17 @@ void lwip_geth_Lwip_init(void)
 #endif
 
   LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init start!\n"));
+  stmHandle = lwip_geth_Lwip_getStmHandle();
+  g_LwipLastTimerTicks = IfxStm_getLower(lwip_geth_Lwip_getStmModule(stmHandle));
 
   /** - initialise LWIP (lwip_init()) */
 #if !LWIP_GETH_RTOS_ENABLED
   lwip_init();
 #endif
   /** - initialise and add a \ref netif */
-  g_Lwip.eth_addr = *(eth_addr_t *)&lwip_geth_handle->app_config->geth_lld_config->mac.macAddress;
+  lwip_geth_CopyBytes(&g_Lwip.eth_addr,
+                      lwip_geth_handle->app_config->geth_lld_config->mac.macAddress,
+                      (uint32)sizeof(g_Lwip.eth_addr));
 
 #if LWIP_GETH_RTOS_ENABLED
   if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
@@ -452,14 +585,12 @@ void lwip_geth_Lwip_init(void)
   }
 #endif
 
-  netif_set_default(&g_Lwip.netif);
-
 #if LWIP_NETIF_STATUS_CALLBACK == 1 /* If callback enabled */
   /* Initialize interface status change callback */
   netif_set_status_callback(&g_Lwip.netif, LWIP_GETH_NETIF_STATUS_CB_FUNCTION);
 #endif
-  netif_set_up(&g_Lwip.netif);
-  netif_set_link_up(&g_Lwip.netif);
+  lwip_geth_Lwip_forceNetifUp();
+  lwip_geth_Lwip_applyLinkStatus();
 
 #if LWIP_NETIF_HOSTNAME
   g_Lwip.netif.hostname = lwip_geth_handle->app_config->hostname;
@@ -492,32 +623,5 @@ void lwip_geth_UpdateTickCount(void)
 {
   g_TickCount_1ms++;
 }
-
-/** This interrupt is raised by the ethernet tx. The initialization is done by IfxGeth_Eth_init(). */
-IFX_INTERRUPT(ISR_Geth_Tx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_TX)
-{
-  isrTxCount++;
-}
-
-/** This interrupt is raised by the ethernet rx. The initialization is done by IfxGeth_Eth_init(). */
-#if LWIP_GETH_IS_ISR
-IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
-{
-#if !LWIP_GETH_RTOS_ENABLED
-  /* NO_SYS bootloader mode drains RX from FblEth_MainFunction. */
-#else
-  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
-  vTaskNotifyGiveFromISR( g_Lwip.EthRxTask, &xHigherPriorityTaskWoken );
-
-  /* If a task was woken by either a frame being received then we may need to
-   * switch to another task.  If the unblocked task was of higher priority then
-   * the interrupted task it will then execute immediately that the ISR
-   * completes.
-   */
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-#endif
-  isrRxCount++;
-}
-#endif
 
 /* CODE_BLOCK_END */

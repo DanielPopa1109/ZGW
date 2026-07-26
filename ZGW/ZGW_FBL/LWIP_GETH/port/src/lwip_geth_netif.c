@@ -91,7 +91,9 @@
 #include "netif/etharp.h"
 #include "netif/ppp/pppoe.h"
 #include "Cpu/Std/IfxCpu_Intrinsics.h"
+#include "Ifx_Cfg.h"
 #include "IfxGeth_Eth.h"
+#include "FblBlu.h"
 #include "lwip_geth_lwip.h"
 #include "lwip_geth_netif.h"
 #include "lwip_geth_conf.h"
@@ -103,6 +105,14 @@
 #include "lwip_geth_private_phy_rtl8211f.h"
 #endif
 
+#ifndef __cacheai
+#define __cacheai(p)  __asm__ volatile("cachea.i [%0]0"::"a"(p))
+#endif
+
+#ifndef __cacheawi
+#define __cacheawi(p) __asm__ volatile("cachea.wi [%0]0"::"a"(p))
+#endif
+
 /***********************************************************************************************************************
  * MACROS
  **********************************************************************************************************************/
@@ -112,17 +122,21 @@
 #define LWIP_GETH_MDIO_WAIT_POLLS      100000u
 #define LWIP_GETH_PHY_RESET_POLLS      100000u
 #define LWIP_GETH_DMA_INIT_ATTEMPTS    2u
+#define LWIP_GETH_TX_WAIT_POLLS        100000u
 #define LWIP_GETH_RX_TASK_BUDGET       64u
 #define LWIP_GETH_RX_FRAME_INVALID     0xFFFFu
 #define LWIP_GETH_CACHE_LINE_SIZE      32u
-
-#ifndef __cacheai
-#define __cacheai(p)  __asm__ volatile("cachea.i [%0]0"::"a"(p))
-#endif
-
-#ifndef __cacheawi
-#define __cacheawi(p) __asm__ volatile("cachea.wi [%0]0"::"a"(p))
-#endif
+#define LWIP_GETH_RX_DESCRIPTOR_INVALID_INDEX 0xFFFFFFFFu
+#define LWIP_GETH_RX_STAGE_IDLE              0u
+#define LWIP_GETH_RX_STAGE_ENTER             1u
+#define LWIP_GETH_RX_STAGE_DESCRIPTOR        2u
+#define LWIP_GETH_RX_STAGE_LENGTH            3u
+#define LWIP_GETH_RX_STAGE_ALLOC             4u
+#define LWIP_GETH_RX_STAGE_BUFFER            5u
+#define LWIP_GETH_RX_STAGE_COPY              6u
+#define LWIP_GETH_RX_STAGE_RELEASE           7u
+#define LWIP_GETH_RX_STAGE_NETIF             8u
+#define LWIP_GETH_RX_STAGE_HANDLE            9u
 
 volatile uint32 lwip_geth_DebugMdioWaitTimeoutCnt;
 volatile uint32 lwip_geth_DebugPhyResetTimeoutCnt;
@@ -164,8 +178,39 @@ volatile uint32 lwip_geth_DebugDmaCh0RxControlAfterStart;
 volatile uint32 lwip_geth_DebugMacConfigurationAfterStart;
 volatile uint32 lwip_geth_DebugLastRxDescrAddr;
 volatile uint32 lwip_geth_DebugLastRxBufferAddr;
+volatile uint32 lwip_geth_DebugRxBadDescriptorCnt;
+volatile uint32 lwip_geth_DebugRxInvalidBufferCnt;
+volatile uint32 lwip_geth_DebugRxDescriptorRestoreCnt;
+volatile uint32 lwip_geth_DebugRxPbufChainInvalidCnt;
+volatile uint32 lwip_geth_DebugRxBadNetifCnt;
+volatile uint32 lwip_geth_DebugRxBadStateCnt;
+volatile uint32 lwip_geth_DebugRxHandleRepairCnt;
+volatile uint32 lwip_geth_DebugRxDescrPtrRepairCnt;
 volatile uint32 lwip_geth_DebugRxCacheInvalidateCnt;
 volatile uint32 lwip_geth_DebugTxCacheWritebackCnt;
+volatile uint32 lwip_geth_DebugDmaCacheMaintSkippedCnt;
+volatile uint32 lwip_geth_LowLevelInputPacketCount;
+
+volatile uint32 g_LwipRxStage;
+volatile uint32 g_LwipRxCurrentNetifPtr;
+volatile uint32 g_LwipRxCurrentNetifStatePtr;
+volatile uint32 g_LwipRxExpectedNetifPtr;
+volatile uint32 g_LwipRxExpectedStatePtr;
+volatile uint32 g_LwipRxCurrentDescrListPtr;
+volatile uint32 g_LwipRxExpectedDescrListPtr;
+volatile uint32 g_LwipRxHandleDescrPtr;
+volatile uint32 g_LwipRxHardwareCurrentDescPtr;
+volatile uint32 g_LwipRxCurrentDescIndex = LWIP_GETH_RX_DESCRIPTOR_INVALID_INDEX;
+volatile uint32 g_LwipRxCurrentDescAddr;
+volatile uint32 g_LwipRxCurrentBufferAddr;
+volatile uint32 g_LwipRxCurrentPbufPtr;
+volatile uint32 g_LwipRxCurrentPbufPayloadPtr;
+volatile uint32 g_LwipRxCurrentPbufLen;
+volatile uint32 g_LwipRxCurrentPbufTotLen;
+volatile uint32 g_LwipRxCurrentPbufRef;
+
+volatile uint32 lwip_geth_AssertCount;
+volatile uint32 lwip_geth_AssertLine;
 
 /***********************************************************************************************************************
  * DATA STRUCTURES
@@ -182,7 +227,258 @@ struct ethernetif
   /* Add whatever per-interface state that is needed here. */
 };
 
-static void lwip_geth_CacheInvalidateRange(const volatile void *address, uint32 length)
+static uint8 lwip_geth_low_level_init(netif_t *netif);
+
+FBL_RAM_ETH_CODE
+void lwip_geth_AssertFail(uint32 line)
+{
+  lwip_geth_AssertLine = line;
+  lwip_geth_AssertCount++;
+
+  /* Continuing after an lwIP invariant failure can corrupt the active download.
+   * This handler and its state are part of the RAM-resident runtime. */
+  __disable();
+  for (;;)
+  {
+    __debug();
+  }
+}
+
+FBL_RAM_ETH_CODE
+static void lwip_geth_CopyBytes(void *destination, const void *source, uint32 length)
+{
+  volatile uint8 *dst = (volatile uint8 *)destination;
+  const volatile uint8 *src = (const volatile uint8 *)source;
+  uint32 index;
+
+  for (index = 0u; index < length; index++)
+  {
+    dst[index] = src[index];
+  }
+}
+
+FBL_RAM_ETH_CODE
+static uint8 lwip_geth_IsExpectedRxDescriptorAddress(uint32 descrAddr)
+{
+  uint32 base = (uint32)&IfxGeth_Eth_rxDescrList[0][0].descr[0];
+  uint32 ringEnd = base + ((uint32)IFXGETH_MAX_RX_DESCRIPTORS * (uint32)sizeof(IfxGeth_RxDescr));
+  uint32 offset;
+
+  if ((descrAddr < base) || (descrAddr >= ringEnd))
+  {
+    return 0u;
+  }
+
+  offset = descrAddr - base;
+
+  if ((offset % (uint32)sizeof(IfxGeth_RxDescr)) != 0u)
+  {
+    return 0u;
+  }
+
+  return 1u;
+}
+
+FBL_RAM_ETH_CODE
+static uint32 lwip_geth_GetRxDescriptorIndex(const IfxGeth_RxDescr *rxDescr)
+{
+  uint32 base = (uint32)&IfxGeth_Eth_rxDescrList[0][0].descr[0];
+  uint32 descrAddr = (uint32)rxDescr;
+
+  if ((rxDescr == NULL_PTR) || (lwip_geth_IsExpectedRxDescriptorAddress(descrAddr) == 0u))
+  {
+    return LWIP_GETH_RX_DESCRIPTOR_INVALID_INDEX;
+  }
+
+  return (descrAddr - base) / (uint32)sizeof(IfxGeth_RxDescr);
+}
+
+FBL_RAM_ETH_CODE
+static IfxGeth_RxDescr *lwip_geth_GetValidatedRxDescriptor(IfxGeth_Eth *ethernetif)
+{
+  uint32 descrAddr;
+  uint32 hwDescrAddr = 0u;
+  IfxGeth_RxDescr *rxDescr;
+
+  if (ethernetif == NULL_PTR)
+  {
+    return NULL_PTR;
+  }
+
+  rxDescr = (IfxGeth_RxDescr *)ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrPtr;
+  descrAddr = (uint32)rxDescr;
+  g_LwipRxHandleDescrPtr = descrAddr;
+
+  if (ethernetif->gethSFR != NULL_PTR)
+  {
+    hwDescrAddr = ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].CURRENT_APP_RXDESC.U;
+  }
+  g_LwipRxHardwareCurrentDescPtr = hwDescrAddr;
+
+  if (lwip_geth_IsExpectedRxDescriptorAddress(descrAddr) != 0u)
+  {
+    return rxDescr;
+  }
+
+  if (lwip_geth_IsExpectedRxDescriptorAddress(hwDescrAddr) != 0u)
+  {
+    ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrPtr = (IfxGeth_RxDescr *)hwDescrAddr;
+    lwip_geth_DebugRxDescrPtrRepairCnt++;
+    return (IfxGeth_RxDescr *)hwDescrAddr;
+  }
+
+  ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrPtr = &IfxGeth_Eth_rxDescrList[0][0].descr[0];
+  lwip_geth_DebugRxDescrPtrRepairCnt++;
+  return (IfxGeth_RxDescr *)&IfxGeth_Eth_rxDescrList[0][0].descr[0];
+}
+
+FBL_RAM_ETH_CODE
+static uint8 lwip_geth_PrepareRxHandle(netif_t *netif, IfxGeth_Eth **ethernetif)
+{
+  IfxGeth_Eth *expectedState = lwip_geth_IfxGeth_get();
+  IfxGeth_RxDescrList *expectedRxList = (IfxGeth_RxDescrList *)&IfxGeth_Eth_rxDescrList[0][0];
+
+  g_LwipRxCurrentNetifPtr = (uint32)netif;
+  g_LwipRxExpectedNetifPtr = (uint32)&g_Lwip.netif;
+  g_LwipRxExpectedStatePtr = (uint32)expectedState;
+  g_LwipRxExpectedDescrListPtr = (uint32)expectedRxList;
+
+  if ((netif == NULL_PTR) || (netif != &g_Lwip.netif) || (ethernetif == NULL_PTR))
+  {
+    lwip_geth_DebugRxBadNetifCnt++;
+    return 0u;
+  }
+
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_NETIF;
+  g_LwipRxCurrentNetifStatePtr = (uint32)netif->state;
+
+  if (netif->state != expectedState)
+  {
+    lwip_geth_DebugRxBadStateCnt++;
+    netif->state = expectedState;
+    g_LwipRxCurrentNetifStatePtr = (uint32)netif->state;
+  }
+
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_HANDLE;
+
+  if (expectedState->gethSFR != &MODULE_GETH)
+  {
+    expectedState->gethSFR = &MODULE_GETH;
+    lwip_geth_DebugRxHandleRepairCnt++;
+  }
+
+  g_LwipRxCurrentDescrListPtr = (uint32)expectedState->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrList;
+  if (expectedState->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrList != expectedRxList)
+  {
+    expectedState->rxChannel[IfxGeth_RxDmaChannel_0].channelId = IfxGeth_RxDmaChannel_0;
+    expectedState->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrList = expectedRxList;
+    g_LwipRxCurrentDescrListPtr = (uint32)expectedState->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrList;
+    lwip_geth_DebugRxHandleRepairCnt++;
+  }
+
+  *ethernetif = expectedState;
+  return 1u;
+}
+
+FBL_RAM_ETH_CODE
+static uint8 lwip_geth_IsDmaNonCachedRange(uint32 address, uint32 length)
+{
+  uint32 end;
+
+  if (length == 0u)
+  {
+    return 0u;
+  }
+
+  end = address + length;
+
+  if ((end < address) || (address < AURIX_ETH_DMA_BASE) || (end > AURIX_ETH_DMA_END))
+  {
+    return 0u;
+  }
+
+  return 1u;
+}
+
+FBL_RAM_ETH_CODE
+static uint8 lwip_geth_IsRxBufferValid(uint32 descriptorIndex, const uint8 *buffer, uint32 length)
+{
+  uint32 bufferAddr = (uint32)buffer;
+  uint32 ringStart = (uint32)&channel0RxBuffer1[0][0];
+  uint32 ringBytes = (uint32)sizeof(channel0RxBuffer1);
+  uint32 ringEnd = ringStart + ringBytes;
+  uint32 offset;
+
+  if ((descriptorIndex >= IFXGETH_MAX_RX_DESCRIPTORS) ||
+      (buffer == NULL_PTR) ||
+      (length == 0u) ||
+      (length > IFXGETH_MAX_RX_BUFFER_SIZE) ||
+      ((bufferAddr & 0x3u) != 0u) ||
+      (bufferAddr < ringStart) ||
+      (bufferAddr >= ringEnd) ||
+      ((bufferAddr + length) < bufferAddr) ||
+      ((bufferAddr + length) > ringEnd) ||
+      (lwip_geth_IsDmaNonCachedRange(bufferAddr, length) == 0u))
+  {
+    return 0u;
+  }
+
+  offset = bufferAddr - ringStart;
+
+  if ((offset % IFXGETH_MAX_RX_BUFFER_SIZE) != 0u)
+  {
+    return 0u;
+  }
+
+  if ((offset / IFXGETH_MAX_RX_BUFFER_SIZE) != descriptorIndex)
+  {
+    return 0u;
+  }
+
+  return 1u;
+}
+
+FBL_RAM_ETH_CODE
+static void lwip_geth_RestoreRxDescriptorBuffer(IfxGeth_Eth *ethernetif, IfxGeth_RxDescr *rxDescr)
+{
+  uint32 descriptorIndex = lwip_geth_GetRxDescriptorIndex(rxDescr);
+
+  if (descriptorIndex >= IFXGETH_MAX_RX_DESCRIPTORS)
+  {
+    return;
+  }
+
+  rxDescr->RDES0.U = (uint32)&channel0RxBuffer1[descriptorIndex][0];
+  lwip_geth_DebugRxDescriptorRestoreCnt++;
+}
+
+//FBL_RAM_ETH_CODE
+//static void lwip_geth_CacheInvalidateRange(const void *address, uint32 length)
+//{
+////  uint32 line;
+////  uint32 end;
+////
+////  if ((address == NULL_PTR) || (length == 0u))
+////  {
+////    return;
+////  }
+////
+////  line = ((uint32)address) & ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+////  end = (((uint32)address) + length + (LWIP_GETH_CACHE_LINE_SIZE - 1u)) &
+////      ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
+////
+////  while (line < end)
+////  {
+////    __cacheai((uint8 *)line);
+////    line += LWIP_GETH_CACHE_LINE_SIZE;
+////  }
+////
+////  __dsync();
+////  lwip_geth_DebugRxCacheInvalidateCnt++;
+//}
+
+FBL_RAM_ETH_CODE
+static void lwip_geth_CacheWritebackInvalidateRange(const volatile void *address, uint32 length)
 {
   uint32 line;
   uint32 end;
@@ -192,27 +488,9 @@ static void lwip_geth_CacheInvalidateRange(const volatile void *address, uint32 
     return;
   }
 
-  line = ((uint32)address) & ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
-  end = (((uint32)address) + length + (LWIP_GETH_CACHE_LINE_SIZE - 1u)) &
-      ~(LWIP_GETH_CACHE_LINE_SIZE - 1u);
-
-  while (line < end)
+  if (lwip_geth_IsDmaNonCachedRange((uint32)address, length) != 0u)
   {
-    __cacheai((uint8 *)line);
-    line += LWIP_GETH_CACHE_LINE_SIZE;
-  }
-
-  __dsync();
-  lwip_geth_DebugRxCacheInvalidateCnt++;
-}
-
-static void lwip_geth_CacheWritebackInvalidateRange(const volatile void *address, uint32 length)
-{
-  uint32 line;
-  uint32 end;
-
-  if ((address == NULL_PTR) || (length == 0u))
-  {
+    lwip_geth_DebugDmaCacheMaintSkippedCnt++;
     return;
   }
 
@@ -230,11 +508,179 @@ static void lwip_geth_CacheWritebackInvalidateRange(const volatile void *address
   lwip_geth_DebugTxCacheWritebackCnt++;
 }
 
+FBL_RAM_ETH_CODE
+void FblRamGeth_ShuffleRxDescriptor(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId)
+{
+  volatile IfxGeth_RxDescr *currentDescr;
+  volatile IfxGeth_RxDescr *lastDescr;
+
+  if ((geth == NULL_PTR) || (geth->rxChannel[channelId].rxDescrList == NULL_PTR))
+  {
+    return;
+  }
+
+  currentDescr = geth->rxChannel[channelId].rxDescrPtr;
+  lastDescr = &geth->rxChannel[channelId].rxDescrList->descr[IFXGETH_MAX_RX_DESCRIPTORS - 1u];
+
+  if (currentDescr == lastDescr)
+  {
+    geth->rxChannel[channelId].rxDescrPtr = &geth->rxChannel[channelId].rxDescrList->descr[0];
+  }
+  else
+  {
+    geth->rxChannel[channelId].rxDescrPtr = &geth->rxChannel[channelId].rxDescrPtr[1];
+  }
+}
+
+FBL_RAM_ETH_CODE
+void FblRamGeth_FreeReceiveBuffer(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId)
+{
+  volatile IfxGeth_RxDescr *descr;
+  IfxGeth_RxDescr3 rdes3;
+
+  if (geth == NULL_PTR)
+  {
+    return;
+  }
+
+  descr = geth->rxChannel[channelId].rxDescrPtr;
+
+  if (descr == NULL_PTR)
+  {
+    return;
+  }
+
+  rdes3.U = 0u;
+  rdes3.R.BUF1V = 1u;
+  rdes3.R.BUF2V = 0u;
+  rdes3.R.IOC = 0u;
+  rdes3.R.OWN = 1u;
+  descr->RDES3.U = rdes3.U;
+
+  FblRamGeth_ShuffleRxDescriptor(geth, channelId);
+}
+
+FBL_RAM_ETH_CODE
+void *FblRamGeth_GetTransmitBuffer(IfxGeth_Eth *geth, IfxGeth_TxDmaChannel channelId)
+{
+  volatile IfxGeth_TxDescr *descr;
+
+  if (geth == NULL_PTR)
+  {
+    return NULL_PTR;
+  }
+
+  descr = geth->txChannel[channelId].txDescrPtr;
+
+  if ((descr != NULL_PTR) && (descr->TDES3.R.OWN == 0u))
+  {
+    return (void *)descr->TDES0.U;
+  }
+
+  return NULL_PTR;
+}
+
+FBL_RAM_ETH_CODE
+void FblRamGeth_WakeupReceiver(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId)
+{
+  Ifx_GETH *gethSFR;
+
+  if ((geth == NULL_PTR) || (geth->gethSFR == NULL_PTR))
+  {
+    return;
+  }
+
+  gethSFR = geth->gethSFR;
+
+  if ((gethSFR->DMA_CH[channelId].STATUS.U & (1u << IfxGeth_DmaInterruptFlag_receiveStopped)) != 0u)
+  {
+    if ((gethSFR->DMA_CH[channelId].STATUS.U & (1u << IfxGeth_DmaInterruptFlag_receiveBufferUnavailable)) != 0u)
+    {
+      gethSFR->DMA_CH[channelId].STATUS.U = (1u << IfxGeth_DmaInterruptFlag_receiveBufferUnavailable);
+    }
+
+    gethSFR->MAC_CONFIGURATION.B.RE = 1u;
+    gethSFR->DMA_CH[channelId].RX_CONTROL.B.SR = 1u;
+  }
+}
+
+FBL_RAM_ETH_CODE
+void FblRamGeth_WakeupTransmitter(IfxGeth_Eth *geth, IfxGeth_TxDmaChannel channelId)
+{
+  Ifx_GETH *gethSFR;
+  uint32 mtlMask = ((1u << IfxGeth_MtlInterruptFlag_txQueueUnderflow) |
+                    (1u << IfxGeth_MtlInterruptFlag_averageBitsPerSlot) |
+                    (1u << IfxGeth_MtlInterruptFlag_rxQueueOverflow)) << 8u;
+
+  if ((geth == NULL_PTR) || (geth->gethSFR == NULL_PTR))
+  {
+    return;
+  }
+
+  gethSFR = geth->gethSFR;
+
+  if ((gethSFR->DMA_CH[channelId].STATUS.U & (1u << IfxGeth_DmaInterruptFlag_transmitStopped)) != 0u)
+  {
+    if ((gethSFR->DMA_CH[channelId].STATUS.U & (1u << IfxGeth_DmaInterruptFlag_transmitBufferUnavailable)) != 0u)
+    {
+      gethSFR->DMA_CH[channelId].STATUS.U = (1u << IfxGeth_DmaInterruptFlag_transmitBufferUnavailable);
+    }
+
+    if ((gethSFR->MTL_Q0.INTERRUPT_CONTROL_STATUS.U & (1u << IfxGeth_MtlInterruptFlag_txQueueUnderflow)) != 0u)
+    {
+      gethSFR->MTL_Q0.INTERRUPT_CONTROL_STATUS.U =
+          (gethSFR->MTL_Q0.INTERRUPT_CONTROL_STATUS.U & mtlMask) |
+          (1u << IfxGeth_MtlInterruptFlag_txQueueUnderflow);
+    }
+
+    gethSFR->MAC_CONFIGURATION.B.TE = 1u;
+    gethSFR->DMA_CH[channelId].TX_CONTROL.B.ST = 1u;
+  }
+}
+
+FBL_RAM_ETH_CODE
+void FblRamGeth_SetLineSpeed(Ifx_GETH *gethSFR, IfxGeth_LineSpeed speed)
+{
+  if (gethSFR == NULL_PTR)
+  {
+    return;
+  }
+
+  switch (speed)
+  {
+  case IfxGeth_LineSpeed_10Mbps:
+    gethSFR->MAC_CONFIGURATION.B.PS = 1u;
+    gethSFR->MAC_CONFIGURATION.B.FES = 0u;
+    break;
+  case IfxGeth_LineSpeed_100Mbps:
+    gethSFR->MAC_CONFIGURATION.B.PS = 1u;
+    gethSFR->MAC_CONFIGURATION.B.FES = 1u;
+    break;
+  case IfxGeth_LineSpeed_1000Mbps:
+    gethSFR->MAC_CONFIGURATION.B.PS = 0u;
+    gethSFR->MAC_CONFIGURATION.B.FES = 0u;
+    break;
+  case IfxGeth_LineSpeed_2500Mbps:
+    gethSFR->MAC_CONFIGURATION.B.PS = 0u;
+    gethSFR->MAC_CONFIGURATION.B.FES = 1u;
+    break;
+  default:
+    break;
+  }
+}
+
+FBL_RAM_ETH_CODE
 static void lwip_geth_FreeReceiveDescriptor(IfxGeth_Eth *ethernetif, IfxGeth_RxDescr *rxDescr)
 {
-  IfxGeth_Eth_freeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
+  if ((ethernetif == NULL_PTR) || (rxDescr == NULL_PTR))
+  {
+    return;
+  }
+
+  lwip_geth_RestoreRxDescriptorBuffer(ethernetif, rxDescr);
+  FblRamGeth_FreeReceiveBuffer(ethernetif, IfxGeth_RxDmaChannel_0);
   lwip_geth_CacheWritebackInvalidateRange(rxDescr, sizeof(*rxDescr));
-  IfxGeth_Eth_wakeupReceiver(ethernetif, IfxGeth_RxDmaChannel_0);
+  FblRamGeth_WakeupReceiver(ethernetif, IfxGeth_RxDmaChannel_0);
 }
 
 static void lwip_geth_PrepareDmaMemory(const IfxGeth_Eth_Config *config)
@@ -304,7 +750,7 @@ static void lwip_geth_ClearDmaDescriptorMemory(const IfxGeth_Eth_Config *config)
 
     if ((txConfig->channelEnable != FALSE) && (txConfig->txDescrList != NULL_PTR))
     {
-      memset((void *)txConfig->txDescrList->descr, 0,
+      MEMSET((void *)txConfig->txDescrList->descr, 0,
           (uint32)(IFXGETH_MAX_TX_DESCRIPTORS * sizeof(IfxGeth_TxDescr)));
     }
   }
@@ -315,7 +761,7 @@ static void lwip_geth_ClearDmaDescriptorMemory(const IfxGeth_Eth_Config *config)
 
     if ((rxConfig->channelEnable != FALSE) && (rxConfig->rxDescrList != NULL_PTR))
     {
-      memset((void *)rxConfig->rxDescrList->descr, 0,
+      MEMSET((void *)rxConfig->rxDescrList->descr, 0,
           (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr)));
     }
   }
@@ -338,6 +784,7 @@ static void lwip_geth_StopMacDma(Ifx_GETH *gethSFR)
   __dsync();
 }
 
+#if (PHY_DEVICE_NAME != PHY_DP83825I)
 static uint8 lwip_geth_MdioWaitReadyBounded(void)
 {
   uint32 timeout = LWIP_GETH_MDIO_WAIT_POLLS;
@@ -420,6 +867,35 @@ static uint8 lwip_geth_PhyWaitResetDoneBounded(void)
   lwip_geth_DebugPhyResetTimeoutCnt++;
   return 0u;
 }
+#endif
+
+FBL_RAM_ETH_CODE
+static void *lwip_geth_WaitTransmitBufferBounded(IfxGeth_Eth *ethernetif)
+{
+  uint32 timeout = LWIP_GETH_TX_WAIT_POLLS;
+  void *tbuf;
+
+  if (ethernetif == NULL_PTR)
+  {
+    lwip_geth_DebugTxNoBufferCnt++;
+    return NULL_PTR;
+  }
+
+  do
+  {
+    tbuf = FblRamGeth_GetTransmitBuffer(ethernetif, IfxGeth_TxDmaChannel_0);
+
+    if (tbuf != NULL_PTR)
+    {
+      return tbuf;
+    }
+
+    timeout--;
+  } while (timeout > 0u);
+
+  lwip_geth_DebugTxNoBufferCnt++;
+  return NULL_PTR;
+}
 
 static uint8 lwip_geth_InitModuleWithResetCheck(IfxGeth_Eth *ethernetif, IfxGeth_Eth_Config *config)
 {
@@ -453,6 +929,7 @@ static uint8 lwip_geth_InitModuleWithResetCheck(IfxGeth_Eth *ethernetif, IfxGeth
   return 0u;
 }
 
+FBL_RAM_ETH_CODE
 static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 packetLength)
 {
   volatile IfxGeth_TxDescr *firstDescr =
@@ -481,14 +958,14 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
   firstDescr->TDES3.R.CPC = 0u;
   firstDescr->TDES3.R.FD = 1u;
   firstDescr->TDES3.R.LD = 1u;
-  firstDescr->TDES2.R.IOC = 1u;
+  firstDescr->TDES2.R.IOC = 0u;
   firstDescr->TDES2.R.B1L = packetLength;
   firstDescr->TDES3.R.OWN = 1u;
 
   lwip_geth_CacheWritebackInvalidateRange(firstDescr, sizeof(IfxGeth_TxDescr));
   ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
   IfxGeth_dma_setTxDescriptorTailPointer(ethernetif->gethSFR, IfxGeth_TxDmaChannel_0, (uint32)nextDescr);
-  IfxGeth_Eth_wakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);
+  FblRamGeth_WakeupTransmitter(ethernetif, IfxGeth_TxDmaChannel_0);
   lwip_geth_DebugLastTxDescOwnAfterKick = firstDescr->TDES3.R.OWN;
   lwip_geth_DebugLastTxDmaStatusAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].STATUS.U;
   lwip_geth_DebugLastTxDmaTailAfterKick = ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TXDESC_TAIL_POINTER.U;
@@ -535,7 +1012,9 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
   /* Do whatever else is needed to initialize interface. */
   {
     IfxGeth_Eth_Config GethConfig;
-    GethConfig = *(lwip_geth_handle->app_config->geth_lld_config);
+    lwip_geth_CopyBytes(&GethConfig,
+        lwip_geth_handle->app_config->geth_lld_config,
+        (uint32)sizeof(GethConfig));
 
     /* We get the ID of Ethernet Phy do determine the board version, also needed for SCR */
     if (lwip_geth_handle->app_config->geth_lld_config->pins.rmiiPins != NULL)
@@ -554,7 +1033,7 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
 
       GETH_GPCTL.B.ALTI0  = lwip_geth_handle->app_config->geth_lld_config->pins.miiPins->mdio->inSelect;
     }
-    else
+    else if (lwip_geth_handle->app_config->geth_lld_config->pins.rgmiiPins != NULL)
     {
       IfxPort_setPinModeOutput(lwip_geth_handle->app_config->geth_lld_config->pins.rgmiiPins->mdc->pin.port,
                                lwip_geth_handle->app_config->geth_lld_config->pins.rgmiiPins->mdc->pin.pinIndex,IfxPort_OutputMode_pushPull,
@@ -562,7 +1041,12 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
 
       GETH_GPCTL.B.ALTI0  = lwip_geth_handle->app_config->geth_lld_config->pins.rgmiiPins->mdio->inSelect;
     }
+    else
+    {
+      /* Pin mappings were not generated; leave MDC/MDIO untouched. */
+    }
 
+#if (PHY_DEVICE_NAME != PHY_DP83825I)
     if (lwip_geth_MdioWaitReadyBounded() != 0u)
     {
       (void)lwip_geth_PhyWaitResetDoneBounded();
@@ -573,6 +1057,7 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
         (void)lwip_geth_PhyWaitResetDoneBounded();
       }
     }
+#endif
 
     /* initialize the module */
     lwip_geth_DebugLowLevelInitState = 2u;
@@ -582,6 +1067,10 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
       return 0u;
     }
     lwip_geth_PrepareDmaMemory(&GethConfig);
+
+    /* Normal operation: keep MAC destination filtering enabled. */
+    IfxGeth_mac_setPromiscuousMode(ethernetif->gethSFR, FALSE);
+    IfxGeth_mac_setAllMulticastPassing(ethernetif->gethSFR, FALSE);
 
     /* initialize the PHY */
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
@@ -603,14 +1092,44 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
     lwip_geth_DebugDmaCh0RxControlAfterStart = ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.U;
     lwip_geth_DebugMacConfigurationAfterStart = ethernetif->gethSFR->MAC_CONFIGURATION.U;
 
-    /* The ETH is ready for use now! */
-    /* we set the LINK_UP flag if we have a valid link */
-    if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSTS == 1)
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
     {
-      /* we have a valid link */
+      Ifx_GETH_MAC_PHYIF_CONTROL_STATUS ctrl_status;
+      ctrl_status.U = lwip_geth_private_Phy_Dp83825i_link_status();
+
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
       netif->flags |= NETIF_FLAG_LINK_UP;
-      /* we set the correct duplexMode */
-      if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKMOD == 1)
+      IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+      FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+#else
+      if (ctrl_status.B.LNKSTS == 1u)
+      {
+        netif->flags |= NETIF_FLAG_LINK_UP;
+        if (ctrl_status.B.LNKMOD == 1u)
+        {
+          IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
+        }
+        else
+        {
+          IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
+        }
+
+        if (ctrl_status.B.LNKSPEED == 0u)
+        {
+          FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+        }
+        else
+        {
+          FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
+        }
+      }
+#endif
+    }
+#else
+    if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSTS == 1u)
+    {
+      netif->flags |= NETIF_FLAG_LINK_UP;
+      if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKMOD == 1u)
       {
         IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_fullDuplex);
       }
@@ -618,26 +1137,21 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
       {
         IfxGeth_mac_setDuplexMode(ethernetif->gethSFR, IfxGeth_DuplexMode_halfDuplex);
       }
-      /* we set the correct speed */
-      if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSPEED == 0)
+
+      if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSPEED == 0u)
       {
-        /* 10MBit speed */
-        IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+        FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_10Mbps);
+      }
+      else if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSPEED == 1u)
+      {
+        FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
       }
       else
       {
-        if (GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSPEED == 1)
-        {
-          /* 100MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
-        }
-        else
-        {
-          /* 1000MBit speed */
-          IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
-        }
+        FblRamGeth_SetLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_1000Mbps);
       }
     }
+#endif
   }
 
   lwip_geth_DebugLowLevelInitState = 4u;
@@ -660,6 +1174,7 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
  *       to become availale since the stack doesn't retry to send a packet
  *       dropped because of memory failure (except for the TCP timers).
  */
+FBL_RAM_ETH_CODE
 static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
 {
   IfxGeth_Eth *ethernetif = netif->state;
@@ -688,7 +1203,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
     return ERR_BUF;
   }
 
-  tbuf = IfxGeth_Eth_waitTransmitBuffer(ethernetif, IfxGeth_TxDmaChannel_0);
+  tbuf = lwip_geth_WaitTransmitBufferBounded(ethernetif);
   lwip_geth_DebugLastTxBufferAddr = (uint32)tbuf;
 
   if (tbuf == NULL_PTR)
@@ -697,7 +1212,6 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
     pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
 #endif
     LINK_STATS_INC(link.drop);
-    lwip_geth_DebugTxNoBufferCnt++;
     lwip_geth_DebugLowLevelOutputErrCnt++;
     return ERR_MEM;
   }
@@ -716,7 +1230,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
       return ERR_BUF;
     }
 
-    memcpy((u8_t *)&tbuf[l], q->payload, q->len);
+    lwip_geth_CopyBytes((u8_t *)&tbuf[l], q->payload, (uint32)q->len);
     l = l + q->len;
     LWIP_DEBUGF(NETIF_DEBUG | LWIP_DBG_TRACE, ("low_level_output: data=%p, %d\n", q->payload, q->len));
     LWIP_ASSERT("low_level_output: length overflow the buffer\n", (l <= IFXGETH_MAX_TX_BUFFER_SIZE));
@@ -747,6 +1261,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
   return ERR_OK;
 }
 
+FBL_RAM_ETH_CODE
 static uint16 lwip_geth_GetRxFrameSize(IfxGeth_RxDescr *descr)
 {
   uint16 len;
@@ -765,7 +1280,7 @@ static uint16 lwip_geth_GetRxFrameSize(IfxGeth_RxDescr *descr)
   {
     uint32 frameLength = rdes3 & 0x7FFFu;
 
-    if (frameLength <= 4u)
+    if ((frameLength <= 4u) || (frameLength > IFXGETH_MAX_RX_BUFFER_SIZE))
     {
       len = LWIP_GETH_RX_FRAME_INVALID;
     }
@@ -787,20 +1302,60 @@ static uint16 lwip_geth_GetRxFrameSize(IfxGeth_RxDescr *descr)
  * @return a pbuf filled with the received packet (including MAC header)
  *         NULL on memory error
  */
+FBL_RAM_ETH_CODE
 static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 {
-  IfxGeth_Eth *ethernetif = netif->state;
+  IfxGeth_Eth *ethernetif = NULL_PTR;
   IfxGeth_RxDescr *rxDescr = NULL_PTR;
-  pbuf_t      *p, *q;
+  pbuf_t      *p = NULL_PTR, *q;
   u8_t        *src;
   u16_t       len;
+  u16_t       copyLen;
+  u16_t       remaining;
+  uint32      descriptorIndex;
 
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_ENTER;
+  g_LwipRxCurrentNetifPtr = (uint32)netif;
+  g_LwipRxCurrentNetifStatePtr = 0u;
+  g_LwipRxExpectedNetifPtr = (uint32)&g_Lwip.netif;
+  g_LwipRxExpectedStatePtr = (uint32)lwip_geth_IfxGeth_get();
+  g_LwipRxCurrentDescrListPtr = 0u;
+  g_LwipRxExpectedDescrListPtr = (uint32)&IfxGeth_Eth_rxDescrList[0][0];
+  g_LwipRxHandleDescrPtr = 0u;
+  g_LwipRxHardwareCurrentDescPtr = 0u;
+  g_LwipRxCurrentDescIndex = LWIP_GETH_RX_DESCRIPTOR_INVALID_INDEX;
+  g_LwipRxCurrentDescAddr = 0u;
+  g_LwipRxCurrentBufferAddr = 0u;
+  g_LwipRxCurrentPbufPtr = 0u;
+  g_LwipRxCurrentPbufPayloadPtr = 0u;
+  g_LwipRxCurrentPbufLen = 0u;
+  g_LwipRxCurrentPbufTotLen = 0u;
+  g_LwipRxCurrentPbufRef = 0u;
   lwip_geth_DebugLowLevelInputCallCount++;
 
   len = 0;
-  rxDescr = (IfxGeth_RxDescr *)IfxGeth_Eth_getActualRxDescriptor(ethernetif, IfxGeth_RxDmaChannel_0);
+  if (lwip_geth_PrepareRxHandle(netif, &ethernetif) == 0u)
+  {
+    lwip_geth_DebugRxNullBufferCnt++;
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
+    return (pbuf_t *)0;
+  }
+
+  rxDescr = lwip_geth_GetValidatedRxDescriptor(ethernetif);
   lwip_geth_DebugLastRxDescrAddr = (uint32)rxDescr;
-  lwip_geth_CacheInvalidateRange(rxDescr, sizeof(*rxDescr));
+  g_LwipRxCurrentDescAddr = (uint32)rxDescr;
+  descriptorIndex = lwip_geth_GetRxDescriptorIndex(rxDescr);
+  g_LwipRxCurrentDescIndex = descriptorIndex;
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_DESCRIPTOR;
+
+  if (descriptorIndex >= IFXGETH_MAX_RX_DESCRIPTORS)
+  {
+    lwip_geth_DebugRxBadDescriptorCnt++;
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
+    return (pbuf_t *)0;
+  }
+
+//  lwip_geth_CacheInvalidateRange(rxDescr, sizeof(*rxDescr));
 
   if ((rxDescr != NULL_PTR) && (rxDescr->RDES3.R.OWN == 0u))
   {
@@ -809,13 +1364,17 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 
   if (len == 0)
   {
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
     return (pbuf_t *)0;
   }
+
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_LENGTH;
 
   if (len == LWIP_GETH_RX_FRAME_INVALID)
   {
     lwip_geth_DebugRxInvalidFrameCnt++;
     lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
     return (pbuf_t *)0;
   }
 
@@ -825,37 +1384,79 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 
   /* We allocate a pbuf chain of pbufs from the pool. */
   p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_ALLOC;
 
   if (p != NULL)
   {
+    g_LwipRxCurrentPbufPtr = (uint32)p;
+    g_LwipRxCurrentPbufPayloadPtr = (uint32)p->payload;
+    g_LwipRxCurrentPbufLen = (uint32)p->len;
+    g_LwipRxCurrentPbufTotLen = (uint32)p->tot_len;
+    g_LwipRxCurrentPbufRef = (uint32)p->ref;
 #if ETH_PAD_SIZE
     pbuf_header(p, -ETH_PAD_SIZE); /* drop the padding word */
 #endif
 
+    copyLen = p->tot_len;
     src = (rxDescr != NULL_PTR) ? (u8_t *)rxDescr->RDES0.U : NULL_PTR;
     lwip_geth_DebugLastRxBufferAddr = (uint32)src;
-    lwip_geth_DebugLastRxLen = (uint32)len;
+    lwip_geth_DebugLastRxLen = (uint32)copyLen;
+    g_LwipRxCurrentBufferAddr = (uint32)src;
+    g_LwipRxCurrentPbufPayloadPtr = (uint32)p->payload;
+    g_LwipRxCurrentPbufLen = (uint32)p->len;
+    g_LwipRxCurrentPbufTotLen = (uint32)p->tot_len;
+    g_LwipRxCurrentPbufRef = (uint32)p->ref;
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_BUFFER;
 
     if (src == NULL_PTR)
     {
       lwip_geth_DebugRxNullBufferCnt++;
       pbuf_free(p);
       lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+      g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
       return (pbuf_t *)0;
     }
 
-    lwip_geth_CacheInvalidateRange(src, (uint32)len);
+    if (lwip_geth_IsRxBufferValid(descriptorIndex, src, (uint32)copyLen) == 0u)
+    {
+      lwip_geth_DebugRxInvalidBufferCnt++;
+      pbuf_free(p);
+      lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+      g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
+      return (pbuf_t *)0;
+    }
+
+//    lwip_geth_CacheInvalidateRange(src, (uint32)copyLen);
     lwip_geth_DebugLowLevelInputPacketCount++;
+    lwip_geth_LowLevelInputPacketCount++;
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_COPY;
+    remaining = copyLen;
 
     /* We iterate over the pbuf chain until we have read the entire
      * packet into the pbuf. */
     for (q = p; q != NULL; q = q->next)
     {
+      g_LwipRxCurrentPbufPtr = (uint32)q;
+      g_LwipRxCurrentPbufPayloadPtr = (uint32)q->payload;
+      g_LwipRxCurrentPbufLen = (uint32)q->len;
+      g_LwipRxCurrentPbufTotLen = (uint32)q->tot_len;
+      g_LwipRxCurrentPbufRef = (uint32)q->ref;
+
       if (q->payload == NULL_PTR)
       {
         lwip_geth_DebugRxNullPayloadCnt++;
         pbuf_free(p);
         lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+        g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
+        return (pbuf_t *)0;
+      }
+
+      if ((((uint32)q->payload & 0x1u) != 0u) || (q->len > remaining))
+      {
+        lwip_geth_DebugRxPbufChainInvalidCnt++;
+        pbuf_free(p);
+        lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+        g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
         return (pbuf_t *)0;
       }
 
@@ -868,13 +1469,24 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
        * pbuf is the sum of the chained pbuf len members.
        */
       /* read data into q->payload, q->len */
-      memcpy(q->payload, src, q->len);
+      lwip_geth_CopyBytes(q->payload, src, (uint32)q->len);
       src = &src[q->len];
+      remaining = (u16_t)(remaining - q->len);
 
       LWIP_DEBUGF(NETIF_DEBUG | LWIP_DBG_TRACE, ("low_level_input: payload=0x%p, len=%d\n", q->payload, q->len));
     }
 
+    if (remaining != 0u)
+    {
+      lwip_geth_DebugRxPbufChainInvalidCnt++;
+      pbuf_free(p);
+      lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
+      g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
+      return (pbuf_t *)0;
+    }
+
     /* acknowledge that packet has been read */
+    g_LwipRxStage = LWIP_GETH_RX_STAGE_RELEASE;
     lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
 
 #if ETH_PAD_SIZE
@@ -891,10 +1503,12 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
   }
 
+  g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
   return p;
 }
 
 
+FBL_RAM_ETH_CODE
 uint8 lwip_geth_netif_input_once(netif_t *netif)
 {
   eth_hdr_t *ethhdr;
@@ -947,6 +1561,7 @@ uint8 lwip_geth_netif_input_once(netif_t *netif)
   return 1u;
 }
 
+FBL_RAM_ETH_CODE
 void lwip_geth_netif_input(void * pvParameters)
 {
   netif_t *netif = (netif_t *)pvParameters;
@@ -980,6 +1595,66 @@ void lwip_geth_netif_input(void * pvParameters)
     }
 #endif
   } while (LWIP_GETH_RTOS_ENABLED);
+}
+
+FBL_RAM_ETH_CODE
+uint8 lwip_geth_RamClosureIsValid(void)
+{
+  g_LwipGethRuntimeClosureFailStep = 0u;
+
+#define LWIP_GETH_CLOSURE_CHECK(step, symbol) \
+  do { if(FblRamRuntime_IsExecutableAddress((uint32)(symbol)) == 0u) { g_LwipGethRuntimeClosureFailStep = (step); return 0u; } } while(0)
+
+  LWIP_GETH_CLOSURE_CHECK(1u, lwip_geth_CopyBytes);
+  LWIP_GETH_CLOSURE_CHECK(2u, lwip_geth_IsExpectedRxDescriptorAddress);
+  LWIP_GETH_CLOSURE_CHECK(3u, lwip_geth_GetRxDescriptorIndex);
+  LWIP_GETH_CLOSURE_CHECK(4u, lwip_geth_GetValidatedRxDescriptor);
+  LWIP_GETH_CLOSURE_CHECK(5u, lwip_geth_PrepareRxHandle);
+  LWIP_GETH_CLOSURE_CHECK(6u, lwip_geth_IsDmaNonCachedRange);
+  LWIP_GETH_CLOSURE_CHECK(7u, lwip_geth_IsRxBufferValid);
+  LWIP_GETH_CLOSURE_CHECK(8u, lwip_geth_RestoreRxDescriptorBuffer);
+//  LWIP_GETH_CLOSURE_CHECK(9u, lwip_geth_CacheInvalidateRange);
+  LWIP_GETH_CLOSURE_CHECK(10u, lwip_geth_CacheWritebackInvalidateRange);
+  LWIP_GETH_CLOSURE_CHECK(11u, lwip_geth_FreeReceiveDescriptor);
+  LWIP_GETH_CLOSURE_CHECK(12u, lwip_geth_WaitTransmitBufferBounded);
+  LWIP_GETH_CLOSURE_CHECK(13u, lwip_geth_SendSingleTransmitBuffer);
+  LWIP_GETH_CLOSURE_CHECK(14u, lwip_geth_low_level_output);
+  LWIP_GETH_CLOSURE_CHECK(15u, lwip_geth_GetRxFrameSize);
+  LWIP_GETH_CLOSURE_CHECK(16u, lwip_geth_low_level_input);
+  LWIP_GETH_CLOSURE_CHECK(17u, lwip_geth_netif_input_once);
+  LWIP_GETH_CLOSURE_CHECK(18u, lwip_geth_netif_input);
+  LWIP_GETH_CLOSURE_CHECK(19u, lwip_geth_AssertFail);
+  LWIP_GETH_CLOSURE_CHECK(20u, FblRamGeth_SetLineSpeed);
+  LWIP_GETH_CLOSURE_CHECK(21u, FblRamGeth_FreeReceiveBuffer);
+  LWIP_GETH_CLOSURE_CHECK(22u, FblRamGeth_ShuffleRxDescriptor);
+  LWIP_GETH_CLOSURE_CHECK(23u, FblRamGeth_GetTransmitBuffer);
+  LWIP_GETH_CLOSURE_CHECK(24u, FblRamGeth_WakeupReceiver);
+  LWIP_GETH_CLOSURE_CHECK(25u, FblRamGeth_WakeupTransmitter);
+
+  if ((g_Lwip.netif.input != NULL_PTR) &&
+      (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.input) == 0u))
+  {
+    g_LwipGethRuntimeClosureFailStep = 25u;
+    return 0u;
+  }
+
+  if ((g_Lwip.netif.output != NULL_PTR) &&
+      (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.output) == 0u))
+  {
+    g_LwipGethRuntimeClosureFailStep = 26u;
+    return 0u;
+  }
+
+  if ((g_Lwip.netif.linkoutput != NULL_PTR) &&
+      (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.linkoutput) == 0u))
+  {
+    g_LwipGethRuntimeClosureFailStep = 27u;
+    return 0u;
+  }
+
+#undef LWIP_GETH_CLOSURE_CHECK
+
+  return 1u;
 }
 
 /**

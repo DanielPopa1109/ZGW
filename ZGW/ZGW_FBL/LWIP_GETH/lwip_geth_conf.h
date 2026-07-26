@@ -95,11 +95,16 @@ extern  LWIP_GETH_t *lwip_geth_handle;
 #define GW_ADDR3                        (1U)
 
 #define CPU_WHICH_SERVICE_ETHERNET      0
-#define ISR_PRIORITY_GETH_TX            10
-#define ISR_PRIORITY_GETH_RX            100
-#define LWIP_GETH_IS_ISR                1
+#define ISR_PRIORITY_GETH_TX            0
+#define ISR_PRIORITY_GETH_RX            0
+#define LWIP_GETH_IS_ISR                0
 
 #define LWIP_GETH_RTOS_ENABLED      0
+
+/* Lab bring-up: keep lwIP administratively up and force a deterministic
+ * RMII MAC mode if the PHY helper still reports link-down. This matches the
+ * application stack integration used on the same hardware. */
+#define LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP 1
 
 #endif /* ifndef LWIP_GETH_CONF_H_ */
 

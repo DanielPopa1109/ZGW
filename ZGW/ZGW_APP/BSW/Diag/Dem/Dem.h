@@ -42,6 +42,8 @@ void Dem_MainFunction(void);
 
 Dem_InitStateType Dem_GetInitState(void);
 boolean Dem_IsReady(void);
+Std_ReturnType Dem_SetDtcSetting(boolean enabled);
+boolean Dem_IsDtcSettingEnabled(void);
 
 Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType EventStatus);
 Std_ReturnType Dem_ReportErrorStatus(Dem_EventIdType EventId, Dem_EventStatusType EventStatus);

@@ -278,15 +278,92 @@ volatile uint8 GatewaySwc_EthRxCaptureData[GATEWAYSWC_ETH_RX_CAPTURE_SLOT_COUNT]
 #endif
 
 long long GatewaySwc_MainFunction_Counter = 0;
+static volatile boolean GatewaySwc_NormalCommunicationRxEnabled = TRUE;
+static volatile boolean GatewaySwc_NormalCommunicationTxEnabled = TRUE;
+
+Dcm_ReturnType GatewaySwc_SetDiagnosticCommunicationControl(uint8 controlType, uint8 communicationType)
+{
+    if ((communicationType == 0u) || ((communicationType & (uint8)~0x03u) != 0u))
+    {
+        return DCM_NRC_REQUEST_OUT_OF_RANGE;
+    }
+
+    switch (controlType)
+    {
+        case 0x00u:
+            GatewaySwc_NormalCommunicationRxEnabled = TRUE;
+            GatewaySwc_NormalCommunicationTxEnabled = TRUE;
+            return DCM_E_OK;
+
+        case 0x01u:
+            GatewaySwc_NormalCommunicationRxEnabled = TRUE;
+            GatewaySwc_NormalCommunicationTxEnabled = FALSE;
+            return DCM_E_OK;
+
+        case 0x02u:
+            GatewaySwc_NormalCommunicationRxEnabled = FALSE;
+            GatewaySwc_NormalCommunicationTxEnabled = TRUE;
+            return DCM_E_OK;
+
+        case 0x03u:
+            GatewaySwc_NormalCommunicationRxEnabled = FALSE;
+            GatewaySwc_NormalCommunicationTxEnabled = FALSE;
+            return DCM_E_OK;
+
+        default:
+            return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
+    }
+}
+
+Dcm_ReturnType DcmAppl_CommunicationControl(
+    uint8 connIdx,
+    Dcm_OpStatusType opStatus,
+    uint8 controlType,
+    uint8 communicationType)
+{
+    (void)connIdx;
+    (void)opStatus;
+
+    return GatewaySwc_SetDiagnosticCommunicationControl(controlType, communicationType);
+}
+
+Dcm_ReturnType DcmAppl_ControlDtcSetting(
+    uint8 connIdx,
+    Dcm_OpStatusType opStatus,
+    uint8 settingType)
+{
+    (void)connIdx;
+    (void)opStatus;
+
+    switch (settingType)
+    {
+        case 0x01u:
+            return (Dem_SetDtcSetting(TRUE) == E_OK) ? DCM_E_OK : DCM_NRC_REQUEST_OUT_OF_RANGE;
+
+        case 0x02u:
+            return (Dem_SetDtcSetting(FALSE) == E_OK) ? DCM_E_OK : DCM_NRC_REQUEST_OUT_OF_RANGE;
+
+        default:
+            return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
+    }
+}
 
 Std_ReturnType GatewaySwc_RequestComSendSignal(Com_SignalIdType signalId, const void *data)
 {
+    if (GatewaySwc_NormalCommunicationTxEnabled == FALSE)
+    {
+        return E_NOT_OK;
+    }
+
     return Com_SendSignal(signalId, data);
 }
 
 void GatewaySwc_RequestComMainFunctionTx(void)
 {
-    Com_MainFunctionTx();
+    if (GatewaySwc_NormalCommunicationTxEnabled != FALSE)
+    {
+        Com_MainFunctionTx();
+    }
 }
 
 Std_ReturnType GatewaySwc_RequestCanIfTransmit(PduIdType txPduId, const uint8 *data, PduLengthType len)
@@ -631,9 +708,16 @@ void GatewaySwc_MainFunction(void)
     GatewaySwc_UpdateComModeFromBusActivity();
 
     nowNs = TimeBase_PlatformGetCounterNs();
-    GatewaySwc_McuStatusMainFunction(nowNs);
+    if (GatewaySwc_NormalCommunicationTxEnabled != FALSE)
+    {
+        GatewaySwc_McuStatusMainFunction(nowNs);
+    }
 
-    if (GatewaySwc_NextEthPublishTimeNs == 0ull)
+    if (GatewaySwc_NormalCommunicationTxEnabled == FALSE)
+    {
+        GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
+    }
+    else if (GatewaySwc_NextEthPublishTimeNs == 0ull)
     {
         GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
     }
@@ -643,19 +727,25 @@ void GatewaySwc_MainFunction(void)
         GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
     }
 
-    GatewaySwc_FlushDtcTransitionQueue();
+    if (GatewaySwc_NormalCommunicationTxEnabled != FALSE)
+    {
+        GatewaySwc_FlushDtcTransitionQueue();
+    }
 
     GatewaySwc_RouteTimerMs += GATEWAYSWC_MAIN_PERIOD_MS;
     GatewaySwc_OutputTimerMs += GATEWAYSWC_MAIN_PERIOD_MS;
     GatewaySwc_DiagTimerMs += GATEWAYSWC_MAIN_PERIOD_MS;
 
-    if (GatewaySwc_RouteTimerMs >= GATEWAYSWC_ROUTE_PERIOD_MS)
+    if ((GatewaySwc_RouteTimerMs >= GATEWAYSWC_ROUTE_PERIOD_MS) &&
+            (GatewaySwc_NormalCommunicationRxEnabled != FALSE) &&
+            (GatewaySwc_NormalCommunicationTxEnabled != FALSE))
     {
         GatewaySwc_RouteTimerMs = 0u;
         GatewaySwc_RouteSignals();
     }
 
-    if (GatewaySwc_OutputTimerMs >= GATEWAYSWC_OUTPUT_PERIOD_MS)
+    if ((GatewaySwc_OutputTimerMs >= GATEWAYSWC_OUTPUT_PERIOD_MS) &&
+            (GatewaySwc_NormalCommunicationTxEnabled != FALSE))
     {
         GatewaySwc_OutputTimerMs = 0u;
         GatewaySwc_GenerateOwnedOutputs();
@@ -836,6 +926,11 @@ static void GatewaySwc_HandleEthRxMessage(uint8 soConId,
     GatewaySwc_CaptureEthRxMessage(soConId, remoteAddr, data, len);
 
     if ((soConId != GATEWAYSWC_ETH_SOCON_ID) || (data == NULL_PTR) || (len < 4u))
+    {
+        return;
+    }
+
+    if (GatewaySwc_NormalCommunicationRxEnabled == FALSE)
     {
         return;
     }

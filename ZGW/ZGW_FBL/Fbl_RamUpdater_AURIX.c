@@ -1,529 +1,460 @@
-/* Fbl_RamUpdater_AURIX.c
- *
- * RAM updater for AURIX TC375 FBL self-update.
- *
- * Supported receive transport while old FBL is still intact:
- *   Raw Ethernet + ARP + IPv4 + UDP, UDP port 13400
- *
- * Ethernet payload is direct UDS payload over UDP, not DoIP/TCP.
- * This is intentional for RAM-updater safety: no lwIP dependency is used here.
- *
- * Destructive phase rule:
- *   After RoutineControl 31 01 01 56, no CAN/Ethernet/lwIP/iLLD Ethernet code is used.
- *   Only RAM-resident updater code and PSPR-copied flash primitives execute.
- *
- * Linker requirement:
- *   Place this complete object into PSPR/LMU RAM for run-time execution.
- *   At minimum, all Ram_* functions executed after Ram_CommitFblImage() starts must run from RAM.
- */
-
-#include <string.h>
 #include "Ifx_Types.h"
-#include "IfxCpu.h"
-#include "IfxScuWdt.h"
-#include "IfxScuRcu.h"
-#include "IfxFlash.h"
-#include "IfxCan_Can.h"
-#include "IfxGeth_Eth.h"
-#include "IfxPort.h"
-#include "IfxPort_reg.h"
-#include "aurix_pin_mappings.h"
-#include "lwip_geth_conf.h"
-#include "lwip_geth_private_phy_dp83825i.h"
+#include "IfxCpu_Intrinsics.h"
+#include "IfxCpu_reg.h"
+#include "IfxCpu_Trap.h"
+#include "IfxDmu_reg.h"
+#include "IfxScu_reg.h"
+#include "IfxStm_reg.h"
+#include "FblBlu.h"
 
-#define RAM_CODE __attribute__((section(".ram_code")))
-#define RAM_DATA __attribute__((section(".ram_data")))
+#define RAM_CODE         FBL_RAM_BLU_CODE
+#define RAM_HELPER_CODE  FBL_RAM_HELPER_CODE
+#define RAM_FLASH_CODE   FBL_RAM_FLASH_CODE
+#define RAM_FLASH_HELPER FBL_RAM_FLASH_HELPER_CODE
+#define RAM_DATA         FBL_RAM_DSPR_DATA
+#define RAM_TRAP_CODE    FBL_RAM_TRAP_CODE
 
-#define FBL_TRANSPORT_ETH_RAW_UDP        1u
-#define FBL_TRANSPORT_CANFD              2u
-#define FBL_TRANSPORT_CAN_CLASSIC        3u
-#define FBL_RAM_CAN_TRANSPORT_ENABLED    0u
+#define CPU0_PSPR_GLOBAL_START           0x70100000u
+#define CPU0_PSPR_GLOBAL_END             0x7010FFFFu
+#define CPU0_PSPR_LOCAL_START            0xC0000000u
+#define CPU0_PSPR_LOCAL_END              0xC000FFFFu
+#define CPU0_DSPR_GLOBAL_START           0x70000000u
+#define CPU0_DSPR_GLOBAL_END             0x7003BFFFu
+#define CPU0_DSPR_LOCAL_START            0xD0000000u
+#define CPU0_DSPR_LOCAL_END              0xD003BFFFu
 
-#define FBL_START_NCACHED                0xA0000000u
-#define FBL_END_NCACHED                  0xA002FFFFu
-#define FBL_SIZE_BYTES                   0x00030000u
-
-#define PFLASH_NC_ADDRESS_PREFIX         0xA0000000u
-#define FLASH_ADDRESS_PREFIX_MASK        0xFF000000u
-#define DFLASH_REJECT_PREFIX_MASK        0xFFFF0000u
-#define DFLASH_REJECT_PREFIX_AF40        0xAF400000u
-#define DFLASH_REJECT_PREFIX_AF01        0xAF010000u
-#define DFLASH_REJECT_PREFIX_AF02        0xAF020000u
-
-#define FBL_IMAGE_RAM_ADDR               0xB0100000u
-#define FBL_IMAGE_RAM_SIZE               FBL_SIZE_BYTES
-
-#define PFLASH_BANK_A_START              0xA0000000u
-#define PFLASH_BANK_A_END                0xA03FFFFFu
-#define PFLASH_BANK_B_START              0xA0400000u
-#define PFLASH_BANK_B_END                0xA07FFFFFu
-
+#define PFLASH_START_NC                  0xA0000000u
+#define PFLASH_END_NC                    0xA05FFFFFu
+#define PFLASH_BANK_A_END                0xA02FFFFFu
+#define PFLASH_BANK_B_END                PFLASH_END_NC
+#define PFLASH_NONCACHED_BASE            0xA0000000u
+#define PFLASH_ALIAS_MASK                0x1FFFFFFFu
 #define PFLASH_PAGE_SIZE                 32u
 #define PFLASH_SECTOR_SIZE               0x4000u
+#define PFLASH_SECTOR_SHIFT              14u
+#define PFLASH_LOGICAL_SECTOR_SIZE       PFLASH_SECTOR_SIZE
+#define PFLASH_PHYSICAL_SECTOR_SIZE      0x00100000u
+#define PFLASH_ERASE_MAX_COMMAND_SIZE    0x00080000u
+#define PFLASH_ERASE_MAX_SECTORS         32u
 
-#define FLASH_MODULE                     0u
-#define PROGRAM_FLASH_BANK_A             IfxFlash_FlashType_P0
-#define PROGRAM_FLASH_BANK_B             IfxFlash_FlashType_P1
+#define FBL_FLASH_OK                     0u
+#define FBL_FLASH_ERROR_RANGE            1u
+#define FBL_FLASH_ERROR_TIMEOUT          2u
+#define FBL_FLASH_ERROR_DMU              3u
 
-#define FBL_CAN_REQ_ID                   0x710u
-#define FBL_CAN_RES_ID                   0x711u
-#define FBL_CAN_RX_PRIO                  2u
-#define FBL_CAN_MAX_DL                   64u
-#define FBL_CAN_CLASSIC_MAX_DL           8u
-#define FBL_CAN_EXT_ADDR_ZGW             0x41u
-#define FBL_CAN_EXT_ADDR_TESTER          0x41u
-#define FBL_CAN_ONBOARD_TRCV_STB_PORT    (&MODULE_P20)
-#define FBL_CAN_ONBOARD_TRCV_STB_PIN     6u
-#define FBL_ISOTP_MAX_PAYLOAD            4095u
+#define FLASH_CMD_BASE                   0xAF000000u
+#define FLASH_TYPE_P0                    2u
+#define FLASH_TYPE_P1                    3u
+#define FLASH_DMU_ERROR_MASK             0x0000001Fu
+#define FLASH_DMU_CLEAR_MASK             0x0000001Eu
+#define FLASH_WAIT_TIMEOUT               0x02000000u
 
-#define FBL_ETH_MTU                      1518u
-#define FBL_ETH_TYPE_ARP                 0x0806u
-#define FBL_ETH_TYPE_IPV4                0x0800u
-#define FBL_IP_PROTO_UDP                 17u
-#define FBL_UDP_PORT                     13400u
-#define FBL_ETH_DMA_INIT_ATTEMPTS        2u
+typedef char FblRam_AssertUint32Size[(sizeof(uint32) == 4u) ? 1 : -1];
+typedef char FblRam_AssertPflashPageSize[(PFLASH_PAGE_SIZE == 32u) ? 1 : -1];
 
-#define FBL_IP0                          IP_ADDR0
-#define FBL_IP1                          IP_ADDR1
-#define FBL_IP2                          IP_ADDR2
-#define FBL_IP3                          IP_ADDR3
+RAM_DATA volatile uint32 g_FblRamRuntimeActive;
+RAM_DATA volatile uint32 g_FblRamRuntimeTrapClass;
+RAM_DATA volatile uint32 g_FblRamRuntimeTrapTin;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastAddress;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastDmuError;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastDmuStatus;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastFlashType;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastWaitMask;
+RAM_DATA volatile uint32 g_FblRamRuntimeLastWaitGuard;
+RAM_DATA volatile uint32 g_FblEraseCommandCount;
+RAM_DATA volatile uint32 g_FblEraseDmuCommandCount;
+RAM_DATA volatile uint32 g_FblEraseLastStart;
+RAM_DATA volatile uint32 g_FblEraseLastLength;
+RAM_DATA volatile uint32 g_FblEraseLastChunkLength;
+RAM_DATA volatile uint32 g_FblEraseLastSectorCount;
+RAM_DATA volatile uint32 g_FblEraseLastPhysicalBoundary;
+RAM_DATA volatile uint32 g_FblEraseLastFlashType;
+RAM_DATA volatile uint32 g_FblEraseLastError;
+RAM_DATA volatile uint32 g_FblEraseErrorBeforeCommand;
+RAM_DATA volatile uint32 g_FblEraseErrorAfterCommand;
+RAM_DATA volatile uint32 g_FblEraseFailedCommandIndex;
+RAM_DATA volatile uint32 g_FblEraseDmuStatusBeforeClear;
+RAM_DATA volatile uint32 g_FblEraseDmuErrorBeforeClear;
+RAM_DATA volatile uint32 g_FblEraseDmuStatusAfterCommand;
+RAM_DATA volatile uint32 g_FblEraseDmuErrorAfterCommand;
+RAM_DATA volatile uint32 g_FblEraseDmuStatusAfterWait;
+RAM_DATA volatile uint32 g_FblEraseDmuErrorAfterWait;
+RAM_DATA volatile uint32 g_FblEraseBank0CommandCount;
+RAM_DATA volatile uint32 g_FblEraseBank1CommandCount;
+RAM_DATA volatile uint32 g_FblEraseDmuStartTick;
+RAM_DATA volatile uint32 g_FblEraseDmuEndTick;
+RAM_DATA volatile uint32 g_FblEraseDmuTicks;
+RAM_DATA volatile uint32 g_FblEraseWaitStartTick;
+RAM_DATA volatile uint32 g_FblEraseWaitEndTick;
+RAM_DATA volatile uint32 g_FblEraseWaitTicks;
+RAM_DATA volatile uint32 g_FblRamRuntimeDestructivePhase;
+RAM_DATA volatile uint32 g_FblRuntimeClosureFailStep;
+RAM_DATA volatile uint32 g_FblEthRuntimeClosureFailStep;
+RAM_DATA volatile uint32 g_LwipGethRuntimeClosureFailStep;
 
-#define UDS_SID_SESSION                  0x10u
-#define UDS_SID_RESET                    0x11u
-#define UDS_SID_RDBI                     0x22u
-#define UDS_SID_SECURITY_ACCESS          0x27u
-#define UDS_SID_COMM_CONTROL             0x28u
-#define UDS_SID_ROUTINE                  0x31u
-#define UDS_SID_REQ_DOWNLOAD             0x34u
-#define UDS_SID_TRANSFER_DATA            0x36u
-#define UDS_SID_TRANSFER_EXIT            0x37u
-#define UDS_SID_TESTER_PRESENT           0x3Eu
-#define UDS_SID_CONTROL_DTC_SETTING      0x85u
-#define UDS_NEG_RESP                     0x7Fu
+static void FblRamRuntime_TrapHandler(uint32 trapClass, uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass0(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass1(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass2(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass3(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass4(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass5(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass6(uint32 tin) RAM_CODE;
+static void FblRamRuntime_TrapHandlerClass7(uint32 tin) RAM_CODE;
+void FblRamRuntime_TrapVectorTable(void) RAM_TRAP_CODE;
+static uint8 FblRamFlash_WaitUnbusy(uint32 flashType) RAM_FLASH_CODE;
+static uint32 FblRamFlash_Bank(uint32 address) RAM_FLASH_CODE;
+static uint32 FblRamFlash_BankEndExclusive(uint32 flashType) RAM_FLASH_CODE;
+static uint32 FblRamFlash_ToNonCached(uint32 address) RAM_FLASH_CODE;
+static uint32 FblRamFlash_GetEraseChunkLength(uint32 address, uint32 remaining) RAM_FLASH_CODE;
+static uint32 FblRamFlash_ValidateEraseRange(uint32 address, uint32 length) RAM_FLASH_CODE;
+static uint32 FblRamFlash_IssueEraseMultiple(uint32 address, uint32 sectorCount, uint32 flashType) RAM_FLASH_CODE;
+static uint8 FblRamFlash_HasError(void) RAM_FLASH_CODE;
+static uint8 FblRamFlash_EnterPageMode(uint32 address) RAM_FLASH_HELPER;
+static void FblRamFlash_Load2X32(uint32 wordLow, uint32 wordHigh) RAM_FLASH_HELPER;
+static void FblRamFlash_WritePage(uint32 address) RAM_FLASH_HELPER;
 
-#define UDS_NRC_SUBFUNC_NOT_SUPPORTED    0x12u
-#define UDS_NRC_INCORRECT_LEN            0x13u
-#define UDS_NRC_COND_NOT_CORRECT         0x22u
-#define UDS_NRC_SEQUENCE_ERROR           0x24u
-#define UDS_NRC_OUT_OF_RANGE             0x31u
-#define UDS_NRC_INVALID_KEY              0x35u
-#define UDS_NRC_TRANSFER_FAIL            0x70u
-#define UDS_NRC_WRONG_BLOCK_SEQUENCE     0x73u
-
-#define UDS_RID_COMMIT_FBL               0x0156u
-
-/* RDBI identifiers and version data must match the FBL application-update
- * handler (Cpu0_Main.c Fbl_UdsHandle) so the programming sequence behaves
- * identically while the RAM updater is active. */
-#define UDS_DID_ACTIVE_SOFTWARE_BLOCK    0xF100u
-#define UDS_DID_SOFTWARE_VERSION         0xF101u
-#define UDS_DID_ACTIVE_SESSION           0xF186u
-#define FBL_DIAG_SESSION_PROGRAMMING     0x02u
-#define FBL_ACTIVE_SOFTWARE_BLOCK        0x01u
-#define APP_SW_VERSION_MAJOR             1u
-#define APP_SW_VERSION_MINOR             0u
-#define APP_SW_VERSION_PATCH             0u
-#define FBL_SW_VERSION_MAJOR             1u
-#define FBL_SW_VERSION_MINOR             0u
-#define FBL_SW_VERSION_PATCH             0u
-
-#define RAM_FLASH_FUNC_BASE              0x70100000u
-#define RAM_FLASH_FUNC_LEN               192u
-#define RAM_FLASH_ERASE_ADDR             (RAM_FLASH_FUNC_BASE)
-#define RAM_FLASH_WAIT_ADDR              (RAM_FLASH_ERASE_ADDR + RAM_FLASH_FUNC_LEN)
-#define RAM_FLASH_ENTER_ADDR             (RAM_FLASH_WAIT_ADDR + RAM_FLASH_FUNC_LEN)
-#define RAM_FLASH_LOAD_ADDR              (RAM_FLASH_ENTER_ADDR + RAM_FLASH_FUNC_LEN)
-#define RAM_FLASH_WRITE_ADDR             (RAM_FLASH_LOAD_ADDR + RAM_FLASH_FUNC_LEN)
-#define RAM_RESET_FUNC_ADDR              (RAM_FLASH_WRITE_ADDR + RAM_FLASH_FUNC_LEN)
-
-extern volatile uint32 g_FblTransportSelect;
-extern const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config;
-extern IfxGeth_Eth LWIP_GETH_0_lld_handle;
-
-#ifndef IFXGETH_MAX_TX_BUFFER_SIZE
-#define IFXGETH_MAX_TX_BUFFER_SIZE       (2560u + 14u + 2u)
-#endif
-
-#ifndef IFXGETH_MAX_RX_BUFFER_SIZE
-#define IFXGETH_MAX_RX_BUFFER_SIZE       (2560u + 14u + 2u)
-#endif
-
-typedef struct
+RAM_HELPER_CODE FblRam_InterruptState FblRam_DisableInterrupts(void)
 {
-    IfxCan_Can_Config canConfig;
-    IfxCan_Can canModule;
-    IfxCan_Can_Node canNode;
-    IfxCan_Can_NodeConfig nodeConfig;
-    IfxCan_Filter filter;
-    IfxCan_Message rxMsg;
-    IfxCan_Message txMsg;
-    uint8 rxData[FBL_CAN_MAX_DL];
-    uint8 txData[FBL_CAN_MAX_DL];
-} RamCan_Type;
+    Ifx_CPU_ICR icr;
+    icr.U = __mfcr(CPU_ICR);
+    __disable();
+    __nop();
+    return (icr.B.IE != 0u) ? 1u : 0u;
+}
 
-typedef struct
+RAM_HELPER_CODE void FblRam_RestoreInterrupts(FblRam_InterruptState state)
 {
-    uint8 rxBuf[FBL_ISOTP_MAX_PAYLOAD];
-    uint16 rxLen;
-    uint16 rxIdx;
-    uint8 nextSn;
-    uint8 rxReady;
-    uint8 addrOffset;
-    uint8 txAddrOffset;
-} RamIso_Type;
-
-typedef struct
-{
-    void (*eraseSectors)(uint32 sectorAddr, uint32 numSector);
-    uint8 (*waitUnbusy)(uint32 flash, IfxFlash_FlashType flashType);
-    uint8 (*enterPageMode)(uint32 pageAddr);
-    void (*load2X32)(uint32 pageAddr, uint32 wordL, uint32 wordU);
-    void (*writePage)(uint32 pageAddr);
-    void (*reset)(uint8 resetType, uint16 userInfo);
-} RamFlashCmd_Type;
-
-typedef struct
-{
-    uint8 active;
-    uint32 targetAddr;
-    uint32 length;
-    uint32 received;
-    uint32 expectedCrc;
-    uint8 expectedCrcValid;
-    uint8 nextBlock;
-} RamDownload_Type;
-
-typedef struct
-{
-    uint8 valid;
-    uint8 mac[6];
-    uint8 ip[4];
-    uint16 udpPort;
-} RamEthPeer_Type;
-
-static RamCan_Type g_can;
-static RamIso_Type g_iso;
-static RamFlashCmd_Type g_cmd;
-static RamDownload_Type g_dl;
-static RamEthPeer_Type g_ethPeer;
-static IfxGeth_Eth *g_geth = &LWIP_GETH_0_lld_handle;
-
-static uint32 g_secSeed;
-static uint8 g_secSeedValid;
-static uint8 g_pageBuf[PFLASH_PAGE_SIZE];
-static uint32 g_pageAddr = 0xFFFFFFFFu;
-static uint32 g_pageFill = 0u;
-static uint8 g_ethMac[6] = {0x00u, 0x03u, 0x19u, 0x45u, 0x00u, 0x00u};
-static uint8 g_ethIp[4] = {FBL_IP0, FBL_IP1, FBL_IP2, FBL_IP3};
-static uint8 g_ethRxFrame[FBL_ETH_MTU];
-static uint8 g_ethTxFrame[FBL_ETH_MTU];
-static uint8 g_udsReq[FBL_ISOTP_MAX_PAYLOAD];
-static uint16 g_udsReqLen;
-static uint8 g_udsReqReady;
-volatile uint32 FblRam_EthDmaResetTimeoutCnt;
-volatile uint32 FblRam_EthDmaInitRetryCnt;
-volatile uint32 FblRam_EthDmaModeAfterInit;
-
-IFX_INTERRUPT(FblRam_CanRxIsr, 0u, FBL_CAN_RX_PRIO);
-
-#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
-static void Ram_CanReleaseClassicRxPinFromScr(void);
-static void Ram_CanOnboardTrcvSetNormalMode(void);
-static void Ram_CanInit(uint8 transport);
-#endif
-static void Ram_CanSend(const uint8 *data, uint8 len);
-static uint8 Ram_CanPayloadLen(void);
-static uint8 Ram_DlcFromLen(uint8 len);
-static uint8 Ram_LenFromDlc(uint8 dlc);
-static void Ram_IsoRx(const uint8 *data, uint8 len);
-#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
-static void Ram_IsoSend(const uint8 *data, uint16 len);
-#endif
-static void Ram_IsoSendFc(void);
-static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len);
-
-static void Ram_EthInit(void);
-static uint8 Ram_EthInitModuleWithResetCheck(IfxGeth_Eth *geth, IfxGeth_Eth_Config *cfg);
-static void Ram_EthStopMacDma(Ifx_GETH *gethSFR);
-static void Ram_EthPoll(void);
-static uint16 Ram_EthRxFrame(uint8 *buf, uint16 maxLen);
-static void Ram_EthTxFrame(const uint8 *buf, uint16 len);
-static void Ram_EthHandleFrame(const uint8 *buf, uint16 len);
-static void Ram_EthHandleArp(const uint8 *buf, uint16 len);
-static void Ram_EthHandleIpv4(const uint8 *buf, uint16 len);
-static void Ram_EthSendArpReply(const uint8 *request);
-static void Ram_EthSendUdp(const uint8 *payload, uint16 payloadLen);
-static uint16 Ram_EthRxFrameSize(IfxGeth_RxDescr *descr);
-static uint16 Ram_IpChecksum(const uint8 *data, uint16 len);
-
-static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport);
-static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport);
-static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport);
-static void Ram_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport);
-static uint32 Ram_SecCalcKey(uint32 seed, uint8 level);
-
-RAM_CODE  static void Ram_FlashInit(void);
-RAM_CODE  static void Ram_CommitFblImage(void);
-RAM_CODE  static uint32 Ram_EraseRange(uint32 addr, uint32 len);
-RAM_CODE  static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len);
-RAM_CODE  static uint32 Ram_FlushPage(void);
-RAM_CODE  static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data);
-RAM_CODE  static IfxFlash_FlashType Ram_Bank(uint32 addr);
-RAM_CODE  static uint32 Ram_Crc32(uint32 addr, uint32 len);
-RAM_CODE  static void Ram_FillByte(void *dst, uint8 value, uint32 len);
-static uint8 Ram_IsExplicitlyRejectedProgrammingAddress(uint32 addr);
-static uint8 Ram_FblRangeValid(uint32 addr, uint32 len);
-static uint32 Ram_Rd32(const uint8 *p);
-static uint16 Ram_Rd16(const uint8 *p);
-static void Ram_Wr16(uint8 *p, uint16 v);
-static void Ram_Wr32(uint8 *p, uint32 v);
-RAM_CODE  static void Ram_Reset(void);
-
-void FblRamUpdater_Entry(void)
-{
-    IfxCpu_disableInterrupts();
-
-    Ram_FlashInit();
-    memset(&g_iso, 0u, sizeof(g_iso));
-    memset(&g_dl, 0u, sizeof(g_dl));
-    memset(&g_ethPeer, 0u, sizeof(g_ethPeer));
-    g_secSeed = 0u;
-    g_secSeedValid = 0u;
-    memset((void *)FBL_IMAGE_RAM_ADDR, 0x36, FBL_IMAGE_RAM_SIZE);
-
-    g_FblTransportSelect = FBL_TRANSPORT_ETH_RAW_UDP;
-    Ram_EthInit();
-
-    IfxCpu_enableInterrupts();
-
-    while(1)
+    if(state != 0u)
     {
-        Ram_EthPoll();
+        __enable();
+    }
+}
 
-        if(g_udsReqReady != 0u)
+RAM_HELPER_CODE uint16 FblRam_GetCpuWatchdogPassword(void)
+{
+    uint16 password = MODULE_SCU.WDTCPU[0].CON0.B.PW;
+    password ^= 0x003Fu;
+    return password;
+}
+
+RAM_HELPER_CODE void FblRam_ClearCpuEndinit(uint16 password)
+{
+    volatile Ifx_SCU_WDTCPU_CON0 *watchdog = &SCU_WDTCPU0_CON0;
+    Ifx_SCU_WDTCPU_CON0 con0;
+
+    if(watchdog->B.LCK != 0u)
+    {
+        con0.U = 0u;
+        con0.B.ENDINIT = 1u;
+        con0.B.LCK = 0u;
+        con0.B.PW = password;
+        con0.B.REL = watchdog->B.REL;
+        watchdog->U = con0.U;
+    }
+
+    con0.U = 0u;
+    con0.B.ENDINIT = 0u;
+    con0.B.LCK = 1u;
+    con0.B.PW = password;
+    con0.B.REL = watchdog->B.REL;
+    watchdog->U = con0.U;
+
+    while(watchdog->B.ENDINIT != 0u)
+    {}
+    __dsync();
+}
+
+RAM_HELPER_CODE void FblRam_SetCpuEndinit(uint16 password)
+{
+    volatile Ifx_SCU_WDTCPU_CON0 *watchdog = &SCU_WDTCPU0_CON0;
+    Ifx_SCU_WDTCPU_CON0 con0;
+
+    if(watchdog->B.LCK != 0u)
+    {
+        con0.U = 0u;
+        con0.B.ENDINIT = 1u;
+        con0.B.LCK = 0u;
+        con0.B.PW = password;
+        con0.B.REL = watchdog->B.REL;
+        watchdog->U = con0.U;
+    }
+
+    con0.U = 0u;
+    con0.B.ENDINIT = 1u;
+    con0.B.LCK = 1u;
+    con0.B.PW = password;
+    con0.B.REL = watchdog->B.REL;
+    watchdog->U = con0.U;
+
+    while(watchdog->B.ENDINIT == 0u)
+    {}
+    __dsync();
+}
+
+RAM_HELPER_CODE uint16 FblRam_GetSafetyWatchdogPassword(void)
+{
+    uint16 password = MODULE_SCU.WDTS.CON0.B.PW;
+    password ^= 0x003Fu;
+    return password;
+}
+
+RAM_HELPER_CODE void FblRam_ClearSafetyEndinit(uint16 password)
+{
+    Ifx_SCU_WDTS_CON0 con0;
+
+    if(SCU_WDTS_CON0.B.LCK != 0u)
+    {
+        con0.U = 0u;
+        con0.B.ENDINIT = 1u;
+        con0.B.LCK = 0u;
+        con0.B.PW = password;
+        con0.B.REL = SCU_WDTS_CON0.B.REL;
+        SCU_WDTS_CON0.U = con0.U;
+    }
+
+    con0.U = 0u;
+    con0.B.ENDINIT = 0u;
+    con0.B.LCK = 1u;
+    con0.B.PW = password;
+    con0.B.REL = SCU_WDTS_CON0.B.REL;
+    SCU_WDTS_CON0.U = con0.U;
+
+    while(SCU_WDTS_CON0.B.ENDINIT != 0u)
+    {}
+    __dsync();
+}
+
+RAM_HELPER_CODE void FblRam_SetSafetyEndinit(uint16 password)
+{
+    Ifx_SCU_WDTS_CON0 con0;
+
+    if(SCU_WDTS_CON0.B.LCK != 0u)
+    {
+        con0.U = 0u;
+        con0.B.ENDINIT = 1u;
+        con0.B.LCK = 0u;
+        con0.B.PW = password;
+        con0.B.REL = SCU_WDTS_CON0.B.REL;
+        SCU_WDTS_CON0.U = con0.U;
+    }
+
+    con0.U = 0u;
+    con0.B.ENDINIT = 1u;
+    con0.B.LCK = 1u;
+    con0.B.PW = password;
+    con0.B.REL = SCU_WDTS_CON0.B.REL;
+    SCU_WDTS_CON0.U = con0.U;
+
+    while(SCU_WDTS_CON0.B.ENDINIT == 0u)
+    {}
+    __dsync();
+}
+
+RAM_HELPER_CODE void FblRam_InvalidateProgramCache(void)
+{
+    uint16 password = FblRam_GetCpuWatchdogPassword();
+    Ifx_CPU_PCON1 pcon1;
+
+    FblRam_ClearCpuEndinit(password);
+    pcon1.U = __mfcr(CPU_PCON1);
+    pcon1.B.PCINV = 1u;
+    __dsync();
+    __mtcr(CPU_PCON1, pcon1.U);
+    __isync();
+    FblRam_SetCpuEndinit(password);
+}
+
+RAM_HELPER_CODE void FblRam_RequestSystemReset(void)
+{
+    uint16 safetyPassword;
+    uint16 cpuPassword;
+
+    (void)FblRam_DisableInterrupts();
+    __dsync();
+
+    safetyPassword = FblRam_GetSafetyWatchdogPassword();
+    FblRam_ClearSafetyEndinit(safetyPassword);
+    MODULE_SCU.RSTCON.B.SW = 2u;
+    FblRam_SetSafetyEndinit(safetyPassword);
+
+    cpuPassword = FblRam_GetCpuWatchdogPassword();
+    FblRam_ClearCpuEndinit(cpuPassword);
+    MODULE_SCU.RSTCON2.B.USRINFO = 0u;
+    MODULE_SCU.SWRSTCON.B.SWRSTREQ = 1u;
+    FblRam_SetCpuEndinit(cpuPassword);
+
+    for(;;)
+    {
+        __nop();
+    }
+}
+
+RAM_HELPER_CODE void FblRam_CopyBytes(void *dst, const void *src, uint32 length)
+{
+    uint8 *d = (uint8 *)dst;
+    const uint8 *s = (const uint8 *)src;
+    uint32 i;
+
+    for(i = 0u; i < length; i++)
+    {
+        d[i] = s[i];
+    }
+}
+
+RAM_HELPER_CODE void *FblRam_Memcpy(void *destination, const void *source, uint32 length)
+{
+    uint8 *d = (uint8 *)destination;
+    const uint8 *s = (const uint8 *)source;
+    uint32 i;
+
+    for(i = 0u; i < length; i++)
+    {
+        d[i] = s[i];
+    }
+
+    return destination;
+}
+
+RAM_HELPER_CODE void *FblRam_Memset(void *destination, uint8 value, uint32 length)
+{
+    uint8 *d = (uint8 *)destination;
+    uint32 i;
+
+    for(i = 0u; i < length; i++)
+    {
+        d[i] = value;
+    }
+
+    return destination;
+}
+
+RAM_HELPER_CODE void *FblRam_Memmove(void *destination, const void *source, uint32 length)
+{
+    uint8 *d = (uint8 *)destination;
+    const uint8 *s = (const uint8 *)source;
+    uint32 i;
+
+    if((d > s) && (d < &s[length]))
+    {
+        for(i = length; i > 0u; i--)
         {
-            g_udsReqReady = 0u;
-            Ram_UdsHandle(g_udsReq, g_udsReqLen, FBL_TRANSPORT_ETH_RAW_UDP);
+            d[i - 1u] = s[i - 1u];
         }
-    }
-}
-
-#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
-static void Ram_CanReleaseClassicRxPinFromScr(void)
-{
-    uint16 safetyWdtPw;
-
-    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
-    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
-    while(P33_PCSR.B.LCK)
-    {
-    }
-    P33_PCSR.B.SEL5 = 0u;
-    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
-}
-
-static void Ram_CanOnboardTrcvSetNormalMode(void)
-{
-    IfxPort_setPinModeOutput(FBL_CAN_ONBOARD_TRCV_STB_PORT,
-            FBL_CAN_ONBOARD_TRCV_STB_PIN,
-            IfxPort_OutputMode_pushPull,
-            IfxPort_OutputIdx_general);
-    IfxPort_setPinLow(FBL_CAN_ONBOARD_TRCV_STB_PORT, FBL_CAN_ONBOARD_TRCV_STB_PIN);
-}
-
-static void Ram_CanInit(uint8 transport)
-{
-    uint8 isClassic = (transport == FBL_TRANSPORT_CAN_CLASSIC) ? 1u : 0u;
-
-    if(isClassic != 0u)
-    {
-        Ram_CanReleaseClassicRxPinFromScr();
-        can1_node3_init_pins();
     }
     else
     {
-        can0_node0_init_pins();
+        for(i = 0u; i < length; i++)
+        {
+            d[i] = s[i];
+        }
     }
 
-    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    return destination;
+}
 
-    IfxCan_Can_initModuleConfig(&g_can.canConfig, (isClassic != 0u) ? &MODULE_CAN1 : &MODULE_CAN0);
-    IfxCan_Can_initModule(&g_can.canModule, &g_can.canConfig);
-    IfxCan_Can_initNodeConfig(&g_can.nodeConfig, &g_can.canModule);
+RAM_HELPER_CODE sint32 FblRam_Memcmp(const void *left, const void *right, uint32 length)
+{
+    const uint8 *a = (const uint8 *)left;
+    const uint8 *b = (const uint8 *)right;
 
-    IfxScuCcu_setMcanFrequency(40000000.0f);
-
-    g_can.nodeConfig.nodeId = (isClassic != 0u) ? IfxCan_NodeId_3 : IfxCan_NodeId_0;
-    g_can.nodeConfig.frame.mode = (isClassic != 0u) ? IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
-    g_can.nodeConfig.frame.type = IfxCan_FrameType_transmitAndReceive;
-    g_can.nodeConfig.baudRate.baudrate = 500000u;
-
-    if(isClassic == 0u)
+    while(length > 0u)
     {
-        g_can.nodeConfig.baudRate.prescaler = 3u;
-        g_can.nodeConfig.baudRate.timeSegment1 = 14u;
-        g_can.nodeConfig.baudRate.timeSegment2 = 3u;
-        g_can.nodeConfig.baudRate.syncJumpWidth = 1u;
-        g_can.nodeConfig.fastBaudRate.baudrate = 2000000u;
-        g_can.nodeConfig.fastBaudRate.prescaler = 0u;
-        g_can.nodeConfig.fastBaudRate.timeSegment1 = 14u;
-        g_can.nodeConfig.fastBaudRate.timeSegment2 = 3u;
-        g_can.nodeConfig.fastBaudRate.syncJumpWidth = 1u;
+        if(*a != *b)
+        {
+            return (*a < *b) ? -1 : 1;
+        }
+
+        ++a;
+        ++b;
+        --length;
     }
 
-    g_can.nodeConfig.calculateBitTimingValues = TRUE;
+    return 0;
+}
 
-    g_can.nodeConfig.txConfig.txMode = IfxCan_TxMode_dedicatedBuffers;
-    g_can.nodeConfig.txConfig.dedicatedTxBuffersNumber = 1u;
-    g_can.nodeConfig.txConfig.txBufferDataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
+RAM_HELPER_CODE uint32 FblRam_Strlen(const char *text)
+{
+    uint32 length = 0u;
 
-    g_can.nodeConfig.rxConfig.rxMode = IfxCan_RxMode_fifo0;
-    g_can.nodeConfig.rxConfig.rxFifo0DataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
-    g_can.nodeConfig.rxConfig.rxBufferDataFieldSize =
-            (isClassic != 0u) ? IfxCan_DataFieldSize_8 : IfxCan_DataFieldSize_64;
-    g_can.nodeConfig.rxConfig.rxFifo0Size = (isClassic != 0u) ? 32u : 12u;
-
-    g_can.nodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_both;
-    g_can.nodeConfig.filterConfig.standardListSize = 1u;
-    g_can.nodeConfig.filterConfig.extendedListSize = 0u;
-    g_can.nodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
-    g_can.nodeConfig.filterConfig.extendedFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
-    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
-    g_can.nodeConfig.filterConfig.rejectRemoteFramesWithExtendedId = TRUE;
-
-    g_can.nodeConfig.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
-    g_can.nodeConfig.interruptConfig.rxf0n.priority = FBL_CAN_RX_PRIO;
-    g_can.nodeConfig.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_0;
-
-    g_can.nodeConfig.messageRAM.baseAddress = (uint32)g_can.nodeConfig.can;
-    g_can.nodeConfig.messageRAM.standardFilterListStartAddress = (isClassic != 0u) ? 0x000u : 0x800u;
-    g_can.nodeConfig.messageRAM.extendedFilterListStartAddress = (isClassic != 0u) ? 0x080u : 0x880u;
-    g_can.nodeConfig.messageRAM.rxFifo0StartAddress = (isClassic != 0u) ? 0x180u : 0x980u;
-    g_can.nodeConfig.messageRAM.txBuffersStartAddress = (isClassic != 0u) ? 0x400u : 0xD00u;
-
-    IfxCan_Can_initNode(&g_can.canNode, &g_can.nodeConfig);
-
-    g_can.filter.number = 0u;
-    g_can.filter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
-    g_can.filter.type = IfxCan_FilterType_classic;
-    g_can.filter.id1 = FBL_CAN_REQ_ID;
-    g_can.filter.id2 = FBL_CAN_REQ_ID;
-    IfxCan_Can_setStandardFilter(&g_can.canNode, &g_can.filter);
-
-    if(isClassic != 0u)
+    if(text == (const char *)0)
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD13B_P33_5_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD13_P33_4_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
+        return 0u;
+    }
+
+    while(text[length] != '\0')
+    {
+        length++;
+    }
+
+    return length;
+}
+
+RAM_HELPER_CODE void FblRam_SetBytes(void *dst, uint8 value, uint32 length)
+{
+    uint8 *d = (uint8 *)dst;
+    uint32 i;
+
+    for(i = 0u; i < length; i++)
+    {
+        d[i] = value;
+    }
+}
+
+RAM_HELPER_CODE void FblRam_MoveBytes(void *dst, const void *src, uint32 length)
+{
+    uint8 *d = (uint8 *)dst;
+    const uint8 *s = (const uint8 *)src;
+    uint32 i;
+
+    if((d > s) && (d < &s[length]))
+    {
+        for(i = length; i > 0u; i--)
+        {
+            d[i - 1u] = s[i - 1u];
+        }
     }
     else
     {
-        IfxCan_Node_initRxPin(g_can.canNode.node, &IfxCan_RXD00B_P20_7_IN, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1);
-        IfxCan_Node_initTxPin(&IfxCan_TXD00_P20_8_OUT, IfxPort_OutputMode_pushPull, IfxPort_PadDriver_cmosAutomotiveSpeed4);
-        Ram_CanOnboardTrcvSetNormalMode();
+        FblRam_CopyBytes(dst, src, length);
     }
-
-    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 }
-#endif
 
-void FblRam_CanRxIsr(void)
+RAM_HELPER_CODE sint32 FblRam_CompareBytes(const void *a, const void *b, uint32 length)
 {
-    uint8 len;
+    const uint8 *pa = (const uint8 *)a;
+    const uint8 *pb = (const uint8 *)b;
+    uint32 i;
 
-    IfxCan_Node_clearInterruptFlag(g_can.canNode.node, IfxCan_Interrupt_rxFifo0NewMessage);
-
-    while(IfxCan_Can_getRxFifo0FillLevel(&g_can.canNode) > 0u)
+    for(i = 0u; i < length; i++)
     {
-        IfxCan_Can_initMessage(&g_can.rxMsg);
-        g_can.rxMsg.readFromRxFifo0 = TRUE;
-        memset(g_can.rxData, 0u, sizeof(g_can.rxData));
-        IfxCan_Can_readMessage(&g_can.canNode, &g_can.rxMsg, (uint32 *)g_can.rxData);
-
-        if(g_can.rxMsg.messageId == FBL_CAN_REQ_ID)
+        if(pa[i] != pb[i])
         {
-            len = Ram_LenFromDlc((uint8)g_can.rxMsg.dataLengthCode);
-            if(len > Ram_CanPayloadLen())
-            {
-                len = Ram_CanPayloadLen();
-            }
-            Ram_IsoRx(g_can.rxData, len);
+            return (sint32)pa[i] - (sint32)pb[i];
         }
     }
+
+    return 0;
 }
 
-static void Ram_CanSend(const uint8 *data, uint8 len)
+RAM_CODE uint8 FblRamRuntime_IsExecutableAddress(uint32 address)
 {
-    uint8 maxLen = Ram_CanPayloadLen();
-
-    if(len > maxLen)
+    if((address >= CPU0_PSPR_GLOBAL_START) && (address <= CPU0_PSPR_GLOBAL_END))
     {
-        len = maxLen;
+        return 1u;
     }
 
-    memset(g_can.txData, 0u, sizeof(g_can.txData));
-    memcpy(g_can.txData, data, len);
-
-    IfxCan_Can_initMessage(&g_can.txMsg);
-    g_can.txMsg.messageId = FBL_CAN_RES_ID;
-    g_can.txMsg.frameMode = (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
-            IfxCan_FrameMode_standard : IfxCan_FrameMode_fdLong;
-    g_can.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
-    g_can.txMsg.dataLengthCode = Ram_DlcFromLen(len);
-    g_can.txMsg.bufferNumber = 0u;
-
-    while(IfxCan_Can_sendMessage(&g_can.canNode, &g_can.txMsg, (uint32 *)g_can.txData) == IfxCan_Status_notSentBusy)
+    if((address >= CPU0_PSPR_LOCAL_START) && (address <= CPU0_PSPR_LOCAL_END))
     {
-    }
-}
-
-static uint8 Ram_DlcFromLen(uint8 len)
-{
-    if(len <= 8u) { return len; }
-    if(len <= 12u) { return 9u; }
-    if(len <= 16u) { return 10u; }
-    if(len <= 20u) { return 11u; }
-    if(len <= 24u) { return 12u; }
-    if(len <= 32u) { return 13u; }
-    if(len <= 48u) { return 14u; }
-    return 15u;
-}
-
-static uint8 Ram_LenFromDlc(uint8 dlc)
-{
-    static const uint8 map[16] = {0u,1u,2u,3u,4u,5u,6u,7u,8u,12u,16u,20u,24u,32u,48u,64u};
-    return map[dlc & 0x0Fu];
-}
-
-static uint8 Ram_CanPayloadLen(void)
-{
-    return (g_FblTransportSelect == FBL_TRANSPORT_CAN_CLASSIC) ?
-            FBL_CAN_CLASSIC_MAX_DL : FBL_CAN_MAX_DL;
-}
-
-static void Ram_IsoSendFc(void)
-{
-    uint8 fc[64];
-    uint8 addrOffset = g_iso.txAddrOffset;
-
-    memset(fc, 0u, sizeof(fc));
-    if(addrOffset != 0u)
-    {
-        fc[0u] = FBL_CAN_EXT_ADDR_TESTER;
+        return 1u;
     }
 
-    fc[addrOffset] = 0x30u;
-    fc[addrOffset + 1u] = 0x00u;
-    fc[addrOffset + 2u] = 0x00u;
-    Ram_CanSend(fc, Ram_CanPayloadLen());
-}
+    if((address >= CPU0_DSPR_GLOBAL_START) && (address <= CPU0_DSPR_GLOBAL_END))
+    {
+        return 1u;
+    }
 
-static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len)
-{
-    if((len > 1u) && (data[0u] == FBL_CAN_EXT_ADDR_ZGW))
+    if((address >= CPU0_DSPR_LOCAL_START) && (address <= CPU0_DSPR_LOCAL_END))
     {
         return 1u;
     }
@@ -531,1243 +462,462 @@ static uint8 Ram_IsoDetectAddrOffset(const uint8 *data, uint8 len)
     return 0u;
 }
 
-static void Ram_IsoRx(const uint8 *data, uint8 len)
+RAM_CODE uint8 FblRamRuntime_EnterCritical(void)
 {
-    uint8 pci;
-    uint8 pciIdx;
-    uint16 ffLen;
-    uint8 copy;
-    uint8 sn;
+    FblRam_InterruptState state = FblRam_DisableInterrupts();
+    __isync();
 
-    if(len == 0u) { return; }
-
-    g_iso.addrOffset = Ram_IsoDetectAddrOffset(data, len);
-    if(len <= g_iso.addrOffset) { return; }
-
-    pciIdx = g_iso.addrOffset;
-    pci = data[pciIdx] & 0xF0u;
-
-    if(pci == 0x00u)
+    if((FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_EnterCritical) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapVectorTable) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass0) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass1) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass2) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass3) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass4) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass5) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass6) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_TrapHandlerClass7) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_SetDestructivePhase) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamFlash_EraseRange) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamFlash_ProgramPage) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_RequestReset) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRam_RequestSystemReset) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRam_InvalidateProgramCache) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRam_CopyBytes) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRam_SetBytes) == 0u))
     {
-        uint8 sfLen = data[pciIdx] & 0x0Fu;
-        uint8 off = (uint8)(pciIdx + 1u);
-
-        if(sfLen == 0u)
-        {
-            if(len < (uint8)(pciIdx + 2u)) { return; }
-            sfLen = data[pciIdx + 1u];
-            off = (uint8)(pciIdx + 2u);
-        }
-
-        if((sfLen <= (len - off)) && (sfLen <= FBL_ISOTP_MAX_PAYLOAD))
-        {
-            memcpy(g_iso.rxBuf, &data[off], sfLen);
-            g_iso.rxLen = sfLen;
-            g_iso.rxIdx = 0u;
-            g_iso.txAddrOffset = g_iso.addrOffset;
-            g_iso.rxReady = 1u;
-        }
-    }
-    else if(pci == 0x10u)
-    {
-        if(len < (uint8)(pciIdx + 3u)) { return; }
-
-        ffLen = (((uint16)(data[pciIdx] & 0x0Fu)) << 8u) | data[pciIdx + 1u];
-
-        if((ffLen == 0u) || (ffLen > FBL_ISOTP_MAX_PAYLOAD)) { return; }
-
-        copy = (uint8)(len - (uint8)(pciIdx + 2u));
-        if(copy > ffLen) { copy = (uint8)ffLen; }
-
-        memcpy(g_iso.rxBuf, &data[pciIdx + 2u], copy);
-        g_iso.rxLen = ffLen;
-        g_iso.rxIdx = copy;
-        g_iso.nextSn = 1u;
-        g_iso.txAddrOffset = g_iso.addrOffset;
-        Ram_IsoSendFc();
-    }
-    else if(pci == 0x20u)
-    {
-        if((len < (uint8)(pciIdx + 2u)) || (g_iso.rxIdx == 0u) || (g_iso.rxIdx >= g_iso.rxLen)) { return; }
-
-        sn = data[pciIdx] & 0x0Fu;
-
-        if(sn != g_iso.nextSn) { return; }
-
-        copy = (uint8)(len - (uint8)(pciIdx + 1u));
-        if((g_iso.rxIdx + copy) > g_iso.rxLen)
-        {
-            copy = (uint8)(g_iso.rxLen - g_iso.rxIdx);
-        }
-
-        memcpy(&g_iso.rxBuf[g_iso.rxIdx], &data[pciIdx + 1u], copy);
-        g_iso.rxIdx += copy;
-        g_iso.nextSn = (uint8)((g_iso.nextSn + 1u) & 0x0Fu);
-
-        if(g_iso.rxIdx >= g_iso.rxLen)
-        {
-            g_iso.txAddrOffset = g_iso.addrOffset;
-            g_iso.rxReady = 1u;
-        }
-    }
-}
-
-#if (FBL_RAM_CAN_TRANSPORT_ENABLED != 0u)
-static void Ram_IsoSend(const uint8 *data, uint16 len)
-{
-    uint8 frame[64];
-    uint8 chunk;
-    uint16 idx;
-    uint8 sn;
-    uint8 payloadLen;
-    uint8 addrOffset;
-    uint8 pciIdx;
-    uint8 sfMax;
-    uint8 ffPayload;
-    uint8 cfPayload;
-
-    if(len > FBL_ISOTP_MAX_PAYLOAD)
-    {
-        return;
-    }
-
-    payloadLen = Ram_CanPayloadLen();
-    addrOffset = g_iso.txAddrOffset;
-    pciIdx = addrOffset;
-
-    if(addrOffset != 0u)
-    {
-        if(payloadLen <= 2u)
-        {
-            return;
-        }
-    }
-
-    sfMax = (uint8)(payloadLen - addrOffset - 1u);
-    if((payloadLen > 8u) && (sfMax > 7u))
-    {
-        sfMax = (uint8)(payloadLen - addrOffset - 2u);
-    }
-
-    if(len <= sfMax)
-    {
-        memset(frame, 0u, sizeof(frame));
-        if(addrOffset != 0u)
-        {
-            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-        }
-
-        if((payloadLen > 8u) && (len > 7u))
-        {
-            frame[pciIdx] = 0x00u;
-            frame[pciIdx + 1u] = (uint8)len;
-            memcpy(&frame[pciIdx + 2u], data, len);
-        }
-        else
-        {
-            frame[pciIdx] = (uint8)len;
-            memcpy(&frame[pciIdx + 1u], data, len);
-        }
-        Ram_CanSend(frame, payloadLen);
-        return;
-    }
-
-    memset(frame, 0u, sizeof(frame));
-    if(addrOffset != 0u)
-    {
-        frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-    }
-
-    frame[pciIdx] = (uint8)(0x10u | ((len >> 8u) & 0x0Fu));
-    frame[pciIdx + 1u] = (uint8)(len & 0xFFu);
-    ffPayload = (uint8)(payloadLen - addrOffset - 2u);
-    chunk = ffPayload;
-    memcpy(&frame[pciIdx + 2u], data, chunk);
-    Ram_CanSend(frame, payloadLen);
-
-    idx = chunk;
-    sn = 1u;
-
-    while(idx < len)
-    {
-        memset(frame, 0u, sizeof(frame));
-        if(addrOffset != 0u)
-        {
-            frame[0u] = FBL_CAN_EXT_ADDR_TESTER;
-        }
-
-        frame[pciIdx] = (uint8)(0x20u | (sn & 0x0Fu));
-
-        cfPayload = (uint8)(payloadLen - addrOffset - 1u);
-        chunk = cfPayload;
-        if((idx + chunk) > len)
-        {
-            chunk = (uint8)(len - idx);
-        }
-
-        memcpy(&frame[pciIdx + 1u], &data[idx], chunk);
-        Ram_CanSend(frame, payloadLen);
-        idx += chunk;
-        sn = (uint8)((sn + 1u) & 0x0Fu);
-    }
-}
-#endif
-
-static void Ram_EthInit(void)
-{
-    IfxGeth_Eth_Config cfg;
-    uint32 link;
-
-    IfxScuWdt_clearCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-
-    cfg = LWIP_GETH_0_geth_lld_config;
-    memcpy(g_ethMac, cfg.mac.macAddress, 6u);
-
-    IfxGeth_enableModule(cfg.gethSFR);
-
-    if(cfg.pins.rmiiPins != NULL_PTR)
-    {
-        IfxPort_setPinModeOutput(cfg.pins.rmiiPins->mdc->pin.port,
-                                 cfg.pins.rmiiPins->mdc->pin.pinIndex,
-                                 IfxPort_OutputMode_pushPull,
-                                 cfg.pins.rmiiPins->mdc->select);
-        GETH_GPCTL.B.ALTI0 = cfg.pins.rmiiPins->mdio->inSelect;
-    }
-
-    if(Ram_EthInitModuleWithResetCheck(g_geth, &cfg) == 0u)
-    {
-        IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-        IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-        return;
-    }
-
-#if (PHY_DEVICE_NAME == PHY_DP83825I)
-    if(lwip_geth_private_Phy_Dp83825i_init() == 0u)
-    {
-        IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-        IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-        return;
-    }
-#endif
-
-    IfxGeth_Eth_startTransmitters(g_geth, 1u);
-    IfxGeth_Eth_startReceivers(g_geth, 1u);
-
-#if (PHY_DEVICE_NAME == PHY_DP83825I)
-    link = lwip_geth_private_Phy_Dp83825i_link_status();
-    GETH_MAC_PHYIF_CONTROL_STATUS.U = link;
-#endif
-
-    if(GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKMOD == 1u)
-    {
-        IfxGeth_mac_setDuplexMode(g_geth->gethSFR, IfxGeth_DuplexMode_fullDuplex);
-    }
-    else
-    {
-        IfxGeth_mac_setDuplexMode(g_geth->gethSFR, IfxGeth_DuplexMode_halfDuplex);
-    }
-
-    if(GETH_MAC_PHYIF_CONTROL_STATUS.B.LNKSPEED == 0u)
-    {
-        IfxGeth_mac_setLineSpeed(g_geth->gethSFR, IfxGeth_LineSpeed_10Mbps);
-    }
-    else
-    {
-        IfxGeth_mac_setLineSpeed(g_geth->gethSFR, IfxGeth_LineSpeed_100Mbps);
-    }
-
-    IfxScuWdt_setCpuEndinit(IfxScuWdt_getCpuWatchdogPassword());
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-}
-
-static void Ram_EthStopMacDma(Ifx_GETH *gethSFR)
-{
-    if(gethSFR == NULL_PTR)
-    {
-        return;
-    }
-
-    IfxGeth_mac_disableTransmitter(gethSFR);
-    IfxGeth_mac_disableReceiver(gethSFR);
-    IfxGeth_dma_stopTransmitter(gethSFR, IfxGeth_TxDmaChannel_0);
-    gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR = 0u;
-}
-
-static uint8 Ram_EthInitModuleWithResetCheck(IfxGeth_Eth *geth, IfxGeth_Eth_Config *cfg)
-{
-    uint32 attempt;
-
-    if((geth == NULL_PTR) || (cfg == NULL_PTR) || (cfg->gethSFR == NULL_PTR))
-    {
+        FblRam_RestoreInterrupts(state);
         return 0u;
     }
 
-    for(attempt = 0u; attempt < FBL_ETH_DMA_INIT_ATTEMPTS; attempt++)
-    {
-        if(attempt > 0u)
-        {
-            FblRam_EthDmaInitRetryCnt++;
-        }
-
-        Ram_EthStopMacDma(cfg->gethSFR);
-        IfxGeth_Eth_initModule(geth, cfg);
-        FblRam_EthDmaModeAfterInit = cfg->gethSFR->DMA_MODE.U;
-
-        if(IfxGeth_dma_isSoftwareResetDone(cfg->gethSFR) != 0)
-        {
-            return 1u;
-        }
-
-        FblRam_EthDmaResetTimeoutCnt++;
-    }
-
-    return 0u;
-}
-
-static void Ram_EthPoll(void)
-{
-    uint16 len;
-
-    do
-    {
-        len = Ram_EthRxFrame(g_ethRxFrame, sizeof(g_ethRxFrame));
-
-        if(len != 0u)
-        {
-            Ram_EthHandleFrame(g_ethRxFrame, len);
-        }
-    } while(len != 0u);
-}
-
-static uint16 Ram_EthRxFrame(uint8 *buf, uint16 maxLen)
-{
-    uint16 len;
-    uint8 *src;
-
-    if(IfxGeth_Eth_isRxDataAvailable(g_geth, IfxGeth_RxDmaChannel_0) == FALSE)
-    {
-        return 0u;
-    }
-
-    len = Ram_EthRxFrameSize((IfxGeth_RxDescr *)IfxGeth_Eth_getActualRxDescriptor(g_geth, IfxGeth_RxDmaChannel_0));
-
-    if((len == 0u) || (len == 0xFFFFu) || (len > maxLen))
-    {
-        IfxGeth_Eth_freeReceiveBuffer(g_geth, IfxGeth_RxDmaChannel_0);
-        return 0u;
-    }
-
-    src = IfxGeth_Eth_getReceiveBuffer(g_geth, IfxGeth_RxDmaChannel_0);
-    memcpy(buf, src, len);
-    IfxGeth_Eth_freeReceiveBuffer(g_geth, IfxGeth_RxDmaChannel_0);
-
-    return len;
-}
-
-static void Ram_EthTxFrame(const uint8 *buf, uint16 len)
-{
-    uint8 *dst;
-    IfxGeth_TxDescr *txDescr;
-
-    if((len == 0u) || (len > FBL_ETH_MTU))
-    {
-        return;
-    }
-
-    dst = IfxGeth_Eth_waitTransmitBuffer(g_geth, IfxGeth_TxDmaChannel_0);
-    memcpy(dst, buf, len);
-
-    txDescr = (IfxGeth_TxDescr *)IfxGeth_Eth_getActualTxDescriptor(g_geth, IfxGeth_TxDmaChannel_0);
-    txDescr->TDES2.R.B1L = IFXGETH_MAX_TX_BUFFER_SIZE;
-
-    IfxGeth_Eth_sendTransmitBuffer(g_geth, len, IfxGeth_TxDmaChannel_0);
-}
-
-static uint16 Ram_EthRxFrameSize(IfxGeth_RxDescr *descr)
-{
-    uint32 rdes3;
-    uint32 rdes1;
-
-    rdes3 = descr->RDES3.U;
-    rdes1 = descr->RDES1.U;
-
-    if(((rdes3 & (1UL << 15)) != 0u) ||
-       ((rdes1 & (1UL << 7)) != 0u) ||
-       ((rdes3 & (1UL << 28)) == 0u))
-    {
-        return 0xFFFFu;
-    }
-
-    return (uint16)((rdes3 & 0x7FFFu) - 4u);
-}
-
-static void Ram_EthHandleFrame(const uint8 *buf, uint16 len)
-{
-    uint16 ethType;
-
-    if(len < 14u) { return; }
-
-    ethType = Ram_Rd16(&buf[12u]);
-
-    if(ethType == FBL_ETH_TYPE_ARP)
-    {
-        Ram_EthHandleArp(buf, len);
-    }
-    else if(ethType == FBL_ETH_TYPE_IPV4)
-    {
-        Ram_EthHandleIpv4(buf, len);
-    }
-}
-
-static void Ram_EthHandleArp(const uint8 *buf, uint16 len)
-{
-    const uint8 *arp;
-    uint16 op;
-
-    if(len < 42u) { return; }
-
-    arp = &buf[14u];
-    op = Ram_Rd16(&arp[6u]);
-
-    if((Ram_Rd16(&arp[0u]) != 0x0001u) ||
-       (Ram_Rd16(&arp[2u]) != FBL_ETH_TYPE_IPV4) ||
-       (arp[4u] != 6u) ||
-       (arp[5u] != 4u))
-    {
-        return;
-    }
-
-    if((op == 0x0001u) && (memcmp(&arp[24u], g_ethIp, 4u) == 0))
-    {
-        Ram_EthSendArpReply(buf);
-    }
-}
-
-static void Ram_EthHandleIpv4(const uint8 *buf, uint16 len)
-{
-    const uint8 *ip;
-    const uint8 *udp;
-    uint16 ipHdrLen;
-    uint16 totalLen;
-    uint16 udpLen;
-    uint16 dstPort;
-    uint16 payloadLen;
-
-    if(len < 34u) { return; }
-
-    ip = &buf[14u];
-
-    if((ip[0u] & 0xF0u) != 0x40u) { return; }
-    if(ip[9u] != FBL_IP_PROTO_UDP) { return; }
-    if(memcmp(&ip[16u], g_ethIp, 4u) != 0) { return; }
-
-    ipHdrLen = (uint16)((ip[0u] & 0x0Fu) * 4u);
-    totalLen = Ram_Rd16(&ip[2u]);
-
-    if((ipHdrLen < 20u) || ((14u + totalLen) > len) || (totalLen < (ipHdrLen + 8u)))
-    {
-        return;
-    }
-
-    udp = &ip[ipHdrLen];
-    dstPort = Ram_Rd16(&udp[2u]);
-    udpLen = Ram_Rd16(&udp[4u]);
-
-    if((dstPort != FBL_UDP_PORT) || (udpLen < 8u))
-    {
-        return;
-    }
-
-    payloadLen = (uint16)(udpLen - 8u);
-
-    if(payloadLen > FBL_ISOTP_MAX_PAYLOAD)
-    {
-        return;
-    }
-
-    memcpy(g_ethPeer.mac, &buf[6u], 6u);
-    memcpy(g_ethPeer.ip, &ip[12u], 4u);
-    g_ethPeer.udpPort = Ram_Rd16(&udp[0u]);
-    g_ethPeer.valid = 1u;
-
-    memcpy(g_udsReq, &udp[8u], payloadLen);
-    g_udsReqLen = payloadLen;
-    g_udsReqReady = 1u;
-}
-
-static void Ram_EthSendArpReply(const uint8 *request)
-{
-    uint8 *tx = g_ethTxFrame;
-    const uint8 *arpReq = &request[14u];
-
-    memcpy(&tx[0u], &request[6u], 6u);
-    memcpy(&tx[6u], g_ethMac, 6u);
-    Ram_Wr16(&tx[12u], FBL_ETH_TYPE_ARP);
-
-    Ram_Wr16(&tx[14u], 0x0001u);
-    Ram_Wr16(&tx[16u], FBL_ETH_TYPE_IPV4);
-    tx[18u] = 6u;
-    tx[19u] = 4u;
-    Ram_Wr16(&tx[20u], 0x0002u);
-    memcpy(&tx[22u], g_ethMac, 6u);
-    memcpy(&tx[28u], g_ethIp, 4u);
-    memcpy(&tx[32u], &arpReq[8u], 6u);
-    memcpy(&tx[38u], &arpReq[14u], 4u);
-
-    Ram_EthTxFrame(tx, 42u);
-}
-
-static void Ram_EthSendUdp(const uint8 *payload, uint16 payloadLen)
-{
-    uint8 *tx = g_ethTxFrame;
-    uint16 ipLen;
-    uint16 frameLen;
-
-    if((g_ethPeer.valid == 0u) || ((uint32)payloadLen + 42u > FBL_ETH_MTU))
-    {
-        return;
-    }
-
-    ipLen = (uint16)(20u + 8u + payloadLen);
-    frameLen = (uint16)(14u + ipLen);
-
-    memcpy(&tx[0u], g_ethPeer.mac, 6u);
-    memcpy(&tx[6u], g_ethMac, 6u);
-    Ram_Wr16(&tx[12u], FBL_ETH_TYPE_IPV4);
-
-    tx[14u] = 0x45u;
-    tx[15u] = 0x00u;
-    Ram_Wr16(&tx[16u], ipLen);
-    Ram_Wr16(&tx[18u], 0x0000u);
-    Ram_Wr16(&tx[20u], 0x4000u);
-    tx[22u] = 64u;
-    tx[23u] = FBL_IP_PROTO_UDP;
-    Ram_Wr16(&tx[24u], 0x0000u);
-    memcpy(&tx[26u], g_ethIp, 4u);
-    memcpy(&tx[30u], g_ethPeer.ip, 4u);
-    Ram_Wr16(&tx[24u], Ram_IpChecksum(&tx[14u], 20u));
-
-    Ram_Wr16(&tx[34u], FBL_UDP_PORT);
-    Ram_Wr16(&tx[36u], g_ethPeer.udpPort);
-    Ram_Wr16(&tx[38u], (uint16)(8u + payloadLen));
-    Ram_Wr16(&tx[40u], 0x0000u);
-
-    memcpy(&tx[42u], payload, payloadLen);
-
-    Ram_EthTxFrame(tx, frameLen);
-}
-
-static uint16 Ram_IpChecksum(const uint8 *data, uint16 len)
-{
-    uint32 sum = 0u;
-    uint16 i;
-
-    for(i = 0u; i < len; i += 2u)
-    {
-        sum += (uint16)((((uint16)data[i]) << 8u) | data[i + 1u]);
-    }
-
-    while((sum >> 16u) != 0u)
-    {
-        sum = (sum & 0xFFFFu) + (sum >> 16u);
-    }
-
-    return (uint16)(~sum);
-}
-
-static void Ram_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
-{
-    uint8 res[64];
-    uint8 sid;
-    uint32 addr;
-    uint32 size;
-    uint16 dataLen;
-    uint16 rid;
-    uint8 *img;
-
-    if(len == 0u) { return; }
-
-    sid = req[0u];
-    img = (uint8 *)FBL_IMAGE_RAM_ADDR;
-
-    if(sid == UDS_SID_SESSION)
-    {
-        if(len < 2u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
-        if((req[1u] & 0x7Fu) == 0x01u)
-        {
-            g_secSeedValid = 0u;
-        }
-
-        res[0u] = 0x50u;
-        res[1u] = req[1u];
-        res[2u] = 0x00u;
-        res[3u] = 0x32u;
-        res[4u] = 0x01u;
-        res[5u] = 0xF4u;
-        Ram_UdsSend(res, 6u, transport);
-    }
-    else if(sid == UDS_SID_TESTER_PRESENT)
-    {
-        res[0u] = 0x7Eu;
-        res[1u] = 0x00u;
-        Ram_UdsSend(res, 2u, transport);
-    }
-    else if(sid == UDS_SID_RDBI)
-    {
-        uint16 didReq;
-
-        if(len != 3u)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
-            return;
-        }
-
-        didReq = Ram_Rd16(&req[1u]);
-
-        if(didReq == UDS_DID_ACTIVE_SESSION)
-        {
-            res[0u] = 0x62u;
-            Ram_Wr16(&res[1u], didReq);
-            res[3u] = FBL_DIAG_SESSION_PROGRAMMING;
-            Ram_UdsSend(res, 4u, transport);
-        }
-        else if(didReq == UDS_DID_ACTIVE_SOFTWARE_BLOCK)
-        {
-            res[0u] = 0x62u;
-            Ram_Wr16(&res[1u], didReq);
-            res[3u] = FBL_ACTIVE_SOFTWARE_BLOCK;
-            Ram_UdsSend(res, 4u, transport);
-        }
-        else if(didReq == UDS_DID_SOFTWARE_VERSION)
-        {
-            res[0u] = 0x62u;
-            Ram_Wr16(&res[1u], didReq);
-            res[3u] = APP_SW_VERSION_MAJOR;
-            res[4u] = APP_SW_VERSION_MINOR;
-            res[5u] = APP_SW_VERSION_PATCH;
-            res[6u] = FBL_SW_VERSION_MAJOR;
-            res[7u] = FBL_SW_VERSION_MINOR;
-            res[8u] = FBL_SW_VERSION_PATCH;
-            Ram_UdsSend(res, 9u, transport);
-        }
-        else
-        {
-            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
-        }
-    }
-    else if(sid == UDS_SID_SECURITY_ACCESS)
-    {
-        Ram_UdsSecurityAccess(req, len, transport);
-    }
-    else if(sid == UDS_SID_COMM_CONTROL)
-    {
-        if(len != 3u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
-
-        res[0u] = 0x68u;
-        res[1u] = (uint8)(req[1u] & 0x7Fu);
-        Ram_UdsSend(res, 2u, transport);
-    }
-    else if(sid == UDS_SID_REQ_DOWNLOAD)
-    {
-        if((len < 12u) || (req[3u] != 0x44u))
-        {
-            Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport);
-            return;
-        }
-
-        addr = Ram_Rd32(&req[4u]);
-        size = Ram_Rd32(&req[8u]);
-
-        if(Ram_FblRangeValid(addr, size) == 0u)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
-            return;
-        }
-
-        memset(img, 0x36, FBL_IMAGE_RAM_SIZE);
-
-        g_dl.active = 1u;
-        g_dl.targetAddr = addr;
-        g_dl.length = size;
-        g_dl.received = 0u;
-        g_dl.expectedCrcValid = 0u;
-        g_dl.expectedCrc = 0u;
-        g_dl.nextBlock = 1u;
-
-        res[0u] = 0x74u;
-        res[1u] = 0x20u;
-        res[2u] = 0x0Fu;
-        res[3u] = 0xFFu;
-        Ram_UdsSend(res, 4u, transport);
-    }
-    else if(sid == UDS_SID_TRANSFER_DATA)
-    {
-        if((g_dl.active == 0u) || (len < 2u))
-        {
-            Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
-            return;
-        }
-
-        if(req[1u] != g_dl.nextBlock)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_WRONG_BLOCK_SEQUENCE, transport);
-            return;
-        }
-
-        dataLen = (uint16)(len - 2u);
-
-        if((g_dl.received + dataLen) > g_dl.length)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
-            return;
-        }
-
-        memcpy(&img[(g_dl.targetAddr - FBL_START_NCACHED) + g_dl.received], &req[2u], dataLen);
-        g_dl.received += dataLen;
-        g_dl.nextBlock++;
-
-        res[0u] = 0x76u;
-        res[1u] = req[1u];
-        Ram_UdsSend(res, 2u, transport);
-    }
-    else if(sid == UDS_SID_TRANSFER_EXIT)
-    {
-        uint32 crc;
-
-        if(g_dl.active == 0u)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
-            return;
-        }
-
-        if(g_dl.received != g_dl.length)
-        {
-            Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
-            return;
-        }
-
-        if(len >= 5u)
-        {
-            g_dl.expectedCrc = Ram_Rd32(&req[1u]);
-            g_dl.expectedCrcValid = 1u;
-
-            crc = Ram_Crc32(FBL_IMAGE_RAM_ADDR + (g_dl.targetAddr - FBL_START_NCACHED), g_dl.length);
-
-            if(crc != g_dl.expectedCrc)
-            {
-                Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
-                return;
-            }
-        }
-
-        res[0u] = 0x77u;
-        Ram_UdsSend(res, 1u, transport);
-    }
-    else if(sid == UDS_SID_CONTROL_DTC_SETTING)
-    {
-        uint8 settingType;
-
-        if(len != 2u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
-
-        settingType = (uint8)(req[1u] & 0x7Fu);
-        if((settingType != 0x01u) && (settingType != 0x02u))
-        {
-            Ram_UdsNeg(sid, UDS_NRC_SUBFUNC_NOT_SUPPORTED, transport);
-            return;
-        }
-
-        res[0u] = 0xC5u;
-        res[1u] = settingType;
-        Ram_UdsSend(res, 2u, transport);
-    }
-    else if(sid == UDS_SID_ROUTINE)
-    {
-        if(len < 4u) { Ram_UdsNeg(sid, UDS_NRC_INCORRECT_LEN, transport); return; }
-
-        rid = Ram_Rd16(&req[2u]);
-
-        if((req[1u] == 0x01u) && (rid == UDS_RID_COMMIT_FBL))
-        {
-            if((g_dl.active == 0u) || (g_dl.received != g_dl.length))
-            {
-                Ram_UdsNeg(sid, UDS_NRC_COND_NOT_CORRECT, transport);
-                return;
-            }
-
-            if(g_dl.expectedCrcValid != 0u)
-            {
-                uint32 crc = Ram_Crc32(FBL_IMAGE_RAM_ADDR + (g_dl.targetAddr - FBL_START_NCACHED), g_dl.length);
-
-                if(crc != g_dl.expectedCrc)
-                {
-                    Ram_UdsNeg(sid, UDS_NRC_TRANSFER_FAIL, transport);
-                    return;
-                }
-            }
-
-            res[0u] = 0x71u;
-            res[1u] = 0x01u;
-            res[2u] = 0x01u;
-            res[3u] = 0x56u;
-            res[4u] = 0x00u;
-            Ram_UdsSend(res, 5u, transport);
-
-            for(volatile uint32 i = 0u; i < 200000u; i++) {}
-
-            /* Never returns: erases and reprograms the FBL PFLASH from RAM, then
-             * resets. After the erase begins there is no valid flash to return to,
-             * so it resets internally on both success and failure. */
-            Ram_CommitFblImage();
-
-            Ram_Reset();
-        }
-        else
-        {
-            Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
-        }
-    }
-    else if(sid == UDS_SID_RESET)
-    {
-        res[0u] = 0x51u;
-        res[1u] = (len >= 2u) ? req[1u] : 0x01u;
-        Ram_UdsSend(res, 2u, transport);
-
-        for(volatile uint32 i = 0u; i < 200000u; i++) {}
-        Ram_Reset();
-    }
-    else
-    {
-        Ram_UdsNeg(sid, UDS_NRC_OUT_OF_RANGE, transport);
-    }
-}
-
-static void Ram_UdsSend(const uint8 *res, uint16 len, uint8 transport)
-{
-    (void)transport;
-    Ram_EthSendUdp(res, len);
-}
-
-static void Ram_UdsNeg(uint8 sid, uint8 nrc, uint8 transport)
-{
-    uint8 res[3];
-
-    res[0u] = UDS_NEG_RESP;
-    res[1u] = sid;
-    res[2u] = nrc;
-
-    Ram_UdsSend(res, 3u, transport);
-}
-
-static void Ram_UdsSecurityAccess(const uint8 *req, uint16 len, uint8 transport)
-{
-    uint8 res[6];
-    uint8 sub;
-    uint8 level;
-    uint32 key;
-    uint32 expected;
-
-    if(len < 2u)
-    {
-        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
-        return;
-    }
-
-    sub = req[1u];
-
-    if((sub == 0u) || (sub > 0x08u))
-    {
-        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_OUT_OF_RANGE, transport);
-        return;
-    }
-
-    level = (uint8)((sub - 1u) / 2u);
-
-    if((sub & 0x01u) != 0u)
-    {
-        if(len != 2u)
-        {
-            Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
-            return;
-        }
-
-        g_secSeed = 0x5A5A0000u ^ ((uint32)level << 8u) ^ g_dl.received ^ g_dl.targetAddr;
-        g_secSeedValid = 1u;
-
-        res[0u] = 0x67u;
-        res[1u] = sub;
-        Ram_Wr32(&res[2u], g_secSeed);
-        Ram_UdsSend(res, 6u, transport);
-        return;
-    }
-
-    if(len != 6u)
-    {
-        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INCORRECT_LEN, transport);
-        return;
-    }
-
-    if(g_secSeedValid == 0u)
-    {
-        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_SEQUENCE_ERROR, transport);
-        return;
-    }
-
-    key = Ram_Rd32(&req[2u]);
-    expected = Ram_SecCalcKey(g_secSeed, level);
-
-    if(key != expected)
-    {
-        g_secSeedValid = 0u;
-        Ram_UdsNeg(UDS_SID_SECURITY_ACCESS, UDS_NRC_INVALID_KEY, transport);
-        return;
-    }
-
-    g_secSeedValid = 0u;
-    res[0u] = 0x67u;
-    res[1u] = sub;
-    Ram_UdsSend(res, 2u, transport);
-}
-
-static uint32 Ram_SecCalcKey(uint32 seed, uint8 level)
-{
-    uint32 key;
-
-    key = seed ^ 0x6A09E667u;
-    key += 0x13572468u + ((uint32)level * 0x1F3D5B79u);
-    key = (key << 3u) | (key >> 29u);
-    key ^= ((seed << 16u) | (seed >> 16u));
-
-    return key;
-}
-
-static void Ram_FlashInit(void)
-{
-    memcpy((void *)RAM_FLASH_ERASE_ADDR, (const void *)IfxFlash_eraseMultipleSectors, RAM_FLASH_FUNC_LEN);
-    memcpy((void *)RAM_FLASH_WAIT_ADDR, (const void *)IfxFlash_waitUnbusy, RAM_FLASH_FUNC_LEN);
-    memcpy((void *)RAM_FLASH_ENTER_ADDR, (const void *)IfxFlash_enterPageMode, RAM_FLASH_FUNC_LEN);
-    memcpy((void *)RAM_FLASH_LOAD_ADDR, (const void *)IfxFlash_loadPage2X32, RAM_FLASH_FUNC_LEN);
-    memcpy((void *)RAM_FLASH_WRITE_ADDR, (const void *)IfxFlash_writePage, RAM_FLASH_FUNC_LEN);
-    memcpy((void *)RAM_RESET_FUNC_ADDR, (const void *)IfxScuRcu_performReset, RAM_FLASH_FUNC_LEN);
-
-    g_cmd.eraseSectors = (void *)RAM_FLASH_ERASE_ADDR;
-    g_cmd.waitUnbusy = (void *)RAM_FLASH_WAIT_ADDR;
-    g_cmd.enterPageMode = (void *)RAM_FLASH_ENTER_ADDR;
-    g_cmd.load2X32 = (void *)RAM_FLASH_LOAD_ADDR;
-    g_cmd.writePage = (void *)RAM_FLASH_WRITE_ADDR;
-    g_cmd.reset = (void *)RAM_RESET_FUNC_ADDR;
-
-    memset(g_pageBuf, 0x36, sizeof(g_pageBuf));
-    g_pageAddr = 0xFFFFFFFFu;
-    g_pageFill = 0u;
-}
-
-static void Ram_CommitFblImage(void)
-{
-    uint32 crc;
-    const uint8 *src;
-
-    src = (const uint8 *)(FBL_IMAGE_RAM_ADDR + (g_dl.targetAddr - FBL_START_NCACHED));
-
-    /* Pre-erase verification: the FBL PFLASH is still intact, so a mismatch can
-     * abort with a clean reset without having modified anything. */
-    if(g_dl.expectedCrcValid != 0u)
-    {
-        crc = Ram_Crc32((uint32)src, g_dl.length);
-
-        if(crc != g_dl.expectedCrc)
-        {
-            Ram_Reset();
-        }
-    }
-
-    IfxCpu_disableInterrupts();
-
-    /* From here on the FBL PFLASH (the bank holding this very code) is erased and
-     * reprogrammed. Everything below is RAM-resident and must never return into
-     * flash, so each failure resets internally instead of returning. */
-    if(Ram_EraseRange(FBL_START_NCACHED, FBL_SIZE_BYTES) != 0u)
-    {
-        Ram_Reset();
-    }
-
-    if(Ram_Program(g_dl.targetAddr, src, g_dl.length) != 0u)
-    {
-        Ram_Reset();
-    }
-
-    if(Ram_FlushPage() != 0u)
-    {
-        Ram_Reset();
-    }
-
-    if(g_dl.length < FBL_SIZE_BYTES)
-    {
-        uint32 padStart = g_dl.targetAddr + g_dl.length;
-        uint32 padLen = FBL_SIZE_BYTES - (padStart - FBL_START_NCACHED);
-        Ram_FillByte((void *)FBL_IMAGE_RAM_ADDR, 0x36, PFLASH_PAGE_SIZE);
-
-        while(padLen != 0u)
-        {
-            uint32 chunk = (padLen > PFLASH_PAGE_SIZE) ? PFLASH_PAGE_SIZE : padLen;
-
-            if(Ram_Program(padStart, (const uint8 *)FBL_IMAGE_RAM_ADDR, chunk) != 0u)
-            {
-                Ram_Reset();
-            }
-
-            padStart += chunk;
-            padLen -= chunk;
-        }
-
-        if(Ram_FlushPage() != 0u)
-        {
-            Ram_Reset();
-        }
-    }
-
-    if(g_dl.expectedCrcValid != 0u)
-    {
-        crc = Ram_Crc32(g_dl.targetAddr, g_dl.length);
-
-        if(crc != g_dl.expectedCrc)
-        {
-            Ram_Reset();
-        }
-    }
-
-    Ram_Reset();
-}
-
-static void Ram_FillByte(void *dst, uint8 value, uint32 len)
-{
-    volatile uint8 *p = (volatile uint8 *)dst;
-    uint32 i;
-
-    for(i = 0u; i < len; i++)
-    {
-        p[i] = value;
-    }
-}
-
-static uint32 Ram_EraseRange(uint32 addr, uint32 len)
-{
-    uint32 start;
-    uint32 end;
-    uint32 count;
-    uint16 pw;
-    IfxFlash_FlashType bank;
-
-    start = addr & ~(PFLASH_SECTOR_SIZE - 1u);
-    end = (addr + len + PFLASH_SECTOR_SIZE - 1u) & ~(PFLASH_SECTOR_SIZE - 1u);
-
-    while(start < end)
-    {
-        uint32 subEnd = end;
-
-        if((start <= PFLASH_BANK_A_END) && (subEnd > (PFLASH_BANK_A_END + 1u)))
-        {
-            subEnd = PFLASH_BANK_A_END + 1u;
-        }
-
-        count = (subEnd - start) / PFLASH_SECTOR_SIZE;
-        bank = Ram_Bank(start);
-
-        pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
-        IfxScuWdt_clearSafetyEndinitInline(pw);
-        g_cmd.eraseSectors(start, count);
-        IfxScuWdt_setSafetyEndinitInline(pw);
-        g_cmd.waitUnbusy(FLASH_MODULE, bank);
-
-        start = subEnd;
-    }
-
-    return 0u;
-}
-
-static uint32 Ram_Program(uint32 addr, const uint8 *data, uint32 len)
-{
-    uint32 i;
-    uint32 page;
-    uint32 off;
-
-    for(i = 0u; i < len; i++)
-    {
-        page = (addr + i) & ~(PFLASH_PAGE_SIZE - 1u);
-        off = (addr + i) - page;
-
-        if(g_pageAddr == 0xFFFFFFFFu)
-        {
-            g_pageAddr = page;
-            Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
-            g_pageFill = 0u;
-        }
-        else if(g_pageAddr != page)
-        {
-            if(Ram_FlushPage() != 0u) { return 1u; }
-
-            g_pageAddr = page;
-            Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
-            g_pageFill = 0u;
-        }
-
-        g_pageBuf[off] = data[i];
-
-        if((off + 1u) > g_pageFill)
-        {
-            g_pageFill = off + 1u;
-        }
-
-        if(g_pageFill >= PFLASH_PAGE_SIZE)
-        {
-            if(Ram_FlushPage() != 0u) { return 1u; }
-        }
-    }
-
-    return 0u;
-}
-
-static uint32 Ram_FlushPage(void)
-{
-    uint32 ret = 0u;
-
-    if(g_pageAddr != 0xFFFFFFFFu)
-    {
-        ret = Ram_ProgramPage(g_pageAddr, g_pageBuf);
-        g_pageAddr = 0xFFFFFFFFu;
-        g_pageFill = 0u;
-        Ram_FillByte(g_pageBuf, 0x36, sizeof(g_pageBuf));
-    }
-
-    return ret;
-}
-
-static uint32 Ram_ProgramPage(uint32 addr, const uint8 *data)
-{
-    uint32 w[8];
-    uint16 pw;
-    IfxFlash_FlashType bank;
-
-    for(uint32 i = 0u; i < 8u; i++)
-    {
-        w[i] = ((uint32)data[(i * 4u) + 0u]) |
-               ((uint32)data[(i * 4u) + 1u] << 8u) |
-               ((uint32)data[(i * 4u) + 2u] << 16u) |
-               ((uint32)data[(i * 4u) + 3u] << 24u);
-    }
-
-    bank = Ram_Bank(addr);
-
-    pw = IfxScuWdt_getSafetyWatchdogPasswordInline();
-    IfxScuWdt_clearSafetyEndinitInline(pw);
-
-    g_cmd.enterPageMode(addr);
-    g_cmd.waitUnbusy(FLASH_MODULE, bank);
-    g_cmd.load2X32(addr, w[0u], w[1u]);
-    g_cmd.load2X32(addr, w[2u], w[3u]);
-    g_cmd.load2X32(addr, w[4u], w[5u]);
-    g_cmd.load2X32(addr, w[6u], w[7u]);
-    g_cmd.writePage(addr);
-    g_cmd.waitUnbusy(FLASH_MODULE, bank);
-
-    IfxScuWdt_setSafetyEndinitInline(pw);
-
-    return 0u;
-}
-
-static IfxFlash_FlashType Ram_Bank(uint32 addr)
-{
-    if((addr >= PFLASH_BANK_B_START) && (addr <= PFLASH_BANK_B_END))
-    {
-        return PROGRAM_FLASH_BANK_B; // @suppress("Symbol is not resolved")
-    }
-
-    return PROGRAM_FLASH_BANK_A; // @suppress("Symbol is not resolved")
-}
-
-static uint32 Ram_Crc32(uint32 addr, uint32 len)
-{
-    volatile const uint8 *p = (volatile const uint8 *)addr;
-    uint32 crc = 0xFFFFFFFFu;
-
-    for(uint32 i = 0u; i < len; i++)
-    {
-        crc ^= p[i];
-
-        for(uint8 b = 0u; b < 8u; b++)
-        {
-            if((crc & 1u) != 0u)
-            {
-                crc = (crc >> 1u) ^ 0xEDB88320u;
-            }
-            else
-            {
-                crc >>= 1u;
-            }
-        }
-    }
-
-    return crc ^ 0xFFFFFFFFu;
-}
-
-static uint8 Ram_IsExplicitlyRejectedProgrammingAddress(uint32 addr)
-{
-    uint32 prefix = addr & DFLASH_REJECT_PREFIX_MASK;
-
-    if((prefix == DFLASH_REJECT_PREFIX_AF40) ||
-       (prefix == DFLASH_REJECT_PREFIX_AF01) ||
-       (prefix == DFLASH_REJECT_PREFIX_AF02))
-    {
-        return 1u;
-    }
-
-    return 0u;
-}
-
-static uint8 Ram_FblRangeValid(uint32 addr, uint32 len)
-{
-    uint32 end;
-
-    if(len == 0u) { return 0u; }
-    if((addr + len) < addr) { return 0u; }
-    end = addr + len - 1u;
-    if((Ram_IsExplicitlyRejectedProgrammingAddress(addr) != 0u) ||
-       (Ram_IsExplicitlyRejectedProgrammingAddress(end) != 0u)) { return 0u; }
-    if((addr & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
-    if((end & FLASH_ADDRESS_PREFIX_MASK) != PFLASH_NC_ADDRESS_PREFIX) { return 0u; }
-    if(addr < FBL_START_NCACHED) { return 0u; }
-    if(end > FBL_END_NCACHED) { return 0u; }
-    if((addr - FBL_START_NCACHED + len) > FBL_IMAGE_RAM_SIZE) { return 0u; }
+    __mtcr(CPU_BTV, (uint32)FblRamRuntime_TrapVectorTable);
+    __isync();
+
+    g_FblRamRuntimeActive = 1u;
+    __dsync();
     return 1u;
 }
 
-static uint32 Ram_Rd32(const uint8 *p)
+RAM_CODE uint8 FblRamRuntime_IsActive(void)
 {
-    return (((uint32)p[0u]) << 24u) | (((uint32)p[1u]) << 16u) | (((uint32)p[2u]) << 8u) | ((uint32)p[3u]);
+    return (g_FblRamRuntimeActive != 0u) ? 1u : 0u;
 }
 
-static uint16 Ram_Rd16(const uint8 *p)
+RAM_CODE void FblRamRuntime_SetDestructivePhase(uint8 active)
 {
-    return (uint16)((((uint16)p[0u]) << 8u) | ((uint16)p[1u]));
+    g_FblRamRuntimeDestructivePhase = (active != 0u) ? 1u : 0u;
+    __dsync();
 }
 
-static void Ram_Wr16(uint8 *p, uint16 v)
+RAM_CODE static void FblRamRuntime_TrapHandler(uint32 trapClass, uint32 tin)
 {
-    p[0u] = (uint8)(v >> 8u);
-    p[1u] = (uint8)v;
+    g_FblRamRuntimeTrapClass = trapClass;
+    g_FblRamRuntimeTrapTin = tin;
+    g_FblRamRuntimeLastAddress = (uint32)__mfcr(CPU_DEADD);
+    __dsync();
+
+    if(g_FblRamRuntimeDestructivePhase != 0u)
+    {
+        Fbl_BluEnterRecoveryWaitFromTrap();
+        __disable();
+        for(;;)
+        {
+            __nop();
+        }
+    }
+
+    FblRamRuntime_RequestReset();
 }
 
-static void Ram_Wr32(uint8 *p, uint32 v)
+RAM_CODE static void FblRamRuntime_TrapHandlerClass0(uint32 tin) { FblRamRuntime_TrapHandler(0u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass1(uint32 tin) { FblRamRuntime_TrapHandler(1u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass2(uint32 tin) { FblRamRuntime_TrapHandler(2u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass3(uint32 tin) { FblRamRuntime_TrapHandler(3u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass4(uint32 tin) { FblRamRuntime_TrapHandler(4u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass5(uint32 tin) { FblRamRuntime_TrapHandler(5u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass6(uint32 tin) { FblRamRuntime_TrapHandler(6u, tin); }
+RAM_CODE static void FblRamRuntime_TrapHandlerClass7(uint32 tin) { FblRamRuntime_TrapHandler(7u, tin); }
+
+RAM_TRAP_CODE void FblRamRuntime_TrapVectorTable(void)
 {
-    p[0u] = (uint8)(v >> 24u);
-    p[1u] = (uint8)(v >> 16u);
-    p[2u] = (uint8)(v >> 8u);
-    p[3u] = (uint8)v;
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass0);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass1);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass2);
+    IfxCpu_Tsr_CallCSATSR(FblRamRuntime_TrapHandlerClass3);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass4);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass5);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass6);
+    IfxCpu_Tsr_CallTSR(FblRamRuntime_TrapHandlerClass7);
 }
 
-static void Ram_Reset(void)
-{ // @suppress("Unused static function")
-    IfxCpu_disableInterrupts();
-    g_cmd.reset(2u, 0u);
-    while(1) {}
+RAM_CODE void FblRamRuntime_RequestReset(void)
+{
+    FblRam_RequestSystemReset();
+}
+
+RAM_FLASH_CODE void FblRamFlash_ClearStatus(void)
+{
+    volatile uint32 *command = (volatile uint32 *)(FLASH_CMD_BASE | 0x5554u);
+
+    DMU_HF_CLRE.U = FLASH_DMU_CLEAR_MASK;
+    *command = 0xFAu;
+    __dsync();
+}
+
+RAM_FLASH_CODE static uint8 FblRamFlash_HasError(void)
+{
+    g_FblRamRuntimeLastDmuError = DMU_HF_ERRSR.U;
+    return ((g_FblRamRuntimeLastDmuError & FLASH_DMU_ERROR_MASK) != 0u) ? 1u : 0u;
+}
+
+RAM_FLASH_CODE static uint8 FblRamFlash_WaitUnbusy(uint32 flashType)
+{
+    uint32 guard = FLASH_WAIT_TIMEOUT;
+    uint32 mask = 1u << flashType;
+
+    g_FblRamRuntimeLastFlashType = flashType;
+    g_FblRamRuntimeLastWaitMask = mask;
+    g_FblEraseWaitStartTick = STM0_TIM0.U;
+
+    while((DMU_HF_STATUS.U & mask) != 0u)
+    {
+        g_FblRamRuntimeLastDmuStatus = DMU_HF_STATUS.U;
+        g_FblRamRuntimeLastWaitGuard = guard;
+        if(guard == 0u)
+        {
+            g_FblEraseWaitEndTick = STM0_TIM0.U;
+            g_FblEraseWaitTicks = g_FblEraseWaitEndTick - g_FblEraseWaitStartTick;
+            return 0u;
+        }
+        guard--;
+    }
+
+    __dsync();
+    g_FblRamRuntimeLastDmuStatus = DMU_HF_STATUS.U;
+    g_FblRamRuntimeLastWaitGuard = guard;
+    g_FblEraseWaitEndTick = STM0_TIM0.U;
+    g_FblEraseWaitTicks = g_FblEraseWaitEndTick - g_FblEraseWaitStartTick;
+    return 1u;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_Bank(uint32 address)
+{
+    return (address > PFLASH_BANK_A_END) ? FLASH_TYPE_P1 : FLASH_TYPE_P0;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_BankEndExclusive(uint32 flashType)
+{
+    if(flashType == FLASH_TYPE_P0)
+    {
+        return PFLASH_BANK_A_END + 1u;
+    }
+
+    return PFLASH_BANK_B_END + 1u;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_ToNonCached(uint32 address)
+{
+    return (address & PFLASH_ALIAS_MASK) | PFLASH_NONCACHED_BASE;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_GetEraseChunkLength(uint32 address, uint32 remaining)
+{
+    uint32 physicalOffset;
+    uint32 untilPhysicalBoundary;
+    uint32 untilBankBoundary;
+    uint32 chunk;
+
+    physicalOffset = address & (PFLASH_PHYSICAL_SECTOR_SIZE - 1u);
+    untilPhysicalBoundary = PFLASH_PHYSICAL_SECTOR_SIZE - physicalOffset;
+    untilBankBoundary = FblRamFlash_BankEndExclusive(FblRamFlash_Bank(address)) - address;
+
+    chunk = remaining;
+
+    if(chunk > PFLASH_ERASE_MAX_COMMAND_SIZE)
+    {
+        chunk = PFLASH_ERASE_MAX_COMMAND_SIZE;
+    }
+
+    if(chunk > untilPhysicalBoundary)
+    {
+        chunk = untilPhysicalBoundary;
+    }
+
+    if(chunk > untilBankBoundary)
+    {
+        chunk = untilBankBoundary;
+    }
+
+    g_FblEraseLastPhysicalBoundary = address + untilPhysicalBoundary;
+    return chunk;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_ValidateEraseRange(uint32 address, uint32 length)
+{
+    if((length == 0u) ||
+       (address < PFLASH_START_NC) ||
+       (address > PFLASH_END_NC) ||
+       ((address & (PFLASH_LOGICAL_SECTOR_SIZE - 1u)) != 0u) ||
+       ((length & (PFLASH_LOGICAL_SECTOR_SIZE - 1u)) != 0u) ||
+       ((address + length) < address) ||
+       ((address + length - 1u) > PFLASH_END_NC))
+    {
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    return FBL_FLASH_OK;
+}
+
+RAM_FLASH_CODE static uint32 FblRamFlash_IssueEraseMultiple(uint32 address, uint32 sectorCount, uint32 flashType)
+{
+    uint16 password;
+
+    if((sectorCount == 0u) || (sectorCount > PFLASH_ERASE_MAX_SECTORS))
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    g_FblEraseCommandCount++;
+    g_FblEraseDmuCommandCount++;
+    g_FblEraseLastStart = address;
+    g_FblEraseLastLength = sectorCount << PFLASH_SECTOR_SHIFT;
+    g_FblEraseLastChunkLength = g_FblEraseLastLength;
+    g_FblEraseLastSectorCount = sectorCount;
+    g_FblEraseLastFlashType = flashType;
+    g_FblRamRuntimeLastAddress = address;
+
+    if(flashType == FLASH_TYPE_P0)
+    {
+        g_FblEraseBank0CommandCount++;
+    }
+    else
+    {
+        g_FblEraseBank1CommandCount++;
+    }
+
+    password = FblRam_GetSafetyWatchdogPassword();
+    g_FblEraseDmuStartTick = STM0_TIM0.U;
+    FblRam_ClearSafetyEndinit(password);
+    g_FblEraseDmuStatusBeforeClear = DMU_HF_STATUS.U;
+    g_FblEraseDmuErrorBeforeClear = DMU_HF_ERRSR.U;
+    g_FblEraseErrorBeforeCommand = g_FblEraseDmuErrorBeforeClear;
+    FblRamFlash_ClearStatus();
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAA50u)) = address;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAA58u)) = sectorCount;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAAA8u)) = 0x80u;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAAA8u)) = 0x50u;
+    __dsync();
+    g_FblEraseDmuStatusAfterCommand = DMU_HF_STATUS.U;
+    g_FblEraseDmuErrorAfterCommand = DMU_HF_ERRSR.U;
+    g_FblEraseErrorAfterCommand = g_FblEraseDmuErrorAfterCommand;
+    FblRam_SetSafetyEndinit(password);
+
+    if(FblRamFlash_WaitUnbusy(flashType) == 0u)
+    {
+        g_FblEraseDmuEndTick = STM0_TIM0.U;
+        g_FblEraseDmuTicks = g_FblEraseDmuEndTick - g_FblEraseDmuStartTick;
+        g_FblEraseDmuStatusAfterWait = DMU_HF_STATUS.U;
+        g_FblEraseDmuErrorAfterWait = DMU_HF_ERRSR.U;
+        g_FblEraseLastError = FBL_FLASH_ERROR_TIMEOUT;
+        g_FblEraseFailedCommandIndex = g_FblEraseCommandCount;
+        return FBL_FLASH_ERROR_TIMEOUT;
+    }
+
+    g_FblEraseDmuEndTick = STM0_TIM0.U;
+    g_FblEraseDmuTicks = g_FblEraseDmuEndTick - g_FblEraseDmuStartTick;
+    g_FblEraseDmuStatusAfterWait = DMU_HF_STATUS.U;
+    g_FblEraseDmuErrorAfterWait = DMU_HF_ERRSR.U;
+
+    if(FblRamFlash_HasError() != 0u)
+    {
+        g_FblEraseLastError = g_FblRamRuntimeLastDmuError;
+        g_FblEraseFailedCommandIndex = g_FblEraseCommandCount;
+        FblRamFlash_ClearStatus();
+        return FBL_FLASH_ERROR_DMU;
+    }
+
+    g_FblEraseLastError = FBL_FLASH_OK;
+    return FBL_FLASH_OK;
+}
+
+RAM_FLASH_CODE uint32 FblRamFlash_EraseRange(uint32 address, uint32 length)
+{
+    uint32 current;
+    uint32 remaining;
+    uint32 erasedLength;
+
+    address = FblRamFlash_ToNonCached(address);
+    g_FblEraseLastStart = address;
+    g_FblEraseLastLength = length;
+    g_FblEraseLastError = FBL_FLASH_OK;
+
+    if(FblRamFlash_ValidateEraseRange(address, length) != FBL_FLASH_OK)
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    current = address;
+    remaining = length;
+
+    while(remaining != 0u)
+    {
+        if(FblRamFlash_EraseNextChunk(current, remaining, &erasedLength) != FBL_FLASH_OK)
+        {
+            return g_FblEraseLastError;
+        }
+
+        current += erasedLength;
+        remaining -= erasedLength;
+    }
+
+    return FBL_FLASH_OK;
+}
+
+RAM_FLASH_CODE uint32 FblRamFlash_EraseNextChunk(uint32 address, uint32 remaining, uint32 *erasedLength)
+{
+    uint32 current;
+    uint32 flashType;
+    uint32 chunkLength;
+    uint32 sectorCount;
+
+    if(erasedLength == NULL_PTR)
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    *erasedLength = 0u;
+    current = FblRamFlash_ToNonCached(address);
+
+    if(FblRamFlash_ValidateEraseRange(current, remaining) != FBL_FLASH_OK)
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    chunkLength = FblRamFlash_GetEraseChunkLength(current, remaining);
+    flashType = FblRamFlash_Bank(current);
+
+    if((chunkLength == 0u) ||
+       ((chunkLength & (PFLASH_LOGICAL_SECTOR_SIZE - 1u)) != 0u) ||
+       (chunkLength > PFLASH_ERASE_MAX_COMMAND_SIZE) ||
+       (((current + chunkLength - 1u) / PFLASH_PHYSICAL_SECTOR_SIZE) !=
+        (current / PFLASH_PHYSICAL_SECTOR_SIZE)) ||
+       (FblRamFlash_Bank(current + chunkLength - 1u) != flashType))
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        g_FblEraseFailedCommandIndex = g_FblEraseCommandCount + 1u;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    sectorCount = chunkLength >> PFLASH_SECTOR_SHIFT;
+    if((sectorCount == 0u) || (sectorCount > PFLASH_ERASE_MAX_SECTORS))
+    {
+        g_FblEraseLastError = FBL_FLASH_ERROR_RANGE;
+        g_FblEraseFailedCommandIndex = g_FblEraseCommandCount + 1u;
+        return FBL_FLASH_ERROR_RANGE;
+    }
+
+    if(FblRamFlash_IssueEraseMultiple(current, sectorCount, flashType) != FBL_FLASH_OK)
+    {
+        return g_FblEraseLastError;
+    }
+
+    *erasedLength = chunkLength;
+    return FBL_FLASH_OK;
+}
+
+RAM_FLASH_CODE uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data)
+{
+    uint32 words[8];
+    uint32 index;
+    uint32 bank;
+    uint16 password;
+
+    if((data == NULL_PTR) ||
+       (address < PFLASH_START_NC) ||
+       (address > (PFLASH_END_NC - (PFLASH_PAGE_SIZE - 1u))) ||
+       ((address & (PFLASH_PAGE_SIZE - 1u)) != 0u))
+    {
+        return 1u;
+    }
+
+    for(index = 0u; index < 8u; index++)
+    {
+        const uint8 *p = &data[index * 4u];
+        words[index] = ((uint32)p[0u]) |
+                       ((uint32)p[1u] << 8u) |
+                       ((uint32)p[2u] << 16u) |
+                       ((uint32)p[3u] << 24u);
+    }
+
+    bank = FblRamFlash_Bank(address);
+    g_FblRamRuntimeLastAddress = address;
+
+    password = FblRam_GetSafetyWatchdogPassword();
+    FblRam_ClearSafetyEndinit(password);
+    FblRamFlash_ClearStatus();
+
+    if((FblRamFlash_EnterPageMode(address) == 0u) ||
+       (FblRamFlash_WaitUnbusy(bank) == 0u))
+    {
+        FblRam_SetSafetyEndinit(password);
+        return 1u;
+    }
+
+    FblRamFlash_Load2X32(words[0u], words[1u]);
+    FblRamFlash_Load2X32(words[2u], words[3u]);
+    FblRamFlash_Load2X32(words[4u], words[5u]);
+    FblRamFlash_Load2X32(words[6u], words[7u]);
+    FblRamFlash_WritePage(address);
+
+    if(FblRamFlash_WaitUnbusy(bank) == 0u)
+    {
+        FblRam_SetSafetyEndinit(password);
+        return 1u;
+    }
+
+    FblRam_SetSafetyEndinit(password);
+
+    if(FblRamFlash_HasError() != 0u)
+    {
+        FblRamFlash_ClearStatus();
+        return 1u;
+    }
+
+    return 0u;
+}
+
+static uint8 FblRamFlash_EnterPageMode(uint32 address) RAM_FLASH_HELPER
+{
+    if((address & 0xFF000000u) != PFLASH_START_NC)
+    {
+        return 0u;
+    }
+
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0x5554u)) = 0x50u;
+    __dsync();
+    return 1u;
+}
+
+static void FblRamFlash_Load2X32(uint32 wordLow, uint32 wordHigh) RAM_FLASH_HELPER
+{
+    volatile uint32 *command = (volatile uint32 *)(FLASH_CMD_BASE | 0x55F0u);
+
+    __dsync();
+    command[0] = wordLow;
+    __dsync();
+    command[1] = wordHigh;
+    __dsync();
+}
+
+static void FblRamFlash_WritePage(uint32 address) RAM_FLASH_HELPER
+{
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAA50u)) = address;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAA58u)) = 0u;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAAA8u)) = 0xA0u;
+    *((volatile uint32 *)(FLASH_CMD_BASE | 0xAAA8u)) = 0xAAu;
+    __dsync();
 }

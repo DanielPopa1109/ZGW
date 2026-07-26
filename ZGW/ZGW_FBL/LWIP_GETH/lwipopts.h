@@ -46,6 +46,8 @@
 #ifndef __LWIPOPTS_H__
 #define __LWIPOPTS_H__
 
+#include "FblRam_LwipHooks.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,7 +68,10 @@ extern "C" {
 #define MEM_SIZE                            16384
 #define PBUF_POOL_SIZE                      96
 #define PBUF_POOL_BUFSIZE                   512
-#define MEMP_NUM_PBUF                       48
+#define MEMP_OVERFLOW_CHECK                 2
+#define MEMP_SANITY_CHECK                   1
+#define MEM_OVERFLOW_CHECK                  1
+#define MEMP_NUM_PBUF                       64
 #define MEMP_NUM_RAW_PCB                    4
 #define MEM_ALIGNMENT                       8
 
@@ -82,11 +87,11 @@ extern "C" {
  * segmented programming traffic, matching the APP-side Ethernet fixes. */
 #define MEMP_NUM_TCP_PCB                    8
 #define MEMP_NUM_TCP_PCB_LISTEN             3
-#define MEMP_NUM_TCP_SEG                    24
+#define MEMP_NUM_TCP_SEG                    32
 #define TCP_MSS                             536
-#define TCP_WND                             2144
-#define TCP_SND_BUF                         2144
-#define TCP_SND_QUEUELEN                    16
+#define TCP_WND                             4288
+#define TCP_SND_BUF                         4288
+#define TCP_SND_QUEUELEN                    24
 /* DoIP is a controlled point-to-point programming link; avoid keeping closed
  * tester sessions in TIME_WAIT long enough to starve the small FBL PCB pool. */
 #define TCP_MSL                             3000

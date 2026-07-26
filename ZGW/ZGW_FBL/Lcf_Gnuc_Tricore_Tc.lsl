@@ -37,44 +37,20 @@ LCF_CSA0_SIZE = 8k;
 LCF_USTACK0_SIZE = 2k;
 LCF_ISTACK0_SIZE = 1k;
 
-LCF_CSA1_SIZE = 8k;
-LCF_USTACK1_SIZE = 2k;
-LCF_ISTACK1_SIZE = 1k;
-
-LCF_CSA2_SIZE = 8k;
-LCF_USTACK2_SIZE = 2k;
-LCF_ISTACK2_SIZE = 1k;
-
 LCF_HEAP_SIZE = 4k;
-
-LCF_DSPR2_START = 0x50000000;
-LCF_DSPR2_SIZE = 96k;
-
-LCF_DSPR1_START = 0x60000000;
-LCF_DSPR1_SIZE = 240k;
 
 LCF_DSPR0_START = 0x70000000;
 LCF_DSPR0_SIZE = 240k;
-
-LCF_CSA2_OFFSET =    (LCF_DSPR2_SIZE - 1k - LCF_CSA2_SIZE);
-LCF_ISTACK2_OFFSET = (LCF_CSA2_OFFSET - 256 - LCF_ISTACK2_SIZE);
-LCF_USTACK2_OFFSET = (LCF_ISTACK2_OFFSET - 256 - LCF_USTACK2_SIZE);
-
-LCF_CSA1_OFFSET =    (LCF_DSPR1_SIZE - 1k - LCF_CSA1_SIZE);
-LCF_ISTACK1_OFFSET = (LCF_CSA1_OFFSET - 256 - LCF_ISTACK1_SIZE);
-LCF_USTACK1_OFFSET = (LCF_ISTACK1_OFFSET - 256 - LCF_USTACK1_SIZE);
 
 LCF_CSA0_OFFSET =    (LCF_DSPR0_SIZE - 1k - LCF_CSA0_SIZE);
 LCF_ISTACK0_OFFSET = (LCF_CSA0_OFFSET - 256 - LCF_ISTACK0_SIZE);
 LCF_USTACK0_OFFSET = (LCF_ISTACK0_OFFSET - 256 - LCF_USTACK0_SIZE);
 
 LCF_HEAP0_OFFSET =   (LCF_USTACK0_OFFSET - LCF_HEAP_SIZE);
-LCF_HEAP1_OFFSET =   (LCF_USTACK1_OFFSET - LCF_HEAP_SIZE);
-LCF_HEAP2_OFFSET =   (LCF_USTACK2_OFFSET - LCF_HEAP_SIZE);
 
-LCF_INTVEC0_START = 0xA02FE000;
-LCF_INTVEC1_START = 0xA05FC000;
-LCF_INTVEC2_START = 0xA05FE000;
+LCF_INTVEC0_START = 0x802FE000;
+LCF_INTVEC1_START = 0x805FC000;
+LCF_INTVEC2_START = 0x805FE000;
 
 __INTTAB_CPU0 = LCF_INTVEC0_START;
 __INTTAB_CPU1 = LCF_INTVEC1_START;
@@ -88,101 +64,37 @@ LCF_STARTPTR_CPU0 = 0x80000000;
 LCF_STARTPTR_CPU1 = 0x80300200;
 LCF_STARTPTR_CPU2 = 0x80300220;
 
-LCF_STARTPTR_NC_CPU0 = 0xA0000000;
-LCF_STARTPTR_NC_CPU1 = 0xA0300200;
-LCF_STARTPTR_NC_CPU2 = 0xA0300220;
-
-RESET = LCF_STARTPTR_NC_CPU0;
+RESET = LCF_STARTPTR_CPU0;
 
 MEMORY
 {
-    dsram2_local (w!xp): org = 0xd0000000, len = 96K
-    dsram2 (w!xp): org = 0x50000000, len = 96K
-    psram2 (w!xp): org = 0x50100000, len = 64K
-    
-    dsram1_local (w!xp): org = 0xd0000000, len = 240K
-    dsram1 (w!xp): org = 0x60000000, len = 240K
-    psram1 (w!xp): org = 0x60100000, len = 64K
-    
     dsram0_local (w!xp): org = 0xd0000000, len = 240K
     dsram0 (w!xp): org = 0x70000000, len = 240K
-    psram0 (w!xp): org = 0x70100000, len = 64K
+    psram0 (w!xp): org = 0x70100000, len = 32K
+    psram0_ramcode (w!xp): org = 0x70108000, len = 32K
     
     psram_local (w!xp): org = 0xc0000000, len = 64K
     
     pfls0 (rx!p): org = 0x80000000, len = 3M
-    pfls0_nc (rx!p): org = 0xa0000000, len = 3M
     
     pfls1 (rx!p): org = 0x80300000, len = 3M
-    pfls1_nc (rx!p): org = 0xa0300000, len = 3M
     
     dfls0 (rx!p): org = 0xaf000000, len = 256K
     
     ucb (rx!p): org = 0xaf400000, len = 24K
     
-    cpu0_dlmu (w!xp): org = 0xb0000000, len = 64K
-    cpu0_dlmu_nc (w!xp): org = 0x90000000, len = 64K
-
-    cpu1_dlmu (w!xp): org = 0xb0010000, len = 64K
-    cpu1_dlmu_nc (w!xp): org = 0x90010000, len = 64K
-
-    cpu2_dlmu (w!xp): org = 0xb0020000, len = 64K
-    cpu2_dlmu_nc (w!xp): org = 0x90020000, len = 64K
+    cpu0_dlmu (w!xp): org = 0xB0000000, len = 64K
     
 }
 
 /* map local memory address to a global address */
 REGION_MAP( CPU0 , ORIGIN(dsram0_local), LENGTH(dsram0_local), ORIGIN(dsram0))
-REGION_MAP( CPU1 , ORIGIN(dsram1_local), LENGTH(dsram1_local), ORIGIN(dsram1))
-REGION_MAP( CPU2 , ORIGIN(dsram2_local), LENGTH(dsram2_local), ORIGIN(dsram2))
-/* map cached and non cached addresses */
-REGION_MIRROR("pfls0", "pfls0_nc")
-REGION_MIRROR("pfls1", "pfls1_nc")
-REGION_MIRROR("cpu0_dlmu", "cpu0_dlmu_nc")
-REGION_MIRROR("cpu1_dlmu", "cpu1_dlmu_nc")
-REGION_MIRROR("cpu2_dlmu", "cpu2_dlmu_nc")
-
-/*Un comment one of the below statement groups to enable CpuX DMI RAM to hold global variables*/
 
 REGION_ALIAS( default_ram , dsram0)
 REGION_ALIAS( default_rom , pfls0)
 
-/*
-REGION_ALIAS( default_ram , dsram1)
-REGION_ALIAS( default_rom , pfls1)
-*/
-/*
-REGION_ALIAS( default_ram , dsram2)
-*/
-
 /*Sections located at absolute fixed address*/
     /*Fixed memory Allocations for stack memory and CSA*/
-    CORE_ID = CPU2;
-    SECTIONS
-    {
-        CORE_SEC(.ustack) (LCF_DSPR2_START + LCF_USTACK2_OFFSET):
-        { PROVIDE(__USTACK2_END = .);    . = . + LCF_USTACK2_SIZE;    PROVIDE(__USTACK2 = .); }
-        
-        CORE_SEC(.istack) (LCF_DSPR2_START + LCF_ISTACK2_OFFSET):
-        { PROVIDE(__ISTACK2_END = .);    . = . + LCF_ISTACK2_SIZE;    PROVIDE(__ISTACK2 = .); }
-        
-        CORE_SEC(.csa) (LCF_DSPR2_START + LCF_CSA2_OFFSET):
-        { PROVIDE(__CSA2 = .);    . = . + LCF_CSA2_SIZE;    PROVIDE(__CSA2_END = .); }
-    }
-    
-    CORE_ID = CPU1;
-    SECTIONS
-    {
-        CORE_SEC(.ustack) (LCF_DSPR1_START + LCF_USTACK1_OFFSET):
-        { PROVIDE(__USTACK1_END = .);    . = . + LCF_USTACK1_SIZE;    PROVIDE(__USTACK1 = .); }
-        
-        CORE_SEC(.istack) (LCF_DSPR1_START + LCF_ISTACK1_OFFSET):
-        { PROVIDE(__ISTACK1_END = .);    . = . + LCF_ISTACK1_SIZE;    PROVIDE(__ISTACK1 = .); }
-        
-        CORE_SEC(.csa) (LCF_DSPR1_START + LCF_CSA1_OFFSET):
-        { PROVIDE(__CSA1 = .);    . = . + LCF_CSA1_SIZE;    PROVIDE(__CSA1_END = .); }
-    }
-    
     CORE_ID = CPU0;
     SECTIONS
     {
@@ -194,15 +106,28 @@ REGION_ALIAS( default_ram , dsram2)
         
         CORE_SEC(.csa) (LCF_DSPR0_START + LCF_CSA0_OFFSET):
         { PROVIDE(__CSA0 = .);    . = . + LCF_CSA0_SIZE;    PROVIDE(__CSA0_END = .); }
+
+        PROVIDE(__USTACK1_END = 0);
+        PROVIDE(__USTACK1 = 0);
+        PROVIDE(__ISTACK1_END = 0);
+        PROVIDE(__ISTACK1 = 0);
+        PROVIDE(__CSA1 = 0);
+        PROVIDE(__CSA1_END = 0);
+        PROVIDE(__USTACK2_END = 0);
+        PROVIDE(__USTACK2 = 0);
+        PROVIDE(__ISTACK2_END = 0);
+        PROVIDE(__ISTACK2 = 0);
+        PROVIDE(__CSA2 = 0);
+        PROVIDE(__CSA2_END = 0);
     }
     
     /*Fixed memory Allocations for _START*/
     CORE_ID = GLOBAL ;
     SECTIONS
     {
-        .start_tc0 (LCF_STARTPTR_NC_CPU0) : FLAGS(rxl) { KEEP (*(.start)); } > pfls0_nc
+        .start_tc0 (LCF_STARTPTR_CPU0) : FLAGS(rxl) { KEEP (*(.start)); } > pfls0
         .interface_const (0x80000020) : { __IF_CONST = .; KEEP (*(.interface_const)); } > pfls0
-        PROVIDE(__START0 = LCF_STARTPTR_NC_CPU0);
+        PROVIDE(__START0 = LCF_STARTPTR_CPU0);
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU0 = 0); /* Not used */
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU1 = 0);
         PROVIDE(__ENABLE_INDIVIDUAL_C_INIT_CPU2 = 0);
@@ -221,10 +146,10 @@ REGION_ALIAS( default_ram , dsram2)
     CORE_ID = GLOBAL ;
     SECTIONS
     {
-        .start_tc1 (LCF_STARTPTR_NC_CPU1) : FLAGS(rxl) { KEEP (*(.start_cpu1)); } > pfls1_nc
-        .start_tc2 (LCF_STARTPTR_NC_CPU2) : FLAGS(rxl) { KEEP (*(.start_cpu2)); } > pfls1_nc
-        PROVIDE(__START1 = LCF_STARTPTR_NC_CPU1);
-        PROVIDE(__START2 = LCF_STARTPTR_NC_CPU2);
+        .start_tc1 (LCF_STARTPTR_CPU1) : FLAGS(rxl) { KEEP (*(.start_cpu1)); } > pfls1
+        .start_tc2 (LCF_STARTPTR_CPU2) : FLAGS(rxl) { KEEP (*(.start_cpu2)); } > pfls1
+        PROVIDE(__START1 = LCF_STARTPTR_CPU1);
+        PROVIDE(__START2 = LCF_STARTPTR_CPU2);
     }
     
     /*Fixed memory Allocations for Interrupt Vector Table*/
@@ -1026,64 +951,40 @@ REGION_ALIAS( default_ram , dsram2)
     
     /*Near Abbsolute Addressable Data Sections*/
     /*Near Absolute Data, selectable with patterns and user defined sections*/
-    CORE_ID = CPU2;
-    SECTIONS
-    {
-        CORE_SEC(.zdata) (LCF_DSPR2_START): FLAGS(awzl)
-        {
-            *Ifx_Ssw_Tc2.* (.zdata)
-            *Cpu2_Main.* (.zdata)
-            *(.zdata_cpu2)
-            *(.zdata_cpu2.*)
-            . = ALIGN(2);
-        } > dsram2 AT> pfls0
-        
-        CORE_SEC(.zbss) (NOLOAD): FLAGS(awz)
-        {
-            *Ifx_Ssw_Tc2.* (.zbss)
-            *Cpu2_Main.* (.zbss)
-            *(.zbss_cpu2)
-            *(.zbss_cpu2.*)
-        } > dsram2
-    }
-    CORE_ID = CPU1;
-    SECTIONS
-    {
-        CORE_SEC(.zdata) (LCF_DSPR1_START): FLAGS(awzl)
-        {
-            *Ifx_Ssw_Tc1.* (.zdata)
-            *Cpu1_Main.* (.zdata)
-            *(.zdata_cpu1)
-            *(.zdata_cpu1.*)
-            . = ALIGN(2);
-        } > dsram1 AT> pfls0
-        
-        CORE_SEC(.zbss) (NOLOAD): FLAGS(awz)
-        {
-            *Ifx_Ssw_Tc1.* (.zbss)
-            *Cpu1_Main.* (.zbss)
-            *(.zbss_cpu1)
-            *(.zbss_cpu1.*)
-        } > dsram1
-    }
     CORE_ID = CPU0;
     SECTIONS
     {
         CORE_SEC(.zdata) (LCF_DSPR0_START): FLAGS(awzl)
         {
             *Ifx_Ssw_Tc0.* (.zdata)
+            *Ifx_Ssw_Tc1.* (.zdata)
+            *Ifx_Ssw_Tc2.* (.zdata)
             *Cpu0_Main.* (.zdata)
+            *Cpu1_Main.* (.zdata)
+            *Cpu2_Main.* (.zdata)
             *(.zdata_cpu0)
             *(.zdata_cpu0.*)
+            *(.zdata_cpu1)
+            *(.zdata_cpu1.*)
+            *(.zdata_cpu2)
+            *(.zdata_cpu2.*)
             . = ALIGN(2);
         } > dsram0 AT> pfls0
         
         CORE_SEC(.zbss) (NOLOAD): FLAGS(awz)
         {
             *Ifx_Ssw_Tc0.* (.zbss)
+            *Ifx_Ssw_Tc1.* (.zbss)
+            *Ifx_Ssw_Tc2.* (.zbss)
             *Cpu0_Main.* (.zbss)
+            *Cpu1_Main.* (.zbss)
+            *Cpu2_Main.* (.zbss)
             *(.zbss_cpu0)
             *(.zbss_cpu0.*)
+            *(.zbss_cpu1)
+            *(.zbss_cpu1.*)
+            *(.zbss_cpu2)
+            *(.zbss_cpu2.*)
         } > dsram0
     }
     
@@ -1242,76 +1143,6 @@ SECTIONS
 
 /*Far Data / Far Const Sections, selectable with patterns and user defined sections*/
 /*Far Data Sections, selectable with patterns and user defined sections*/
-CORE_ID = CPU2 ;
-SECTIONS
-{
-    /*DSRAM2 Sections*/
-    CORE_SEC(.data) : FLAGS(awl)
-    {
-        *Ifx_Ssw_Tc2.* (.data)
-        *Cpu2_Main.* (.data)
-        *(.data_cpu2)
-        *(.data_cpu2.*)
-        . = ALIGN(2);
-    } > dsram2 AT> pfls0
-    
-    CORE_SEC(.bss) (NOLOAD): FLAGS(aw)
-    {
-        *Ifx_Ssw_Tc2.* (.bss)
-        *Cpu2_Main.* (.bss)
-        *(.bss_cpu2)
-        *(.bss_cpu2.*)
-    } > dsram2
-    
-    /*DLMU2 Sections*/
-    CORE_SEC(.lmudata) : FLAGS(awl)
-    {
-        *(.lmudata_cpu2)
-        *(.lmudata_cpu2.*)
-        . = ALIGN(2);
-    } > cpu2_dlmu AT> pfls0
-    
-    CORE_SEC(.lmubss) : FLAGS(aw)
-    {
-        *(.lmubss_cpu2)
-        *(.lmubss_cpu2.*)
-    } > cpu2_dlmu
-}
-CORE_ID = CPU1 ;
-SECTIONS
-{
-    /*DSRAM1 Sections*/
-    CORE_SEC(.data) : FLAGS(awl)
-    {
-        *Ifx_Ssw_Tc1.* (.data)
-        *Cpu1_Main.* (.data)
-        *(.data_cpu1)
-        *(.data_cpu1.*)
-        . = ALIGN(2);
-    } > dsram1 AT> pfls0
-    
-    CORE_SEC(.bss) (NOLOAD): FLAGS(aw)
-    {
-        *Ifx_Ssw_Tc1.* (.bss)
-        *Cpu1_Main.* (.bss)
-        *(.bss_cpu1)
-        *(.bss_cpu1.*)
-    } > dsram1
-    
-    /*DLMU1 Sections*/
-    CORE_SEC(.lmudata) : FLAGS(awl)
-    {
-        *(.lmudata_cpu1)
-        *(.lmudata_cpu1.*)
-        . = ALIGN(2);
-    } > cpu1_dlmu AT> pfls0
-    
-    CORE_SEC(.lmubss) : FLAGS(aw)
-    {
-        *(.lmubss_cpu1)
-        *(.lmubss_cpu1.*)
-    } > cpu1_dlmu
-}
 CORE_ID = CPU0 ;
 SECTIONS
 {
@@ -1319,18 +1150,34 @@ SECTIONS
     CORE_SEC(.data) : FLAGS(awl)
     {
         *Ifx_Ssw_Tc0.* (.data)
+        *Ifx_Ssw_Tc1.* (.data)
+        *Ifx_Ssw_Tc2.* (.data)
         *Cpu0_Main.* (.data)
+        *Cpu1_Main.* (.data)
+        *Cpu2_Main.* (.data)
         *(.data_cpu0)
         *(.data_cpu0.*)
+        *(.data_cpu1)
+        *(.data_cpu1.*)
+        *(.data_cpu2)
+        *(.data_cpu2.*)
         . = ALIGN(2);
     } > dsram0 AT> pfls0
     
     CORE_SEC(.bss) (NOLOAD): FLAGS(aw)
     {
         *Ifx_Ssw_Tc0.* (.bss)
+        *Ifx_Ssw_Tc1.* (.bss)
+        *Ifx_Ssw_Tc2.* (.bss)
         *Cpu0_Main.* (.bss)
+        *Cpu1_Main.* (.bss)
+        *Cpu2_Main.* (.bss)
         *(.bss_cpu0)
         *(.bss_cpu0.*)
+        *(.bss_cpu1)
+        *(.bss_cpu1.*)
+        *(.bss_cpu2)
+        *(.bss_cpu2.*)
     } > dsram0
     
     /*DLMU0 Sections*/
@@ -1350,6 +1197,10 @@ SECTIONS
         *(.data.shared_nc.*)
         *(.lmudata_cpu0)
         *(.lmudata_cpu0.*)
+        *(.lmudata_cpu1)
+        *(.lmudata_cpu1.*)
+        *(.lmudata_cpu2)
+        *(.lmudata_cpu2.*)
         . = ALIGN(2);
     } > cpu0_dlmu AT> pfls0
     
@@ -1369,7 +1220,23 @@ SECTIONS
         *(.bss.shared_nc.*)
         *(.lmubss_cpu0)
         *(.lmubss_cpu0.*)
+        *(.lmubss_cpu1)
+        *(.lmubss_cpu1.*)
+        *(.lmubss_cpu2)
+        *(.lmubss_cpu2.*)
     } > cpu0_dlmu
+
+    /*
+     * RAM-updater live state sits above the 192K CPU0 DSPR image staging
+     * window at 0x70000000..0x7002ffff, so it remains CPU0-only non-cached RAM
+     * without consuming CPU0 DLMU used by GETH DMA buffers.
+     */
+    CORE_SEC(.ram_data) (LCF_DSPR0_START + 0x30000) : FLAGS(awl)
+    {
+        *(.ram_data)
+        *(.ram_data.*)
+        . = ALIGN(2);
+    } > dsram0 AT> pfls0
 }
 
 CORE_ID = GLOBAL;
@@ -1453,34 +1320,18 @@ SECTIONS
     CORE_SEC(.rodata) : FLAGS(arl)
     {
         *Ifx_Ssw_Tc0.* (.rodata)
+        *Ifx_Ssw_Tc1.* (.rodata)
+        *Ifx_Ssw_Tc2.* (.rodata)
         *Cpu0_Main.* (.rodata)
+        *Cpu1_Main.* (.rodata)
+        *Cpu2_Main.* (.rodata)
         *(.rodata_cpu0)
         *(.rodata_cpu0.*)
-    } > pfls0
-}
-
-CORE_ID = CPU1;
-SECTIONS
-{
-    CORE_SEC(.rodata) : FLAGS(arl)
-    {
-        *Ifx_Ssw_Tc1.* (.rodata)
-        *Cpu1_Main.* (.rodata)
         *(.rodata_cpu1)
         *(.rodata_cpu1.*)
-    } > pfls1
-}
-
-CORE_ID = CPU2;
-SECTIONS
-{
-    CORE_SEC(.rodata) : FLAGS(arl)
-    {
-        *Ifx_Ssw_Tc2.* (.rodata)
-        *Cpu2_Main.* (.rodata)
         *(.rodata_cpu2)
         *(.rodata_cpu2.*)
-    } > pfls1
+    } > pfls0
 }
 
 /*Far Const Sections, selectable by toolchain*/
@@ -1501,12 +1352,6 @@ SECTIONS
      */
     . = ALIGN(4) ;
     PROVIDE(__clear_table = .);
-    LONG(0 + ADDR(.CPU2.zbss));       LONG(SIZEOF(.CPU2.zbss));
-    LONG(0 + ADDR(.CPU2.bss));        LONG(SIZEOF(.CPU2.bss));
-    LONG(0 + ADDR(.CPU2.lmubss));     LONG(SIZEOF(.CPU2.lmubss));
-    LONG(0 + ADDR(.CPU1.zbss));       LONG(SIZEOF(.CPU1.zbss));
-    LONG(0 + ADDR(.CPU1.bss));        LONG(SIZEOF(.CPU1.bss));
-    LONG(0 + ADDR(.CPU1.lmubss));     LONG(SIZEOF(.CPU1.lmubss));
     LONG(0 + ADDR(.CPU0.zbss));       LONG(SIZEOF(.CPU0.zbss));
     LONG(0 + ADDR(.CPU0.bss));        LONG(SIZEOF(.CPU0.bss));
     LONG(0 + ADDR(.CPU0.lmubss));     LONG(SIZEOF(.CPU0.lmubss));
@@ -1520,23 +1365,16 @@ SECTIONS
     LONG(0 + ADDR(.zbss_powerOn));    LONG(SIZEOF(.zbss_powerOn));
     LONG(-1);                         LONG(-1);
     PROVIDE(__copy_table = .);
-    LONG(LOADADDR(.CPU2.zdata));      LONG(0 + ADDR(.CPU2.zdata));      LONG(SIZEOF(.CPU2.zdata));
-    LONG(LOADADDR(.CPU2.data));       LONG(0 + ADDR(.CPU2.data));       LONG(SIZEOF(.CPU2.data));
-    LONG(LOADADDR(.CPU2.lmudata));    LONG(0 + ADDR(.CPU2.lmudata));    LONG(SIZEOF(.CPU2.lmudata));
-    LONG(LOADADDR(.CPU1.zdata));      LONG(0 + ADDR(.CPU1.zdata));      LONG(SIZEOF(.CPU1.zdata));
-    LONG(LOADADDR(.CPU1.data));       LONG(0 + ADDR(.CPU1.data));       LONG(SIZEOF(.CPU1.data));
-    LONG(LOADADDR(.CPU1.lmudata));    LONG(0 + ADDR(.CPU1.lmudata));    LONG(SIZEOF(.CPU1.lmudata));
     LONG(LOADADDR(.CPU0.zdata));      LONG(0 + ADDR(.CPU0.zdata));      LONG(SIZEOF(.CPU0.zdata));
     LONG(LOADADDR(.CPU0.data));       LONG(0 + ADDR(.CPU0.data));       LONG(SIZEOF(.CPU0.data));
     LONG(LOADADDR(.CPU0.lmudata));    LONG(0 + ADDR(.CPU0.lmudata));    LONG(SIZEOF(.CPU0.lmudata));
+    LONG(LOADADDR(.CPU0.ram_data));   LONG(0 + ADDR(.CPU0.ram_data));   LONG(SIZEOF(.CPU0.ram_data));
     LONG(LOADADDR(.zdata));           LONG(0 + ADDR(.zdata));           LONG(SIZEOF(.zdata));
     LONG(LOADADDR(.sdata));           LONG(0 + ADDR(.sdata));           LONG(SIZEOF(.sdata));
     LONG(LOADADDR(.data));            LONG(0 + ADDR(.data));            LONG(SIZEOF(.data));
     LONG(LOADADDR(.lmudata));         LONG(0 + ADDR(.lmudata));         LONG(SIZEOF(.lmudata));
     LONG(LOADADDR(.sdata4));          LONG(0 + ADDR(.sdata4));          LONG(SIZEOF(.sdata4));
     LONG(LOADADDR(.CPU0.psram_text)); LONG(0 + ADDR(.CPU0.psram_text)); LONG(SIZEOF(.CPU0.psram_text));
-    LONG(LOADADDR(.CPU1.psram_text)); LONG(0 + ADDR(.CPU1.psram_text)); LONG(SIZEOF(.CPU1.psram_text));
-    LONG(LOADADDR(.CPU2.psram_text)); LONG(0 + ADDR(.CPU2.psram_text)); LONG(SIZEOF(.CPU2.psram_text));
     LONG(-1);                         LONG(-1);                         LONG(-1);
     PROVIDE(__copy_table_powerOn = .) ;
     LONG(LOADADDR(.zdata_powerOn));   LONG(0 + ADDR(.zdata_powerOn));   LONG(SIZEOF(.zdata_powerOn));
@@ -1554,11 +1392,23 @@ SECTIONS
     {
         . = ALIGN(2);
         *Ifx_Ssw_Tc0.*(.text)
+        *Ifx_Ssw_Tc1.*(.text)
+        *Ifx_Ssw_Tc2.*(.text)
         *Cpu0_Main.*(.text)
+        *Cpu1_Main.*(.text)
+        *Cpu2_Main.*(.text)
         *Ifx_Ssw_Tc0.*(.text.*)
+        *Ifx_Ssw_Tc1.*(.text.*)
+        *Ifx_Ssw_Tc2.*(.text.*)
         *Cpu0_Main.*(.text.*)
+        *Cpu1_Main.*(.text.*)
+        *Cpu2_Main.*(.text.*)
         *(.text_cpu0)
         *(.text_cpu0.*)
+        *(.text_cpu1)
+        *(.text_cpu1.*)
+        *(.text_cpu2)
+        *(.text_cpu2.*)
     } > pfls0
     
     /*
@@ -1593,60 +1443,20 @@ SECTIONS
         . = ALIGN(2);
         *(.psram_text_cpu0)
         *(.psram_text_cpu0.*)
-        *(.cpu0_psram)
-        *(.cpu0_psram.*)
-        . = ALIGN(2);
-    } > psram0 AT> pfls0
-}
-
-CORE_ID = CPU1;
-SECTIONS
-{
-    CORE_SEC(.text) : FLAGS(axl)
-    {
-        . = ALIGN(2);
-        *Ifx_Ssw_Tc1.*(.text)
-        *Cpu1_Main.*(.text)
-        *Ifx_Ssw_Tc1.*(.text.*)
-        *Cpu1_Main.*(.text.*)
-        *(.text_cpu1)
-        *(.text_cpu1.*)
-    } > pfls1
-
-    CORE_SEC(.psram_text)  : FLAGS(awx)
-    {
-        . = ALIGN(2);
         *(.psram_text_cpu1)
         *(.psram_text_cpu1.*)
-        *(.cpu1_psram)
-        *(.cpu1_psram.*)
-        . = ALIGN(2);
-    } > psram1 AT> pfls1
-}
-
-CORE_ID = CPU2;
-SECTIONS
-{
-    CORE_SEC(.text) : FLAGS(axl)
-    {
-        . = ALIGN(2);
-        *Ifx_Ssw_Tc2.*(.text)
-        *Cpu2_Main.*(.text)
-        *Ifx_Ssw_Tc2.*(.text.*)
-        *Cpu2_Main.*(.text.*)
-        *(.text_cpu2)
-        *(.text_cpu2.*)
-    } > pfls1
-
-    CORE_SEC(.psram_text)  : FLAGS(awx)
-    {
-        . = ALIGN(2);
         *(.psram_text_cpu2)
         *(.psram_text_cpu2.*)
+        *(.cpu0_psram)
+        *(.cpu0_psram.*)
+        *(.cpu1_psram)
+        *(.cpu1_psram.*)
         *(.cpu2_psram)
         *(.cpu2_psram.*)
+        *(.ram_code)
+        *(.ram_code.*)
         . = ALIGN(2);
-    } > psram2 AT> pfls1
+    } > psram0_ramcode AT> pfls0
 }
 
 /*Code Sections, selectable by toolchain*/

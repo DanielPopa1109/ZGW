@@ -73,7 +73,7 @@ extern "C" {
 #endif /* MEM_SANITY_REGION_AFTER*/
 
 void mem_overflow_init_raw(void *p, size_t size);
-void mem_overflow_check_raw(void *p, size_t size, const char *descr1, const char *descr2);
+void mem_overflow_check_raw(void *p, size_t size);
 
 #endif /* MEM_OVERFLOW_CHECK || MEMP_OVERFLOW_CHECK */
 

@@ -65,6 +65,7 @@
 /*----------------------------------Includes----------------------------------*/
 /******************************************************************************/
 
+#include "Ifx_Cfg.h"
 #include "_Impl/IfxGeth_cfg.h"
 #include "IfxGeth_reg.h"
 #include "Scu/Std/IfxScuWdt.h"

@@ -77,6 +77,7 @@
 #define LWIP_NO_STDINT_H 1
 
 #include <Cpu/Std/Ifx_Types.h>
+#include "FblRam_LwipHooks.h"
 #include "lwipopts.h"
 #include <stdio.h>
 
@@ -115,15 +116,22 @@ typedef u32_t  mem_ptr_t;
 
 #define LWIP_PROVIDE_ERRNO
 
+#define abort(void)
+
+/* Keep lwIP assertions enabled without retaining assertion text or __FILE__
+ * strings in PFLASH. The post-erase FBL runtime records only the numeric source
+ * line and halts at the point of detection. The macro intentionally does not
+ * reference `msg`, so TASKING does not emit .rodata.*.str for assertion text. */
+extern volatile uint32 lwip_geth_AssertCount;
+extern volatile uint32 lwip_geth_AssertLine;
+extern void            lwip_geth_AssertFail(uint32 line);
+
+#define LWIP_PLATFORM_ASSERT(msg)  lwip_geth_AssertFail((uint32)__LINE__)
+
 #ifdef LWIP_DEBUG
-#define LWIP_PLATFORM_ASSERT(msg)                                                \
-  printf("Assertion \"%s\" failed at line %d in %s\n", msg, __LINE__, __FILE__); \
-  while (1) {}
 #define LWIP_PLATFORM_DIAG(msg)   printf msg; printf("\r\n");
 #else
-#define LWIP_PLATFORM_ASSERT(msg) ((void)0)
 #define LWIP_PLATFORM_DIAG(msg)   ((void)0)
-
 #endif
 
 #endif  //__LWIP_EE_CC_TRICORE_H__

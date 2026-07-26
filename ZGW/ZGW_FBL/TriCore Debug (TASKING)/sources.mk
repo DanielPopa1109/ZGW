@@ -45,12 +45,9 @@ LWIP_GETH/port/src \
 Libraries/Infra/Platform/Tricore/Compilers \
 Libraries/Infra/Ssw/TC3xx/Tricore \
 Libraries \
-Libraries/iLLD/TC3xx/Tricore/Can/Can \
-Libraries/iLLD/TC3xx/Tricore/Can/Std \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Irq \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Std \
 Libraries/iLLD/TC3xx/Tricore/Cpu/Trap \
-Libraries/iLLD/TC3xx/Tricore/Flash/Std \
 Libraries/iLLD/TC3xx/Tricore/Geth/Eth \
 Libraries/iLLD/TC3xx/Tricore/Geth/Std \
 Libraries/iLLD/TC3xx/Tricore/Gtm/Std \

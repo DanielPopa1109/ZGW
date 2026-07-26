@@ -36,13 +36,13 @@ DEFAULT_PORT = 13400
 DEFAULT_SOURCE_ADDR = 0x0710
 DEFAULT_TARGET_ADDR = 0x1001
 DEFAULT_APP_START = 0xA0030000
-DEFAULT_APP_END = 0xA07FFFFF
-# Keep the whole TransferData diagnostic packet inside the ZGW_APP bus payload cap.
-DEFAULT_BLOCK_SIZE = 256
+DEFAULT_APP_END = 0xA05CFFFF
+# Normal ZGW DoIP TransferData carries 4096 firmware bytes plus SID/BSC overhead.
+DEFAULT_BLOCK_SIZE = 4096
 TRANSFER_DATA_REQUEST_LIMIT = 256
 TRANSFER_DATA_OVERHEAD_BYTES = 2
 TRANSFER_DATA_MAX_CHUNK_SIZE = TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
-ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT = 4093
+ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT = 4098
 ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE = (
     ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
 )
@@ -77,6 +77,8 @@ ROUTED_FLASH_POST_RESET_GAP_SECONDS = 1.000
 ROUTED_SEND_BACKPRESSURE_TIMEOUT_SECONDS = 30.0
 ROUTED_SEND_BACKPRESSURE_POLL_SECONDS = 0.050
 ROUTED_TRANSPORT_ACK_TIMEOUT_SECONDS = 120.0
+FBL_UPDATER_ENTRY_TIMEOUT_SECONDS = 30.0
+FBL_ERASE_TIMEOUT_SECONDS = 120.0
 TRACE_DRAIN_MAX_LINES = 100
 
 # Fault-memory Snapshot Data readout can require hundreds of short 0x19 requests.
@@ -264,7 +266,7 @@ DEM_DTC_CODING_ECU_NOT_CODED = 0x023000
 DEM_DTC_CODING_INVALID = 0x023001
 DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT = 0x021000
 DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT = CODING_RX_PARAMETER_COUNT
-DEM_DTC_TIMESTAMP_DATA_SIZE = 18
+DEM_DTC_TIMESTAMP_DATA_SIZE = 22
 MCUSM_SNAPSHOT_TIMESTAMP_OFFSET = 224
 
 STATIC_DTC_DESCRIPTIONS = {
@@ -394,6 +396,7 @@ DEM_EVENT_ID_NAMES = {
 ROUTINE_ERASE_MEMORY = 0x0001
 ROUTINE_CHECK_MEMORY_CRC = 0x0002
 ROUTINE_START_FBL_RAM_UPDATER = 0x0155
+ROUTINE_SELECT_SW_BLOCK = 0x0200
 
 DID_ACTIVE_SW_BLOCK = 0xF100
 DID_APP_SW_VERSION = 0xF101
@@ -402,6 +405,8 @@ DID_ACTIVE_DIAG_SESSION = 0xF186
 SESSION_DEFAULT = 0x01
 SESSION_PROGRAMMING = 0x02
 SESSION_EXTENDED = 0x03
+ACTIVE_SW_BLOCK_APP = 0x01
+ACTIVE_SW_BLOCK_FBL = 0x02
 SESSION_CODING_REQUESTED = 0x41
 
 
@@ -605,6 +610,12 @@ def uds_request_log_text(data):
 def u16_be(data, offset):
     return (data[offset] << 8) | data[offset + 1]
 
+def s16_be(data, offset):
+    value = u16_be(data, offset)
+    if value >= 0x8000:
+        value -= 0x10000
+    return value
+
 def u32_be(data, offset):
     return (
         (data[offset] << 24)
@@ -627,6 +638,9 @@ def format_dtc_timestamp_data(data, prefix="DTC occurrence time"):
     utc_ns = u64_be(data, 8)
     utc_valid = data[16]
     source = data[17]
+    mcu_temp_cdeg = s16_be(data, 18)
+    snapshot_version = data[20]
+    snapshot_kind = data[21]
     source_text = TIMEBASE_SOURCE_TEXT.get(source, f"source {source}")
     parts = [f"{prefix}: vehicleTimeNs={vehicle_ns}"]
     if utc_valid != 0 and utc_ns != 0:
@@ -637,6 +651,9 @@ def format_dtc_timestamp_data(data, prefix="DTC occurrence time"):
         parts.append("UTC not valid")
         parts.append(f"utcNs={utc_ns}")
     parts.append(f"time source: {source_text} ({source})")
+    parts.append(f"MCU temperature: {mcu_temp_cdeg / 100.0:.2f} deg C")
+    parts.append(f"snapshot version: {snapshot_version}")
+    parts.append(f"snapshot kind: {snapshot_kind}")
     return ", ".join(parts)
 
 
@@ -921,6 +938,7 @@ class DoipClient:
         self.lock = threading.Lock()
         self._last_request_ts = 0.0
         self.request_spacing_seconds = REQUEST_SPACING_SECONDS
+        self.last_nrc78_count = 0
 
     @property
     def connected(self):
@@ -1099,8 +1117,10 @@ class DoipClient:
         payload = struct.pack(">HH", self.source_addr, self.target_addr) + bytes(request)
         deadline = time.monotonic() + timeout
         resent_after_stale_response = False
+        nrc78_count = 0
 
         with self.lock:
+            self.last_nrc78_count = 0
             self._pace()
             self._send_frame(DOIP_PT_DIAG_MSG, payload)
             while True:
@@ -1140,6 +1160,8 @@ class DoipClient:
                     continue
 
                 if len(uds) >= 3 and uds[0] == 0x7F and uds[2] == 0x78:
+                    nrc78_count += 1
+                    self.last_nrc78_count = nrc78_count
                     deadline = time.monotonic() + timeout
                     continue
                 if len(uds) >= 3 and uds[0] == 0x7F and uds[2] == 0x21:
@@ -1646,13 +1668,28 @@ class RawTcpUdsClient:
     def send_uds(self, request, timeout=None, allow_no_response=False):
         if self.sock is None:
             raise FcdError("Not connected")
+        timeout = self.timeout if timeout is None else float(timeout)
+        deadline = time.monotonic() + timeout
+        nrc78_count = 0
         with self.lock:
+            self.last_nrc78_count = 0
             self._pace()
-            self.sock.settimeout(self.timeout if timeout is None else timeout)
+            self.sock.settimeout(timeout)
             self.sock.sendall(bytes(request))
             if allow_no_response:
                 return b""
-            return self.sock.recv(4096)
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Timed out waiting for UDS data")
+                self.sock.settimeout(remaining)
+                response = self.sock.recv(4096)
+                if len(response) >= 3 and response[0] == 0x7F and response[2] == 0x78:
+                    nrc78_count += 1
+                    self.last_nrc78_count = nrc78_count
+                    deadline = time.monotonic() + timeout
+                    continue
+                return response
 
 
 class FcdApp:
@@ -2145,7 +2182,7 @@ class FcdApp:
         self.node_tree.configure(yscrollcommand=node_scroll.set)
 
         columns = ("ecu", "hex")
-        self.generator_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="browse")
+        self.generator_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="extended")
         for col, text, width in [
             ("ecu", "ECU", 160),
             ("hex", "HEX File", 520),
@@ -2176,8 +2213,6 @@ class FcdApp:
         for col in range(10):
             options.columnconfigure(col, weight=1)
 
-        self.dry_run_var = tk.BooleanVar(value=True)
-        self.arm_programming_var = tk.BooleanVar(value=False)
         self.erase_var = tk.BooleanVar(value=True)
         self.transfer_crc_var = tk.BooleanVar(value=True)
         self.verify_crc_var = tk.BooleanVar(value=True)
@@ -2185,13 +2220,11 @@ class FcdApp:
         self.flash_appl_var = tk.BooleanVar(value=True)
         self.flash_coding_var = tk.BooleanVar(value=True)
         self.block_size_var = tk.StringVar(value=str(DEFAULT_BLOCK_SIZE))
+        self.fbl_erase_timeout_var = tk.StringVar(value=str(FBL_ERASE_TIMEOUT_SECONDS))
         self.session_var = tk.StringVar(value="0x02")
 
-        ttk.Checkbutton(options, text="Dry run", variable=self.dry_run_var).grid(row=0, column=0, sticky="w", padx=6)
-        ttk.Checkbutton(options, text="Arm programming", variable=self.arm_programming_var).grid(
-            row=0, column=1, sticky="w", padx=6
-        )
         self._entry_row(options, 1, "Block size", self.block_size_var, 10, 0)
+        self._entry_row(options, 1, "FBL erase timeout", self.fbl_erase_timeout_var, 10, 2)
 
         columns = ("item", "value")
         self.payload_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="browse")
@@ -2542,6 +2575,14 @@ class FcdApp:
     def _send_uds_with_reconnect(self, client, request, label, timeout=None, allow_no_response=False, max_retries=1):
         request = bytes(request)
         retries = 0
+        no_auto_retry = request[:1] in (b"\x34", b"\x36", b"\x37")
+        if (
+            len(request) >= 4
+            and request[0] == 0x31
+            and request[1] == 0x01
+            and struct.unpack(">H", request[2:4])[0] in (ROUTINE_ERASE_MEMORY, ROUTINE_CHECK_MEMORY_CRC)
+        ):
+            no_auto_retry = True
         while True:
             require_current_client = self.client is client
             if self._reconnect_cancelled(client, require_current_client=require_current_client):
@@ -2551,7 +2592,7 @@ class FcdApp:
             except (OSError, TimeoutError, DoipError) as exc:
                 if allow_no_response:
                     return b""
-                if not isinstance(client, DoipClient) or retries >= max_retries:
+                if no_auto_retry or not isinstance(client, DoipClient) or retries >= max_retries:
                     raise
                 retries += 1
                 self.log(f"{label}: DoIP request failed ({exc}); reconnecting and retrying")
@@ -4899,7 +4940,7 @@ class FcdApp:
         is_zgw = bool(target.get("is_zgw")) or node_name.upper() == "ZGW"
         simulated = self._target_is_simulated(target)
         target_strict = self._strict_response_for_target(target, strict_response)
-        effective_dry = dry and not simulated
+        effective_dry = dry
         base_send = self._make_uds_sender(
             client,
             dry=effective_dry,
@@ -4911,14 +4952,17 @@ class FcdApp:
                 return base_send
 
             def send_zgw(request, name, timeout=None, allow_no_response=False):
-                return base_send(
+                response = base_send(
                     request,
                     name,
                     timeout=BUS_TARGET_DIAG_TIMEOUT_SECONDS,
                     allow_no_response=allow_no_response or simulated,
                 )
+                send_zgw.last_nrc78_count = getattr(base_send, "last_nrc78_count", 0)
+                return response
 
             send_zgw.dry_run = getattr(base_send, "dry_run", effective_dry)
+            send_zgw.last_nrc78_count = getattr(base_send, "last_nrc78_count", 0)
             return send_zgw
         if not extended:
             extended = default_extended_diag_address(node_name, target.get("bus_type", "UNKNOWN"))
@@ -4948,6 +4992,7 @@ class FcdApp:
                     self.log(f"TX {name}{retry_note}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
                     try:
                         response = client.send_uds(prefixed_request, timeout=request_timeout, allow_no_response=accept_no_response)
+                        send.last_nrc78_count = getattr(client, "last_nrc78_count", 0)
                         response = bytes(response)
                         if not response:
                             self.log(f"RX {name}: no response accepted")
@@ -5006,6 +5051,7 @@ class FcdApp:
                     return do_send()
 
         send.dry_run = getattr(base_send, "dry_run", effective_dry)
+        send.last_nrc78_count = 0
         return send
 
     def _request_read_coding_routine(self, send, rid, node_name, phase="", timeout=20.0, max_pending_polls=10):
@@ -5212,8 +5258,7 @@ class FcdApp:
             send = None
 
             try:
-                # The full coding procedure is always sent for real - coding is never a
-                # dry run. dry=False guards against an active Flash-tab dry-run checkbox.
+                # The full coding procedure is always transmitted.
                 send = self._make_uds_sender(client, dry=False)
 
                 # --- Code the ECU from the coding session ---
@@ -5752,15 +5797,37 @@ class FcdApp:
             step_no = 1
             self._sync_coding_tabs_from_nodes()
             coding_descriptors = self._all_coding_descriptors()
+            all_targets_by_name = {}
+            for t in self.node_rows.values():
+                if not t.get("simulated_enabled", True):
+                    continue
+                target = dict(t)
+                target["payload_blocks"] = []
+                all_targets_by_name[target["node_name"].upper()] = target
+
+            selected_iids = [iid for iid in self.generator_tree.selection() if iid in self.generator_rows]
+            all_iids = [iid for iid in self.generator_tree.get_children() if iid in self.generator_rows]
+            if not selected_iids and len(all_iids) > 1:
+                raise FcdError("Select the HEX row(s) to include in the generated bundle")
+            source_iids = selected_iids or all_iids
+            ordered_rows = [self.generator_rows[iid] for iid in source_iids]
+            if selected_iids:
+                self.log(f"Generate FCD Files: using {len(selected_iids)} selected HEX row(s)")
+            else:
+                self.log("Generate FCD Files: using the only HEX row")
+            generator_ecu_names = {
+                ecu_name_from_hex_stem(str(row.get("ecu") or Path(row["hex"]).stem).strip()).upper()
+                for row in ordered_rows
+            }
             targets_by_name = {
-                t["node_name"].upper(): dict(t)
-                for t in self.node_rows.values()
-                if t.get("simulated_enabled", True)
+                name: target
+                for name, target in all_targets_by_name.items()
+                if name in generator_ecu_names
             }
             for target in targets_by_name.values():
                 target["coding_descriptor"] = coding_descriptors.get(target["node_name"].upper(), {})
 
-            ordered_rows = [self.generator_rows[iid] for iid in self.generator_tree.get_children() if iid in self.generator_rows]
+            seen_payload_blocks = set()
             for row in ordered_rows:
                 hex_path = Path(row["hex"])
                 source_ecu_name = str(row.get("ecu") or hex_path.stem).strip()
@@ -5807,6 +5874,10 @@ class FcdApp:
 
                 for index, segment in enumerate(segments):
                     address = download_address_from_hex_address(segment.address) + base_delta
+                    payload_key = (ecu_name, flash_kind, address, len(segment.data), str(hex_path).lower())
+                    if payload_key in seen_payload_blocks:
+                        continue
+                    seen_payload_blocks.add(payload_key)
                     name = f"{ecu_name}_{index}_{address:08X}.bin".replace(" ", "_")
                     payload_path = payload_dir / name
                     payload_path.write_bytes(segment.data)
@@ -6107,19 +6178,17 @@ class FcdApp:
                 f"node={event.get('node_name')} active_on_bus={event.get('active_on_bus')}"
             )
         total_bytes = sum(int(p.get("size", 0)) for p in self.package_payloads)
-        zgw_last_flash = "yes" if any(e.get("is_zgw") for e in flash_events[-1:]) else "n/a"
-        zgw_last_coding = "yes" if any(e.get("is_zgw") for e in coding_events[-1:]) else "n/a"
+        total_mib = total_bytes / (1024 * 1024)
         flash_slot_count = len({e.get("time_slot", 0) for e in flash_events})
         coding_slot_count = len({e.get("time_slot", 0) for e in coding_events})
         rows = [
             ("Targets", str(len(targets) or len({p.get("ecu", "") for p in self.package_payloads}))),
             ("Payload blocks", str(len(self.package_payloads))),
-            ("Payload bytes", str(total_bytes)),
+            ("Payload bytes", f"{total_bytes} ({total_mib:.2f} MiB data records)"),
+            ("TransferData requests", str(self._payloads_total_packets(self.package_payloads))),
             ("Buses", ", ".join(buses) if buses else "legacy package"),
             ("Flash slots", str(flash_slot_count)),
             ("Coding slots", str(coding_slot_count)),
-            ("ZGW flash last", zgw_last_flash),
-            ("ZGW coding last", zgw_last_coding),
         ]
         for item, value in rows:
             self.payload_tree.insert("", "end", values=(item, value))
@@ -6128,8 +6197,6 @@ class FcdApp:
         payloads = self.selected_payloads()
         if not payloads and not self.flash_coding_var.get():
             raise FcdError("Load/select payloads or enable Coding first")
-        if not self.dry_run_var.get() and not self.arm_programming_var.get() and self._selected_real_targets_require_arm(payloads):
-            raise FcdError("Real programming requires Arm programming to be checked")
         return payloads
 
     def _execute_selected_payloads_once(self, payloads, strict_response=False):
@@ -6143,15 +6210,16 @@ class FcdApp:
         client = self.require_client()
         start_time = time.monotonic()
         progress_cb, complete_progress = self._make_package_progress(
-            self._payloads_total_packets(payloads),
+            self._payloads_total_bytes(payloads),
             start_time,
         )
 
-        self._execute_zgw_programming_preamble(client)
+        self._execute_zgw_programming_preamble(
+            client,
+            is_fbl=bool(self.flash_fbl_var.get() and fbl_payloads),
+        )
 
         if self.flash_fbl_var.get() and fbl_payloads:
-            self._execute_start_fbl_ram_updater(client)
-            self._execute_status_readback(client, "after FBL RAM updater")
             for payload in fbl_payloads:
                 self._execute_payload(
                     client,
@@ -6198,30 +6266,6 @@ class FcdApp:
         action_name = "Execute Parallel Bundle" if self.package_manifest is not None else "Execute ZGW Sequence"
         self.worker(action_name, lambda: self._execute_selected_payloads_once(payloads))
 
-    def _selected_real_targets_require_arm(self, payloads):
-        if self.package_manifest is None:
-            return True
-        target_by_name = {
-            str(target.get("node_name", "")).upper(): target
-            for target in self.package_manifest.get("targets", [])
-        }
-        selected_names = {
-            str(payload.get("node_name") or payload.get("ecu", "")).upper()
-            for payload in payloads
-        }
-        selected_names.discard("")
-        if self.flash_coding_var.get():
-            for name, target in target_by_name.items():
-                if target.get("coding_descriptor"):
-                    selected_names.add(name)
-        if not selected_names:
-            return True
-        for name in selected_names:
-            target = target_by_name.get(name)
-            if not target or not self._target_is_simulated(target):
-                return True
-        return False
-
     def _new_parallel_client(self, target_addr):
         if self.transport_var.get() != "DoIP":
             raise FcdError("Parallel bundle execution currently requires DoIP")
@@ -6254,21 +6298,35 @@ class FcdApp:
         # Mirror _execute_payload exactly so the packet count below matches the
         # number of TransferData requests actually sent at runtime.
         target_info = self._target_for_payload(payload)
+        target_is_zgw = self._payload_targets_zgw(payload, target_info)
         routed_target = bool(target_info) and not (
-            bool(target_info.get("is_zgw"))
-            or str(target_info.get("node_name", "")).upper() == "ZGW"
+            self._payload_targets_zgw(payload, target_info)
         )
         configured_block_size = parse_int(self.block_size_var.get())
         max_chunk_size = (
-            ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target else TRANSFER_DATA_MAX_CHUNK_SIZE
+            ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE if target_is_zgw
+            else ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target
+            else TRANSFER_DATA_MAX_CHUNK_SIZE
         )
         return max(8, min(max_chunk_size, configured_block_size))
 
+    @staticmethod
+    def _request_download_max_block_length(response):
+        if len(response) < 2 or response[0] != 0x74:
+            raise FcdError("RequestDownload did not return a positive response")
+        length_bytes = (response[1] >> 4) & 0x0F
+        if length_bytes == 0 or len(response) < 2 + length_bytes:
+            raise FcdError(
+                f"RequestDownload returned invalid max block length format: {response.hex(' ').upper()}"
+            )
+        value = 0
+        for b in response[2 : 2 + length_bytes]:
+            value = (value << 8) | b
+        return value
+
     def _payloads_total_packets(self, payloads):
-        # Progress is tracked in TransferData packets, not raw bytes. The effective
-        # data chunk is derived from the 256-byte diagnostic packet limit, so
-        # byte-weighting can make small packets look stalled on larger payloads.
-        # Counting packets keeps the bar advancing in step with what is being sent.
+        # Display-only estimate of TransferData requests. Progress itself is
+        # byte-based so mixed ZGW DoIP and routed/CAN payloads share one unit.
         total = 0
         for payload in payloads:
             try:
@@ -6281,14 +6339,14 @@ class FcdApp:
             total += (size + block_size - 1) // block_size
         return total
 
-    def _make_package_progress(self, total_bytes, start_time):
-        maximum = max(1, int(total_bytes))
-        progress_state = {"bytes": 0, "render_pending": False}
+    def _make_package_progress(self, total_units, start_time):
+        maximum = max(1, int(total_units))
+        progress_state = {"units": 0, "render_pending": False}
         progress_lock = threading.Lock()
 
         def render_progress():
             with progress_lock:
-                value = min(maximum, progress_state["bytes"])
+                value = min(maximum, progress_state["units"])
                 progress_state["render_pending"] = False
             elapsed = int(time.monotonic() - start_time)
             self.progress.configure(maximum=maximum, value=value)
@@ -6315,12 +6373,12 @@ class FcdApp:
                 delta = 0
             with progress_lock:
                 if delta:
-                    progress_state["bytes"] = min(maximum, progress_state["bytes"] + delta)
+                    progress_state["units"] = min(maximum, progress_state["units"] + delta)
                 queue_render_locked()
 
         def complete():
             with progress_lock:
-                progress_state["bytes"] = maximum
+                progress_state["units"] = maximum
                 queue_render_locked()
 
         return advance, complete
@@ -6334,7 +6392,7 @@ class FcdApp:
         targets = {t.get("node_name", ""): t for t in manifest.get("targets", [])}
         start_time = time.monotonic()
         progress_cb, complete_progress = self._make_package_progress(
-            self._payloads_total_packets(payloads),
+            self._payloads_total_bytes(payloads),
             start_time,
         )
 
@@ -6401,35 +6459,34 @@ class FcdApp:
         if not by_bus:
             return
 
-        if self.dry_run_var.get():
-            fbl_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=True)
-            app_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=False)
-            phase_lanes = {}
-            for bus, tasks in fbl_lanes.items():
-                phase_lanes.setdefault(bus, []).extend(("FBL", True, slot, work) for slot, work in tasks)
-            for bus, tasks in app_lanes.items():
-                phase_lanes.setdefault(bus, []).extend(("APP", False, slot, work) for slot, work in tasks)
-            if phase_lanes and all(
-                self._can_run_paced_flash_slot(work)
-                for tasks in phase_lanes.values()
-                for _phase_name, _is_fbl, _slot, work in tasks
-            ):
-                client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                try:
-                    client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
-                    client.drain()
-                    self.log(
-                        "Execute Parallel Bundle: non-ZGW flash uses one DoIP TCP connection "
-                        "for independent routed bus lanes"
-                    )
-                    self._execute_paced_simulated_flash_phase_lanes(
-                        phase_lanes,
-                        client,
-                        progress_cb,
-                    )
-                finally:
-                    client.close()
-                return
+        fbl_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=True)
+        app_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=False)
+        phase_lanes = {}
+        for bus, tasks in fbl_lanes.items():
+            phase_lanes.setdefault(bus, []).extend(("FBL", True, slot, work) for slot, work in tasks)
+        for bus, tasks in app_lanes.items():
+            phase_lanes.setdefault(bus, []).extend(("APP", False, slot, work) for slot, work in tasks)
+        if phase_lanes and all(
+            self._can_run_paced_flash_slot(work)
+            for tasks in phase_lanes.values()
+            for _phase_name, _is_fbl, _slot, work in tasks
+        ):
+            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            try:
+                client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                client.drain()
+                self.log(
+                    "Execute Parallel Bundle: non-ZGW flash uses one DoIP TCP connection "
+                    "for independent routed bus lanes"
+                )
+                self._execute_paced_simulated_flash_phase_lanes(
+                    phase_lanes,
+                    client,
+                    progress_cb,
+                )
+            finally:
+                client.close()
+            return
 
         def run_bus(bus_events):
             self._execute_parallel_flash_phase(
@@ -6491,7 +6548,7 @@ class FcdApp:
         )
         self.log(f"Execute Parallel Bundle: {phase_name} bus lanes={lane_text}")
 
-        if self.dry_run_var.get() and self._can_run_paced_flash_lanes(lanes):
+        if self._can_run_paced_flash_lanes(lanes):
             client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
             try:
                 client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
@@ -6543,7 +6600,7 @@ class FcdApp:
             f"Execute Parallel Bundle: {phase_name} slot {slot} bus={bus} "
             f"nodes={', '.join(item[0] for item in work)}"
         )
-        if self.dry_run_var.get() and self._can_run_paced_flash_slot(work):
+        if self._can_run_paced_flash_slot(work):
             client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
             try:
                 self._execute_paced_simulated_flash_slot(slot, work, client, progress_cb, is_fbl)
@@ -6873,14 +6930,9 @@ class FcdApp:
         add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Default Session before flash")
         add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session before flash")
         add_status(f"{node_name}: Flash preamble")
-        add(b"\x28\x01", f"{node_name}: CommunicationControl enableRxAndDisableTx")
+        add(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: Programming Session")
-        if is_fbl:
-            add(
-                b"\x31\x01" + struct.pack(">H", ROUTINE_START_FBL_RAM_UPDATER),
-                f"{node_name}: RoutineControl 0155 Start FBL RAM Updater",
-            )
         add_status(f"{node_name}: Programming pre-flash")
 
         configured_block_size = parse_int(self.block_size_var.get())
@@ -6902,7 +6954,20 @@ class FcdApp:
                 f"block_data={block_size} routed_max_block_data={ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE}"
             )
 
-            if self.erase_var.get():
+            if block_name == "FBL":
+                add(
+                    b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_FBL]),
+                    f"{node_name}: RoutineControl 0200 Select FBL software block",
+                )
+                add(
+                    b"\x31\x01" + struct.pack(">H", ROUTINE_START_FBL_RAM_UPDATER),
+                    f"{node_name}: RoutineControl 0155 Start FBL RAM Updater",
+                )
+                add(
+                    b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size),
+                    f"{node_name}: RoutineControl Erase {block_name}",
+                )
+            elif self.erase_var.get():
                 add(
                     b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size),
                     f"{node_name}: RoutineControl Erase {block_name}",
@@ -6924,7 +6989,7 @@ class FcdApp:
                         f"{node_name}: TransferData {block_name} #{transfer_index} "
                         f"bsc=0x{block_counter:02X} offset=0x{offset:X} len={len(chunk)}"
                     ),
-                    progress_count=1,
+                    progress_count=len(chunk),
                 )
                 offset += len(chunk)
                 block_counter = (block_counter + 1) & 0xFF
@@ -6951,7 +7016,7 @@ class FcdApp:
         add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Default Session after {node_name} {'FBL' if is_fbl else 'APP'} flash")
         add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session after {node_name} {'FBL' if is_fbl else 'APP'} flash")
         add_status(f"{node_name}: Post-{node_name} {'FBL' if is_fbl else 'APP'} flash")
-        add(b"\x28\x00", f"{node_name}: CommunicationControl enableRxAndTx")
+        add(b"\x28\x00\x03", f"{node_name}: CommunicationControl enableRxAndTx")
         add(b"\x85\x01", f"{node_name}: ControlDTCSetting on")
         return sequence
 
@@ -6972,33 +7037,6 @@ class FcdApp:
         if not payloads:
             return
         target_addr = self._parallel_target_addr(target, payloads)
-        simulated = self._target_is_simulated(target)
-        dry = self.dry_run_var.get() and not simulated
-        if dry:
-            client = object()
-            stage_is_fbl = any(self._payload_is_fbl(p) for p in payloads)
-            self._execute_target_flash_preamble(
-                client,
-                target,
-                is_fbl=stage_is_fbl,
-                strict_response=strict_response,
-            )
-            for payload in payloads:
-                self._execute_payload(
-                    client,
-                    payload,
-                    is_fbl=self._payload_is_fbl(payload),
-                    progress_cb=progress_cb,
-                    target_info=target,
-                    strict_response=strict_response,
-                )
-            self._execute_target_flash_postamble(
-                client,
-                target,
-                f"{target.get('node_name', payloads[0].get('ecu', 'target'))} {('FBL' if stage_is_fbl else 'APP')} flash",
-                strict_response=strict_response,
-            )
-            return
         client = self._new_parallel_client(target_addr)
         try:
             stage_is_fbl = any(self._payload_is_fbl(p) for p in payloads)
@@ -7031,21 +7069,21 @@ class FcdApp:
         send = self._make_target_uds_sender(
             client,
             target,
-            dry=self.dry_run_var.get(),
+            dry=False,
             strict_response=strict_response,
         )
+        target_is_zgw = bool(target.get("is_zgw")) or str(node_name).upper() == "ZGW"
+        if target_is_zgw:
+            self._execute_zgw_flash_entry(send, node_name, is_fbl=is_fbl)
+            return
         self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session before flash")
         self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash")
         self._read_standard_status(send, f"{node_name}: Flash preamble")
-        send(b"\x28\x01", f"{node_name}: CommunicationControl enableRxAndDisableTx")
+        send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
         if is_fbl:
-            send(
-                b"\x31\x01" + struct.pack(">H", ROUTINE_START_FBL_RAM_UPDATER),
-                f"{node_name}: RoutineControl 0155 Start FBL RAM Updater",
-                timeout=20.0,
-            )
+            self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
         self._read_standard_status(send, f"{node_name}: Programming pre-flash")
 
     def _execute_target_flash_postamble(self, client, target, reason, strict_response=False):
@@ -7053,7 +7091,7 @@ class FcdApp:
         send = self._make_target_uds_sender(
             client,
             target,
-            dry=self.dry_run_var.get(),
+            dry=False,
             strict_response=strict_response,
         )
         self._send_ecu_reset_best_effort(send, f"{node_name}: ECUReset hardReset after {reason}")
@@ -7068,7 +7106,7 @@ class FcdApp:
         self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session after {reason}")
         self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session after {reason}")
         self._read_standard_status(send, f"{node_name}: Post-{reason}")
-        send(b"\x28\x00", f"{node_name}: CommunicationControl enableRxAndTx")
+        send(b"\x28\x00\x03", f"{node_name}: CommunicationControl enableRxAndTx")
         send(b"\x85\x01", f"{node_name}: ControlDTCSetting on")
 
     def _execute_parallel_coding(self, manifest, progress_cb, include_zgw=True, only_zgw=False, strict_response=False):
@@ -7115,7 +7153,6 @@ class FcdApp:
         try:
             if (
                 self.transport_var.get() == "DoIP"
-                and self.dry_run_var.get()
                 and any(
                     self._can_run_paced_coding_slot("Code Vehicle", work)
                     for tasks in lanes.values()
@@ -7149,7 +7186,6 @@ class FcdApp:
 
         if (
             self.transport_var.get() == "DoIP"
-            and self.dry_run_var.get()
             and self._can_run_paced_coding_slot("Code Vehicle", work)
         ):
             owns_client = False
@@ -7192,20 +7228,14 @@ class FcdApp:
         if not mask:
             return
         target_addr = self._parallel_target_addr(target)
-        simulated = self._target_is_simulated(target)
-        dry = self.dry_run_var.get() and not simulated
-        if dry:
-            client = object()
-        else:
-            client = self._new_parallel_client(target_addr)
+        client = self._new_parallel_client(target_addr)
         try:
-            send = self._make_target_uds_sender(client, target, dry=dry, strict_response=strict_response)
+            send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
             self._ensure_session(send, SESSION_CODING_REQUESTED, f"{target.get('node_name')}: Coding Session requested as 10 41")
             self._run_coding_routine(send, parse_int(descriptor.get("write_routine", int_hex(CODING_ROUTINE_WRITE_ALL))), mask, f"{target.get('node_name')}: Write Coding", timeout=90.0)
             self._run_coding_routine(send, parse_int(descriptor.get("validate_routine", int_hex(CODING_ROUTINE_VALIDATE))), b"", f"{target.get('node_name')}: Check Coding", timeout=20.0)
         finally:
-            if not dry:
-                client.close()
+            client.close()
 
     def _payload_is_fbl(self, payload):
         flash_kind = str(payload.get("flash_kind", "")).strip().upper()
@@ -7230,12 +7260,30 @@ class FcdApp:
                 return target
         return {}
 
+    def _payload_targets_zgw(self, payload, target_info=None):
+        if target_info is None:
+            target_info = self._target_for_payload(payload)
+
+        names = {
+            str(payload.get("node_name", "")).upper(),
+            str(payload.get("ecu", "")).upper(),
+            str(target_info.get("node_name", "")).upper(),
+        }
+        names.discard("")
+
+        if bool(payload.get("is_zgw")) or bool(target_info.get("is_zgw")) or ("ZGW" in names):
+            return True
+
+        try:
+            payload_target = parse_int(payload.get("target_logical_address", int_hex(DEFAULT_TARGET_ADDR)))
+        except Exception:
+            payload_target = 0
+
+        return payload_target == DEFAULT_TARGET_ADDR
+
     def _make_uds_sender(self, client, dry=None, accept_no_response=False):
-        # Dry run is a Flash-tab safety latch. Coding-tab actions pass dry=False so an
-        # active Flash dry-run checkbox never silently suppresses a coding request
-        # (e.g. the coding session change or Load Default routine).
         if dry is None:
-            dry = self.dry_run_var.get()
+            dry = False
 
         def send(request, name, timeout=None, allow_no_response=False):
             request = bytes(request)
@@ -7254,12 +7302,14 @@ class FcdApp:
                         timeout=timeout or float(self.timeout_var.get()),
                         allow_no_response=no_response_ok,
                     )
+                    send.last_nrc78_count = getattr(client, "last_nrc78_count", 0)
                 else:
                     response = client.send_uds(
                         request,
                         timeout=timeout or float(self.timeout_var.get()),
                         allow_no_response=no_response_ok,
                     )
+                    send.last_nrc78_count = 0
             except Exception:
                 if no_response_ok:
                     self.log(f"RX {name}: no response accepted")
@@ -7273,6 +7323,7 @@ class FcdApp:
             return response
 
         send.dry_run = dry
+        send.last_nrc78_count = 0
         return send
 
     def _send_session(self, send, session, label, allow_no_response=False, timeout=10.0):
@@ -7302,6 +7353,19 @@ class FcdApp:
         session = response[3]
         self.log(f"{prefix}: active_session=0x{session:02X}")
         return session
+
+    def _read_active_sw_block(self, send, prefix, timeout=2.0):
+        response = send(
+            b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK),
+            f"{prefix}: Read Active Software Block F100",
+            timeout=timeout,
+        )
+        require_positive_response(response, 0x22)
+        if (len(response) < 4) or (response[1] != 0xF1) or (response[2] != 0x00):
+            raise FcdError(f"{prefix}: malformed active-sw-block DID response {bytes_to_hex(response)}")
+        block = response[3]
+        self.log(f"{prefix}: active_sw_block=0x{block:02X}")
+        return block
 
     def _ensure_session(self, send, session, label, timeout=3.0):
         try:
@@ -7337,6 +7401,55 @@ class FcdApp:
             self.log(f"{label}: no usable response ({exc}); continuing")
             return b""
 
+    def _run_flash_routine_control(self, send, rid, option, label, timeout, expected_payload=None):
+        request = b"\x31\x01" + struct.pack(">H", rid) + bytes(option or b"")
+        expected_payload = bytes(expected_payload) if expected_payload is not None else None
+        start = time.monotonic()
+        self.log(
+            f"{label}: routine=0x{rid:04X} request_time={datetime.now().isoformat(timespec='milliseconds')}"
+        )
+
+        try:
+            response = send(request, label, timeout=timeout)
+        except NegativeResponse as exc:
+            elapsed = time.monotonic() - start
+            self.log(
+                f"{label}: routine=0x{rid:04X} final=negative elapsed={elapsed:.3f}s "
+                f"nrc78=handled-by-transport nrc=0x{exc.nrc:02X}"
+            )
+            raise
+
+        if len(response) < 4 or response[0] != 0x71 or response[1] != 0x01:
+            raise FcdError(f"{label}: malformed RoutineControl response {bytes_to_hex(response)}")
+        echoed_rid = struct.unpack(">H", response[2:4])[0]
+        if echoed_rid != rid:
+            raise FcdError(
+                f"{label}: RoutineControl RID echo mismatch sent=0x{rid:04X} received=0x{echoed_rid:04X}"
+            )
+        if expected_payload is not None:
+            actual_payload = response[4 : 4 + len(expected_payload)]
+            if actual_payload != expected_payload:
+                raise FcdError(
+                    f"{label}: RoutineControl payload mismatch expected={bytes_to_hex(expected_payload)} "
+                    f"received={bytes_to_hex(response[4:])}"
+                )
+        elapsed = time.monotonic() - start
+        nrc78_count = getattr(send, "last_nrc78_count", 0)
+        self.log(
+            f"{label}: routine=0x{rid:04X} final=positive elapsed={elapsed:.3f}s nrc78={nrc78_count}"
+        )
+        return response
+
+    def _select_fbl_software_block(self, send, label_prefix):
+        self._run_flash_routine_control(
+            send,
+            ROUTINE_SELECT_SW_BLOCK,
+            bytes([ACTIVE_SW_BLOCK_FBL]),
+            f"{label_prefix}: RoutineControl 0200 Select FBL software block",
+            timeout=FBL_UPDATER_ENTRY_TIMEOUT_SECONDS,
+            expected_payload=bytes([ACTIVE_SW_BLOCK_FBL]),
+        )
+
     def _read_standard_status(self, send, prefix):
         for did, name in [
             (DID_APP_SW_VERSION, "Read Software Version F101"),
@@ -7345,25 +7458,51 @@ class FcdApp:
         ]:
             send(b"\x22" + struct.pack(">H", did), f"{prefix}: {name}")
 
-    def _execute_zgw_programming_preamble(self, client):
+    def _is_nrc(self, exc, sid, nrc):
+        return f"Negative response for 0x{sid:02X}: NRC 0x{nrc:02X}" in str(exc)
+
+    def _execute_zgw_flash_entry(self, send, node_name, is_fbl=False):
+        entry_prefix = f"{node_name}: Entry probe"
+        active_block = self._read_active_sw_block(send, entry_prefix, timeout=2.0)
+        active_session = self._read_active_diag_session(send, entry_prefix, timeout=2.0)
+
+        if active_block != ACTIVE_SW_BLOCK_FBL:
+            self.log(f"{node_name}: flash entry mode=APPL fresh")
+            self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session before flash")
+            self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash")
+            self._read_standard_status(send, f"{node_name}: Flash preamble")
+            send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
+            send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+            self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
+            if is_fbl:
+                self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
+            self._read_standard_status(send, f"{node_name}: Programming pre-flash")
+            return
+
+        self.log(f"{node_name}: flash entry mode=FBL active")
+        if active_session != SESSION_PROGRAMMING:
+            self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
+        send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
+        send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+
+        if is_fbl:
+            self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
+
+        self._read_standard_status(send, f"{node_name}: Programming pre-flash")
+
+    def _execute_zgw_programming_preamble(self, client, is_fbl=False):
         send = self._make_uds_sender(client)
-        self._send_session(send, SESSION_DEFAULT, "Default Session")
-        self._send_session(send, SESSION_EXTENDED, "Extended Session")
-        self._read_standard_status(send, "Preamble")
-        send(b"\x28\x01", "CommunicationControl enableRxAndDisableTx")
-        send(b"\x85\x02", "ControlDTCSetting off")
-        self._send_session(send, SESSION_PROGRAMMING, "Programming Session")
-        if isinstance(client, DoipClient) and not self.dry_run_var.get():
-            self.reconnect_doip(client, "programming session")
-            send = self._make_uds_sender(client)
-        self._read_standard_status(send, "Programming pre-flash")
+        self._execute_zgw_flash_entry(send, "ZGW", is_fbl=is_fbl)
 
     def _execute_start_fbl_ram_updater(self, client):
         send = self._make_uds_sender(client)
-        send(
-            b"\x31\x01" + struct.pack(">H", ROUTINE_START_FBL_RAM_UPDATER),
+        self._select_fbl_software_block(send, "FBL updater entry")
+        self._run_flash_routine_control(
+            send,
+            ROUTINE_START_FBL_RAM_UPDATER,
+            b"",
             "RoutineControl 0155 Start FBL RAM Updater",
-            timeout=20.0,
+            timeout=FBL_UPDATER_ENTRY_TIMEOUT_SECONDS,
         )
 
     def _execute_status_readback(self, client, prefix):
@@ -7371,11 +7510,6 @@ class FcdApp:
         self._read_standard_status(send, prefix)
 
     def _execute_hard_reset(self, client, reason):
-        if self.dry_run_var.get():
-            send = self._make_uds_sender(client)
-            send(b"\x11\x01", f"ECUReset hardReset {reason}", timeout=5.0, allow_no_response=True)
-            return
-
         self._tolerant_ecu_reset(client, reason)
 
     def _execute_post_programming_extended(self, client):
@@ -7383,7 +7517,7 @@ class FcdApp:
         self._send_session(send, SESSION_DEFAULT, "Default Session after programming")
         self._send_session(send, SESSION_EXTENDED, "Extended Session after programming")
         self._read_standard_status(send, "Post-programming")
-        send(b"\x28\x00", "CommunicationControl enableRxAndTx")
+        send(b"\x28\x00\x03", "CommunicationControl enableRxAndTx")
         send(b"\x85\x01", "ControlDTCSetting on")
 
     def _execute_coding_after_flash(self, client):
@@ -7431,23 +7565,22 @@ class FcdApp:
             raise FcdError(f"{payload['ecu']}: payload size mismatch {len(data)} != {size}")
         if (binascii.crc32(data) & 0xFFFFFFFF) != expected_crc:
             raise FcdError(f"{payload['ecu']}: payload CRC mismatch")
-        target_is_zgw = bool(target_info.get("is_zgw")) or str(target_info.get("node_name", "")).upper() == "ZGW"
+        target_is_zgw = self._payload_targets_zgw(payload, target_info)
         if isinstance(client, DoipClient) and target_is_zgw:
             client.target_addr = target
 
         configured_block_size = parse_int(self.block_size_var.get())
         routed_target = bool(target_info) and not (
-            bool(target_info.get("is_zgw")) or str(target_info.get("node_name", "")).upper() == "ZGW"
+            target_is_zgw
         )
         if target_is_zgw:
             max_chunk_size = ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE
             transfer_request_limit = ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT
-            block_size = max_chunk_size
+            block_size = max(8, min(max_chunk_size, configured_block_size))
         else:
             max_chunk_size = ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target else TRANSFER_DATA_MAX_CHUNK_SIZE
             transfer_request_limit = TRANSFER_DATA_REQUEST_LIMIT
             block_size = max(8, min(max_chunk_size, configured_block_size))
-        dry = self.dry_run_var.get() and not self._target_is_simulated(target_info)
         block_name = "FBL" if is_fbl else "APPL"
         label = f"{payload['ecu']} {block_name} {int_hex(address, 8)} size={size}"
         block_note = (
@@ -7457,24 +7590,60 @@ class FcdApp:
             block_note += f" configured_block_size={configured_block_size}"
         if routed_target:
             block_note += f" routed_max_block_data={ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE}"
-        self.log(f"Flash start: {label} target={int_hex(target)} dry_run={dry} {block_note}")
+        self.log(f"Flash start: {label} target={int_hex(target)} {block_note}")
 
         if target_info:
             send = self._make_target_uds_sender(
                 client,
                 target_info,
-                dry=dry,
+                dry=False,
                 strict_response=strict_response,
             )
         else:
             send = self._make_uds_sender(client)
 
-        if self.erase_var.get():
+        if is_fbl:
+            self._select_fbl_software_block(send, block_name)
+            self._run_flash_routine_control(
+                send,
+                ROUTINE_START_FBL_RAM_UPDATER,
+                b"",
+                f"RoutineControl 0155 Start FBL RAM Updater {block_name}",
+                timeout=FBL_UPDATER_ENTRY_TIMEOUT_SECONDS,
+            )
+            self._run_flash_routine_control(
+                send,
+                ROUTINE_ERASE_MEMORY,
+                struct.pack(">II", address, size),
+                f"RoutineControl Erase {block_name}",
+                timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get())),
+                expected_payload=b"\x00",
+            )
+        elif self.erase_var.get():
             erase_request = b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size)
-            send(erase_request, f"RoutineControl Erase {block_name}", timeout=30.0)
+            send(
+                erase_request,
+                f"RoutineControl Erase {block_name}",
+                timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get())),
+            )
 
         req_download = b"\x34\x00\x44" + struct.pack(">II", address, size)
-        send(req_download, f"RequestDownload {block_name}", timeout=15.0)
+        download_response = send(req_download, f"RequestDownload {block_name}", timeout=15.0)
+        transfer_request_limit = self._request_download_max_block_length(download_response)
+        ecu_payload_limit = max(0, transfer_request_limit - TRANSFER_DATA_OVERHEAD_BYTES)
+        if ecu_payload_limit < 8:
+            raise FcdError(
+                f"{payload['ecu']}: RequestDownload max block length too small "
+                f"({transfer_request_limit}, payload {ecu_payload_limit})"
+            )
+        old_block_size = block_size
+        block_size = max(8, min(block_size, ecu_payload_limit))
+        if block_size != old_block_size:
+            self.log(
+                f"{payload['ecu']}: TransferData block size clamped by ECU "
+                f"RequestDownload limit: {old_block_size} -> {block_size} "
+                f"(max_len={transfer_request_limit})"
+            )
 
         block_counter = 1
         transfer_index = 1
@@ -7486,19 +7655,17 @@ class FcdApp:
                 f"TransferData {block_name} #{transfer_index} "
                 f"bsc=0x{block_counter:02X} offset=0x{offset:X} len={len(chunk)}"
             )
-            response = send(request, transfer_label, timeout=8.0)
-            if not dry and len(response) >= 2 and response[1] != block_counter:
+            response = send(request, transfer_label, timeout=20.0 if target_is_zgw else 8.0)
+            if len(response) >= 2 and response[1] != block_counter:
                 raise FcdError(
                     f"TransferData block echo mismatch at #{transfer_index} "
                     f"(sent bsc=0x{block_counter:02X}, received 0x{response[1]:02X})"
                 )
             offset += len(chunk)
             if progress_cb is not None:
-                progress_cb(1)
+                progress_cb(len(chunk))
             else:
                 self.root.after(0, lambda done=offset, total=size, name=block_name: self.progress.configure(value=min(done, total), maximum=max(1, total)))
-            if dry:
-                time.sleep(0.001)
             block_counter = (block_counter + 1) & 0xFF
             transfer_index += 1
 

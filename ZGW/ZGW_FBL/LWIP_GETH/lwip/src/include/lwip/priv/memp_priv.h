@@ -106,10 +106,10 @@ typedef enum {
 
 /** Memory pool descriptor */
 struct memp_desc {
-#if defined(LWIP_DEBUG) || MEMP_OVERFLOW_CHECK || LWIP_STATS_DISPLAY
+#if defined(LWIP_DEBUG) || LWIP_STATS_DISPLAY
   /** Textual description */
   const char *desc;
-#endif /* LWIP_DEBUG || MEMP_OVERFLOW_CHECK || LWIP_STATS_DISPLAY */
+#endif /* LWIP_DEBUG || LWIP_STATS_DISPLAY */
 #if MEMP_STATS
   /** Statistics */
   struct stats_mem *stats;
@@ -130,7 +130,7 @@ struct memp_desc {
 #endif /* MEMP_MEM_MALLOC */
 };
 
-#if defined(LWIP_DEBUG) || MEMP_OVERFLOW_CHECK || LWIP_STATS_DISPLAY
+#if defined(LWIP_DEBUG) || LWIP_STATS_DISPLAY
 #define DECLARE_LWIP_MEMPOOL_DESC(desc) (desc),
 #else
 #define DECLARE_LWIP_MEMPOOL_DESC(desc)
@@ -148,7 +148,7 @@ void memp_init_pool(const struct memp_desc *desc);
 
 #if MEMP_OVERFLOW_CHECK
 void *memp_malloc_pool_fn(const struct memp_desc* desc, const char* file, const int line);
-#define memp_malloc_pool(d) memp_malloc_pool_fn((d), __FILE__, __LINE__)
+#define memp_malloc_pool(d) memp_malloc_pool_fn((d), NULL, __LINE__)
 #else
 void *memp_malloc_pool(const struct memp_desc *desc);
 #endif
