@@ -27,7 +27,7 @@
 #include "BSW/Time/TimeBase.h"
 #include "../../../SCR/scr_time_shared.h"
 
-#define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 200u
+#define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 2000u
 #define SYSMGR_KEEP_AWAKE_WHILE_FULL_COM  1u
 /*
  * Backstop iteration cap for the GoSleep NvM drain loops.  GoSleep runs with

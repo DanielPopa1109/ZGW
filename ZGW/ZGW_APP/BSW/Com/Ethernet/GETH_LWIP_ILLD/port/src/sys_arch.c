@@ -342,6 +342,7 @@ sys_sem_new(sys_sem_t *sem, u8_t initial_count)
     {
         portBASE_TYPE_core2 ret = xSemaphoreGive_core2(sem->sem);
         LWIP_ASSERT("sys_sem_new: initial give failed", ret == pdTRUE_core2);
+        (void)ret;
     }
     return ERR_OK;
 }

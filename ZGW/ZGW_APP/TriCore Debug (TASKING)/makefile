@@ -83,6 +83,7 @@ RM := rm -rf
 -include APP/ParallelFlashSwc/subdir.mk
 -include APP/GatewaySwc/subdir.mk
 -include APP/CodingApp/subdir.mk
+-include APP/AiModel/subdir.mk
 -include subdir.mk
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(strip $(C++M_DEPS)),)

@@ -1,0 +1,52 @@
+{
+  "schema": "FCD_SVT_v1",
+  "created": "2026-07-28T22:29:15",
+  "ecus": [
+    {
+      "name": "ZGW",
+      "target_logical_address": "0x1001",
+      "can_request_id": "0x0710",
+      "can_response_id": "0x0711",
+      "coding_did": "0xF186",
+      "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex",
+      "segments": [
+        {
+          "ecu": "ZGW",
+          "node_name": "ZGW",
+          "bus_type": "ETHERNET",
+          "target_logical_address": "0x1001",
+          "address": "0xA0030000",
+          "size": 5898240,
+          "crc32": "0x533A34BC",
+          "file": "payloads\\ZGW_0_A0030000.bin",
+          "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex",
+          "source_address": "0x80030000",
+          "flash_kind": "APPL"
+        }
+      ]
+    },
+    {
+      "name": "ZGW",
+      "target_logical_address": "0x1001",
+      "can_request_id": "0x0710",
+      "can_response_id": "0x0711",
+      "coding_did": "0xF186",
+      "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex",
+      "segments": [
+        {
+          "ecu": "ZGW",
+          "node_name": "ZGW",
+          "bus_type": "ETHERNET",
+          "target_logical_address": "0x1001",
+          "address": "0xA0000000",
+          "size": 196608,
+          "crc32": "0x833393EE",
+          "file": "payloads\\ZGW_0_A0000000.bin",
+          "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex",
+          "source_address": "0x80000000",
+          "flash_kind": "FBL"
+        }
+      ]
+    }
+  ]
+}

@@ -61,6 +61,9 @@ static FblEth_TcpEventCb g_tcpRxOverflowCb;
 volatile uint32 g_FblEthTcpAcceptCounter;
 volatile uint32 g_FblEthTcpDisconnectCounter;
 volatile uint32 g_FblEthTcpErrCounter;
+volatile sint32 g_FblEthTcpLastErr;
+volatile uint32 g_FblEthTcpLocalAbortCounter;
+volatile uint32 g_FblEthTcpLastLocalAbortReason;
 volatile uint32 g_FblEthTcpStaleErrCounter;
 volatile uint32 g_FblEthTcpSendNoActiveCounter;
 volatile uint32 g_FblEthTcpSendNullBufCounter;
@@ -68,6 +71,11 @@ volatile uint32 g_FblEthTcpSendZeroLenCounter;
 volatile uint32 g_FblEthTcpSendPcbChangedCounter;
 volatile uint32 g_FblEthTcpWriteErrCounter;
 volatile sint32 g_FblEthTcpLastWriteErr;
+volatile uint32 g_FblEthTcpSendOkCounter;
+volatile uint32 g_FblEthTcpSendIncompleteCounter;
+volatile uint32 g_FblEthTcpDrainOkCounter;
+volatile uint32 g_FblEthTcpDrainTimeoutCounter;
+volatile uint32 g_FblEthTcpLastDrainResult;
 volatile uint16 g_FblEthTcpLastSendLen;
 volatile uint16 g_FblEthTcpLastSentLen;
 volatile uint32 g_FblEthTcpActivePcbAddress;
@@ -100,6 +108,7 @@ volatile uint32 g_FblEthTcpReceiveLastStreamPtr;
 volatile uint32 g_FblEthRxStage;
 volatile uint32 g_FblEthRxPollCallCount;
 
+static void FblEth_RecordLocalAbort(uint32 reason);
 static void FblEth_UpdateTcpDebugState(void);
 static void FblEth_ResetTcpStream(void);
 static void FblEth_CopyBytes(uint8 *dst, const uint8 *src, uint16 len);
@@ -178,6 +187,12 @@ static uint8 FblEth_IsTcpPbufChainValid(const struct pbuf *p, uint16 *sumLen)
 
     g_FblEthTcpRecvCbInvalidPbufReason = 0u;
     return 1u;
+}
+
+static void FblEth_RecordLocalAbort(uint32 reason)
+{
+    g_FblEthTcpLocalAbortCounter++;
+    g_FblEthTcpLastLocalAbortReason = reason;
 }
 
 static void FblEth_UpdateTcpDebugState(void)
@@ -412,6 +427,7 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
         if(tcp_close(tpcb) != ERR_OK)
         {
             g_FblEthTcpRecvCbStage = 6u;
+            FblEth_RecordLocalAbort(1u);
             tcp_abort(tpcb);
             return ERR_ABRT;
         }
@@ -426,12 +442,8 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
     {
         g_FblEthTcpRecvCbInvalidPbufCounter++;
         g_FblEthTcpRecvCbStage = 13u;
-        tcp_arg(tpcb, NULL);
-        tcp_recv(tpcb, NULL);
-        tcp_err(tpcb, NULL);
-        tcp_abort(tpcb);
-        FblEth_OnTcpDisconnected();
-        return ERR_ABRT;
+        pbuf_free(p);
+        return ERR_OK;
     }
 
     if(FblEth_QueueTcp(p) == 0u)
@@ -453,8 +465,6 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
 
 static void FblEth_TcpErrCb(void *arg, err_t err)
 {
-    (void)err;
-
     if((uint32)arg != g_tcpSessionCookie)
     {
         g_FblEthTcpStaleErrCounter++;
@@ -462,6 +472,7 @@ static void FblEth_TcpErrCb(void *arg, err_t err)
     }
 
     g_FblEthTcpErrCounter++;
+    g_FblEthTcpLastErr = (sint32)err;
     FblEth_OnTcpDisconnected();
 }
 
@@ -487,6 +498,7 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
         tcp_arg(stale, NULL);
         tcp_recv(stale, NULL);
         tcp_err(stale, NULL);
+        FblEth_RecordLocalAbort(2u);
         tcp_abort(stale);
     }
 
@@ -507,12 +519,10 @@ static err_t FblEth_TcpAcceptCb(void *arg, struct tcp_pcb *newPcb, err_t err)
     tcp_backlog_accepted(newPcb);
 #endif
 
-    /* Detect a tester that disappears mid-session so the slot frees itself even
-     * with no reconnect attempt: probe after 8 s idle, then 3 probes 2 s apart. */
-    newPcb->so_options |= SOF_KEEPALIVE;
-    newPcb->keep_idle = 8000u;
-    newPcb->keep_intvl = 2000u;
-    newPcb->keep_cnt = 3u;
+    /* FBL deviation: do not let TCP keepalive close the diagnostic socket.
+     * A stale tester is handled by accepting a new connection and replacing the
+     * old PCB; while flashing, liveness is maintained by DoIP ACK and UDS 0x78. */
+    newPcb->so_options &= (uint8)(~SOF_KEEPALIVE);
 
 #if TCP_NODELAY
     tcp_nagle_disable(newPcb);
@@ -677,6 +687,7 @@ void FblEth_MainFunction(void)
     g_FblEthRxStage = 1u;
     g_FblEthRxPollCallCount++;
     lwip_geth_Lwip_pollReceiveFlags();
+    lwip_geth_Lwip_watchRxProgress();
     g_FblEthRxStage = 0u;
 }
 
@@ -693,7 +704,18 @@ void FblEth_PollReceiveOnly(void)
     g_FblEthRxPollCallCount++;
     g_FblEthRxStage = 2u;
     lwip_geth_Lwip_pollReceiveFlags();
+    lwip_geth_Lwip_watchRxProgress();
     g_FblEthRxStage = 0u;
+}
+
+void FblEth_WatchRxProgress(void)
+{
+    if(g_ethInitDone == 0u)
+    {
+        return;
+    }
+
+    lwip_geth_Lwip_watchRxProgress();
 }
 
 void FblEth_PollTimerOnly(void)
@@ -878,6 +900,8 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             if(g_tcpActivePcb == pcb)
             {
                 (void)tcp_output(pcb);
+                lwip_geth_Lwip_pollTimerFlags();
+                lwip_geth_Lwip_pollReceiveFlags();
             }
             else
             {
@@ -915,6 +939,8 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             if(g_tcpActivePcb == pcb)
             {
                 (void)tcp_output(pcb);
+                lwip_geth_Lwip_pollTimerFlags();
+                lwip_geth_Lwip_pollReceiveFlags();
             }
             else
             {
@@ -939,6 +965,8 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             if(g_tcpActivePcb == pcb)
             {
                 (void)tcp_output(pcb);
+                lwip_geth_Lwip_pollTimerFlags();
+                lwip_geth_Lwip_pollReceiveFlags();
             }
             else
             {
@@ -950,6 +978,14 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
     }
 
     g_FblEthTcpLastSentLen = sent;
+    if(sent == len)
+    {
+        g_FblEthTcpSendOkCounter++;
+    }
+    else
+    {
+        g_FblEthTcpSendIncompleteCounter++;
+    }
 }
 
 uint8 FblEth_TcpDrain(uint32 pollBudget)
@@ -961,6 +997,8 @@ uint8 FblEth_TcpDrain(uint32 pollBudget)
         pcb = g_tcpActivePcb;
         if(pcb == NULL)
         {
+            g_FblEthTcpDrainOkCounter++;
+            g_FblEthTcpLastDrainResult = 1u;
             return 1u;
         }
 
@@ -970,6 +1008,8 @@ uint8 FblEth_TcpDrain(uint32 pollBudget)
            (pcb->unsent == NULL) &&
            (pcb->unacked == NULL))
         {
+            g_FblEthTcpDrainOkCounter++;
+            g_FblEthTcpLastDrainResult = 1u;
             return 1u;
         }
 
@@ -978,6 +1018,8 @@ uint8 FblEth_TcpDrain(uint32 pollBudget)
         pollBudget--;
     }
 
+    g_FblEthTcpDrainTimeoutCounter++;
+    g_FblEthTcpLastDrainResult = 0u;
     return 0u;
 }
 
@@ -1057,6 +1099,8 @@ uint8 FblEth_RuntimeClosureOk(void)
     if(lwip_geth_RamClosureIsValid() == 0u) { g_FblEthRuntimeClosureFailStep = 1000u + g_LwipGethRuntimeClosureFailStep; return 0u; }
     FBL_ETH_CLOSURE_CHECK(31u, lwip_geth_Lwip_pollReceiveFlags);
     FBL_ETH_CLOSURE_CHECK(32u, lwip_geth_Lwip_pollTimerFlags);
+    FBL_ETH_CLOSURE_CHECK(47u, lwip_geth_Lwip_watchRxProgress);
+    FBL_ETH_CLOSURE_CHECK(48u, lwip_geth_netif_recover_rx);
     FBL_ETH_CLOSURE_CHECK(33u, tcp_output);
     FBL_ETH_CLOSURE_CHECK(34u, tcp_write);
     FBL_ETH_CLOSURE_CHECK(35u, pbuf_alloc);
@@ -1070,6 +1114,7 @@ uint8 FblEth_RuntimeClosureOk(void)
     FBL_ETH_CLOSURE_CHECK(43u, FblRam_Strlen);
     FBL_ETH_CLOSURE_CHECK(44u, raw_input);
     FBL_ETH_CLOSURE_CHECK(45u, ethernet_input);
+    FBL_ETH_CLOSURE_CHECK(46u, FblEth_RecordLocalAbort);
 
 #undef FBL_ETH_CLOSURE_CHECK
 

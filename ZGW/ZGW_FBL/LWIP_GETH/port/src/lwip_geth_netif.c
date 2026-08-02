@@ -605,6 +605,62 @@ void FblRamGeth_WakeupReceiver(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId
 }
 
 FBL_RAM_ETH_CODE
+static uint8 lwip_geth_RecoverRxRamOnly(netif_t *netif)
+{
+  IfxGeth_Eth *ethernetif;
+  IfxGeth_RxDescr *descr;
+  uint32 i;
+
+  if (lwip_geth_PrepareRxHandle(netif, &ethernetif) == 0u)
+  {
+    return 0u;
+  }
+
+  if ((ethernetif == NULL_PTR) || (ethernetif->gethSFR == NULL_PTR))
+  {
+    return 0u;
+  }
+
+  ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].channelId = IfxGeth_RxDmaChannel_0;
+  ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrList =
+      (IfxGeth_RxDescrList *)&IfxGeth_Eth_rxDescrList[0][0];
+  ethernetif->rxChannel[IfxGeth_RxDmaChannel_0].rxDescrPtr =
+      (IfxGeth_RxDescr *)&IfxGeth_Eth_rxDescrList[0][0].descr[0];
+
+  for (i = 0u; i < IFXGETH_MAX_RX_DESCRIPTORS; i++)
+  {
+    descr = (IfxGeth_RxDescr *)&IfxGeth_Eth_rxDescrList[0][0].descr[i];
+    descr->RDES0.U = (uint32)&channel0RxBuffer1[i][0];
+    descr->RDES1.U = 0u;
+    descr->RDES2.U = 0u;
+    descr->RDES3.U = 0u;
+    descr->RDES3.R.BUF1V = 1u;
+    descr->RDES3.R.BUF2V = 0u;
+    descr->RDES3.R.IOC = 0u;
+    descr->RDES3.R.OWN = 1u;
+  }
+
+  lwip_geth_CacheWritebackInvalidateRange(&IfxGeth_Eth_rxDescrList[0][0].descr[0],
+      (uint32)(IFXGETH_MAX_RX_DESCRIPTORS * sizeof(IfxGeth_RxDescr)));
+
+  ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].STATUS.U =
+      (1u << IfxGeth_DmaInterruptFlag_receiveBufferUnavailable) |
+      (1u << IfxGeth_DmaInterruptFlag_receiveStopped);
+  ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RXDESC_LIST_ADDRESS.U =
+      (uint32)&IfxGeth_Eth_rxDescrList[0][0].descr[0];
+  ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RXDESC_TAIL_POINTER.U =
+      (uint32)&IfxGeth_Eth_rxDescrList[0][0].descr[IFXGETH_MAX_RX_DESCRIPTORS];
+  ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RXDESC_RING_LENGTH.U =
+      (IFXGETH_MAX_RX_DESCRIPTORS - 1u);
+
+  ethernetif->gethSFR->MAC_CONFIGURATION.B.RE = 1u;
+  ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.B.SR = 1u;
+  __dsync();
+
+  return 1u;
+}
+
+FBL_RAM_ETH_CODE
 void FblRamGeth_WakeupTransmitter(IfxGeth_Eth *geth, IfxGeth_TxDmaChannel channelId)
 {
   Ifx_GETH *gethSFR;
@@ -1630,25 +1686,27 @@ uint8 lwip_geth_RamClosureIsValid(void)
   LWIP_GETH_CLOSURE_CHECK(23u, FblRamGeth_GetTransmitBuffer);
   LWIP_GETH_CLOSURE_CHECK(24u, FblRamGeth_WakeupReceiver);
   LWIP_GETH_CLOSURE_CHECK(25u, FblRamGeth_WakeupTransmitter);
+  LWIP_GETH_CLOSURE_CHECK(29u, FblRamRuntime_IsActive);
+  LWIP_GETH_CLOSURE_CHECK(30u, lwip_geth_RecoverRxRamOnly);
 
   if ((g_Lwip.netif.input != NULL_PTR) &&
       (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.input) == 0u))
   {
-    g_LwipGethRuntimeClosureFailStep = 25u;
+    g_LwipGethRuntimeClosureFailStep = 26u;
     return 0u;
   }
 
   if ((g_Lwip.netif.output != NULL_PTR) &&
       (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.output) == 0u))
   {
-    g_LwipGethRuntimeClosureFailStep = 26u;
+    g_LwipGethRuntimeClosureFailStep = 27u;
     return 0u;
   }
 
   if ((g_Lwip.netif.linkoutput != NULL_PTR) &&
       (FblRamRuntime_IsExecutableAddress((uint32)g_Lwip.netif.linkoutput) == 0u))
   {
-    g_LwipGethRuntimeClosureFailStep = 27u;
+    g_LwipGethRuntimeClosureFailStep = 28u;
     return 0u;
   }
 
@@ -1713,6 +1771,22 @@ err_t lwip_geth_netif_init(netif_t *netif)
   }
 
   return ERR_OK;
+}
+
+FBL_RAM_ETH_CODE
+uint8 lwip_geth_netif_recover_rx(netif_t *netif)
+{
+  if ((netif == NULL_PTR) || (netif->state == NULL_PTR))
+  {
+    return 0u;
+  }
+
+  if (FblRamRuntime_IsActive() != 0u)
+  {
+    return lwip_geth_RecoverRxRamOnly(netif);
+  }
+
+  return lwip_geth_low_level_init(netif);
 }
 
 /* CODE_BLOCK_END */

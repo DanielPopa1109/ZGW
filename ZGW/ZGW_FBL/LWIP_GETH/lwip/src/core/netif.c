@@ -51,7 +51,6 @@
 #include "lwip/opt.h"
 
 #include <string.h> /* memset */
-#include <stdlib.h> /* atoi */
 
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
@@ -124,6 +123,19 @@ static u8_t netif_client_id;
 #define NETIF_REPORT_TYPE_IPV4  0x01
 #define NETIF_REPORT_TYPE_IPV6  0x02
 static void netif_issue_reports(struct netif *netif, u8_t report_type);
+
+static u8_t
+netif_parse_num(const char *name)
+{
+  u8_t num = 0;
+
+  while ((*name >= '0') && (*name <= '9')) {
+    num = (u8_t)((num * 10u) + (u8_t)(*name - '0'));
+    name++;
+  }
+
+  return num;
+}
 
 #if LWIP_IPV6
 static err_t netif_null_output_ip6(struct netif *netif, struct pbuf *p, const ip6_addr_t *ipaddr);
@@ -1763,7 +1775,7 @@ netif_find(const char *name)
     return NULL;
   }
 
-  num = (u8_t)atoi(&name[2]);
+  num = netif_parse_num(&name[2]);
   if (!num && (name[2] != '0')) {
     /* this means atoi has failed */
     return NULL;

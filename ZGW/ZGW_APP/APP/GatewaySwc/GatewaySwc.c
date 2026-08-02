@@ -11,6 +11,7 @@
 #include "SysMgr.h"
 #include "IfxCpu.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "APP/AiModel/AiModel.h"
 #include "BSW/Time/TimeBase.h"
 #include "BSW/Sys/SmM/SafetyKit_Main.h"
 
@@ -22,6 +23,7 @@
 #define GATEWAYSWC_FRAME_COMMAND_SIGNAL               0x02u
 #define GATEWAYSWC_FRAME_COMMAND_BLOCK                0x03u
 #define GATEWAYSWC_FRAME_DTC_TRANSITION               0x04u
+#define GATEWAYSWC_FRAME_AI_MODEL                     0x05u
 
 #define GATEWAYSWC_HEADER_LEN                         12u
 #define GATEWAYSWC_ENTRY_LEN                          7u
@@ -39,6 +41,7 @@
 #define GATEWAYSWC_ETH_TX_KIND_SUMMARY                1u
 #define GATEWAYSWC_ETH_TX_KIND_DTC_TRANSITION         2u
 #define GATEWAYSWC_ETH_TX_KIND_MCU_STATUS             3u
+#define GATEWAYSWC_ETH_TX_KIND_AI_MODEL               4u
 
 #define GATEWAYSWC_DIAG_PERIOD_MS                     1000u
 #define GATEWAYSWC_ETH_PERIOD_NS                      ((uint64)GATEWAYSWC_ETH_PERIOD_MS * TIMEBASE_NS_PER_MS)
@@ -523,6 +526,7 @@ static void GatewaySwc_GenerateCanOutputs(void);
 static void GatewaySwc_GenerateCanFdOutputs(void);
 static void GatewaySwc_GenerateLinOutputs(void);
 static void GatewaySwc_PublishEthernetSummary(void);
+static void GatewaySwc_PublishAiModelResult(void);
 static void GatewaySwc_McuStatusInit(void);
 static void GatewaySwc_McuStatusMainFunction(uint64 nowNs);
 static void GatewaySwc_McuStatusOpenSocket(void);
@@ -590,6 +594,7 @@ static void GatewaySwc_PublishDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteTy
 static void GatewaySwc_AppendU8(uint16 *len, uint8 value);
 static void GatewaySwc_AppendU16(uint16 *len, uint16 value);
 static void GatewaySwc_AppendU32(uint16 *len, uint32 value);
+static void GatewaySwc_AppendF32(uint16 *len, float32 value);
 static void GatewaySwc_StoreU16(uint8 *buffer, uint16 offset, uint16 value);
 static void GatewaySwc_StoreS16(uint8 *buffer, uint16 offset, sint16 value);
 static void GatewaySwc_StoreU32(uint8 *buffer, uint16 offset, uint32 value);
@@ -1349,6 +1354,66 @@ static void GatewaySwc_PublishEthernetSummary(void)
         GatewaySwc_PublishRange(GatewaySwc_EthSignalRanges[i].bus,
                 GatewaySwc_EthSignalRanges[i].firstSignalId,
                 GatewaySwc_EthSignalRanges[i].lastSignalId);
+    }
+
+    GatewaySwc_PublishAiModelResult();
+}
+
+static void GatewaySwc_PublishAiModelResult(void)
+{
+    AiModel_ResultType result;
+    uint16 len;
+    uint8 fault;
+
+    if (AiModel_GetLatestResult(&result) != E_OK)
+    {
+        return;
+    }
+
+    len = 0u;
+    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC0);
+    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC1);
+    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC2);
+    GatewaySwc_AppendU8(&len, GATEWAYSWC_FRAME_AI_MODEL);
+    GatewaySwc_AppendU32(&len, GatewaySwc_Status.mainCycles);
+    GatewaySwc_AppendU8(&len, GATEWAYSWC_BUS_CANFD);
+    GatewaySwc_AppendU8(&len, result.inputValid);
+    GatewaySwc_AppendU8(&len, result.inferenceValid);
+    GatewaySwc_AppendU8(&len, result.windowReady);
+
+    GatewaySwc_AppendF32(&len, result.inputVoltage_V);
+    GatewaySwc_AppendF32(&len, result.inputCurrent_A);
+    GatewaySwc_AppendF32(&len, result.inputTemperature_C);
+    GatewaySwc_AppendF32(&len, result.expectedVoltage_V);
+    GatewaySwc_AppendF32(&len, result.expectedCurrent_A);
+    GatewaySwc_AppendF32(&len, result.expectedTemperature_C);
+    GatewaySwc_AppendF32(&len, result.anomaly);
+    GatewaySwc_AppendF32(&len, result.health);
+    for (fault = 0u; fault < BCM_NUM_FAULT_CLASSES; fault++)
+    {
+        GatewaySwc_AppendF32(&len, result.faultProbability[fault]);
+    }
+
+    GatewaySwc_AppendU8(&len, result.dominantFault);
+    GatewaySwc_AppendU8(&len, 0u);
+    GatewaySwc_AppendU8(&len, 0u);
+    GatewaySwc_AppendU8(&len, 0u);
+    GatewaySwc_AppendU32(&len, result.inputTimestamp);
+    GatewaySwc_AppendU32(&len, result.inferenceSequence);
+    GatewaySwc_AppendU32(&len, result.executionTimeUs);
+    GatewaySwc_AppendU32(&len, result.errorFlags);
+
+    GatewaySwc_Status.ethLastPayloadLength = len;
+    if (GatewaySwc_QueueEthTx(GATEWAYSWC_ETH_TX_KIND_AI_MODEL,
+            (SoAd_SoConIdType)GATEWAYSWC_ETH_SOCON_ID,
+            NULL_PTR,
+            GatewaySwc_EthBuffer,
+            len) == FALSE)
+    {
+        GatewaySwc_Status.ethLastOpenResult = 0u;
+        GatewaySwc_Status.ethLastSoAdResult = SOAD_NOT_OK;
+        GatewaySwc_Status.ethLastTransmitOk = 0u;
+        GatewaySwc_Status.ethFramesFailed++;
     }
 }
 
@@ -2659,6 +2724,18 @@ static void GatewaySwc_AppendU32(uint16 *len, uint32 value)
     GatewaySwc_AppendU8(len, (uint8)((value >> 16u) & 0xFFu));
     GatewaySwc_AppendU8(len, (uint8)((value >> 8u) & 0xFFu));
     GatewaySwc_AppendU8(len, (uint8)(value & 0xFFu));
+}
+
+static void GatewaySwc_AppendF32(uint16 *len, float32 value)
+{
+    union
+    {
+        float32 f;
+        uint32 u;
+    } converted;
+
+    converted.f = value;
+    GatewaySwc_AppendU32(len, converted.u);
 }
 
 static void GatewaySwc_StoreU16(uint8 *buffer, uint16 offset, uint16 value)

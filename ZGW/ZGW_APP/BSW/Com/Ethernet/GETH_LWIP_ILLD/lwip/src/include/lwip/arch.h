@@ -80,6 +80,9 @@
 #ifndef LWIP_PLATFORM_DIAG
 #define LWIP_PLATFORM_DIAG(x) do {printf x;} while(0)
 #include <stdio.h>
+#if defined(__TASKING__)
+#pragma warning 514
+#endif
 #include <stdlib.h>
 #endif
 
@@ -92,6 +95,9 @@
 #define LWIP_PLATFORM_ASSERT(x) do {printf("Assertion \"%s\" failed at line %d in %s\n", \
                                      x, __LINE__, __FILE__); fflush(NULL); abort();} while(0)
 #include <stdio.h>
+#if defined(__TASKING__)
+#pragma warning 514
+#endif
 #include <stdlib.h>
 #endif
 

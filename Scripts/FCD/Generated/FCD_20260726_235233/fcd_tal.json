@@ -1,0 +1,734 @@
+{
+  "schema": "FCD_TAL_v1",
+  "created": "2026-07-26T23:52:34",
+  "steps": [
+    {
+      "step": 1,
+      "ecu": "CBM",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 2,
+      "ecu": "CBM",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 3,
+      "ecu": "CBM",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 4,
+      "ecu": "CBM",
+      "service": "TransferData",
+      "source": "payloads\\CBM_0_08003C00.bin"
+    },
+    {
+      "step": 5,
+      "ecu": "CBM",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 6,
+      "ecu": "CBM",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 7,
+      "ecu": "CBM",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 8,
+      "ecu": "CBM",
+      "service": "TransferData",
+      "source": "payloads\\CBM_1_08003D10.bin"
+    },
+    {
+      "step": 9,
+      "ecu": "CBM",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 10,
+      "ecu": "CBM",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 11,
+      "ecu": "CBM",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 12,
+      "ecu": "CBM",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 13,
+      "ecu": "CBM",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 14,
+      "ecu": "CBM",
+      "service": "TransferData",
+      "source": "payloads\\CBM_0_08000000.bin"
+    },
+    {
+      "step": 15,
+      "ecu": "CBM",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 16,
+      "ecu": "CBM",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 17,
+      "ecu": "DMU",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 18,
+      "ecu": "DMU",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 19,
+      "ecu": "DMU",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 20,
+      "ecu": "DMU",
+      "service": "TransferData",
+      "source": "payloads\\DMU_0_08003C00.bin"
+    },
+    {
+      "step": 21,
+      "ecu": "DMU",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 22,
+      "ecu": "DMU",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 23,
+      "ecu": "DMU",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 24,
+      "ecu": "DMU",
+      "service": "TransferData",
+      "source": "payloads\\DMU_1_08003D10.bin"
+    },
+    {
+      "step": 25,
+      "ecu": "DMU",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 26,
+      "ecu": "DMU",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 27,
+      "ecu": "DMU",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 28,
+      "ecu": "DMU",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 29,
+      "ecu": "DMU",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 30,
+      "ecu": "DMU",
+      "service": "TransferData",
+      "source": "payloads\\DMU_0_08000000.bin"
+    },
+    {
+      "step": 31,
+      "ecu": "DMU",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 32,
+      "ecu": "DMU",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 33,
+      "ecu": "ELC",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 34,
+      "ecu": "ELC",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 35,
+      "ecu": "ELC",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 36,
+      "ecu": "ELC",
+      "service": "TransferData",
+      "source": "payloads\\ELC_0_08003C00.bin"
+    },
+    {
+      "step": 37,
+      "ecu": "ELC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 38,
+      "ecu": "ELC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 39,
+      "ecu": "ELC",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 40,
+      "ecu": "ELC",
+      "service": "TransferData",
+      "source": "payloads\\ELC_1_08003D10.bin"
+    },
+    {
+      "step": 41,
+      "ecu": "ELC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 42,
+      "ecu": "ELC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 43,
+      "ecu": "ELC",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 44,
+      "ecu": "ELC",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 45,
+      "ecu": "ELC",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 46,
+      "ecu": "ELC",
+      "service": "TransferData",
+      "source": "payloads\\ELC_0_08000000.bin"
+    },
+    {
+      "step": 47,
+      "ecu": "ELC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 48,
+      "ecu": "ELC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 49,
+      "ecu": "FRBE",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 50,
+      "ecu": "FRBE",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 51,
+      "ecu": "FRBE",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 52,
+      "ecu": "FRBE",
+      "service": "TransferData",
+      "source": "payloads\\FRBE_0_08003C00.bin"
+    },
+    {
+      "step": 53,
+      "ecu": "FRBE",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 54,
+      "ecu": "FRBE",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 55,
+      "ecu": "FRBE",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 56,
+      "ecu": "FRBE",
+      "service": "TransferData",
+      "source": "payloads\\FRBE_1_08003D10.bin"
+    },
+    {
+      "step": 57,
+      "ecu": "FRBE",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 58,
+      "ecu": "FRBE",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 59,
+      "ecu": "FRBE",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 60,
+      "ecu": "FRBE",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 61,
+      "ecu": "FRBE",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 62,
+      "ecu": "FRBE",
+      "service": "TransferData",
+      "source": "payloads\\FRBE_0_08000000.bin"
+    },
+    {
+      "step": 63,
+      "ecu": "FRBE",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 64,
+      "ecu": "FRBE",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 65,
+      "ecu": "HVDCDC",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 66,
+      "ecu": "HVDCDC",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 67,
+      "ecu": "HVDCDC",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 68,
+      "ecu": "HVDCDC",
+      "service": "TransferData",
+      "source": "payloads\\HVDCDC_0_08003C00.bin"
+    },
+    {
+      "step": 69,
+      "ecu": "HVDCDC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 70,
+      "ecu": "HVDCDC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 71,
+      "ecu": "HVDCDC",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 12016,
+      "crc32": "0x95ED0CA9"
+    },
+    {
+      "step": 72,
+      "ecu": "HVDCDC",
+      "service": "TransferData",
+      "source": "payloads\\HVDCDC_1_08003D10.bin"
+    },
+    {
+      "step": 73,
+      "ecu": "HVDCDC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 74,
+      "ecu": "HVDCDC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 12016,
+      "crc32": "0x95ED0CA9"
+    },
+    {
+      "step": 75,
+      "ecu": "HVDCDC",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 76,
+      "ecu": "HVDCDC",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 77,
+      "ecu": "HVDCDC",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 4096,
+      "crc32": "0xF23989FF"
+    },
+    {
+      "step": 78,
+      "ecu": "HVDCDC",
+      "service": "TransferData",
+      "source": "payloads\\HVDCDC_0_08000000.bin"
+    },
+    {
+      "step": 79,
+      "ecu": "HVDCDC",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 80,
+      "ecu": "HVDCDC",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 4096,
+      "crc32": "0xF23989FF"
+    },
+    {
+      "step": 81,
+      "ecu": "PDM1",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 82,
+      "ecu": "PDM1",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 83,
+      "ecu": "PDM1",
+      "service": "RequestDownload",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 84,
+      "ecu": "PDM1",
+      "service": "TransferData",
+      "source": "payloads\\PDM1_0_08003C00.bin"
+    },
+    {
+      "step": 85,
+      "ecu": "PDM1",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 86,
+      "ecu": "PDM1",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003C00",
+      "size": 268,
+      "crc32": "0x1922AD68"
+    },
+    {
+      "step": 87,
+      "ecu": "PDM1",
+      "service": "RequestDownload",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 88,
+      "ecu": "PDM1",
+      "service": "TransferData",
+      "source": "payloads\\PDM1_1_08003D10.bin"
+    },
+    {
+      "step": 89,
+      "ecu": "PDM1",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 90,
+      "ecu": "PDM1",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08003D10",
+      "size": 46552,
+      "crc32": "0xB7ADBAE9"
+    },
+    {
+      "step": 91,
+      "ecu": "PDM1",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 92,
+      "ecu": "PDM1",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 93,
+      "ecu": "PDM1",
+      "service": "RequestDownload",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 94,
+      "ecu": "PDM1",
+      "service": "TransferData",
+      "source": "payloads\\PDM1_0_08000000.bin"
+    },
+    {
+      "step": 95,
+      "ecu": "PDM1",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 96,
+      "ecu": "PDM1",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0x08000000",
+      "size": 14268,
+      "crc32": "0x77A6C306"
+    },
+    {
+      "step": 97,
+      "ecu": "ZGW",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 98,
+      "ecu": "ZGW",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 99,
+      "ecu": "ZGW",
+      "service": "RequestDownload",
+      "address": "0xA0030000",
+      "size": 5898240,
+      "crc32": "0x533A34BC"
+    },
+    {
+      "step": 100,
+      "ecu": "ZGW",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_0_A0030000.bin"
+    },
+    {
+      "step": 101,
+      "ecu": "ZGW",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 102,
+      "ecu": "ZGW",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA0030000",
+      "size": 5898240,
+      "crc32": "0x533A34BC"
+    },
+    {
+      "step": 103,
+      "ecu": "ZGW",
+      "service": "DiagnosticSessionControl",
+      "request": "10 02"
+    },
+    {
+      "step": 104,
+      "ecu": "ZGW",
+      "service": "RoutineControl EraseApp",
+      "request": "31 01 00 01"
+    },
+    {
+      "step": 105,
+      "ecu": "ZGW",
+      "service": "RequestDownload",
+      "address": "0xA0000000",
+      "size": 196608,
+      "crc32": "0xF157A195"
+    },
+    {
+      "step": 106,
+      "ecu": "ZGW",
+      "service": "TransferData",
+      "source": "payloads\\ZGW_0_A0000000.bin"
+    },
+    {
+      "step": 107,
+      "ecu": "ZGW",
+      "service": "RequestTransferExit"
+    },
+    {
+      "step": 108,
+      "ecu": "ZGW",
+      "service": "RoutineControl CRC",
+      "rid": "0x0002",
+      "address": "0xA0000000",
+      "size": 196608,
+      "crc32": "0xF157A195"
+    }
+  ]
+}

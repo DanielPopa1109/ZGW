@@ -63,6 +63,7 @@ extern volatile uint32 lwip_geth_DebugLowLevelOutputOkCount;
 extern volatile uint32 lwip_geth_DebugLowLevelOutputErrCnt;
 extern volatile uint32 lwip_geth_DebugLowLevelInputCallCount;
 extern volatile uint32 lwip_geth_DebugLowLevelInputPacketCount;
+extern volatile uint32 lwip_geth_LowLevelInputPacketCount;
 extern volatile uint32 lwip_geth_DebugNetifInputLoopCount;
 extern volatile uint32 lwip_geth_DebugNetifInputOnceCount;
 extern volatile uint32 lwip_geth_DebugNetifInputOkCount;
@@ -87,6 +88,7 @@ extern volatile uint32 lwip_geth_DebugLastRxBufferAddr;
 
 err_t lwip_geth_netif_init(struct netif *netif);
 uint8 lwip_geth_netif_input_once(struct netif *netif);
+uint8 lwip_geth_netif_recover_rx(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
 uint8 lwip_geth_RamClosureIsValid(void);
 void FblRamGeth_ShuffleRxDescriptor(IfxGeth_Eth *geth, IfxGeth_RxDmaChannel channelId);

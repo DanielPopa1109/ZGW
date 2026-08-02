@@ -93,6 +93,7 @@
 									<listOptionValue builtIn="false" value="544"/>
 									<listOptionValue builtIn="false" value="557"/>
 									<listOptionValue builtIn="false" value="508"/>
+									<listOptionValue builtIn="false" value="514"/>
 								</option>
 								<option id="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.tradeoff.1548626886" name="Trade-off between speed and size: (--tradeoff=)" superClass="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.tradeoff" value="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.tradeoff.0" valueType="enumerated"/>
 								<option id="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.level.debug.1326325260" name="Optimization level: (-Ox)" superClass="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.level.debug" value="com.infineon.aurix.buildsystem.managed.c.compiler.tasking.optimization.level.0" valueType="enumerated"/>
@@ -308,6 +309,7 @@
 									<listOptionValue builtIn="false" value="544"/>
 									<listOptionValue builtIn="false" value="557"/>
 									<listOptionValue builtIn="false" value="508"/>
+									<listOptionValue builtIn="false" value="514"/>
 								</option>
 								<inputType id="com.infineon.aurix.buildsystem.managed.tool.c.compiler.tasking.input.cpp.1204256928" name="C++" superClass="com.infineon.aurix.buildsystem.managed.tool.c.compiler.tasking.input.cpp"/>
 								<inputType id="com.infineon.aurix.buildsystem.managed.tool.c.compiler.tasking.input.739316944" name="C" superClass="com.infineon.aurix.buildsystem.managed.tool.c.compiler.tasking.input"/>

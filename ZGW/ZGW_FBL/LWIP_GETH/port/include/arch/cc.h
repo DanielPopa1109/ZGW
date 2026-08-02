@@ -79,7 +79,10 @@
 #include <Cpu/Std/Ifx_Types.h>
 #include "FblRam_LwipHooks.h"
 #include "lwipopts.h"
+
+#ifdef LWIP_DEBUG
 #include <stdio.h>
+#endif
 
 typedef uint8  u8_t;
 typedef uint16 u16_t;

@@ -373,6 +373,8 @@
 "APP/ParallelFlashSwc/ParallelFlashSwc.o"
 "APP/GatewaySwc/GatewaySwc.o"
 "APP/CodingApp/CodingApp.o"
+"APP/AiModel/AiModel.o"
+"APP/AiModel/bcm_infer.o"
 "Cpu0_Main.o"
 "Cpu1_Main.o"
 "Cpu2_Main.o"

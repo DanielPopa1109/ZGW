@@ -150,7 +150,7 @@
          <Use>false</Use>
         </StackUsage>
         <SymbolFiles>
-         <DefaultFile>1</DefaultFile>
+         <DefaultFile>0</DefaultFile>
          <File>
           <__.0>
            <Area></Area>
@@ -721,7 +721,7 @@
         <DisplayCollapsedArrayStruct>true</DisplayCollapsedArrayStruct>
         <DisplayPointerMemArea>true</DisplayPointerMemArea>
         <EnumDisplay>Enum</EnumDisplay>
-        <Hex>true</Hex>
+        <Hex>false</Hex>
         <MaxParseUpload>256</MaxParseUpload>
         <QualifiedNames>Unique</QualifiedNames>
         <UseSpacers>true</UseSpacers>
@@ -3786,7 +3786,7 @@
        <CallPoint>
         <Attach_ConnectToSoC_Same>true</Attach_ConnectToSoC_Same>
         <Attach_InitSoC_Same>true</Attach_InitSoC_Same>
-        <Attach_StopToExecute>true</Attach_StopToExecute>
+        <Attach_StopToExecute>false</Attach_StopToExecute>
         <Debug_ConnectToSoC_Same>true</Debug_ConnectToSoC_Same>
         <Debug_InitSoC_Same>true</Debug_InitSoC_Same>
         <Program_ResetAfterProgram>false</Program_ResetAfterProgram>
@@ -3839,10 +3839,10 @@
         <SubCPU>TC375TP</SubCPU>
         <Aurix>
          <AllowCacheMonExec>false</AllowCacheMonExec>
-         <ApplicationLBIST>false</ApplicationLBIST>
+         <ApplicationLBIST>true</ApplicationLBIST>
          <BRKIN>HIGH</BRKIN>
          <ClearICRIEWhenStopped>false</ClearICRIEWhenStopped>
-         <DAPClock>4000</DAPClock>
+         <DAPClock>50000</DAPClock>
          <DAPE>false</DAPE>
          <DAPE_Clock>10000</DAPE_Clock>
          <DAPE_DebugMode>DAP</DAPE_DebugMode>
@@ -3860,7 +3860,7 @@
          <Password_5>0</Password_5>
          <Password_6>0</Password_6>
          <Password_7>0</Password_7>
-         <QuickLBIST>false</QuickLBIST>
+         <QuickLBIST>true</QuickLBIST>
          <SingleStepMode>Run until next instruction</SingleStepMode>
          <SoC_Debug_SetOnReset>false</SoC_Debug_SetOnReset>
          <StopAfterAppReset>false</StopAfterAppReset>

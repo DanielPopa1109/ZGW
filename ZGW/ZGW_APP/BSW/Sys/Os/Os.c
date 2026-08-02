@@ -49,6 +49,7 @@
 #include "BSW/Time/TimeBase.h"
 #include "BSW/Time/EthTimeSync.h"
 #include "BSW/Time/Gptp_Lab.h"
+#include "APP/AiModel/AiModel.h"
 
 void Os_Init_C0(void);
 void Os_Init_C1(void);
@@ -224,6 +225,7 @@ long long QM_BSW_Task_C0_Counter = 0;
 long long QM_APPL_Task_C0_Counter = 0;
 long long ASIL_BSW_Task_C1_Counter = 0;
 long long ASIL_APPL_Task_C1_Counter = 0;
+long long AiModel_MainFunction_Counter = 0;
 long long ASIL_APPL_Task_C2_Counter = 0;
 long long QM_BSW_Task_C2_Counter = 0;
 volatile uint32 Os_NvMBudgetHitCounter = 0u;
@@ -984,6 +986,7 @@ void ASIL_BSW_Task_C1(void *pvParameters)
         {
             Alarm5ms_Flag_ASIL_BSW_Task_C1 = 0u;
             serviceCpuWatchdog();
+            AiModel_MainFunction();
             ASIL_BSW_Task_C1_Counter++;
         }
         else
