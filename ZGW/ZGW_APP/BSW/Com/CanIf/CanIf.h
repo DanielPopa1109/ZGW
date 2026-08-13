@@ -77,23 +77,12 @@
 
 /* DBC generated CAN-FD COM I-PDU IDs. Existing CAN Classic IDs above are untouched. */
 #define CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS                                    103u
-#define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                             104u
-#define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                             105u
-#define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_3                             106u
-#define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_4                             107u
-#define CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_5                             108u
 #define CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1                             109u
 #define CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_2                             110u
 #define CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_3                             111u
 #define CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_4                             112u
 #define CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5                             113u
-#define CANIF_RX_PDU_CANFD_PDM1_STUCKATONEVENT                                114u
-#define CANIF_RX_PDU_CANFD_PDM1_STUCKATOFFEVENT                               115u
-#define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_1                         116u
-#define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_2                         117u
-#define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                         118u
-#define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                         119u
-#define CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                         120u
+#define CANIF_RX_PDU_CANFD_PDM1_INPUTT30                                      114u
 #define CANIF_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                  172u
 #define CANIF_TX_PDU_CANFD_INFOTAINMENTDATA1                                  100u
 #define CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA2                              101u

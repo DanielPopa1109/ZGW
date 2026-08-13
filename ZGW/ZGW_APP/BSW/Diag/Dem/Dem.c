@@ -260,10 +260,17 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
             return 0u;
         }
 
+        if ((eventId >= DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST) &&
+                (eventId <= DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_LAST))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT +
+                    (eventId - DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST));
+        }
+
         if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
                 (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
         {
-            return (uint16)(DEM_STATIC_EVENT_COUNT +
+            return (uint16)(DEM_STATIC_EVENT_COUNT + DEM_AIMODEL_CONSUMER_EVENT_COUNT +
                     (eventId - DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST));
         }
 
@@ -305,6 +312,13 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
         baseDtc = DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT & 0x00FFFFFFu;
         if ((udsDtc >= baseDtc) &&
                 (udsDtc < (baseDtc + (uint32)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)))
+        {
+            return (uint16)(DEM_STATIC_EVENT_COUNT + DEM_AIMODEL_CONSUMER_EVENT_COUNT + (udsDtc - baseDtc));
+        }
+
+        baseDtc = DEM_DTC_AIMODEL_CONSUMER_FAULT & 0x00FFFFFFu;
+        if ((udsDtc >= baseDtc) &&
+                (udsDtc < (baseDtc + (uint32)DEM_AIMODEL_CONSUMER_EVENT_COUNT)))
         {
             return (uint16)(DEM_STATIC_EVENT_COUNT + (udsDtc - baseDtc));
         }
@@ -969,6 +983,14 @@ static boolean Dem_IsGeneratedUniqueDtc(Dem_DTCType dtc)
             dtc,
             DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT,
             (uint16)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT) != FALSE)
+    {
+        return TRUE;
+    }
+
+    if (Dem_DtcInGeneratedRange(
+            dtc,
+            DEM_DTC_AIMODEL_CONSUMER_FAULT,
+            (uint16)DEM_AIMODEL_CONSUMER_EVENT_COUNT) != FALSE)
     {
         return TRUE;
     }

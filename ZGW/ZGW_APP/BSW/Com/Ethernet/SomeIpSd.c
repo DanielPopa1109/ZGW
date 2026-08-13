@@ -1,13 +1,22 @@
 #include "SomeIpSd.h"
 #include "GatewaySwc.h"
 #include "EthernetDiag.h"
-#include "../../Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 #include <string.h>
+
+#define SOMEIPSD_OFFER_TX_WINDOW_MS             10000u
+#define SOMEIPSD_OFFER_TX_FAIL_THRESHOLD        3u
+#define SOMEIPSD_MANDATORY_EVENTGROUP_ID        0x0001u
 
 static const SomeIpSd_ConfigType *SomeIpSd_Cfg;
 static uint64 SomeIpSd_NextOfferTimeNs;
 static uint64 SomeIpSd_LastMainTimeNs;
 static SomeIpSd_SubscriptionType SomeIpSd_Subscriptions[SOMEIPSD_MAX_SUBSCRIPTIONS];
+static uint32 SomeIpSd_OfferTxWindowStartMs;
+static uint16 SomeIpSd_OfferTxWindowFails;
+static uint8 SomeIpSd_OfferTxHealthy;
+static uint8 SomeIpSd_MandatorySubscriberSeen;
+static uint8 SomeIpSd_MandatorySubscriberActive;
 
 long long SomeIpSd_MainFunction_Counter = 0;
 
@@ -42,6 +51,54 @@ static uint32 SomeIpSd_GetElapsedMs(uint64 nowNs)
 static void SomeIpSd_UpdateNextOfferDeadline(uint64 nowNs, uint64 offerPeriodNs)
 {
     SomeIpSd_NextOfferTimeNs = nowNs + offerPeriodNs;
+}
+
+static uint32 SomeIpSd_NowMs(void)
+{
+    return (uint32)(TimeBase_PlatformGetCounterNs() / TIMEBASE_NS_PER_MS);
+}
+
+static void SomeIpSd_UpdateDiagAvailability(void)
+{
+    uint8 subscriberOk;
+
+    subscriberOk = ((SomeIpSd_MandatorySubscriberSeen == 0u) ||
+                    (SomeIpSd_MandatorySubscriberActive != 0u)) ? 1u : 0u;
+
+    EthernetDiag_ReportServiceAvailable(0u,
+            ((SomeIpSd_OfferTxHealthy != 0u) && (subscriberOk != 0u)) ? TRUE : FALSE);
+}
+
+static void SomeIpSd_ReportOfferTxResult(uint8 success)
+{
+    uint32 nowMs;
+
+    nowMs = SomeIpSd_NowMs();
+    if ((uint32)(nowMs - SomeIpSd_OfferTxWindowStartMs) >= SOMEIPSD_OFFER_TX_WINDOW_MS)
+    {
+        SomeIpSd_OfferTxWindowStartMs = nowMs;
+        SomeIpSd_OfferTxWindowFails = 0u;
+    }
+
+    if (success == 0u)
+    {
+        if (SomeIpSd_OfferTxWindowFails < 0xFFFFu)
+        {
+            SomeIpSd_OfferTxWindowFails++;
+        }
+
+        if (SomeIpSd_OfferTxWindowFails >= SOMEIPSD_OFFER_TX_FAIL_THRESHOLD)
+        {
+            SomeIpSd_OfferTxHealthy = 0u;
+        }
+    }
+    else
+    {
+        SomeIpSd_OfferTxWindowFails = 0u;
+        SomeIpSd_OfferTxHealthy = 1u;
+    }
+
+    SomeIpSd_UpdateDiagAvailability();
 }
 
 static uint16_t rd16(const uint8_t *p)
@@ -256,6 +313,7 @@ static void SomeIpSd_SendOfferTo(const TcpIp_SockAddrType *remoteAddr,
 {
     uint8_t tx[SOMEIPSD_MAX_PACKET_LEN];
     uint16_t len;
+    SoAd_ReturnType result;
 
     if ((SomeIpSd_Cfg == 0) || (svc == 0))
     {
@@ -264,10 +322,11 @@ static void SomeIpSd_SendOfferTo(const TcpIp_SockAddrType *remoteAddr,
 
     len = SomeIpSd_BuildOffer(tx, svc, ttl);
 
-    (void)GatewaySwc_RequestSoAdIfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
+    result = GatewaySwc_RequestSoAdIfTransmit(SomeIpSd_Cfg->sdUdpSoConId,
                           remoteAddr,
                           tx,
                           len);
+    SomeIpSd_ReportOfferTxResult((result == SOAD_OK) ? 1u : 0u);
 }
 
 static void SomeIpSd_SendAllOffers(void)
@@ -358,6 +417,12 @@ static void SomeIpSd_AddSubscription(uint16_t serviceId,
             (memcmp(&s->remoteAddr, remoteAddr, sizeof(TcpIp_SockAddrType)) == 0))
         {
             s->ttlMs = ttl * 1000u;
+            if (eventgroupId == SOMEIPSD_MANDATORY_EVENTGROUP_ID)
+            {
+                SomeIpSd_MandatorySubscriberSeen = 1u;
+                SomeIpSd_MandatorySubscriberActive = 1u;
+                SomeIpSd_UpdateDiagAvailability();
+            }
             return;
         }
     }
@@ -374,8 +439,46 @@ static void SomeIpSd_AddSubscription(uint16_t serviceId,
             s->instanceId = instanceId;
             s->eventgroupId = eventgroupId;
             s->ttlMs = ttl * 1000u;
+            if (eventgroupId == SOMEIPSD_MANDATORY_EVENTGROUP_ID)
+            {
+                SomeIpSd_MandatorySubscriberSeen = 1u;
+                SomeIpSd_MandatorySubscriberActive = 1u;
+                SomeIpSd_UpdateDiagAvailability();
+            }
             return;
         }
+    }
+}
+
+static void SomeIpSd_UpdateMandatorySubscriberState(void)
+{
+    uint8 i;
+    uint8 active;
+    const SomeIpSd_OfferedServiceType *svc;
+
+    active = 0u;
+    svc = ((SomeIpSd_Cfg != 0) && (SomeIpSd_Cfg->serviceCount > 0u)) ?
+            &SomeIpSd_Cfg->services[0] : 0;
+
+    for (i = 0u; i < SOMEIPSD_MAX_SUBSCRIPTIONS; i++)
+    {
+        const SomeIpSd_SubscriptionType *s = &SomeIpSd_Subscriptions[i];
+
+        if ((svc != 0) &&
+            (s->active != 0u) &&
+            (s->serviceId == svc->serviceId) &&
+            (s->instanceId == svc->instanceId) &&
+            (s->eventgroupId == SOMEIPSD_MANDATORY_EVENTGROUP_ID))
+        {
+            active = 1u;
+            break;
+        }
+    }
+
+    if (SomeIpSd_MandatorySubscriberActive != active)
+    {
+        SomeIpSd_MandatorySubscriberActive = active;
+        SomeIpSd_UpdateDiagAvailability();
     }
 }
 
@@ -435,6 +538,7 @@ static void SomeIpSd_HandleSubscribe(const TcpIp_SockAddrType *remoteAddr,
     if (ttl == 0u)
     {
         SomeIpSd_RemoveSubscription(serviceId, instanceId, eventgroupId, remoteAddr);
+        SomeIpSd_UpdateMandatorySubscriberState();
         SomeIpSd_SendSubscribeAck(remoteAddr, svc, eventgroupId, 0u);
     }
     else
@@ -484,6 +588,11 @@ void SomeIpSd_Init(const SomeIpSd_ConfigType *config)
     SomeIpSd_Cfg = config;
     SomeIpSd_NextOfferTimeNs = 0ull;
     SomeIpSd_LastMainTimeNs = 0ull;
+    SomeIpSd_OfferTxWindowStartMs = SomeIpSd_NowMs();
+    SomeIpSd_OfferTxWindowFails = 0u;
+    SomeIpSd_OfferTxHealthy = 1u;
+    SomeIpSd_MandatorySubscriberSeen = 0u;
+    SomeIpSd_MandatorySubscriberActive = 0u;
     memset(SomeIpSd_Subscriptions, 0, sizeof(SomeIpSd_Subscriptions));
     EthernetDiag_ReportServiceAvailable(0u, TRUE);
 }
@@ -533,6 +642,7 @@ void SomeIpSd_MainFunction(uint32 elapsedMs)
             else
             {
                 memset(s, 0, sizeof(*s));
+                SomeIpSd_UpdateMandatorySubscriberState();
             }
         }
     }

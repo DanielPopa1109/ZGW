@@ -37,7 +37,8 @@
 #include "APP/CodingApp/CodingApp.h"
 #include "APP/GatewaySwc/GatewaySwc.h"
 #include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
+#include "BSW/Io/GtmTom/GtmTom.h"
 
 AURIX_SHARED_NC volatile uint8 OsInit_C0;
 volatile uint32 Core0_WaitForNvMIdleLoopCounter = 0u;
@@ -279,6 +280,8 @@ void Core0_InitSequence(void)
 
     Core0_PinInit();
 
+    GtmTom_Init();
+
     TimeBase_Init();
 
     Core0_ComInit();
@@ -296,8 +299,6 @@ void Core0_InitSequence(void)
 
 void core0_main(void)
 {
-    //while(0x40000000 == SCU_RSTSTAT.U){__debug();}
-
     Core0_InitSequence();
 
     vTaskStartScheduler_core0();

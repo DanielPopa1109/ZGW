@@ -12,7 +12,8 @@
 #include "IfxCpu.h"
 #include "APP/CodingApp/CodingApp.h"
 #include "APP/AiModel/AiModel.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
+#include "BSW/Sys/Os/Os.h"
 #include "BSW/Sys/SmM/SafetyKit_Main.h"
 
 #define GATEWAYSWC_MAGIC0                             0x5Au
@@ -25,6 +26,8 @@
 #define GATEWAYSWC_FRAME_DTC_TRANSITION               0x04u
 #define GATEWAYSWC_FRAME_AI_MODEL                     0x05u
 
+#define GATEWAYSWC_AI_MODEL_GLOBAL_LEN                56u
+#define GATEWAYSWC_AI_MODEL_CHANNEL_LEN               43u
 #define GATEWAYSWC_HEADER_LEN                         12u
 #define GATEWAYSWC_ENTRY_LEN                          7u
 #define GATEWAYSWC_DTC_TRANSITION_LEN                 17u
@@ -458,7 +461,7 @@ static const GatewaySwc_RouteMapType GatewaySwc_RouteMap[] =
         { COM_SIG_RX_PDCSTAT_PDCBUZZERFRONTREAR,               COM_SIG_TX_CANFD_BODYDATA1_BD1_PDCBUZZERFRONTREAR },
 
         { COM_SIG_RX_BATTFULLSTAT_TIMETOFULL,                  COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_TIMETOFULL },
-        { COM_SIG_RX_VOLTAGECURRENT_T30VOLTAGE,                COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_T30VOLTAGE },
+        { COM_SIG_RX_CANFD_PDM1_INPUTT30_INPUTT30,             COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_T30VOLTAGE },
         { COM_SIG_RX_BATTSOCSOH_SOH,                           COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_SOH },
         { COM_SIG_RX_BATTSOC_SOCOCV,                           COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_SOCOCV },
         { COM_SIG_RX_BATTSOCSOH_SOCHYBRID,                     COM_SIG_TX_CANFD_ENERGYMANAGEMENTDATA1_EM1_SOCHYBRID },
@@ -500,7 +503,9 @@ static const GatewaySwc_PduRangeType GatewaySwc_RxMessageDiagRanges[] =
         { COM_RX_PDU_PDCSTAT,                COM_RX_PDU_DMU_ALIVE,                       GATEWAYSWC_BUS_CAN },
         { COM_RX_PDU_VOLTAGECURRENT,         COM_RX_PDU_L1_I2T_COUNTER,                  GATEWAYSWC_BUS_CAN },
         { COM_RX_PDU_BATTSOCSOH,             COM_RX_PDU_BATTCAPRES,                      GATEWAYSWC_BUS_CAN },
-        { COM_RX_PDU_CANFD_PDM1_LOADSTATUS,  COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5, GATEWAYSWC_BUS_CANFD },
+        { COM_RX_PDU_CANFD_PDM1_LOADSTATUS,  COM_RX_PDU_CANFD_PDM1_LOADSTATUS,            GATEWAYSWC_BUS_CANFD },
+        { COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5, GATEWAYSWC_BUS_CANFD },
+        { COM_RX_PDU_CANFD_PDM1_INPUTT30,    COM_RX_PDU_CANFD_PDM1_INPUTT30,              GATEWAYSWC_BUS_CANFD },
         { COM_RX_PDU_LIN_HVDCDC_STATUS,      COM_RX_PDU_LIN_HVDCDC_STATUS,                GATEWAYSWC_BUS_LIN }
 };
 
@@ -510,7 +515,9 @@ static const GatewaySwc_SignalRangeType GatewaySwc_EthSignalRanges[] =
         { GATEWAYSWC_CAN_RX_FIRST_1, GATEWAYSWC_CAN_RX_LAST_1, GATEWAYSWC_BUS_CAN },
         { GATEWAYSWC_CAN_RX_FIRST_2, GATEWAYSWC_CAN_RX_LAST_2, GATEWAYSWC_BUS_CAN },
         { GATEWAYSWC_CAN_RX_FIRST_3, GATEWAYSWC_CAN_RX_LAST_3, GATEWAYSWC_BUS_CAN },
-        { GATEWAYSWC_CANFD_RX_FIRST, GATEWAYSWC_CANFD_RX_LAST, GATEWAYSWC_BUS_CANFD },
+        { GATEWAYSWC_CANFD_LOAD_RX_FIRST, GATEWAYSWC_CANFD_LOAD_RX_LAST, GATEWAYSWC_BUS_CANFD },
+        { GATEWAYSWC_CANFD_INPUTT30_RX_FIRST, GATEWAYSWC_CANFD_INPUTT30_RX_LAST, GATEWAYSWC_BUS_CANFD },
+        { GATEWAYSWC_CANFD_CURRENT_RX_FIRST, GATEWAYSWC_CANFD_CURRENT_RX_LAST, GATEWAYSWC_BUS_CANFD },
         { GATEWAYSWC_LIN_RX_FIRST,   GATEWAYSWC_LIN_RX_LAST,   GATEWAYSWC_BUS_LIN }
 };
 
@@ -1361,59 +1368,116 @@ static void GatewaySwc_PublishEthernetSummary(void)
 
 static void GatewaySwc_PublishAiModelResult(void)
 {
-    AiModel_ResultType result;
+    AiModel_GlobalResultType result;
+    AiModel_ChannelResultType channelResult;
     uint16 len;
+    uint8 channelOffset;
+    uint8 maxChannelsPerFrame;
+    uint8 channel;
+    uint8 channelCount;
     uint8 fault;
 
-    if (AiModel_GetLatestResult(&result) != E_OK)
+    if (AiModel_GetLatestGlobalResult(&result) != E_OK)
     {
         return;
     }
 
-    len = 0u;
-    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC0);
-    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC1);
-    GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC2);
-    GatewaySwc_AppendU8(&len, GATEWAYSWC_FRAME_AI_MODEL);
-    GatewaySwc_AppendU32(&len, GatewaySwc_Status.mainCycles);
-    GatewaySwc_AppendU8(&len, GATEWAYSWC_BUS_CANFD);
-    GatewaySwc_AppendU8(&len, result.inputValid);
-    GatewaySwc_AppendU8(&len, result.inferenceValid);
-    GatewaySwc_AppendU8(&len, result.windowReady);
-
-    GatewaySwc_AppendF32(&len, result.inputVoltage_V);
-    GatewaySwc_AppendF32(&len, result.inputCurrent_A);
-    GatewaySwc_AppendF32(&len, result.inputTemperature_C);
-    GatewaySwc_AppendF32(&len, result.expectedVoltage_V);
-    GatewaySwc_AppendF32(&len, result.expectedCurrent_A);
-    GatewaySwc_AppendF32(&len, result.expectedTemperature_C);
-    GatewaySwc_AppendF32(&len, result.anomaly);
-    GatewaySwc_AppendF32(&len, result.health);
-    for (fault = 0u; fault < BCM_NUM_FAULT_CLASSES; fault++)
+    maxChannelsPerFrame = (uint8)((GATEWAYSWC_ETH_MAX_PAYLOAD - GATEWAYSWC_AI_MODEL_GLOBAL_LEN) /
+            GATEWAYSWC_AI_MODEL_CHANNEL_LEN);
+    if (maxChannelsPerFrame == 0u)
     {
-        GatewaySwc_AppendF32(&len, result.faultProbability[fault]);
+        return;
     }
 
-    GatewaySwc_AppendU8(&len, result.dominantFault);
-    GatewaySwc_AppendU8(&len, 0u);
-    GatewaySwc_AppendU8(&len, 0u);
-    GatewaySwc_AppendU8(&len, 0u);
-    GatewaySwc_AppendU32(&len, result.inputTimestamp);
-    GatewaySwc_AppendU32(&len, result.inferenceSequence);
-    GatewaySwc_AppendU32(&len, result.executionTimeUs);
-    GatewaySwc_AppendU32(&len, result.errorFlags);
-
-    GatewaySwc_Status.ethLastPayloadLength = len;
-    if (GatewaySwc_QueueEthTx(GATEWAYSWC_ETH_TX_KIND_AI_MODEL,
-            (SoAd_SoConIdType)GATEWAYSWC_ETH_SOCON_ID,
-            NULL_PTR,
-            GatewaySwc_EthBuffer,
-            len) == FALSE)
+    for (channelOffset = 0u; channelOffset < BCM_NUM_CHANNELS; channelOffset = (uint8)(channelOffset + channelCount))
     {
-        GatewaySwc_Status.ethLastOpenResult = 0u;
-        GatewaySwc_Status.ethLastSoAdResult = SOAD_NOT_OK;
-        GatewaySwc_Status.ethLastTransmitOk = 0u;
-        GatewaySwc_Status.ethFramesFailed++;
+        channelCount = (uint8)(BCM_NUM_CHANNELS - channelOffset);
+        if (channelCount > maxChannelsPerFrame)
+        {
+            channelCount = maxChannelsPerFrame;
+        }
+
+        len = 0u;
+        GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC0);
+        GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC1);
+        GatewaySwc_AppendU8(&len, GATEWAYSWC_MAGIC2);
+        GatewaySwc_AppendU8(&len, GATEWAYSWC_FRAME_AI_MODEL);
+        GatewaySwc_AppendU32(&len, GatewaySwc_Status.mainCycles);
+        GatewaySwc_AppendU8(&len, GATEWAYSWC_BUS_CANFD);
+        GatewaySwc_AppendU8(&len, result.inputValid);
+        GatewaySwc_AppendU8(&len, result.inferenceValid);
+        GatewaySwc_AppendU8(&len, result.windowReady);
+        GatewaySwc_AppendU8(&len, result.undervoltage);
+        GatewaySwc_AppendU8(&len, result.overvoltage);
+        GatewaySwc_AppendU8(&len, channelCount);
+        GatewaySwc_AppendU8(&len, channelOffset);
+        GatewaySwc_AppendU8(&len, BCM_NUM_CHANNELS);
+
+        GatewaySwc_AppendF32(&len, result.inputVoltage_V);
+        GatewaySwc_AppendU8(&len, result.dominantFaultChannel);
+        GatewaySwc_AppendU8(&len, result.dominantFault);
+        GatewaySwc_AppendU16(&len, 0u);
+        GatewaySwc_AppendU32(&len, result.inputTimestamp);
+        GatewaySwc_AppendU32(&len, result.inferenceSequence);
+        GatewaySwc_AppendU32(&len, result.channelExecutionTimeUs);
+        GatewaySwc_AppendU32(&len, result.totalInferenceTimeUs);
+        GatewaySwc_AppendU32(&len, result.processingTimeUs);
+        GatewaySwc_AppendU32(&len, result.maxChannelExecutionTimeUs);
+        GatewaySwc_AppendU32(&len, result.maxTotalInferenceTimeUs);
+        GatewaySwc_AppendU32(&len, result.maxProcessingTimeUs);
+        GatewaySwc_AppendU32(&len, result.errorFlags);
+
+        for (channel = channelOffset; channel < (uint8)(channelOffset + channelCount); channel++)
+        {
+            if (AiModel_GetLatestChannelResult(channel, &channelResult) != E_OK)
+            {
+                channelResult.channelId = channel;
+                channelResult.measuredCurrent_A = 0.0f;
+                channelResult.currentRating_A = 0.0f;
+                channelResult.predictedCurrent_A = 0.0f;
+                channelResult.faultSoonProbability = 0.0f;
+                channelResult.faultProbability[0u] = 0.0f;
+                channelResult.faultProbability[1u] = 0.0f;
+                channelResult.faultProbability[2u] = 0.0f;
+                channelResult.faultProbability[3u] = 0.0f;
+                channelResult.currentUtilization = 0.0f;
+                channelResult.predictedFaultClass = 0u;
+                channelResult.impendingOvercurrent = 0u;
+                channelResult.actualOvercurrent = 0u;
+                channelResult.inferenceValid = 0u;
+            }
+
+            GatewaySwc_AppendU8(&len, channelResult.channelId);
+            GatewaySwc_AppendU8(&len, channelResult.predictedFaultClass);
+            GatewaySwc_AppendU8(&len, channelResult.impendingOvercurrent);
+            GatewaySwc_AppendU8(&len, channelResult.actualOvercurrent);
+            GatewaySwc_AppendU8(&len, channelResult.inferenceValid);
+            GatewaySwc_AppendU8(&len, 0u);
+            GatewaySwc_AppendU8(&len, 0u);
+            GatewaySwc_AppendF32(&len, channelResult.measuredCurrent_A);
+            GatewaySwc_AppendF32(&len, channelResult.currentRating_A);
+            GatewaySwc_AppendF32(&len, channelResult.predictedCurrent_A);
+            GatewaySwc_AppendF32(&len, channelResult.faultSoonProbability);
+            GatewaySwc_AppendF32(&len, channelResult.currentUtilization);
+            for (fault = 0u; fault < BCM_NUM_FAULT_CLASSES; fault++)
+            {
+                GatewaySwc_AppendF32(&len, channelResult.faultProbability[fault]);
+            }
+        }
+
+        GatewaySwc_Status.ethLastPayloadLength = len;
+        if (GatewaySwc_QueueEthTx(GATEWAYSWC_ETH_TX_KIND_AI_MODEL,
+                (SoAd_SoConIdType)GATEWAYSWC_ETH_SOCON_ID,
+                NULL_PTR,
+                GatewaySwc_EthBuffer,
+                len) == FALSE)
+        {
+            GatewaySwc_Status.ethLastOpenResult = 0u;
+            GatewaySwc_Status.ethLastSoAdResult = SOAD_NOT_OK;
+            GatewaySwc_Status.ethLastTransmitOk = 0u;
+            GatewaySwc_Status.ethFramesFailed++;
+            break;
+        }
     }
 }
 
@@ -1520,6 +1584,9 @@ static void GatewaySwc_McuStatusBuildPacket(uint8 *packet)
     GatewaySwc_StoreS16(packet, 44u, GatewaySwc_McuStatusScaleCentiDeg(g_SafetyKitStatus.dieTempStatus.dieTempDifference));
     GatewaySwc_StoreS16(packet, 46u, GatewaySwc_McuStatusScaleCentiDeg(g_SafetyKitStatus.dieTempStatus.dieTempHighest));
     GatewaySwc_StoreS16(packet, 48u, GatewaySwc_McuStatusScaleCentiDeg(g_SafetyKitStatus.dieTempStatus.dieTempLowest));
+    GatewaySwc_StoreU16(packet, 50u, Os_GetCpuLoadPermille(0u));
+    GatewaySwc_StoreU16(packet, 52u, Os_GetCpuLoadPermille(1u));
+    GatewaySwc_StoreU16(packet, 54u, Os_GetCpuLoadPermille(2u));
 
     crc = Crc_CalculateCRC32(packet, GATEWAYSWC_MCU_STATUS_CRC_OFFSET, 0u, TRUE);
     GatewaySwc_StoreU32(packet, GATEWAYSWC_MCU_STATUS_CRC_OFFSET, crc);

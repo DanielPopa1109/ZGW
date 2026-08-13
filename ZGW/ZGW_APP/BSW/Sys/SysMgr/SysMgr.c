@@ -24,7 +24,7 @@
 #include "Fls.h"
 #include "SCR.h"
 #include "IfxPms_reg.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 #include "../../../SCR/scr_time_shared.h"
 
 #define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 2000u

@@ -29,6 +29,14 @@ volatile uint32 DoIP_DebugInactivityTimerMs = 0u;
 #define DOIP_DEBUG_INC(lhs) do { (void)0; } while (0)
 #endif
 
+volatile uint32 DoIP_DiagResponseSendAttemptCounter = 0u;
+volatile uint32 DoIP_DiagResponseSendOkCounter = 0u;
+volatile uint32 DoIP_DiagResponseSendBusyStateCounter = 0u;
+volatile uint32 DoIP_DiagResponseSendTransmitFailCounter = 0u;
+volatile uint8 DoIP_DiagResponseLastTcpState = 0u;
+volatile uint8 DoIP_DiagResponseLastRoutingActive = 0u;
+volatile uint16 DoIP_DiagResponseLastUdsLen = 0u;
+
 typedef struct
 {
         const DoIP_ConfigType *cfg;
@@ -802,6 +810,11 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
 {
     uint16_t idx;
 
+    DoIP_DiagResponseSendAttemptCounter++;
+    DoIP_DiagResponseLastTcpState = (uint8)DoIP_Rt.tcpState;
+    DoIP_DiagResponseLastRoutingActive = DoIP_Rt.routingActive;
+    DoIP_DiagResponseLastUdsLen = udsLen;
+
     if ((DoIP_Rt.cfg == 0) || (uds == 0) || (udsLen > DOIP_MAX_UDS_PAYLOAD_LEN))
     {
         return DOIP_PARAM_ERROR;
@@ -810,6 +823,7 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
     if ((DoIP_Rt.tcpState != DOIP_TCP_ROUTING_ACTIVE) ||
             (DoIP_Rt.routingActive == 0u))
     {
+        DoIP_DiagResponseSendBusyStateCounter++;
         return DOIP_BUSY;
     }
 
@@ -828,11 +842,13 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16_t sourceAddress,
 
     if (GatewaySwc_RequestSoAdIfTransmit(DoIP_Rt.cfg->tcpSoConId, 0, DoIP_Rt.txBuffer, idx) != SOAD_OK)
     {
+        DoIP_DiagResponseSendTransmitFailCounter++;
         return DOIP_BUSY;
     }
 
     DoIP_MarkTcpActivity();
     DoIP_Rt.diagTxCnt++;
+    DoIP_DiagResponseSendOkCounter++;
 
     return DOIP_OK;
 }

@@ -1,7 +1,8 @@
 #include "Dem_Cfg.h"
 #include "SysMgr.h"
 #include "EthernetDiag.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/AiModel/AiModel.h"
+#include "APP/TimeSync/TimeBase.h"
 #include "SafetyKit_Main.h"
 #include <string.h>
 
@@ -104,6 +105,22 @@ static Std_ReturnType Dem_GetDtcForEventId(Dem_EventIdType eventId, Dem_DTCType 
         return E_OK;
     }
 
+    if ((eventId >= DEM_EVENT_ID_AIMODEL_INPUT_INVALID) &&
+        (eventId <= DEM_EVENT_ID_AIMODEL_OUTPUT_OUT_OF_RANGE))
+    {
+        *dtc = (Dem_DTCType)(DEM_DTC_AIMODEL_INPUT_INVALID +
+                (Dem_DTCType)(eventId - DEM_EVENT_ID_AIMODEL_INPUT_INVALID));
+        return E_OK;
+    }
+
+    if ((eventId >= DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST) &&
+        (eventId <= DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_LAST))
+    {
+        *dtc = (Dem_DTCType)(DEM_DTC_AIMODEL_CONSUMER_FAULT +
+                (Dem_DTCType)(eventId - DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST));
+        return E_OK;
+    }
+
     if ((eventId >= DEM_EVENT_ID_ETH_LINK_LOST) &&
         (eventId <= DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED))
     {
@@ -190,6 +207,70 @@ static const Dem_EventConfigType Dem_StaticEventConfigList[] =
         40u,
         TRUE,
         Dem_DefaultSnapshotDataCapture,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_AIMODEL_INPUT_INVALID,
+        DEM_DTC_AIMODEL_INPUT_INVALID,
+        0u,
+        1u,
+        3,
+        -3,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        AiModel_CaptureDiagSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_AIMODEL_INFERENCE_INVALID,
+        DEM_DTC_AIMODEL_INFERENCE_INVALID,
+        0u,
+        1u,
+        3,
+        -3,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        AiModel_CaptureDiagSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_AIMODEL_DEADLINE_EXCEEDED,
+        DEM_DTC_AIMODEL_DEADLINE_EXCEEDED,
+        0u,
+        1u,
+        3,
+        -3,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        AiModel_CaptureDiagSnapshotData,
+        NULL_PTR
+    },
+    {
+        DEM_EVENT_ID_AIMODEL_OUTPUT_OUT_OF_RANGE,
+        DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE,
+        0u,
+        1u,
+        3,
+        -3,
+        1,
+        1,
+        1u,
+        TRUE,
+        40u,
+        TRUE,
+        AiModel_CaptureDiagSnapshotData,
         NULL_PTR
     },
     {
@@ -376,6 +457,28 @@ static void Dem_FillGatewayEventConfig(
     eventConfig->StatusChangedCallback = NULL_PTR;
 }
 
+static void Dem_FillAiModelConsumerEventConfig(
+    Dem_EventConfigType *eventConfig,
+    Dem_EventIdType eventId,
+    Dem_DTCType dtc
+)
+{
+    eventConfig->EventId = eventId;
+    eventConfig->DTC = dtc;
+    eventConfig->Severity = 0u;
+    eventConfig->Priority = 1u;
+    eventConfig->FailedThreshold = 1;
+    eventConfig->PassedThreshold = -3;
+    eventConfig->IncrementStep = 1;
+    eventConfig->DecrementStep = 1;
+    eventConfig->ConfirmationThreshold = 1u;
+    eventConfig->AgingAllowed = TRUE;
+    eventConfig->AgingThreshold = 40u;
+    eventConfig->StorageEnabled = TRUE;
+    eventConfig->SnapshotDataCapture = AiModel_CaptureDiagSnapshotData;
+    eventConfig->StatusChangedCallback = NULL_PTR;
+}
+
 static void Dem_ApplyStoredDataLimit(
     uint16 eventIndex,
     Dem_EventConfigType *eventConfig
@@ -404,6 +507,18 @@ Std_ReturnType Dem_Cfg_GetEventConfig(uint16 eventIndex, Dem_EventConfigType *ev
     }
 
     offset = (uint16)(eventIndex - DEM_STATIC_EVENT_COUNT);
+
+    if (offset < (uint16)DEM_AIMODEL_CONSUMER_EVENT_COUNT)
+    {
+        Dem_FillAiModelConsumerEventConfig(
+                eventConfig,
+                (Dem_EventIdType)(DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST + offset),
+                (Dem_DTCType)(DEM_DTC_AIMODEL_CONSUMER_FAULT + offset));
+        Dem_ApplyStoredDataLimit(eventIndex, eventConfig);
+        return E_OK;
+    }
+
+    offset = (uint16)(offset - (uint16)DEM_AIMODEL_CONSUMER_EVENT_COUNT);
 
     if (offset < (uint16)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)
     {

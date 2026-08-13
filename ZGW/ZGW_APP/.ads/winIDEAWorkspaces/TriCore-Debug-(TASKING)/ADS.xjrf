@@ -150,13 +150,13 @@
          <Use>false</Use>
         </StackUsage>
         <SymbolFiles>
-         <DefaultFile>0</DefaultFile>
+         <DefaultFile>1</DefaultFile>
          <File>
           <__.0>
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\..\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.elf</Path>
+           <Path>../../../../ZGW_FBL/TriCore Debug (TASKING)/ZGW_FBL.elf</Path>
            <PgmDestination>memory</PgmDestination>
            <TargetDir></TargetDir>
            <UseDefaultMSID>true</UseDefaultMSID>
@@ -251,7 +251,7 @@
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\TriCore Debug (TASKING)\ZGW_APP.elf</Path>
+           <Path>../../../TriCore Debug (TASKING)/ZGW_APP.elf</Path>
            <PgmDestination>memory</PgmDestination>
            <TargetDir></TargetDir>
            <UseDefaultMSID>true</UseDefaultMSID>
@@ -359,7 +359,7 @@
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\..\ZGW_FBL\TriCore Debug (TASKING)\ZGW_FBL.hex</Path>
+           <Path>../../../../ZGW_FBL/TriCore Debug (TASKING)/ZGW_FBL.hex</Path>
            <PgmDestination>memory</PgmDestination>
            <TargetDir></TargetDir>
            <UseDefaultMSID>true</UseDefaultMSID>
@@ -454,7 +454,7 @@
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\TriCore Debug (TASKING)\ZGW_APP.hex</Path>
+           <Path>../../../TriCore Debug (TASKING)/ZGW_APP.hex</Path>
            <PgmDestination>memory</PgmDestination>
            <TargetDir></TargetDir>
            <UseDefaultMSID>true</UseDefaultMSID>
@@ -721,7 +721,7 @@
         <DisplayCollapsedArrayStruct>true</DisplayCollapsedArrayStruct>
         <DisplayPointerMemArea>true</DisplayPointerMemArea>
         <EnumDisplay>Enum</EnumDisplay>
-        <Hex>false</Hex>
+        <Hex>true</Hex>
         <MaxParseUpload>256</MaxParseUpload>
         <QualifiedNames>Unique</QualifiedNames>
         <UseSpacers>true</UseSpacers>
@@ -845,6 +845,20 @@
     </Mode>
     <Op_System>
      <Debug>
+      <BPs>
+       <__.0>
+        <ActionEnabled>false</ActionEnabled>
+        <ActionParams></ActionParams>
+        <ActionScript></ActionScript>
+        <ActionShow>false</ActionShow>
+        <Condition>false</Condition>
+        <Count>0</Count>
+        <Enabled>true</Enabled>
+        <Expression></Expression>
+        <Location>&quot;../../../BSW/Sys/McuSm/McuSm.c&quot;::347</Location>
+        <ProcessFilter></ProcessFilter>
+       </__.0>
+      </BPs>
       <Processes.0>
        <URL></URL>
       </Processes.0>
@@ -2596,10 +2610,10 @@
           <RDOnly>false</RDOnly>
           <SafeMode>Auto</SafeMode>
           <Timeout>10</Timeout>
-          <UseBufferCompress>true</UseBufferCompress>
-          <UseCompression>true</UseCompression>
-          <UseHash>true</UseHash>
-          <UseHashing>true</UseHashing>
+          <UseBufferCompress>false</UseBufferCompress>
+          <UseCompression>false</UseCompression>
+          <UseHash>false</UseHash>
+          <UseHashing>false</UseHashing>
           <Verify>true</Verify>
           <VerifyOnTheFly>true</VerifyOnTheFly>
           <Version></Version>
@@ -3842,7 +3856,7 @@
          <ApplicationLBIST>true</ApplicationLBIST>
          <BRKIN>HIGH</BRKIN>
          <ClearICRIEWhenStopped>false</ClearICRIEWhenStopped>
-         <DAPClock>50000</DAPClock>
+         <DAPClock>5000</DAPClock>
          <DAPE>false</DAPE>
          <DAPE_Clock>10000</DAPE_Clock>
          <DAPE_DebugMode>DAP</DAPE_DebugMode>
@@ -4913,10 +4927,10 @@
            <RDOnly>false</RDOnly>
            <SafeMode>Auto</SafeMode>
            <Timeout>10</Timeout>
-           <UseBufferCompress>true</UseBufferCompress>
-           <UseCompression>true</UseCompression>
-           <UseHash>true</UseHash>
-           <UseHashing>true</UseHashing>
+           <UseBufferCompress>false</UseBufferCompress>
+           <UseCompression>false</UseCompression>
+           <UseHash>false</UseHash>
+           <UseHashing>false</UseHashing>
            <Verify>true</Verify>
            <VerifyOnTheFly>true</VerifyOnTheFly>
            <Version></Version>

@@ -46,10 +46,11 @@
 #include "UdpNm.h"
 #include "EthSM.h"
 #include "EthernetDiag.h"
-#include "BSW/Time/TimeBase.h"
-#include "BSW/Time/EthTimeSync.h"
-#include "BSW/Time/Gptp_Lab.h"
+#include "APP/TimeSync/TimeBase.h"
+#include "BSW/Com/Ethernet/EthTimeSync.h"
+#include "APP/TimeSync/Gptp_Lab.h"
 #include "APP/AiModel/AiModel.h"
+#include "BSW/Io/GtmTom/GtmTom.h"
 
 void Os_Init_C0(void);
 void Os_Init_C1(void);
@@ -86,6 +87,8 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_STACK_CORE0_QM_CAN     ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE0_QM_LIN     ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE0_QM_APPL    ( configMINIMAL_STACK_SIZE_core0 * 2u )
+#define OS_TASK_STACK_CORE1_ASIL_BSW   ( configMINIMAL_STACK_SIZE_core1 * 8u )
+#define OS_TASK_STACK_CORE1_ASIL_APPL  ( configMINIMAL_STACK_SIZE_core1 )
 #define OS_TASK_STACK_CORE2_APPL       ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_STACK_CORE2_QM_BSW     ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_PRIO_CORE0_ASIL_BSW    28u
@@ -379,12 +382,12 @@ void Os_Init_C0(void)
 
 void Os_Init_C1(void)
 {
-    if(xTaskCreate_core1(ASIL_BSW_Task_C1, "ASIL_BSW_Task_C1", configMINIMAL_STACK_SIZE_core1, NULL, 29u, &ASIL_BSW_Task_C1_THandle) != pdPASS_core1)
+    if(xTaskCreate_core1(ASIL_BSW_Task_C1, "ASIL_BSW_Task_C1", OS_TASK_STACK_CORE1_ASIL_BSW, NULL, 29u, &ASIL_BSW_Task_C1_THandle) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_ASIL_TASK);
     }
 
-    if(xTaskCreate_core1(ASIL_APPL_Task_C1, "ASIL_APPL_Task_C1", configMINIMAL_STACK_SIZE_core1, NULL, 28u, &ASIL_APPL_Task_C1_THandle) != pdPASS_core1)
+    if(xTaskCreate_core1(ASIL_APPL_Task_C1, "ASIL_APPL_Task_C1", OS_TASK_STACK_CORE1_ASIL_APPL, NULL, 28u, &ASIL_APPL_Task_C1_THandle) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_TASK);
     }
@@ -878,6 +881,7 @@ void QM_BSW_Task_C0(void *pvParameters)
             ComM_MainFunction();
             Nm_MainFunction();
             CanNm_MainFunction();
+            GtmTom_MainFunction();
             QM_BSW_Task_C0_Counter ++;
         }
         else

@@ -53,7 +53,7 @@ const Ifx_Ssw_Bmhd bmhd_0_orig =
 #if SAFETYKIT_CFG_SSW_ENABLE_LBIST_BOOT
     0x01FE,         /* 0x000: .bmi: Boot Mode Index (BMI)                                               */
     0xB359,         /* 0x002: .bmhdid: Boot Mode Header ID (CODE) = B359H                               */
-    0x80000000,     /* 0x004: .stad: User Code start address                                            */
+    0xA0000000,     /* 0x004: .stad: User Code start address                                            */
     0xFA2586D5,     /* 0x008: .crc: Check Result for the BMI Header (offset 000H - 007H)                */
     0x05DA792A,     /* 0x00C: .crcInv: Inverted Check Result for the BMI Header (offset 000H - 007H)    */
 #else
@@ -126,7 +126,7 @@ const Ifx_Ssw_Bmhd bmhd_0_copy =
 #if SAFETYKIT_CFG_SSW_ENABLE_LBIST_BOOT
     0x01FE,         /* 0x000: .bmi: Boot Mode Index (BMI)                                               */
     0xB359,         /* 0x002: .bmhdid: Boot Mode Header ID (CODE) = B359H                               */
-    0x80000000,     /* 0x004: .stad: User Code start address                                            */
+    0xA0000000,     /* 0x004: .stad: User Code start address                                            */
     0xFA2586D5,     /* 0x008: .crc: Check Result for the BMI Header (offset 000H - 007H)                */
     0x05DA792A,     /* 0x00C: .crcInv: Inverted Check Result for the BMI Header (offset 000H - 007H)    */
 #else

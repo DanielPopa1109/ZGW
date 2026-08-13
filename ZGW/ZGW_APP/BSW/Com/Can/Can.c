@@ -58,23 +58,12 @@ typedef struct
 static const Can_StdIdFilterConfigType Can_FdStdIdFilters[] =
 {
     { 0x090u, "PDM1_LoadStatus" }, /* PDM1_LoadStatus, sender PDM1 */
-    { 0x300u, "PDM1_VoltageFeedback_1" }, /* PDM1_VoltageFeedback_1, sender PDM1 */
-    { 0x301u, "PDM1_VoltageFeedback_2" }, /* PDM1_VoltageFeedback_2, sender PDM1 */
-    { 0x302u, "PDM1_VoltageFeedback_3" }, /* PDM1_VoltageFeedback_3, sender PDM1 */
-    { 0x303u, "PDM1_VoltageFeedback_4" }, /* PDM1_VoltageFeedback_4, sender PDM1 */
-    { 0x304u, "PDM1_VoltageFeedback_5" }, /* PDM1_VoltageFeedback_5, sender PDM1 */
     { 0x305u, "PDM1_CurrentFeedback_1" }, /* PDM1_CurrentFeedback_1, sender PDM1 */
     { 0x306u, "PDM1_CurrentFeedback_2" }, /* PDM1_CurrentFeedback_2, sender PDM1 */
     { 0x307u, "PDM1_CurrentFeedback_3" }, /* PDM1_CurrentFeedback_3, sender PDM1 */
     { 0x308u, "PDM1_CurrentFeedback_4" }, /* PDM1_CurrentFeedback_4, sender PDM1 */
     { 0x309u, "PDM1_CurrentFeedback_5" }, /* PDM1_CurrentFeedback_5, sender PDM1 */
-    { 0x30Au, "PDM1_StuckAtOnEvent" }, /* PDM1_StuckAtOnEvent, sender PDM1 */
-    { 0x30Bu, "PDM1_StuckAtOffEvent" }, /* PDM1_StuckAtOffEvent, sender PDM1 */
-    { 0x30Cu, "PDM1_TemperatureFeedback_1" }, /* PDM1_TemperatureFeedback_1, sender PDM1 */
-    { 0x30Du, "PDM1_TemperatureFeedback_2" }, /* PDM1_TemperatureFeedback_2, sender PDM1 */
-    { 0x30Eu, "PDM1_TemperatureFeedback_3" }, /* PDM1_TemperatureFeedback_3, sender PDM1 */
-    { 0x30Fu, "PDM1_TemperatureFeedback_4" }, /* PDM1_TemperatureFeedback_4, sender PDM1 */
-    { 0x310u, "PDM1_TemperatureFeedback_5" }, /* PDM1_TemperatureFeedback_5, sender PDM1 */
+    { 0x30Au, "PDM1_InputT30" }, /* PDM1_InputT30, sender PDM1 */
     { 0x721u, "PDM1_DiagResponse" }, /* PDM1_DiagResponse, sender PDM1 */
     { 0x710u, "DiagRequest_710" } /* DiagRequest_710, sender Tester */
 };

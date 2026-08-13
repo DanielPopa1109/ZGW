@@ -10,7 +10,7 @@
 #include "Os.h"
 #include "NvM.h"
 #include "SysMgr.h"
-#include "BSW/Time/Dcm_TimeRoutine.h"
+#include "BSW/Diag/Dcm/Dcm_TimeRoutine.h"
 #include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 
 /* ===================== Internal types ===================== */
@@ -136,6 +136,20 @@ static uint8 Dcm_NvMWriteAllOwnerSid = 0u;
 static uint8 Dcm_PendingHardReset = FALSE;
 static uint16 Dcm_HardResetCountdown = 0u;
 static uint16 Dcm_HardResetNvMDrainCountdown = 0u;
+static uint16 Dcm_HardResetNvMDrainElapsedTicks = 0u;
+static uint8 Dcm_HardResetDrainNvM = TRUE;
+
+volatile uint32 Dcm_DebugHardResetArmedCounter = 0u;
+volatile uint32 Dcm_DebugHardResetPerformedCounter = 0u;
+volatile uint32 Dcm_DebugHardResetNvMDrainSkipCounter = 0u;
+volatile uint32 Dcm_DebugHardResetNvMDrainWaitCounter = 0u;
+volatile uint32 Dcm_DebugHardResetNvMDrainTimeoutCounter = 0u;
+volatile uint16 Dcm_DebugHardResetLastDelayTicks = 0u;
+volatile uint16 Dcm_DebugHardResetLastNvMDrainTicks = 0u;
+volatile uint16 Dcm_DebugHardResetLastNvMDrainElapsedTicks = 0u;
+volatile uint8 Dcm_DebugHardResetLastDrainNvM = 0u;
+volatile uint8 Dcm_DebugHardResetLastBusType = 0xFFu;
+volatile uint8 Dcm_DebugHardResetLastNvMStatus = 0xFFu;
 
 /* ===================== Forward ===================== */
 static void Dcm_SendBusyRepeatIfPossible(uint8 connIdx, uint8 sid, Dcm_AddressingType addressing);
@@ -771,6 +785,7 @@ void Dcm_MainFunction(void)
 {
     uint8 i;
     NvM_StatusType nvmStatus;
+    uint8 waitForNvM;
 
     if (Dcm_ConfigPtr == NULL_PTR)
     {
@@ -840,14 +855,36 @@ void Dcm_MainFunction(void)
         else
         {
             nvmStatus = NvM_GetStatus();
-            if (((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL)) &&
+            Dcm_DebugHardResetLastNvMStatus = (uint8)nvmStatus;
+
+            waitForNvM = FALSE;
+
+            if (Dcm_HardResetDrainNvM == FALSE)
+            {
+                Dcm_DebugHardResetNvMDrainSkipCounter++;
+            }
+            else if (((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL)) &&
                     (Dcm_HardResetNvMDrainCountdown > 0u))
             {
                 Dcm_HardResetNvMDrainCountdown--;
+                Dcm_HardResetNvMDrainElapsedTicks++;
+                Dcm_DebugHardResetNvMDrainWaitCounter++;
+                Dcm_DebugHardResetLastNvMDrainElapsedTicks = Dcm_HardResetNvMDrainElapsedTicks;
+                waitForNvM = TRUE;
             }
             else
             {
+                if ((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL))
+                {
+                    Dcm_DebugHardResetNvMDrainTimeoutCounter++;
+                }
+            }
+
+            if (waitForNvM == FALSE)
+            {
                 Dcm_PendingHardReset = FALSE;
+                Dcm_DebugHardResetPerformedCounter++;
+                Dcm_DebugHardResetLastNvMDrainElapsedTicks = Dcm_HardResetNvMDrainElapsedTicks;
                 Dcm_ResetDelay();
                 SysMgr_ClearMcuSmSwErrorTriggerData();
                 McuSm_SaveRetainedStateToScr();
@@ -2054,7 +2091,13 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
 
 static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
 {
-    (void)connIdx;
+    Dcm_BusType busType;
+
+    busType = DCM_BUS_CAN_CLASSIC;
+    if ((Dcm_ConfigPtr != NULL_PTR) && (connIdx < Dcm_ConfigPtr->numConnections))
+    {
+        busType = Dcm_ConfigPtr->connections[connIdx].busType;
+    }
 
     if (resetType == 0x01u)
     {
@@ -2064,7 +2107,18 @@ static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
         Dcm_PendingHardReset = TRUE;
         Dcm_HardResetCountdown = DCM_HARD_RESET_DELAY_TICKS;
-        Dcm_HardResetNvMDrainCountdown = DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS;
+        /* DoIP hard reset already drained NvM before the positive response. */
+        Dcm_HardResetDrainNvM = (busType == DCM_BUS_ETHERNET) ? FALSE : TRUE;
+        Dcm_HardResetNvMDrainCountdown = (Dcm_HardResetDrainNvM != FALSE) ?
+                DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS : 0u;
+        Dcm_HardResetNvMDrainElapsedTicks = 0u;
+        Dcm_DebugHardResetArmedCounter++;
+        Dcm_DebugHardResetLastDelayTicks = DCM_HARD_RESET_DELAY_TICKS;
+        Dcm_DebugHardResetLastNvMDrainTicks = Dcm_HardResetNvMDrainCountdown;
+        Dcm_DebugHardResetLastNvMDrainElapsedTicks = 0u;
+        Dcm_DebugHardResetLastDrainNvM = Dcm_HardResetDrainNvM;
+        Dcm_DebugHardResetLastBusType = (uint8)busType;
+        Dcm_DebugHardResetLastNvMStatus = (uint8)NvM_GetStatus();
     }
 }
 

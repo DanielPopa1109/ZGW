@@ -37,7 +37,6 @@ RM := rm -rf
 -include Libraries/subdir.mk
 -include Configurations/Debug/subdir.mk
 -include Configurations/subdir.mk
--include BSW/Time/subdir.mk
 -include BSW/Sys/Wdg/subdir.mk
 -include BSW/Sys/SysMgr/subdir.mk
 -include BSW/Sys/SmM/02_Safety_Mechanisms/subdir.mk
@@ -57,6 +56,7 @@ RM := rm -rf
 -include BSW/Mem/MemIf/subdir.mk
 -include BSW/Mem/Fls/subdir.mk
 -include BSW/Mem/Fee/subdir.mk
+-include BSW/Io/GtmTom/subdir.mk
 -include BSW/Diag/Dem/subdir.mk
 -include BSW/Diag/Dcm/subdir.mk
 -include BSW/Com/UdpNm/subdir.mk
@@ -80,6 +80,7 @@ RM := rm -rf
 -include BSW/Com/CanIf/subdir.mk
 -include BSW/Com/Can/subdir.mk
 -include BSW/Com/subdir.mk
+-include APP/TimeSync/subdir.mk
 -include APP/ParallelFlashSwc/subdir.mk
 -include APP/GatewaySwc/subdir.mk
 -include APP/CodingApp/subdir.mk
@@ -140,7 +141,7 @@ all: main-build
 main-build: ZGW_APP.elf secondary-outputs
 
 dependents:
-	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) clean all
+	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) all
 
 # Tool invocations
 ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)/SCR_AURIX_TC3x" makefile $(OPTIONAL_TOOL_DEPS) .ZGW_APP.elf.opt

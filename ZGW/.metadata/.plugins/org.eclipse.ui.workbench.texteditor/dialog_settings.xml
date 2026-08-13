@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS"/>
+		<item key="selection" value="core0_main"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
+			<item value="core0_main"/>
+			<item value="performreset"/>
 			<item value="SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS"/>
 			<item value="FBL_BLU_STATE_IDLE"/>
 			<item value="dsram0"/>
 			<item value="LCF_FBL_LIVE_RODATA_SIZE"/>
 			<item value="cpu0_dlmu_nc"/>
-			<item value="core0_main"/>
 			<item value="core0_man"/>
 			<item value="FBL_STAGING_START_NC"/>
 			<item value="0xA05D0000"/>
@@ -22,7 +23,6 @@
 			<item value="UDS_RID_ERASE_APP"/>
 			<item value="erase"/>
 			<item value="g_pageBuf"/>
-			<item value="lmu_cached"/>
 		</list>
 		<list key="replacehistory">
 		</list>

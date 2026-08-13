@@ -2,7 +2,7 @@
 
 #include "GatewaySwc.h"
 #include "../ComM/ComM.h"
-#include "../../Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 
 #include <string.h>
 

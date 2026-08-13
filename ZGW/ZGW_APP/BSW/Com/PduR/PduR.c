@@ -268,23 +268,12 @@ static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =
     { TRUE, CANIF_RX_PDU_BATTCAPDISCHARGE                        , PDUR_IF_DEST_COM, COM_RX_PDU_BATTCAPDISCHARGE                            , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_BATTCAPRES                              , PDUR_IF_DEST_COM, COM_RX_PDU_BATTCAPRES                                  , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS                                   , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_LOADSTATUS                                        , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_VOLTAGEFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_2                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_2                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_3                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_3                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_4                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_4                                 , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5                            , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5                                 , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_STUCKATONEVENT                               , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_STUCKATONEVENT                                    , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_STUCKATOFFEVENT                              , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_STUCKATOFFEVENT                                   , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_1                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_1                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_2                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_2                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_3                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_4                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                        , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5                             , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, CANIF_RX_PDU_CANFD_PDM1_INPUTT30                                     , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_INPUTT30                                          , PDUR_SOAD_INVALID_SOCON },
     { TRUE, CANIF_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                 , PDUR_IF_DEST_COM, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , PDUR_SOAD_INVALID_SOCON },
 };
 
@@ -359,6 +348,12 @@ volatile uint32 PduR_DoIPTxMailboxFullCounter;
 volatile uint32 PduR_DoIPTxConfirmFullCounter;
 volatile uint32 PduR_DoIPTxSentCounter;
 volatile uint32 PduR_DoIPTxFailCounter;
+volatile uint32 PduR_DoIPTxRetryCounter;
+volatile uint8 PduR_DoIPTxLastMailboxState;
+volatile uint8 PduR_DoIPTxLastRetries;
+volatile uint8 PduR_DoIPTxLastDoIPReturn;
+volatile uint8 PduR_DoIPTxLastTcpState;
+volatile uint16 PduR_DoIPTxLastLength;
 volatile uint32 PduR_DoIPFastConfirmCounter;
 #if PDUR_DEBUG_INSTRUMENTATION
 volatile uint8 PduR_DebugInitialized;
@@ -834,8 +829,10 @@ static uint8 PduR_ComMChannelForCanIfRx(PduIdType canIfRxPduId,
         return FALSE;
     }
 
-    if (((canIfRxPduId >= CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS) &&
-         (canIfRxPduId <= CANIF_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5)) ||
+    if ((canIfRxPduId == CANIF_RX_PDU_CANFD_PDM1_LOADSTATUS) ||
+        ((canIfRxPduId >= CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_1) &&
+         (canIfRxPduId <= CANIF_RX_PDU_CANFD_PDM1_CURRENTFEEDBACK_5)) ||
+        (canIfRxPduId == CANIF_RX_PDU_CANFD_PDM1_INPUTT30) ||
         (canIfRxPduId == CANIF_RX_PDU_CANFD_PDM1_DIAGRESPONSE))
     {
         *channel = COMM_CH_CANFD;
@@ -2034,10 +2031,15 @@ void PduR_DoIPCore2MainFunction(void)
     if (PduR_DoIPTxMailbox.state == PDUR_DOIP_TX_STATE_PENDING)
     {
         __dsync();
+        PduR_DoIPTxLastMailboxState = PduR_DoIPTxMailbox.state;
+        PduR_DoIPTxLastRetries = PduR_DoIPTxMailbox.txRetries;
+        PduR_DoIPTxLastLength = PduR_DoIPTxMailbox.udsLen;
+        PduR_DoIPTxLastTcpState = (uint8)DoIP_GetTcpState();
         doipRet = DoIP_SendDiagnosticResponse(PduR_DoIPTxMailbox.sourceAddress,
                                               PduR_DoIPTxMailbox.targetAddress,
                                               PduR_DoIPTxMailbox.data,
                                               PduR_DoIPTxMailbox.udsLen);
+        PduR_DoIPTxLastDoIPReturn = (uint8)doipRet;
         PduR_DoIPTxMailbox.result = (doipRet == DOIP_OK) ? E_OK : E_NOT_OK;
         if (doipRet == DOIP_OK)
         {
@@ -2049,6 +2051,8 @@ void PduR_DoIPCore2MainFunction(void)
                     (PduR_DoIPTxMailbox.txRetries < PDUR_DOIP_TX_RETRY_LIMIT))
             {
                 PduR_DoIPTxMailbox.txRetries++;
+                PduR_DoIPTxRetryCounter++;
+                PduR_DoIPTxLastRetries = PduR_DoIPTxMailbox.txRetries;
                 __dsync();
                 return;
             }
@@ -2070,6 +2074,7 @@ void PduR_DoIPCore2MainFunction(void)
 
     if (PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_CONFIRM)
     {
+        PduR_DoIPTxLastMailboxState = PduR_DoIPTxMailbox.state;
         return;
     }
 

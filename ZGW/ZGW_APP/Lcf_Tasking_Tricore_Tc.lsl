@@ -822,6 +822,34 @@ derivative tc37
             select ".bss.SomeIpSd.*";
         }
 
+        group app_aimodel_core1_ram (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
+        {
+            select ".data.AiModel.*";
+            select ".bss.AiModel.*";
+            select ".data.bcm_infer.*";
+            select ".bss.bcm_infer.*";
+        }
+
+        group freertos_core1_ram (ordered, align = 4, attributes=rw, run_addr = mem:dsram1)
+        {
+            select ".data.heap_4_core1.*";
+            select ".bss.heap_4_core1.*";
+            select ".data.tasks_core1.*";
+            select ".bss.tasks_core1.*";
+            select ".data.timers_core1.*";
+            select ".bss.timers_core1.*";
+            select ".data.queue_core1.*";
+            select ".bss.queue_core1.*";
+            select ".data.list_core1.*";
+            select ".bss.list_core1.*";
+            select ".data.port_core1.*";
+            select ".bss.port_core1.*";
+            select ".data.event_groups_core1.*";
+            select ".bss.event_groups_core1.*";
+            select ".data.stream_buffer_core1.*";
+            select ".bss.stream_buffer_core1.*";
+        }
+
         group gateway_swc_core0_ram (ordered, align = 4, attributes=rw, run_addr = mem:dsram0)
         {
             select ".data.GatewaySwc.*";

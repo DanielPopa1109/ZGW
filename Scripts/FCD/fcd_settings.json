@@ -12,32 +12,32 @@
     "output_folder": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Scripts\\FCD\\Generated",
     "nodes": {
       "PDM1": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x42"
       },
       "CBM": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x54"
       },
       "DMU": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x56"
       },
       "ELC": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x58"
       },
       "FRBE": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x59"
       },
       "HVDCDC": {
-        "selected": false,
+        "selected": true,
         "node_kind": "Simulated",
         "extended_diag_address": "0x51"
       },

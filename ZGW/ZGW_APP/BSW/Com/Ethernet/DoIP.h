@@ -14,7 +14,7 @@
 #define DOIP_MAX_VIN_LEN                      17u
 #define DOIP_MAX_EID_LEN                      6u
 #define DOIP_MAX_GID_LEN                      6u
-#define DOIP_MAX_UDS_PAYLOAD_LEN              256u
+#define DOIP_MAX_UDS_PAYLOAD_LEN              512u
 #define DOIP_HEADER_LEN                       8u
 #define DOIP_TCP_RX_STREAM_LEN                12288u
 
@@ -123,6 +123,14 @@ DoIP_ReturnType DoIP_SendDiagnosticResponse(uint16 sourceAddress,
                                             uint16 udsLen);
 
 DoIP_TcpStateType DoIP_GetTcpState(void);
+
+extern volatile uint32 DoIP_DiagResponseSendAttemptCounter;
+extern volatile uint32 DoIP_DiagResponseSendOkCounter;
+extern volatile uint32 DoIP_DiagResponseSendBusyStateCounter;
+extern volatile uint32 DoIP_DiagResponseSendTransmitFailCounter;
+extern volatile uint8 DoIP_DiagResponseLastTcpState;
+extern volatile uint8 DoIP_DiagResponseLastRoutingActive;
+extern volatile uint16 DoIP_DiagResponseLastUdsLen;
 
 #if DOIP_DEBUG_INSTRUMENTATION
 extern volatile uint32 DoIP_DebugAliveReqTxCounter;

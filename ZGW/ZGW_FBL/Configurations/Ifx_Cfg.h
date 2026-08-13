@@ -84,13 +84,15 @@
  * and choose one of the supported values.
  */
 
+/* External oscillator frequency in Hz */
+#define IFX_CFG_SCU_XTAL_FREQUENCY      (20000000)  /* Allowed values are: 40000000, 25000000, 20000000, 16000000 */
 /* System PLL frequency in Hz */
-/* #define IFX_CFG_SCU_PLL_FREQUENCY      (300000000) */   /* Allowed values are: 300000000, 240000000, 200000000, 160000000, 
-                                                             * 133000000, 80000000 */
+#define IFX_CFG_SCU_PLL_FREQUENCY       (300000000) /* Allowed values are: 300000000, 200000000, 160000000, 133000000
+                                                     * or 80000000 */
 /* Peripheral PLL1 frequency in Hz */
-/*#define IFX_CFG_SCU_PLL1_FREQUENCY      (320000000) */    /* Allowed values are: 320000000, 160000000 */
+#define IFX_CFG_SCU_PLL1_FREQUENCY      (320000000) /* Allowed values are: 320000000, 160000000 */
 /* Peripheral PLL2 frequency in Hz */
-/*#define IFX_CFG_SCU_PLL2_FREQUENCY      (200000000) */    /* Allowed values are: 200000000 */
+#define IFX_CFG_SCU_PLL2_FREQUENCY      (200000000) /* Allowed values are: 200000000 */
 
 /*********************************************************************************************************************/
 /*-----------------------------------Configuration for Software managed interrupt------------------------------------*/

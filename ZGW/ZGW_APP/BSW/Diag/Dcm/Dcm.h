@@ -37,8 +37,8 @@ typedef uint8 Dcm_OpStatusType;
 
 #define DCM_MAX_CONNECTIONS          16u
 #define DCM_CLASSIC_ISOTP_MAX_LEN    256u
-#define DCM_MAX_PDU_LEN              256u
-#define DCM_MAX_RESPONSE_LEN         256u
+#define DCM_MAX_PDU_LEN              512u
+#define DCM_MAX_RESPONSE_LEN         512u
 #define DCM_RX_QUEUE_DEPTH           8u
 #define DCM_RX_QUEUE_BUFFER_LEN      256u
 #define DCM_MAX_SERVICES             32u
@@ -243,6 +243,18 @@ extern volatile uint8 Dcm_DebugExtForwardLastSid;
 extern volatile uint16 Dcm_DebugExtForwardLastLen;
 extern volatile uint8 Dcm_DebugExtForwardLastResult;
 #endif
+
+extern volatile uint32 Dcm_DebugHardResetArmedCounter;
+extern volatile uint32 Dcm_DebugHardResetPerformedCounter;
+extern volatile uint32 Dcm_DebugHardResetNvMDrainSkipCounter;
+extern volatile uint32 Dcm_DebugHardResetNvMDrainWaitCounter;
+extern volatile uint32 Dcm_DebugHardResetNvMDrainTimeoutCounter;
+extern volatile uint16 Dcm_DebugHardResetLastDelayTicks;
+extern volatile uint16 Dcm_DebugHardResetLastNvMDrainTicks;
+extern volatile uint16 Dcm_DebugHardResetLastNvMDrainElapsedTicks;
+extern volatile uint8 Dcm_DebugHardResetLastDrainNvM;
+extern volatile uint8 Dcm_DebugHardResetLastBusType;
+extern volatile uint8 Dcm_DebugHardResetLastNvMStatus;
 
 /* ===================== Weak application hooks ===================== */
 

@@ -1,0 +1,24 @@
+{
+  "selected_keys": [
+    "ETH:TimeSync:TimeSync:UtcTimeSeconds",
+    "ETH:MCUData:MCUData:TempPms",
+    "ETH:MCUData:MCUData:CpuLoadCore0",
+    "ETH:MCUData:MCUData:CpuLoadCore1",
+    "ETH:MCUData:MCUData:CpuLoadCore2",
+    "CANFD:1298:PDM1_CurrentFeedback_4:PDM1_CurrFb_049",
+    "CANFD:1250:PDM1_CurrentFeedback_1:PDM1_CurrFb_001",
+    "CANFD:1271:PDM1_CurrentFeedback_2:PDM1_CurrFb_022"
+  ],
+  "signals": {
+    "CANFD:1250:PDM1_CurrentFeedback_1:PDM1_CurrFb_001": "CANFD | COM 0x04E2 | PDM1_CurrentFeedback_1 | PDM1_CurrFb_001",
+    "CANFD:1271:PDM1_CurrentFeedback_2:PDM1_CurrFb_022": "CANFD | COM 0x04F7 | PDM1_CurrentFeedback_2 | PDM1_CurrFb_022",
+    "CANFD:1298:PDM1_CurrentFeedback_4:PDM1_CurrFb_049": "CANFD | COM 0x0512 | PDM1_CurrentFeedback_4 | PDM1_CurrFb_049",
+    "ETH:MCUData:MCUData:CpuLoadCore0": "ETH | MCUData | MCUData | CpuLoadCore0",
+    "ETH:MCUData:MCUData:CpuLoadCore1": "ETH | MCUData | MCUData | CpuLoadCore1",
+    "ETH:MCUData:MCUData:CpuLoadCore2": "ETH | MCUData | MCUData | CpuLoadCore2",
+    "ETH:MCUData:MCUData:TempPms": "ETH | MCUData | MCUData | TempPms",
+    "ETH:TimeSync:TimeSync:UtcTimeSeconds": "ETH | TimeSync | TimeSync | UtcTimeSeconds"
+  },
+  "view_mode": "Stacked",
+  "window_s": 30.0
+}

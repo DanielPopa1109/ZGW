@@ -1,5 +1,5 @@
 <v1:pinSettings xmlns:v1="http://www.tasking.com/schema/pinsettings/v1.1">
-  <v1:pinMappingsRef version="1.3" file="platform:/plugin/com.tasking.pinmapper.input.aurix/etc/TC37xA_pinmappings.xml"/>
+  <v1:pinMappingsRef version="1.5" file="platform:/plugin/com.tasking.pinmapper.input.aurix/etc/TC37xA_pinmappings.xml"/>
   <v1:deviceSetting id="tc37xpda" pattern="TC375* A">
     <v1:packageSetting id="lqfp176"/>
   </v1:deviceSetting>
@@ -70,8 +70,6 @@
   <v1:configSetting configurationId="p20_7.in.bind" altId="p20_7.in.bind.in">
     <v1:connectionSetting altId="can0_node0.rxd.bind.rxd1"/>
   </v1:configSetting>
-  <v1:configSetting configurationId="can0_node1.txd.bind" altId="can0_node1.txd.bind.none"/>
-  <v1:configSetting configurationId="can0_node1.rxd.bind" altId="can0_node1.rxd.bind.none"/>
   <v1:propertySetting propertyId="p20_7.symbolicname" value="CAN0_NODE0_RXD"/>
   <v1:propertySetting propertyId="p20_8.symbolicname" value="CAN0_NODE0_TXD"/>
   <v1:configSetting configurationId="p20_6.dir" altId="p20_6.dir.out"/>
@@ -112,7 +110,6 @@
     <v1:connectionSetting altId="rmii0.txd0.bind.txd0"/>
   </v1:configSetting>
   <v1:configSetting configurationId="p21_2.dir" altId="p21_2.dir.out"/>
-  <v1:configSetting configurationId="rgmii0.mdi.bind" altId="rgmii0.mdi.bind.none"/>
   <v1:configSetting configurationId="rmii0.crsdv.bind" altId="rmii0.crsdv.bind.crsdv0">
     <v1:connectionSetting altId="p11_11.in.bind.in"/>
   </v1:configSetting>
@@ -125,7 +122,6 @@
   <v1:configSetting configurationId="rmii0.rxd1.bind" altId="rmii0.rxd1.bind.rxd10">
     <v1:connectionSetting altId="p11_9.in.bind.in"/>
   </v1:configSetting>
-  <v1:configSetting configurationId="rmii0.mdo0.bind" altId="rmii0.mdo0.bind.none"/>
   <v1:configSetting configurationId="rmii0.pps0.bind" altId="rmii0.pps0.bind.pps0">
     <v1:connectionSetting altId="p14_4.out.bind.alt6.mutex2"/>
   </v1:configSetting>
@@ -136,7 +132,6 @@
     <v1:connectionSetting altId="p21_3.out.bind.hwout1.mutex2"/>
   </v1:configSetting>
   <v1:configSetting configurationId="p11_2.dir" altId="p11_2.dir.out"/>
-  <v1:configSetting configurationId="rgmii0.rxclk.bind" altId="rgmii0.rxclk.bind.none"/>
   <v1:configSetting configurationId="p11_6.out.bind" altId="p11_6.out.bind.alt6.mutex2">
     <v1:connectionSetting altId="rmii0.txen.bind.txen"/>
   </v1:configSetting>
@@ -151,7 +146,6 @@
   <v1:propertySetting propertyId="p11_12.symbolicname" value="RMII0_REFCLK"/>
   <v1:propertySetting propertyId="p11_2.symbolicname" value="RMII0_TXD1"/>
   <v1:propertySetting propertyId="p11_3.symbolicname" value="RMII0_TXD0"/>
-  <v1:configSetting configurationId="scr_p01_2.in.bind" altId="scr_p01_2.in.bind.none"/>
   <v1:configSetting configurationId="scr_p01_2.dir" altId="scr_p01_2.dir.in"/>
   <v1:configSetting configurationId="scr_p01_2.in.mode" altId="scr_p01_2.in.mode.ts"/>
   <v1:configSetting configurationId="rmii0.mdi.bind" altId="rmii0.mdi.bind.mdi3">

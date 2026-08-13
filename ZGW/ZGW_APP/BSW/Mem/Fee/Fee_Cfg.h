@@ -5,7 +5,7 @@
 #include "Fls_Cfg.h"
 #include "Dem_Int.h"
 #include "APP/CodingApp/CodingApp.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 
 typedef enum
 {

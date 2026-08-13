@@ -3,7 +3,7 @@
 #include "IfxCpu_IntrinsicsTasking.h"
 #include "IfxCpu_reg.h"
 #include "IfxPms_reg.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 
 uint32 McuSm_AGs[12u];
 uint32 McuSm_LastResetReason;
@@ -359,29 +359,17 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
     McuSm_IndexResetHistory++;
     McuSm_FBL_ResetCounter += 1u;
 
-    if(McuSm_IndexResetHistory >= 20u)
-    {
-        McuSm_IndexResetHistory = 0u;
-    }
-    else
-    {
-        /* Do nothing. */
-    }
-
     McuSm_SaveRetainedStateToScr();
     /* Publish the incremented error-reset counter to the SCR XRAM mailbox so the
      * FBL can detect a sustained boot loop and force a recovery programming
      * session once it reaches the [49,52] window. */
     McuSm_PublishFblResetCounter();
+
+    while(1){__debug();}
+
     McuSm_ResetHookPerformCounter++;
 
-    while(1)
-    {
-        __debug();
-    }
-
     IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
-
 }
 
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd)

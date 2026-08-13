@@ -34,6 +34,7 @@ APP/AiModel \
 APP/CodingApp \
 APP/GatewaySwc \
 APP/ParallelFlashSwc \
+APP/TimeSync \
 BSW/Com/Can \
 BSW/Com/CanIf \
 BSW/Com/CanNm \
@@ -57,6 +58,7 @@ BSW/Com/PduR \
 BSW/Com/UdpNm \
 BSW/Diag/Dcm \
 BSW/Diag/Dem \
+BSW/Io/GtmTom \
 BSW/Mem/Fee \
 BSW/Mem/Fls \
 BSW/Mem/MemIf \
@@ -76,7 +78,6 @@ BSW/Sys/SmM/02_Safety_Mechanisms \
 BSW/Sys/SmM \
 BSW/Sys/SysMgr \
 BSW/Sys/Wdg \
-BSW/Time \
 Configurations/Debug \
 Configurations \
 . \

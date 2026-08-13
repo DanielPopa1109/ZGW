@@ -48,7 +48,7 @@ static const EthernetDiagServiceConfigType EthernetDiag_Services[] =
         0u,
         0x1234u,
         0x0001u,
-        FALSE,
+        TRUE,
         5000u,
         25000u,
         45000u,

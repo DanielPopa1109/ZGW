@@ -4,7 +4,7 @@
 #include "EthSM.h"
 #include "SoAd.h"
 #include "TcpIpH.h"
-#include "BSW/Time/TimeBase.h"
+#include "APP/TimeSync/TimeBase.h"
 #include <string.h>
 
 #define ETHERNETDIAG_LINK_DEBOUNCE_MS       3000u

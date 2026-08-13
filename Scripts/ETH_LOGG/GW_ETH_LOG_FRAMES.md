@@ -7,7 +7,7 @@ payload format to names that are useful in the trace view.
 ## Transport
 
 - Default AURIX source IP: `192.168.1.10`
-- Default receive ports: `30600, 35000, 35001, 54088`
+- Default receive ports: `30600, 30490, 30500, 35000, 35001, 54088`
 - The logger receiver can listen on multiple ports. Use comma-separated ports
   such as `30600,30490,30500`, or ranges such as `30600-30610`.
 - The AURIX source IP filter is applied to every configured receiver port.
@@ -77,3 +77,8 @@ Rows produced by the local transmit generator are configured in the
 `Count = 0` means continuous transmit. Positive `Count` values send that many
 packets. When transmit is enabled, the logger starts one sender for each
 enabled row in the table.
+
+`Use SD Subscribe` fills the editor with a SOME/IP-SD SubscribeEventgroup
+packet for ZGW service `0x1234`, instance `0x0001`, eventgroup `0x0001`, TTL
+`3 s`. Add that packet and leave it enabled at the default `1 s` interval to
+act as the PC subscriber supervised by ZGW_APP.

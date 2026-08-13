@@ -35,6 +35,9 @@ DEFAULT_HOST = "192.168.1.10"
 DEFAULT_PORT = 13400
 DEFAULT_SOURCE_ADDR = 0x0710
 DEFAULT_TARGET_ADDR = 0x1001
+FCD_TRACE_MIRROR_HOST = "127.0.0.1"
+FCD_TRACE_MIRROR_PORT = 54088
+FCD_TRACE_MIRROR_MAGIC = b"FCDT"
 DEFAULT_APP_START = 0xA0030000
 DEFAULT_APP_END = 0xA05CFFFF
 # Normal ZGW DoIP TransferData carries 4096 firmware bytes plus SID/BSC overhead.
@@ -193,13 +196,11 @@ def _build_coding_parameter_names():
         # CAN: COM_RX_PDU_BATTSOCSOH .. COM_RX_PDU_BATTCAPRES
         "BATTSOCSOH", "BATTSOC", "BATTDIAGNOSIS", "BATTCURRENT", "BATTCAPDISCHARGE", "BATTCAPRES",
     ]
-    # CAN-FD: COM_RX_PDU_CANFD_PDM1_LOADSTATUS .. COM_RX_PDU_CANFD_PDM1_TEMPERATUREFEEDBACK_5
+    # CAN-FD: PDM1 load/current/InputT30 receive diagnostics.
     rx_names += ["CANFD_PDM1_LOADSTATUS"]
     for pdm in (1,):
-        rx_names += [f"CANFD_PDM{pdm}_VOLTAGEFEEDBACK_{i}" for i in range(1, 6)]
         rx_names += [f"CANFD_PDM{pdm}_CURRENTFEEDBACK_{i}" for i in range(1, 6)]
-        rx_names += [f"CANFD_PDM{pdm}_STUCKATONEVENT", f"CANFD_PDM{pdm}_STUCKATOFFEVENT"]
-        rx_names += [f"CANFD_PDM{pdm}_TEMPERATUREFEEDBACK_{i}" for i in range(1, 6)]
+    rx_names += ["CANFD_PDM1_INPUTT30"]
     # LIN: HVDCDC is the only configured slave node.
     rx_names += ["LIN_HVDCDC_STATUS"]
 
@@ -264,6 +265,12 @@ def coding_parameter_index(name):
 DEM_DTC_MCUSM_SW_ERROR = 0x010101
 DEM_DTC_CODING_ECU_NOT_CODED = 0x023000
 DEM_DTC_CODING_INVALID = 0x023001
+DEM_DTC_AIMODEL_INPUT_INVALID = 0x024000
+DEM_DTC_AIMODEL_INFERENCE_INVALID = 0x024001
+DEM_DTC_AIMODEL_DEADLINE_EXCEEDED = 0x024002
+DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE = 0x024003
+DEM_DTC_AIMODEL_CONSUMER_FAULT = 0x024100
+DEM_AIMODEL_CONSUMER_EVENT_COUNT = 75
 DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT = 0x021000
 DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT = CODING_RX_PARAMETER_COUNT
 DEM_DTC_TIMESTAMP_DATA_SIZE = 22
@@ -273,7 +280,19 @@ STATIC_DTC_DESCRIPTIONS = {
     DEM_DTC_MCUSM_SW_ERROR: "MCUSM software error",
     DEM_DTC_CODING_ECU_NOT_CODED: "Coding ECU not coded",
     DEM_DTC_CODING_INVALID: "Coding invalid",
+    DEM_DTC_AIMODEL_INPUT_INVALID: "AiModel input invalid or stale",
+    DEM_DTC_AIMODEL_INFERENCE_INVALID: "AiModel inference invalid",
+    DEM_DTC_AIMODEL_DEADLINE_EXCEEDED: "AiModel inference deadline exceeded",
+    DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE: "AiModel output out of range",
 }
+
+def is_aimodel_consumer_dtc(dtc):
+    return DEM_DTC_AIMODEL_CONSUMER_FAULT <= dtc < (
+        DEM_DTC_AIMODEL_CONSUMER_FAULT + DEM_AIMODEL_CONSUMER_EVENT_COUNT)
+
+def describe_aimodel_consumer_dtc(dtc):
+    channel = (dtc - DEM_DTC_AIMODEL_CONSUMER_FAULT) + 1
+    return f"AiModel consumer {channel:02d} predicted fault"
 
 # Plain-language maps used to decode the ZGW Dem Snapshot Data buffers. The
 # byte layouts mirror the firmware capture callbacks and every multi-byte field
@@ -391,6 +410,10 @@ DEM_EVENT_ID_NAMES = {
     1: "MCUSM software error",
     2: "Coding ECU not coded",
     3: "Coding invalid",
+    4: "AiModel input invalid or stale",
+    5: "AiModel inference invalid",
+    6: "AiModel inference deadline exceeded",
+    7: "AiModel output out of range",
 }
 
 ROUTINE_ERASE_MEMORY = 0x0001
@@ -430,6 +453,7 @@ NRC_TEXT = {
     0x11: "Service Not Supported",
     0x12: "SubFunction Not Supported",
     0x13: "Incorrect Message Length",
+    0x14: "Response Too Long",
     0x22: "Conditions Not Correct",
     0x24: "Request Sequence Error",
     0x31: "Request Out Of Range",
@@ -607,6 +631,41 @@ def uds_request_log_text(data):
     return bytes_to_hex(data)
 
 
+class FcdTraceMirror:
+    def __init__(self, host=FCD_TRACE_MIRROR_HOST, port=FCD_TRACE_MIRROR_PORT):
+        self.addr = (host, int(port))
+        self.lock = threading.Lock()
+        self.sock = None
+
+    def _socket(self):
+        if self.sock is None:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return self.sock
+
+    def emit_doip(self, direction, payload_type, source_addr, target_addr, payload):
+        payload = bytes(payload or b"")
+        header = struct.pack(
+            ">4scHHHI",
+            FCD_TRACE_MIRROR_MAGIC,
+            bytes(str(direction or "?")[:1], "ascii", errors="ignore") or b"?",
+            int(payload_type) & 0xFFFF,
+            int(source_addr) & 0xFFFF,
+            int(target_addr) & 0xFFFF,
+            len(payload),
+        )
+        try:
+            with self.lock:
+                self._socket().sendto(header + payload, self.addr)
+        except OSError:
+            pass
+
+    def emit_raw_uds(self, direction, source_addr, target_addr, payload):
+        self.emit_doip(direction, 0xFFFF, source_addr, target_addr, payload)
+
+
+FCD_TRACE_MIRROR = FcdTraceMirror()
+
+
 def u16_be(data, offset):
     return (data[offset] << 8) | data[offset + 1]
 
@@ -623,6 +682,12 @@ def u32_be(data, offset):
         | (data[offset + 2] << 8)
         | data[offset + 3]
     )
+
+def s32_be(data, offset):
+    value = u32_be(data, offset)
+    if value >= 0x80000000:
+        value -= 0x100000000
+    return value
 
 def u64_be(data, offset):
     value = 0
@@ -1037,6 +1102,7 @@ class DoipClient:
                     self.close()
                     raise DoipError("TCP connection closed")
                 sent += count
+            FCD_TRACE_MIRROR.emit_doip("T", payload_type, self.source_addr, self.target_addr, payload)
         except TimeoutError:
             raise
         except OSError:
@@ -1088,6 +1154,7 @@ class DoipClient:
         if payload_len > 1024 * 1024:
             raise DoipError(f"DoIP payload too large: {payload_len}")
         payload = self._recv_exact(payload_len, deadline) if payload_len else b""
+        FCD_TRACE_MIRROR.emit_doip("R", payload_type, self.source_addr, self.target_addr, payload)
         return payload_type, payload
 
     def routing_activation(self, activation_type=0x00):
@@ -1676,6 +1743,7 @@ class RawTcpUdsClient:
             self._pace()
             self.sock.settimeout(timeout)
             self.sock.sendall(bytes(request))
+            FCD_TRACE_MIRROR.emit_raw_uds("T", self.source_addr, self.target_addr, request)
             if allow_no_response:
                 return b""
             while True:
@@ -1685,10 +1753,12 @@ class RawTcpUdsClient:
                 self.sock.settimeout(remaining)
                 response = self.sock.recv(4096)
                 if len(response) >= 3 and response[0] == 0x7F and response[2] == 0x78:
+                    FCD_TRACE_MIRROR.emit_raw_uds("R", self.source_addr, self.target_addr, response)
                     nrc78_count += 1
                     self.last_nrc78_count = nrc78_count
                     deadline = time.monotonic() + timeout
                     continue
+                FCD_TRACE_MIRROR.emit_raw_uds("R", self.source_addr, self.target_addr, response)
                 return response
 
 
@@ -2575,7 +2645,9 @@ class FcdApp:
     def _send_uds_with_reconnect(self, client, request, label, timeout=None, allow_no_response=False, max_retries=1):
         request = bytes(request)
         retries = 0
-        no_auto_retry = request[:1] in (b"\x34", b"\x36", b"\x37")
+        # TransferData may be retried with the same BSC after a transport drop;
+        # RequestDownload/TransferExit and flash routines change wider ECU state.
+        no_auto_retry = request[:1] in (b"\x34", b"\x37")
         if (
             len(request) >= 4
             and request[0] == 0x31
@@ -3198,11 +3270,66 @@ class FcdApp:
             if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (
                     DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
                 return self._explain_gateway_detail(dtc, data, is_snapshot)
+            if dtc in (
+                    DEM_DTC_AIMODEL_INPUT_INVALID,
+                    DEM_DTC_AIMODEL_INFERENCE_INVALID,
+                    DEM_DTC_AIMODEL_DEADLINE_EXCEEDED,
+                    DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE):
+                return self._explain_aimodel_detail(dtc, data, is_snapshot)
+            if is_aimodel_consumer_dtc(dtc):
+                return self._explain_aimodel_detail(dtc, data, is_snapshot)
             if dtc in (DEM_DTC_CODING_ECU_NOT_CODED, DEM_DTC_CODING_INVALID):
                 return self._explain_default_detail(data, is_snapshot)
         except (IndexError, struct.error):
             return ""
         return ""
+
+    def _explain_aimodel_detail(self, dtc, data, is_snapshot):
+        if not is_snapshot:
+            return ""
+        timestamp_text = format_dtc_timestamp_data(data, "AiModel DTC occurrence time")
+        if len(data) < 98:
+            return timestamp_text
+        base = DEM_DTC_TIMESTAMP_DATA_SIZE
+        event_id = u32_be(data, base)
+        error_flags = u32_be(data, base + 4)
+        input_voltage = s32_be(data, base + 8) / 1000.0
+        input_valid = data[base + 12]
+        inference_valid = data[base + 13]
+        window_ready = data[base + 14]
+        channel = data[base + 15]
+        predicted_fault = data[base + 16]
+        undervoltage = data[base + 17]
+        overvoltage = data[base + 18]
+        overcurrent = data[base + 19]
+        input_timestamp = u32_be(data, base + 20)
+        inference_sequence = u32_be(data, base + 24)
+        channel_us = u32_be(data, base + 28)
+        total_us = u32_be(data, base + 32)
+        processing_us = u32_be(data, base + 36)
+        measured_current = s32_be(data, base + 40) / 1000.0
+        current_rating = s32_be(data, base + 44) / 1000.0
+        predicted_current = s32_be(data, base + 48) / 1000.0
+        fault_soon = s32_be(data, base + 52) / 1000.0
+        utilization = s32_be(data, base + 56) / 1000.0
+        probabilities = [s32_be(data, base + 60 + (idx * 4)) / 1000.0 for idx in range(4)]
+        parts = [self._describe_zgw_dtc(dtc)]
+        if timestamp_text:
+            parts.append(timestamp_text)
+        parts.extend([
+            f"event id {event_id}",
+            f"error flags 0x{error_flags:08X}",
+            f"input {input_voltage:.3f} V, valid={input_valid}, windowReady={window_ready}",
+            f"inference valid={inference_valid}, sequence={inference_sequence}",
+            f"channel {channel + 1}, predicted class={predicted_fault}",
+            f"measured={measured_current:.3f} A, rating={current_rating:.3f} A, predicted={predicted_current:.3f} A",
+            f"fault soon={fault_soon:.3f}, utilization={utilization:.3f}",
+            f"fault probabilities={', '.join(f'{value:.3f}' for value in probabilities)}",
+            f"limits: undervoltage={undervoltage}, overvoltage={overvoltage}, overcurrent={overcurrent}",
+            f"inputTimestamp={input_timestamp} ms",
+            f"timing: channel={channel_us} us, total={total_us} us, processing={processing_us} us",
+        ])
+        return " | ".join(parts)
 
     def _explain_gateway_detail(self, dtc, data, is_snapshot, is_message=True):
         # GatewaySwc_CaptureRxDiagSnapshotData layout, with legacy 0x19/06 fallback.
@@ -3474,6 +3601,9 @@ class FcdApp:
     def _describe_zgw_dtc(self, dtc):
         if dtc in STATIC_DTC_DESCRIPTIONS:
             return STATIC_DTC_DESCRIPTIONS[dtc]
+
+        if is_aimodel_consumer_dtc(dtc):
+            return describe_aimodel_consumer_dtc(dtc)
 
         if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
             index = dtc - DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
