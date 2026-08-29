@@ -62,13 +62,11 @@
 #define AURIX_ETH_DMA_NC                AURIX_ETH_DMA
 #define AURIX_SHARED_NC                 __attribute__((section(".bss.shared_nc")))
 
-/* APP uses 16/16 descriptors, but the FBL's fixed non-cached DMA linker window
- * is only 64 KiB at 0xb0000000..0xb0010000. With 2592-byte RX/TX buffers,
- * 16/16 descriptors require ~82 KiB and do not link. Use the largest depth
- * that still fits the FBL DMA window while increasing headroom beyond the iLLD
- * default 8/8. */
-#define IFXGETH_MAX_TX_DESCRIPTORS      (12)
-#define IFXGETH_MAX_RX_DESCRIPTORS      (12)
+/* The FBL must absorb a complete advertised DoIP/TCP receive window while the
+ * NO_SYS stack is polled cooperatively. Keep TX modest and spend the fixed
+ * 64 KiB non-cached DMA window on RX descriptors. */
+#define IFXGETH_MAX_TX_DESCRIPTORS      (8)
+#define IFXGETH_MAX_RX_DESCRIPTORS      (32)
 
 #if defined(__TASKING__) && !defined(Ifx__dsync)
 #define Ifx__dsync()                    __dsync()

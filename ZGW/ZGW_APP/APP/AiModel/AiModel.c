@@ -10,10 +10,15 @@
 #define AIMODEL_MAILBOX_LOCK_TIMEOUT           100000u
 #define AIMODEL_INFERENCE_TICKS                (AIMODEL_INFERENCE_PERIOD_MS / AIMODEL_PERIOD_MS)
 #define AIMODEL_IMPENDING_OVERCURRENT_CLASS    1u
+#define AIMODEL_IMPENDING_OPEN_LOAD_CLASS      2u
+#define AIMODEL_IMPENDING_INTERMITTENT_CLASS   3u
 #define AIMODEL_DIAG_SNAPSHOT_SIZE             98u
 #define AIMODEL_DIAG_SCALE_1000                1000.0f
 #define AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD  0.90f
 #define AIMODEL_CONSUMER_FAULT_PASS_THRESHOLD  0.70f
+#define AIMODEL_OVERCURRENT_EVIDENCE_MIN       0.85f
+#define AIMODEL_OPEN_LOAD_EVIDENCE_MAX         0.20f
+#define AIMODEL_INTERMITTENT_EVIDENCE_MAX      0.30f
 
 static AiModel_ResultType AiModel_Mailbox[2u];
 static volatile uint32 AiModel_MailboxSeq;
@@ -356,8 +361,21 @@ static void AiModel_ReportDiagnostics(const AiModel_ResultType *result)
         {
             consumerStatus = DEM_EVENT_STATUS_PREPASSED;
         }
-        else if ((channelResult->predictedFaultClass != 0u) &&
-                 (channelResult->faultSoonProbability >= AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD))
+        else if ((channelResult->predictedFaultClass == AIMODEL_IMPENDING_OVERCURRENT_CLASS) &&
+                 (channelResult->faultSoonProbability >= AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD) &&
+                 (channelResult->currentUtilization >= AIMODEL_OVERCURRENT_EVIDENCE_MIN))
+        {
+            consumerStatus = DEM_EVENT_STATUS_FAILED;
+        }
+        else if ((channelResult->predictedFaultClass == AIMODEL_IMPENDING_OPEN_LOAD_CLASS) &&
+                 (channelResult->faultSoonProbability >= AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD) &&
+                 (channelResult->currentUtilization <= AIMODEL_OPEN_LOAD_EVIDENCE_MAX))
+        {
+            consumerStatus = DEM_EVENT_STATUS_FAILED;
+        }
+        else if ((channelResult->predictedFaultClass == AIMODEL_IMPENDING_INTERMITTENT_CLASS) &&
+                 (channelResult->faultSoonProbability >= AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD) &&
+                 (channelResult->currentUtilization <= AIMODEL_INTERMITTENT_EVIDENCE_MAX))
         {
             consumerStatus = DEM_EVENT_STATUS_FAILED;
         }

@@ -79,6 +79,25 @@
 #define FBL_RAM_DATA                     __attribute__((section(".ram_blu_data")))
 #define FBL_RAM_DSPR_DATA                __attribute__((section(".ram_data_dspr")))
 
+#ifndef FBL_FLASH_CHECK_PAGE_ARGUMENTS
+#define FBL_FLASH_CHECK_PAGE_ARGUMENTS          0u
+#endif
+#ifndef FBL_FLASH_CLEAR_STATUS_EACH_PAGE
+#define FBL_FLASH_CLEAR_STATUS_EACH_PAGE        0u
+#endif
+#ifndef FBL_FLASH_CHECK_DMU_ERROR_EACH_PAGE
+#define FBL_FLASH_CHECK_DMU_ERROR_EACH_PAGE     0u
+#endif
+#ifndef FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE
+#define FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE  0u
+#endif
+#ifndef FBL_FLASH_USE_PAGE_STAGING_BUFFER
+#define FBL_FLASH_USE_PAGE_STAGING_BUFFER       0u
+#endif
+#ifndef FBL_FLASH_EXTRA_LOAD_DSYNC
+#define FBL_FLASH_EXTRA_LOAD_DSYNC              0u
+#endif
+
 typedef struct
 {
     uint8 state;
@@ -124,6 +143,7 @@ uint32 FblRamFlash_EraseNextChunk(uint32 address, uint32 remaining, uint32 *eras
 uint32 FblRamFlash_EraseRange(uint32 address, uint32 length);
 uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data);
 void FblRamFlash_ClearStatus(void);
+uint8 FblRamFlash_HasError(void);
 
 extern volatile uint32 g_FblRamRuntimeActive;
 extern volatile uint32 g_FblRamRuntimeTrapClass;
@@ -143,6 +163,28 @@ extern volatile uint32 g_FblTransferTcpStreamHighWatermark;
 extern volatile uint32 g_FblTransferTcpCallbackCount;
 extern volatile uint32 g_FblTransferOverflowCount;
 extern volatile uint32 g_FblTransferProgrammedPageCount;
+extern volatile uint32 g_FblPerfTransferStartTick;
+extern volatile uint32 g_FblPerfTransferEndTick;
+extern volatile uint32 g_FblPerfRxFrameStartTick;
+extern volatile uint32 g_FblPerfRxFrameCompleteTick;
+extern volatile uint32 g_FblPerfFlashStartTick;
+extern volatile uint32 g_FblPerfFlashEndTick;
+extern volatile uint32 g_FblPerfResponseStartTick;
+extern volatile uint32 g_FblPerfResponseEndTick;
+extern volatile uint32 g_FblPerfCurrentTcpStreamLen;
+extern volatile uint32 g_FblPerfMaxTcpStreamLen;
+extern volatile uint32 g_FblPerfRxPollCount;
+extern volatile uint32 g_FblPerfTcpRecvCallbackCount;
+extern volatile uint32 g_FblPerfPbufCount;
+extern volatile uint32 g_FblPerfMaxPbufChain;
+extern volatile uint32 g_FblPerfRxDescriptorProcessed;
+extern volatile uint32 g_FblPerfRxDescriptorStarvationCount;
+extern volatile uint32 g_FblPerfPbufAllocFailCount;
+extern volatile uint32 g_FblPerfTcpZeroWindowCount;
+extern volatile uint32 g_FblPerfTcpWindowMin;
+extern volatile uint32 g_FblPerfTcpRetransmitIndicators;
+extern volatile uint32 g_FblPerfStreamCopyBytes;
+extern volatile uint32 g_FblPerfStreamMoveBytes;
 extern volatile uint32 g_FblEraseCommandCount;
 extern volatile uint32 g_FblEraseLogicalCallCount;
 extern volatile uint32 g_FblEraseLogicalLastStart;

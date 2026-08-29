@@ -273,6 +273,8 @@ void IfxScuRcu_performReset(IfxScuRcu_ResetType resetType, uint16 userResetInfo)
     uint32 index;
     uint16 password;
 
+    while(1){__debug();}
+
     /* Clear endinit protection */
     password = IfxScuWdt_getSafetyWatchdogPassword();
     IfxScuWdt_clearSafetyEndinitInline(password);

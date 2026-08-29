@@ -6,11 +6,9 @@
 
 typedef enum
 {
-    SYSMGR_INIT = 0U,
-    SYSMGR_STARTUP = 1U,
-    SYSMGR_RUN = 2U,
-    SYSMGR_POSTRUN = 3U,
-    SYSMGR_SLEEP = 4U
+    SYSMGR_STARTUP = 0U,
+    SYSMGR_RUN = 1U,
+    SYSMGR_GOSLEEP = 2U
 }SysMgr_EcuState_t;
 
 extern volatile SysMgr_EcuState_t SysMgr_EcuState;
@@ -24,5 +22,6 @@ extern void SysMgr_CaptureScrFaultBeforeScrReset(void);
 extern void SysMgr_ClearMcuSmSwErrorTriggerData(void);
 extern void SysMgr_OnDemEventCleared(Dem_EventIdType eventId);
 extern Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
+extern Std_ReturnType SysMgr_CapturePmsErrataSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 
 #endif /* SYSMGR_H_ */

@@ -14,6 +14,7 @@ static const EthernetDiagConnectionConfigType EthernetDiag_Connections[] =
         0u,
         ETHERNETDIAG_SOCON_DOIP_TCP,
         TRUE,
+        TRUE,
         TCPIP_PROTOCOL_TCP,
         5000u,
         0u,
@@ -28,6 +29,7 @@ static const EthernetDiagConnectionConfigType EthernetDiag_Connections[] =
     {
         1u,
         ETHERNETDIAG_SOCON_PDUR_IF_UDP,
+        FALSE,
         FALSE,
         TCPIP_PROTOCOL_UDP,
         5000u,

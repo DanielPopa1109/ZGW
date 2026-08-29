@@ -19,6 +19,7 @@
 /* Infineon's iLLD library include files */
 
 #include <Port/Io/IfxPort_Io.h>
+#include <Port/Std/IfxPort.h>
 
 #include <_PinMap/IfxPort_PinMap.h>
 
@@ -28,12 +29,13 @@
 // p20_6
 #define IFXCFG_PORT_GPIO1                       IfxPort_P20_6
 #define IFXCFG_PORT_GPIO1_MODE                  IfxPort_Mode_outputPushPullGeneral
-#define IFXCFG_PORT_GPIO1_PAD_DRIVER            IfxPort_PadDriver_cmosAutomotiveSpeed4
+#define IFXCFG_PORT_GPIO1_PAD_DRIVER            IfxPort_PadDriver_cmosAutomotiveSpeed2
 
 
 /* Generic port I/O configuration */
 
 #define IFXCFG_P20_6_IO_CONFIG                  { &IFXCFG_PORT_GPIO1, IFXCFG_PORT_GPIO1_MODE, IFXCFG_PORT_GPIO1_PAD_DRIVER }
+#define IFXCFG_PORT_P20_6                       IFXCFG_PORT_GPIO1
 
 
 /* Generic alternate I/O configuration */
@@ -41,14 +43,20 @@
 // asclin1
 #define IFXCFG_P15_4_IO_CONFIG                  { &IfxPort_P15_4, IfxPort_Mode_outputPushPullAlt2, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 #define IFXCFG_P15_5_IO_CONFIG                  { &IfxPort_P15_5, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_PORT_P15_4                       IfxPort_P15_4
+#define IFXCFG_PORT_P15_5                       IfxPort_P15_5
 
 // can0_node0
 #define IFXCFG_P20_7_IO_CONFIG                  { &IfxPort_P20_7, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
 #define IFXCFG_P20_8_IO_CONFIG                  { &IfxPort_P20_8, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_PORT_P20_7                       IfxPort_P20_7
+#define IFXCFG_PORT_P20_8                       IfxPort_P20_8
 
 // can1_node3
-#define IFXCFG_P33_4_IO_CONFIG                  { &IfxPort_P33_4, IfxPort_Mode_outputPushPullAlt7, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P33_4_IO_CONFIG                  { &IfxPort_P33_4, IfxPort_Mode_outputPushPullAlt7, IfxPort_PadDriver_cmosAutomotiveSpeed2 }
 #define IFXCFG_P33_5_IO_CONFIG                  { &IfxPort_P33_5, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
+#define IFXCFG_PORT_P33_4                       IfxPort_P33_4
+#define IFXCFG_PORT_P33_5                       IfxPort_P33_5
 
 // rmii0
 #define IFXCFG_P11_2_IO_CONFIG                  { &IfxPort_P11_2, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
@@ -58,10 +66,19 @@
 #define IFXCFG_P11_10_IO_CONFIG                 { &IfxPort_P11_10, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
 #define IFXCFG_P11_11_IO_CONFIG                 { &IfxPort_P11_11, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
 #define IFXCFG_P11_12_IO_CONFIG                 { &IfxPort_P11_12, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed1 }
-#define IFXCFG_P14_4_IO_CONFIG                  { &IfxPort_P14_4, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_P14_4_IO_CONFIG                  { &IfxPort_P14_4, IfxPort_Mode_outputPushPullAlt6, IfxPort_PadDriver_cmosAutomotiveSpeed2 }
 #define IFXCFG_P21_2_IO_CONFIG                  { &IfxPort_P21_2, IfxPort_Mode_outputPushPullAlt5, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 #define IFXCFG_P21_3_IO_CONFIG                  { &IfxPort_P21_3, IfxPort_Mode_outputPushPullGeneral, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
 #define IFXCFG_P21_3_IO_CONFIG_IN               { &IfxPort_P21_3, IfxPort_Mode_inputPullUp, IfxPort_PadDriver_cmosAutomotiveSpeed4 }
+#define IFXCFG_PORT_P11_2                       IfxPort_P11_2
+#define IFXCFG_PORT_P11_3                       IfxPort_P11_3
+#define IFXCFG_PORT_P11_6                       IfxPort_P11_6
+#define IFXCFG_PORT_P11_9                       IfxPort_P11_9
+#define IFXCFG_PORT_P11_10                      IfxPort_P11_10
+#define IFXCFG_PORT_P11_11                      IfxPort_P11_11
+#define IFXCFG_PORT_P11_12                      IfxPort_P11_12
+#define IFXCFG_PORT_P21_2                       IfxPort_P21_2
+#define IFXCFG_PORT_P21_3                       IfxPort_P21_3
 
 
 /* Initialization routines */

@@ -96,6 +96,7 @@ extern volatile uint32 lwip_geth_DebugRxRecoveryFailCnt;
 
 err_t lwip_geth_netif_init(struct netif *netif);
 uint8 lwip_geth_netif_input_once(struct netif *netif);
+uint8 lwip_geth_netif_input_core_once(struct netif *netif);
 uint8 lwip_geth_netif_recover_rx(struct netif *netif);
 void lwip_geth_netif_input(void * pvParameters);
 

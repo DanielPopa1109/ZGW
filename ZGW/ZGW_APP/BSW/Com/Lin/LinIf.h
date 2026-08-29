@@ -27,6 +27,9 @@ typedef enum
 } LinIf_ChannelStateType;
 
 LinIf_ChannelStateType LinIf_GetChannelState(void);
+uint8 LinIf_GetActiveSchedule(void);
+uint32 LinIf_GetScheduleErrorCounter(void);
+uint32 LinIf_GetDiagTimeoutCounter(void);
 void LinIf_ResetDiagnostic(void);
 
 typedef enum

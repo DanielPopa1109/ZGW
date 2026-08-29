@@ -134,8 +134,8 @@ typedef struct
 #define IFXGETH_HEADER_LENGTH       14 /* bytes */
 /* Keep every descriptor buffer entry cache-line aligned even though the FBL
  * links the arrays through the non-cached CPU0 DLMU alias. */
-#define IFXGETH_MAX_TX_BUFFER_SIZE  (2592U) /* bytes */
-#define IFXGETH_MAX_RX_BUFFER_SIZE  (2592U) /* bytes */
+#define IFXGETH_MAX_TX_BUFFER_SIZE  (1536U) /* bytes */
+#define IFXGETH_MAX_RX_BUFFER_SIZE  (1536U) /* bytes */
 
 /***********************************************************************************************************************
  * GLOBAL VARIABLES

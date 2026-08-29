@@ -92,6 +92,31 @@
 #define SCR_FBL_OFFSET_CHECKSUM             12u
 #define SCR_FBL_RECORD_LENGTH               16u
 
+/*
+ * One-shot standby wake/intent latch.  The application arms this just before
+ * entering PMS standby so startup can classify the next boot as a standby wake
+ * even if live PMS wake flags are already clear.
+ */
+#define SCR_STANDBY_WAKE_XRAM_BASE          0x17F0u
+#define SCR_STANDBY_WAKE_MAGIC              0x53544259u /* "STBY" */
+#define SCR_STANDBY_WAKE_VERSION            1u
+#define SCR_STANDBY_WAKE_VALID              1u
+
+#define SCR_STANDBY_WAKE_OFFSET_MAGIC       0u
+#define SCR_STANDBY_WAKE_OFFSET_VERSION     4u
+#define SCR_STANDBY_WAKE_OFFSET_VALID       5u
+#define SCR_STANDBY_WAKE_OFFSET_SOURCE_MASK 6u
+#define SCR_STANDBY_WAKE_OFFSET_PMSWSTAT2   7u
+#define SCR_STANDBY_WAKE_OFFSET_SCR_REASON  8u
+#define SCR_STANDBY_WAKE_OFFSET_VALID_INV   9u
+#define SCR_STANDBY_WAKE_RECORD_LENGTH      10u
+
+#define SCR_STANDBY_WAKE_SOURCE_PMS         0x01u
+#define SCR_STANDBY_WAKE_SOURCE_SCR_XRAM    0x02u
+#define SCR_STANDBY_WAKE_SOURCE_APP_ARMED   0x04u
+#define SCR_STANDBY_WAKE_PMSWSTAT2_WAKE_FLAGS_MASK \
+        0xFFu
+
 #define BOOT_STAGE_RTC_INIT_ENTER      (0x60u)
 #define BOOT_STAGE_RTC_PMCON_DONE      (0x61u)
 #define BOOT_STAGE_RTC_STOP_DONE       (0x62u)

@@ -1,5 +1,6 @@
 #include "LinIf.h"
 #include "Lin_Cfg.h"
+#include "LinDiag.h"
 #include "LinTp.h"
 #include "PduR.h"
 #include <string.h>
@@ -88,6 +89,19 @@ typedef struct
     uint32 scheduleErrorCounter;
     uint32 diagTimeoutCounter;
 } LinIf_StateType;
+
+static uint8 LinIf_GetPublisherNad(const LinIf_ScheduleEntryType* entry)
+{
+    if ((entry != NULL_PTR) &&
+        (entry->frame != NULL_PTR) &&
+        (entry->direction == LIN_SLAVE_RESPONSE) &&
+        (entry->frame->id == 0x0Bu))
+    {
+        return LINIF_NAD_HVDCDC;
+    }
+
+    return 0u;
+}
 
 static const LinIf_AppPduConfigType LinIf_AppTxPduCfg[] =
 {
@@ -439,6 +453,23 @@ void LinIf_MainFunction(void)
             }
         }
 
+        {
+            uint8 completedPid = entry->frame->pid;
+
+            if (entry->frame->id <= 0x3Fu)
+            {
+                completedPid = Lin_MakePid(entry->frame->id);
+            }
+
+            LinDiag_ReportFrameResult(LIN_CHANNEL_0,
+                                      completedSchedule,
+                                      entry->frame->id,
+                                      completedPid,
+                                      LinIf_GetPublisherNad(entry),
+                                      (entry->direction == LIN_SLAVE_RESPONSE) ? TRUE : FALSE,
+                                      res);
+        }
+
         LinIf_State.busy = FALSE;
         LinIf_State.channelState = LINIF_CHANNEL_IDLE;
 
@@ -496,6 +527,21 @@ void LinIf_MainFunction(void)
 LinIf_ChannelStateType LinIf_GetChannelState(void)
 {
     return LinIf_State.channelState;
+}
+
+uint8 LinIf_GetActiveSchedule(void)
+{
+    return LinIf_State.activeSchedule;
+}
+
+uint32 LinIf_GetScheduleErrorCounter(void)
+{
+    return LinIf_State.scheduleErrorCounter;
+}
+
+uint32 LinIf_GetDiagTimeoutCounter(void)
+{
+    return LinIf_State.diagTimeoutCounter;
 }
 
 void LinIf_ResetDiagnostic(void)

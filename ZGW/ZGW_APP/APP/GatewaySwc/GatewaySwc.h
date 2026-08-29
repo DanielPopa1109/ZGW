@@ -215,6 +215,8 @@ void GatewaySwc_Init(void);
 void GatewaySwc_MainFunction(void);
 void GatewaySwc_EthernetMainFunction(void);
 Dcm_ReturnType GatewaySwc_SetDiagnosticCommunicationControl(uint8 controlType, uint8 communicationType);
+boolean GatewaySwc_IsNormalCommunicationRxEnabled(void);
+boolean GatewaySwc_IsNormalCommunicationTxEnabled(void);
 Std_ReturnType GatewaySwc_RequestComSendSignal(Com_SignalIdType signalId, const void *data);
 void GatewaySwc_RequestComMainFunctionTx(void);
 Std_ReturnType GatewaySwc_RequestCanIfTransmit(PduIdType txPduId, const uint8 *data, PduLengthType len);

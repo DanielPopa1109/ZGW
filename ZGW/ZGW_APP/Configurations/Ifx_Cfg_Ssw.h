@@ -35,6 +35,8 @@
 #include "Ifx_Cfg.h"
 #include "Ifx_Ssw.h"
 
+extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
+
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -91,6 +93,7 @@
 
 extern void Ifx_Ssw_Pms_Init(void);
 extern void Ifx_Ssw_Pms_InitCheck(void);
+extern void Ifx_Ssw_Pms_Tc013RstcTrim(void);
 
 /* Callout hook API macro for PMS Initialization.
  * This callout hook is referenced in Startup sequence. This need to be configured by application to
@@ -101,6 +104,7 @@ extern void Ifx_Ssw_Pms_InitCheck(void);
         {                                                      \
     Ifx_Ssw_jumpToFunctionWithLink(&Ifx_Ssw_Pms_Init); \
     IFX_CFG_SSW_CALLOUT_PMS_CHECK();                   \
+    Ifx_Ssw_jumpToFunctionWithLink(&Ifx_Ssw_Pms_Tc013RstcTrim); \
         }
 
 #if IFX_CFG_SSW_ENABLE_PMS_INIT_CHECK == 1U
@@ -161,7 +165,6 @@ extern void Ifx_Ssw_Monbist(void);
  */
 #if IFX_CFG_SSW_ENABLE_PLL_INIT == 1U
 #include "IfxScuCcu.h"
-extern void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation);
 #define IFX_CFG_SSW_CALLOUT_PLL_INIT()                      \
         {                                                           \
     if (IfxScuCcu_init(&IfxScuCcu_defaultClockConfig) == 1) \

@@ -34,8 +34,9 @@
 #define PFLASH_SECTOR_SHIFT              14u
 #define PFLASH_LOGICAL_SECTOR_SIZE       PFLASH_SECTOR_SIZE
 #define PFLASH_PHYSICAL_SECTOR_SIZE      0x00100000u
-#define PFLASH_ERASE_MAX_COMMAND_SIZE    0x00080000u
-#define PFLASH_ERASE_MAX_SECTORS         32u
+/* TC37x Erratum FLASH_TC.053: limit PFLASH logical erase commands to 256 KiB. */
+#define PFLASH_ERASE_MAX_COMMAND_SIZE    0x00040000u
+#define PFLASH_ERASE_MAX_SECTORS         (PFLASH_ERASE_MAX_COMMAND_SIZE / PFLASH_SECTOR_SIZE)
 
 #define FBL_FLASH_OK                     0u
 #define FBL_FLASH_ERROR_RANGE            1u
@@ -109,7 +110,7 @@ static uint32 FblRamFlash_ToNonCached(uint32 address) RAM_FLASH_CODE;
 static uint32 FblRamFlash_GetEraseChunkLength(uint32 address, uint32 remaining) RAM_FLASH_CODE;
 static uint32 FblRamFlash_ValidateEraseRange(uint32 address, uint32 length) RAM_FLASH_CODE;
 static uint32 FblRamFlash_IssueEraseMultiple(uint32 address, uint32 sectorCount, uint32 flashType) RAM_FLASH_CODE;
-static uint8 FblRamFlash_HasError(void) RAM_FLASH_CODE;
+uint8 FblRamFlash_HasError(void) RAM_FLASH_CODE;
 static uint8 FblRamFlash_EnterPageMode(uint32 address) RAM_FLASH_HELPER;
 static void FblRamFlash_Load2X32(uint32 wordLow, uint32 wordHigh) RAM_FLASH_HELPER;
 static void FblRamFlash_WritePage(uint32 address) RAM_FLASH_HELPER;
@@ -480,6 +481,7 @@ RAM_CODE uint8 FblRamRuntime_EnterCritical(void)
        (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_SetDestructivePhase) == 0u) ||
        (FblRamRuntime_IsExecutableAddress((uint32)FblRamFlash_EraseRange) == 0u) ||
        (FblRamRuntime_IsExecutableAddress((uint32)FblRamFlash_ProgramPage) == 0u) ||
+       (FblRamRuntime_IsExecutableAddress((uint32)FblRamFlash_HasError) == 0u) ||
        (FblRamRuntime_IsExecutableAddress((uint32)FblRamRuntime_RequestReset) == 0u) ||
        (FblRamRuntime_IsExecutableAddress((uint32)FblRam_RequestSystemReset) == 0u) ||
        (FblRamRuntime_IsExecutableAddress((uint32)FblRam_InvalidateProgramCache) == 0u) ||
@@ -564,7 +566,7 @@ RAM_FLASH_CODE void FblRamFlash_ClearStatus(void)
     __dsync();
 }
 
-RAM_FLASH_CODE static uint8 FblRamFlash_HasError(void)
+RAM_FLASH_CODE uint8 FblRamFlash_HasError(void)
 {
     g_FblRamRuntimeLastDmuError = DMU_HF_ERRSR.U;
     return ((g_FblRamRuntimeLastDmuError & FLASH_DMU_ERROR_MASK) != 0u) ? 1u : 0u;
@@ -575,14 +577,18 @@ RAM_FLASH_CODE static uint8 FblRamFlash_WaitUnbusy(uint32 flashType)
     uint32 guard = FLASH_WAIT_TIMEOUT;
     uint32 mask = 1u << flashType;
 
+#if (FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE != 0u)
     g_FblRamRuntimeLastFlashType = flashType;
     g_FblRamRuntimeLastWaitMask = mask;
+#endif
     g_FblEraseWaitStartTick = STM0_TIM0.U;
 
     while((DMU_HF_STATUS.U & mask) != 0u)
     {
+#if (FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE != 0u)
         g_FblRamRuntimeLastDmuStatus = DMU_HF_STATUS.U;
         g_FblRamRuntimeLastWaitGuard = guard;
+#endif
         if(guard == 0u)
         {
             g_FblEraseWaitEndTick = STM0_TIM0.U;
@@ -593,8 +599,10 @@ RAM_FLASH_CODE static uint8 FblRamFlash_WaitUnbusy(uint32 flashType)
     }
 
     __dsync();
+#if (FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE != 0u)
     g_FblRamRuntimeLastDmuStatus = DMU_HF_STATUS.U;
     g_FblRamRuntimeLastWaitGuard = guard;
+#endif
     g_FblEraseWaitEndTick = STM0_TIM0.U;
     g_FblEraseWaitTicks = g_FblEraseWaitEndTick - g_FblEraseWaitStartTick;
     return 1u;
@@ -836,6 +844,7 @@ RAM_FLASH_CODE uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data)
     uint32 bank;
     uint16 password;
 
+#if (FBL_FLASH_CHECK_PAGE_ARGUMENTS != 0u)
     if((data == NULL_PTR) ||
        (address < PFLASH_START_NC) ||
        (address > (PFLASH_END_NC - (PFLASH_PAGE_SIZE - 1u))) ||
@@ -843,22 +852,38 @@ RAM_FLASH_CODE uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data)
     {
         return 1u;
     }
+#endif
 
-    for(index = 0u; index < 8u; index++)
+    if((((uint32)data) & 0x03u) == 0u)
     {
-        const uint8 *p = &data[index * 4u];
-        words[index] = ((uint32)p[0u]) |
-                       ((uint32)p[1u] << 8u) |
-                       ((uint32)p[2u] << 16u) |
-                       ((uint32)p[3u] << 24u);
+        const uint32 *srcWords = (const uint32 *)data;
+        for(index = 0u; index < 8u; index++)
+        {
+            words[index] = srcWords[index];
+        }
+    }
+    else
+    {
+        for(index = 0u; index < 8u; index++)
+        {
+            const uint8 *p = &data[index * 4u];
+            words[index] = ((uint32)p[0u]) |
+                           ((uint32)p[1u] << 8u) |
+                           ((uint32)p[2u] << 16u) |
+                           ((uint32)p[3u] << 24u);
+        }
     }
 
     bank = FblRamFlash_Bank(address);
+#if (FBL_FLASH_UPDATE_DEBUG_STATE_EACH_PAGE != 0u)
     g_FblRamRuntimeLastAddress = address;
+#endif
 
     password = FblRam_GetSafetyWatchdogPassword();
     FblRam_ClearSafetyEndinit(password);
+#if (FBL_FLASH_CLEAR_STATUS_EACH_PAGE != 0u)
     FblRamFlash_ClearStatus();
+#endif
 
     if((FblRamFlash_EnterPageMode(address) == 0u) ||
        (FblRamFlash_WaitUnbusy(bank) == 0u))
@@ -871,6 +896,7 @@ RAM_FLASH_CODE uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data)
     FblRamFlash_Load2X32(words[2u], words[3u]);
     FblRamFlash_Load2X32(words[4u], words[5u]);
     FblRamFlash_Load2X32(words[6u], words[7u]);
+    __dsync();
     FblRamFlash_WritePage(address);
 
     if(FblRamFlash_WaitUnbusy(bank) == 0u)
@@ -881,11 +907,13 @@ RAM_FLASH_CODE uint32 FblRamFlash_ProgramPage(uint32 address, const uint8 *data)
 
     FblRam_SetSafetyEndinit(password);
 
+#if (FBL_FLASH_CHECK_DMU_ERROR_EACH_PAGE != 0u)
     if(FblRamFlash_HasError() != 0u)
     {
         FblRamFlash_ClearStatus();
         return 1u;
     }
+#endif
 
     return 0u;
 }
@@ -906,11 +934,17 @@ static void FblRamFlash_Load2X32(uint32 wordLow, uint32 wordHigh) RAM_FLASH_HELP
 {
     volatile uint32 *command = (volatile uint32 *)(FLASH_CMD_BASE | 0x55F0u);
 
+#if (FBL_FLASH_EXTRA_LOAD_DSYNC != 0u)
     __dsync();
+#endif
     command[0] = wordLow;
+#if (FBL_FLASH_EXTRA_LOAD_DSYNC != 0u)
     __dsync();
+#endif
     command[1] = wordHigh;
+#if (FBL_FLASH_EXTRA_LOAD_DSYNC != 0u)
     __dsync();
+#endif
 }
 
 static void FblRamFlash_WritePage(uint32 address) RAM_FLASH_HELPER

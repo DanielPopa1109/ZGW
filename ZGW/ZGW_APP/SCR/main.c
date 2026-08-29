@@ -53,12 +53,15 @@
 #define WCAN_CFG_SELWK_EN              (0x04u)
 #define WCAN_CFG_CCE                   (0x08u)
 
-/* Standard ID 0x90 is stored shifted by 18; mask bits 3:2 to accept 0x90..0x93. */
+/*
+ * WCAN has one WUF ID/mask pattern. This accepts the requested standard IDs 0x51, 0x250 and 0x253,
+ * plus unavoidable mask aliases 0x50, 0x52, 0x53, 0x251 and 0x252.
+ */
 #define WCAN_WAKE_ID2_VALUE            (0x40u)
-#define WCAN_WAKE_ID3_VALUE            (0x08u)
+#define WCAN_WAKE_ID3_VALUE            (0x04u)
 #define WCAN_WAKE_ID2_MASK             (0xF3u)
-#define WCAN_WAKE_ID3_MASK             (0x7Du)
-#define WCAN_WAKE_DLC_VALUE            (0x08u)
+#define WCAN_WAKE_ID3_MASK             (0x5Du)
+#define WCAN_WAKE_DLC_VALUE            (0x00u)
 
 /*
  * The 0x90..0x93 messages in the CANFD DBC are StandardCAN_FD frames. WCAN does not expose the FD frame ID to
@@ -680,16 +683,20 @@ static void WCAN_CheckWake(void)
     {
         wakeReason = WCAN_WAKE_REASON_WUF;
     }
+#if (WCAN_WAKE_ON_FD_FRAME != 0u)
     else if((WCAN_WAKE_ON_FD_FRAME != 0u) &&
             ((wcanStatus1 & WCAN_STATUS1_FDF_MASK) != 0u) &&
             ((*G_FDF_BASELINE_ADDR & WCAN_STATUS1_FDF_MASK) == 0u))
     {
         wakeReason = WCAN_WAKE_REASON_FDF;
     }
+#endif
+#if (WCAN_WAKE_ON_SYNC_FRAME != 0u)
     else if((WCAN_WAKE_ON_SYNC_FRAME != 0u) && ((wcanStatus1 & WCAN_STATUS1_SYNC_MASK) != 0u))
     {
         wakeReason = WCAN_WAKE_REASON_SYNC;
     }
+#endif
 
     if(wakeReason != 0u)
     {

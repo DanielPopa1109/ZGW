@@ -31,12 +31,16 @@
 /*********************************************************************************************************************/
 #include "Ifx_Cfg_Ssw.h"
 #include "Ifx_Ssw_Infra.h"
+#include "IfxPms_reg.h"
 
 
 
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+#define IFX_CFG_SSW_PMS_TC013_RSTCTRIM_RECOMMENDED       0x58u
+#define IFX_CFG_SSW_RESET_REASON_PMS_TC013_RSTCTRIM      390u
+
 #if defined(__TASKING__)
 #pragma optimize RL
 #elif defined(__HIGHTEC__)
@@ -51,6 +55,30 @@ void Ifx_Ssw_Pms_Init(void)
     if (IfxPmsEvr_runInitSequence(&IfxPmsEvr_cfgSequenceDefault) == 0)
     {
         McuSm_PerformResetHook(374u, 1u);
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    Ifx_Ssw_jumpBackToLink();
+}
+
+void Ifx_Ssw_Pms_Tc013RstcTrim(void)
+{
+    unsigned short safetyWdtPassword = Ifx_Ssw_getSafetyWatchdogPasswordInline();
+    Ifx_PMS_EVRRSTCON evrRstCon;
+
+    /* PMS_TC.013: configure VDD reset trim before PLL initialization starts. */
+    Ifx_Ssw_clearSafetyEndinitInline(safetyWdtPassword);
+    evrRstCon.U = PMS_EVRRSTCON.U;
+    evrRstCon.B.RSTCTRIM = IFX_CFG_SSW_PMS_TC013_RSTCTRIM_RECOMMENDED;
+    PMS_EVRRSTCON.U = evrRstCon.U;
+    Ifx_Ssw_setSafetyEndinitInline(safetyWdtPassword);
+
+    if (PMS_EVRRSTCON.B.RSTCTRIM != IFX_CFG_SSW_PMS_TC013_RSTCTRIM_RECOMMENDED)
+    {
+        McuSm_PerformResetHook(IFX_CFG_SSW_RESET_REASON_PMS_TC013_RSTCTRIM, 1u);
     }
     else
     {

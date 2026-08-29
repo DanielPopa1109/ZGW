@@ -23,6 +23,8 @@
 #include "PduR.h"
 #include "Com.h"
 #include "CanSM.h"
+#include "CanDiag.h"
+#include "LinDiag.h"
 #include "LinTp.h"
 #include "DoIP.h"
 #include "SoAd.h"
@@ -139,6 +141,24 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_INIT_FAIL_C0_QM_LIN_START   29u
 #define OS_INIT_FAIL_C0_ASIL_NVM_START 30u
 
+typedef enum
+{
+        OS_NVM_STARTUP_INIT_WAIT = 0,
+        OS_NVM_STARTUP_READALL_START,
+        OS_NVM_STARTUP_READALL_WAIT,
+        OS_NVM_STARTUP_APPLY_READALL,
+        OS_NVM_STARTUP_TIME_LOAD_WAIT,
+        OS_NVM_STARTUP_TIME_STANDBY_PREPARE,
+        OS_NVM_STARTUP_TIME_STANDBY_WAIT,
+        OS_NVM_STARTUP_DEM_INIT,
+        OS_NVM_STARTUP_DEM_WAIT,
+        OS_NVM_STARTUP_OPERATION_CYCLE_START,
+        OS_NVM_STARTUP_OPERATION_CYCLE_WAIT,
+        OS_NVM_STARTUP_DEFERRED_FORMAT_START,
+        OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT,
+        OS_NVM_STARTUP_DONE
+} Os_NvMStartupStateType;
+
 typedef struct
 {
         uint8 initialized;
@@ -162,6 +182,7 @@ static void Os_CpuLoad_StorePublic(uint8 CoreId, uint16 LoadPermille, uint8 Vali
 static void Os_InitFailure(uint8 CoreId, uint32 Step);
 static uint8 Os_TryInitEthStackCore2(void);
 static boolean Os_NvMStackHasPendingJobs(void);
+static void Os_NvMStartup_MainFunction(void);
 void Os_CpuLoad_TaskSwitchedIn(uint8 CoreId, uint8 IsIdleTask);
 void Os_CpuLoad_TaskSwitchedOut(uint8 CoreId);
 
@@ -232,6 +253,12 @@ long long AiModel_MainFunction_Counter = 0;
 long long ASIL_APPL_Task_C2_Counter = 0;
 long long QM_BSW_Task_C2_Counter = 0;
 volatile uint32 Os_NvMBudgetHitCounter = 0u;
+volatile uint8 Os_NvMStartupState = OS_NVM_STARTUP_INIT_WAIT;
+volatile uint32 Os_NvMStartupMainCounter = 0u;
+volatile uint32 Os_NvMStartupReadAllStartCounter = 0u;
+volatile uint32 Os_NvMStartupDeferredFormatStartCounter = 0u;
+volatile uint32 Os_NvMStartupErrorCounter = 0u;
+volatile uint32 Os_NvMStartupLastErrorState = 0u;
 
 void Os_Init_C0(void)
 {
@@ -806,6 +833,146 @@ static boolean Os_NvMStackHasPendingJobs(void)
     return FALSE;
 }
 
+static void Os_NvMStartup_RecordError(void)
+{
+    Os_NvMStartupErrorCounter++;
+    Os_NvMStartupLastErrorState = (uint32)Os_NvMStartupState;
+}
+
+static void Os_NvMStartup_MainFunction(void)
+{
+    Os_NvMStartupMainCounter++;
+
+    switch ((Os_NvMStartupStateType)Os_NvMStartupState)
+    {
+        case OS_NVM_STARTUP_INIT_WAIT:
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_READALL_START;
+            }
+            break;
+
+        case OS_NVM_STARTUP_READALL_START:
+            if (NvM_GetStatus() != NVM_IDLE)
+            {
+                break;
+            }
+
+            if (NvM_ReadAll() == E_OK)
+            {
+                Os_NvMStartupReadAllStartCounter++;
+                Os_NvMStartupState = OS_NVM_STARTUP_READALL_WAIT;
+            }
+            else
+            {
+                Os_NvMStartup_RecordError();
+            }
+            break;
+
+        case OS_NVM_STARTUP_READALL_WAIT:
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_APPLY_READALL;
+            }
+            break;
+
+        case OS_NVM_STARTUP_APPLY_READALL:
+            CodingApp_OnNvMReadAllComplete();
+            (void)TimeBase_LoadUtcFromNvM();
+            Os_NvMStartupState = OS_NVM_STARTUP_TIME_LOAD_WAIT;
+            break;
+
+        case OS_NVM_STARTUP_TIME_LOAD_WAIT:
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_TIME_STANDBY_PREPARE;
+            }
+            break;
+
+        case OS_NVM_STARTUP_TIME_STANDBY_PREPARE:
+            if (NvM_GetStatus() != NVM_IDLE)
+            {
+                break;
+            }
+
+            (void)TimeBase_PrepareStandbyRtc();
+            Os_NvMStartupState = OS_NVM_STARTUP_TIME_STANDBY_WAIT;
+            break;
+
+        case OS_NVM_STARTUP_TIME_STANDBY_WAIT:
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_DEM_INIT;
+            }
+            break;
+
+        case OS_NVM_STARTUP_DEM_INIT:
+            if (NvM_GetStatus() != NVM_IDLE)
+            {
+                break;
+            }
+
+            Dem_Init(&Dem_Config);
+            Os_NvMStartupState = OS_NVM_STARTUP_DEM_WAIT;
+            break;
+
+        case OS_NVM_STARTUP_DEM_WAIT:
+            Dem_MainFunction();
+            if ((Dem_IsReady() != FALSE) && (NvM_GetStatus() == NVM_IDLE))
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_OPERATION_CYCLE_START;
+            }
+            break;
+
+        case OS_NVM_STARTUP_OPERATION_CYCLE_START:
+            if (NvM_GetStatus() != NVM_IDLE)
+            {
+                break;
+            }
+
+            (void)Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE, DEM_CYCLE_STATE_START);
+            Os_NvMStartupState = OS_NVM_STARTUP_OPERATION_CYCLE_WAIT;
+            break;
+
+        case OS_NVM_STARTUP_OPERATION_CYCLE_WAIT:
+            Dem_MainFunction();
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_DEFERRED_FORMAT_START;
+            }
+            break;
+
+        case OS_NVM_STARTUP_DEFERRED_FORMAT_START:
+            if (NvM_GetStatus() != NVM_IDLE)
+            {
+                break;
+            }
+
+            if (NvM_StartDeferredDefaultImage() == E_OK)
+            {
+                Os_NvMStartupDeferredFormatStartCounter++;
+                Os_NvMStartupState = OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT;
+            }
+            else
+            {
+                Os_NvMStartup_RecordError();
+                Os_NvMStartupState = OS_NVM_STARTUP_DONE;
+            }
+            break;
+
+        case OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT:
+            if (NvM_GetStatus() == NVM_IDLE)
+            {
+                Os_NvMStartupState = OS_NVM_STARTUP_DONE;
+            }
+            break;
+
+        case OS_NVM_STARTUP_DONE:
+        default:
+            break;
+    }
+}
+
 
 void ASIL_BSW_Task_C0(void *pvParameters)
 {
@@ -838,7 +1005,7 @@ void ASIL_NVM_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASIL_NVM_Task_C0)
         {
             Alarm5ms_Flag_ASIL_NVM_Task_C0 = 0u;
-            (void)NvM_StartDeferredDefaultImage();
+            Os_NvMStartup_MainFunction();
             nvmCycleBudget = OS_NVM_MAIN_CYCLES_PER_ACTIVATION;
             do
             {
@@ -925,6 +1092,7 @@ void QM_LIN_Task_C0(void *pvParameters)
             LinSM_MainFunction();
             GatewaySwc_RequestLinIfMainFunction();
             LinTp_MainFunction();
+            LinDiag_MainFunction();
             QM_LIN_Task_C0_Counter ++;
         }
         else
@@ -945,6 +1113,7 @@ void QM_CAN_Task_C0(void *pvParameters)
             Alarm5ms_Flag_QM_CAN_Task_C0 = 0u;
             Can_MainFunction();
             CanSM_MainFunction();
+            CanDiag_MainFunction();
             CanTp_MainFunction();
             QM_CAN_Task_C0_Counter++;
         }
@@ -1065,7 +1234,6 @@ static uint8 Os_TryInitEthStackCore2(void)
 
 void QM_BSW_Task_C2(void *pvParameters)
 {
-    uint32 waitLoops;
     TickType_t_core2 lastWakeTime;
 
     (void)pvParameters;
@@ -1077,17 +1245,7 @@ void QM_BSW_Task_C2(void *pvParameters)
 
     (void)LWIP_GETH_Init(lwip_geth_handle);
 
-    for (waitLoops = 0u; waitLoops < 200u; waitLoops++)
-    {
-        if (g_LwipInitDone != 0u)
-        {
-            break;
-        }
-
-        vTaskDelay_core2(pdMS_TO_TICKS_core2(10u));
-    }
-
-    Os_EthNetifWaitLoops = waitLoops;
+    Os_EthNetifWaitLoops = 0u;
     (void)Os_TryInitEthStackCore2();
     lastWakeTime = xTaskGetTickCount_core2();
 
@@ -1097,6 +1255,7 @@ void QM_BSW_Task_C2(void *pvParameters)
 
         if (Os_EthStackInitialized == 0u)
         {
+            Os_EthNetifWaitLoops++;
             (void)Os_TryInitEthStackCore2();
         }
 

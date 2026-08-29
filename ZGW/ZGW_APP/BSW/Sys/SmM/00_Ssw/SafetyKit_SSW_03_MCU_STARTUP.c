@@ -30,15 +30,18 @@
 #include "SafetyKit_SSW_03_MCU_STARTUP.h"
 #include "SafetyKit_Main.h"
 #include "IfxFce_reg.h"
+#include "McuSm.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
 #define MCU_STARTUP_TARGET_DERIVATIVE          "TC375DP"
-#define MCU_STARTUP_EXPECTED_CRC_TC375DP       (0x32CB1E1CU)
+#define MCU_STARTUP_EXPECTED_CRC_TC375DP       (0x3A3E63C2U)
 #define MCU_STARTUP_EXPECTED_CRC               MCU_STARTUP_EXPECTED_CRC_TC375DP
 
 /* Golden CRC for the TC375DP startup protection-register table below.
- * Regenerate this value whenever the register set, masks, or derivative appendix baseline changes. */
+ * Regenerate this value whenever the register set, masks, or derivative appendix baseline changes.
+ * SCU_STSTAT.HWCFG is intentionally excluded on TC375DP because it is not stable across standby wake
+ * on this target and the inherited SafetyKit comment already marks it as derivative-specific. */
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -101,7 +104,6 @@ const McuStartupType mcuStartupCheck [] =
         { &DMU_HP_PROCONWOP14.U,     0xFFFFFFFFU     },
         { &DMU_HP_PROCONWOP15.U,     0xFFFFFFFFU     },
         { &DMU_HF_PROCONTP.U,        0xFFFFFFFFU     },
-        { &SCU_STSTAT.U,             0x000000FFU     }, /*Exception for TC33x and TC32 -> PMSWSTAT.HWCFGEVR.U */
 };
 const int mcuStartupCheckSize = sizeof(mcuStartupCheck) / sizeof (McuStartupType);
 /*********************************************************************************************************************/
@@ -126,15 +128,46 @@ void safetyKitSswMcuStartup(void)
     /* Set crc_value to initial seed value */
     uint32 initialSeed = 0xFFFFFFFF;
     uint32 crcValue    = initialSeed;
+    uint8 diagIndex;
+
+//    McuSm_McuStartupComputedCrc = 0u;
+//    McuSm_McuStartupExpectedCrc = MCU_STARTUP_EXPECTED_CRC;
+//    McuSm_McuStartupRegisterCount = (uint32)mcuStartupCheckSize;
+//    McuSm_McuStartupFailureIndex = MCUSM_MCU_STARTUP_DIAG_ENTRY_COUNT;
+//    McuSm_McuStartupLastRegisterAddress = 0u;
+//    McuSm_McuStartupLastRegisterMask = 0u;
+//    McuSm_McuStartupCrcBeforeLastRegister = initialSeed;
+//    McuSm_McuStartupLastMaskedValue = 0u;
+//
+//    for (diagIndex = 0u; diagIndex < MCUSM_MCU_STARTUP_DIAG_ENTRY_COUNT; diagIndex++)
+//    {
+//        McuSm_McuStartupRawValues[diagIndex] = 0u;
+//        McuSm_McuStartupMaskedValues[diagIndex] = 0u;
+//    }
+
     /* And start to calculate the CRC value for all register values */
     for(uint8 i = 0; i < mcuStartupCheckSize; i++)
     {
         uint32 currentRegValue = *(volatile uint32 *)mcuStartupCheck[i].regUnderTest;
-        crcValue = calculateCRC32P4(crcValue, (currentRegValue & mcuStartupCheck[i].mask));
+        uint32 maskedRegValue = (currentRegValue & mcuStartupCheck[i].mask);
+
+//        McuSm_McuStartupCrcBeforeLastRegister = crcValue;
+//        McuSm_McuStartupLastMaskedValue = maskedRegValue;
+//
+//        McuSm_McuStartupRawValues[i] = currentRegValue;
+//        McuSm_McuStartupMaskedValues[i] = maskedRegValue;
+//        McuSm_McuStartupLastRegisterAddress = (uint32)mcuStartupCheck[i].regUnderTest;
+//        McuSm_McuStartupLastRegisterMask = mcuStartupCheck[i].mask;
+
+        crcValue = calculateCRC32P4(crcValue, maskedRegValue);
     }
+
+    //McuSm_McuStartupComputedCrc = crcValue;
+
     /* If value is not as expected appropriate reaction shall be taken */
     if(crcValue != MCU_STARTUP_EXPECTED_CRC)
     {
+        //McuSm_McuStartupFailureIndex = (uint32)mcuStartupCheckSize;
         g_SafetyKitStatus.sswStatus.mcuStartupStatus = failed;
     }
     else

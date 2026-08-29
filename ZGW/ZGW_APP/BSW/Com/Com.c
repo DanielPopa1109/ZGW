@@ -57,6 +57,7 @@ typedef struct
     uint8 txInProgress;
     uint16 periodTimer;
     uint8 periodDue;
+    uint8 startupPending;
     uint16 mdtTimer;
     uint8 repetitionsLeft;
     uint16 repetitionTimer;
@@ -751,7 +752,34 @@ static void Com_StoreValue(void* ptr, uint8 size, uint32 value)
 static uint8 Com_IsTxModeSendOnChange(uint8 txMode)
 {
     if ((txMode == COM_TX_MODE_DIRECT) ||
+        (txMode == COM_TX_MODE_PERIODIC) ||
         (txMode == COM_TX_MODE_MIXED))
+    {
+        return COM_TRUE;
+    }
+
+    return COM_FALSE;
+}
+
+static uint8 Com_IsDiagnosticOrXcpTxPdu(PduIdType pduId)
+{
+    if (((pduId >= COM_TX_PDU_XCPREQUEST_7C8) &&
+            (pduId <= COM_TX_PDU_XCPREQUEST_7C0)) ||
+            ((pduId >= COM_TX_PDU_DIAGREQUEST_706) &&
+            (pduId <= COM_TX_PDU_DIAGREQUEST_700)) ||
+            (pduId == COM_TX_PDU_CANFD_PDM1_DIAGREQUEST))
+    {
+        return COM_TRUE;
+    }
+
+    return COM_FALSE;
+}
+
+static uint8 Com_IsNormalTxIpdu(const Com_TxIpduConfigType* cfg)
+{
+    if ((cfg != NULL_PTR) &&
+            (cfg->txMode != COM_TX_MODE_NONE) &&
+            (Com_IsDiagnosticOrXcpTxPdu(cfg->pduId) == COM_FALSE))
     {
         return COM_TRUE;
     }
@@ -924,6 +952,7 @@ static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
     {
         Com_TxRt[txIdx].dirty = COM_FALSE;
         Com_TxRt[txIdx].periodDue = COM_FALSE;
+        Com_TxRt[txIdx].startupPending = COM_FALSE;
         Com_TxRt[txIdx].repetitionsLeft = 0u;
         return E_NOT_OK;
     }
@@ -990,6 +1019,7 @@ void Com_Init(void)
         Com_TxRt[i].deadlineTimer = Com_TxIpduCfg[i].deadlineTicks;
         Com_TxRt[i].active = COM_TRUE;
         Com_TxRt[i].periodDue = COM_FALSE;
+        Com_TxRt[i].startupPending = Com_IsNormalTxIpdu(&Com_TxIpduCfg[i]);
         Com_TxLastTriggerSequence[i] = 0u;
         Com_TxTriggerCounter[i] = 0u;
         Com_TxDuplicateSuppressedCounter[i] = 0u;
@@ -1013,6 +1043,7 @@ Std_ReturnType Com_IpduGroupStart(Com_IpduGroupIdType groupId)
         if (Com_TxIpduCfg[i].groupId == groupId)
         {
             Com_TxRt[i].active = COM_TRUE;
+            Com_TxRt[i].startupPending = Com_IsNormalTxIpdu(&Com_TxIpduCfg[i]);
         }
     }
 
@@ -1057,7 +1088,7 @@ void Com_TriggerFullComRestartBurst(uint8 channel)
     for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
     {
         if ((Com_TxRt[i].active == COM_FALSE) ||
-            (Com_TxIpduCfg[i].txMode == COM_TX_MODE_NONE) ||
+            (Com_IsNormalTxIpdu(&Com_TxIpduCfg[i]) == COM_FALSE) ||
             (Com_TxIpduBelongsToChannel(Com_TxIpduCfg[i].pduId, channel) == COM_FALSE))
         {
             continue;
@@ -1067,7 +1098,7 @@ void Com_TriggerFullComRestartBurst(uint8 channel)
         Com_TxRt[i].mdtTimer = 0u;
         Com_TxRt[i].dirty = COM_TRUE;
         Com_TxRt[i].periodDue = COM_TRUE;
-        (void)Com_TriggerTransmit(i);
+        Com_TxRt[i].startupPending = COM_TRUE;
     }
 }
 
@@ -1152,7 +1183,8 @@ Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataP
         Com_TxRt[txIdx].repetitionTimer = 0u;
     }
 
-    if (triggerOnChange != COM_FALSE)
+    if ((triggerOnChange != COM_FALSE) &&
+            (Com_TxRt[txIdx].startupPending == COM_FALSE))
     {
         (void)Com_TriggerTransmit(txIdx);
     }
@@ -1404,6 +1436,8 @@ void Com_TxConfirmation(PduIdType TxPduId)
 void Com_MainFunctionTx(void)
 {
     uint8 i;
+    uint8 startupActive;
+    uint8 startupSent;
 
     Com_MainFunctionTxSequence++;
     if (Com_MainFunctionTxSequence == 0u)
@@ -1413,6 +1447,18 @@ void Com_MainFunctionTx(void)
     }
 
     Com_MainFunctionTxActive = COM_TRUE;
+    startupActive = COM_FALSE;
+    startupSent = COM_FALSE;
+
+    for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
+    {
+        if ((Com_TxRt[i].active != COM_FALSE) &&
+                (Com_TxRt[i].startupPending != COM_FALSE))
+        {
+            startupActive = COM_TRUE;
+            break;
+        }
+    }
 
     for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
     {
@@ -1454,6 +1500,30 @@ void Com_MainFunctionTx(void)
                 Com_TxRt[i].repetitionsLeft--;
                 Com_TxRt[i].repetitionTimer = Com_TxIpduCfg[i].repetitionPeriodTicks;
             }
+        }
+
+        if ((startupSent == COM_FALSE) &&
+            (Com_TxRt[i].startupPending != COM_FALSE) &&
+            (Com_TxRt[i].txInProgress == COM_FALSE))
+        {
+            if (Com_TriggerTransmit(i) == E_OK)
+            {
+                Com_TxRt[i].startupPending = COM_FALSE;
+                Com_TxRt[i].periodDue = COM_FALSE;
+                Com_TxRt[i].periodTimer = Com_TxIpduCfg[i].periodTicks;
+                startupSent = COM_TRUE;
+            }
+            else
+            {
+                startupSent = COM_TRUE;
+            }
+
+            continue;
+        }
+
+        if (startupActive != COM_FALSE)
+        {
+            continue;
         }
 
         if ((Com_TxIpduCfg[i].txMode == COM_TX_MODE_PERIODIC) ||

@@ -34,6 +34,9 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
+#define PMS_MILLIVOLT_TO_VOLT(value) ((float32)((value) / 1000.0f))
+#define PMS_TC007_MONSTAT1_REFRESH_WAIT_LIMIT 1000000u
+#define PMS_TC007_MONSTAT1_SETTLE_SAMPLES     4u
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
@@ -46,10 +49,203 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+static void safetyKitPmsErrataCaptureRegisters(void);
+static void safetyKitPmsErrataUpdateStatus(uint32 failureMask);
+static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadFreshMonStat1(void);
+static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadSettledMonStat1(void);
+static void safetyKitVerifyPmsTcH003Thresholds(void);
 
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+static void safetyKitPmsErrataCaptureRegisters(void)
+{
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrStat = PMS_EVRSTAT.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrAdcStat = PMS_EVRADCSTAT.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrMonStat1 = PMS_EVRMONSTAT1.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrRstCon = PMS_EVRRSTCON.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrOvMon2 = PMS_EVROVMON2.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataEvrUvMon2 = PMS_EVRUVMON2.U;
+}
+
+static void safetyKitPmsErrataUpdateStatus(uint32 failureMask)
+{
+    g_SafetyKitStatus.voltStatus.pmsErrataFailureMask |= failureMask;
+    g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus =
+            (g_SafetyKitStatus.voltStatus.pmsErrataFailureMask == 0u) ?
+                    SAFETYKIT_PMS_ERRATA_STATUS_PASSED :
+                    SAFETYKIT_PMS_ERRATA_STATUS_FAILED;
+    safetyKitPmsErrataCaptureRegisters();
+}
+
+static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadFreshMonStat1(void)
+{
+    uint32 waitCount = PMS_TC007_MONSTAT1_REFRESH_WAIT_LIMIT;
+    Ifx_PMS_MONSTAT1 initialMonStat1;
+    Ifx_PMS_MONSTAT1 currentMonStat1;
+
+    initialMonStat1.U = PMS_EVRMONSTAT1.U;
+    currentMonStat1.U = initialMonStat1.U;
+
+    while (waitCount > 0u)
+    {
+        currentMonStat1.U = PMS_EVRMONSTAT1.U;
+        if (currentMonStat1.B.ACTVCNT != initialMonStat1.B.ACTVCNT)
+        {
+            break;
+        }
+        serviceCpuWatchdog();
+        serviceSafetyWatchdog();
+        waitCount--;
+    }
+
+    if (waitCount == 0u)
+    {
+        g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount++;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    return currentMonStat1;
+}
+
+static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadSettledMonStat1(void)
+{
+    uint32 sample;
+    Ifx_PMS_MONSTAT1 currentMonStat1;
+
+    currentMonStat1.U = PMS_EVRMONSTAT1.U;
+
+    for(sample = 0u; sample < PMS_TC007_MONSTAT1_SETTLE_SAMPLES; sample++)
+    {
+        currentMonStat1 = safetyKitPmsErrataReadFreshMonStat1();
+        g_SafetyKitStatus.voltStatus.pmsErrataTc007SampleCount++;
+    }
+
+    return currentMonStat1;
+}
+
+void initPmsErrataWorkarounds(void)
+{
+    uint16 passwd;
+    uint32 failureMask = 0u;
+    uint32 standbyWakeIgnoredMask = 0u;
+    Ifx_PMS_EVRRSTCON evrRstCon;
+    Ifx_PMS_EVRSTAT checkedEvrStat;
+    Ifx_PMS_MONSTAT1 checkedMonStat1;
+    float32 vddp3Secondary;
+    float32 vddSecondary;
+    boolean tc007SamplesFresh;
+    boolean tc007Vddp3Ov;
+    boolean tc007VddOv;
+
+    g_SafetyKitStatus.voltStatus.pmsErrataFailureMask = 0u;
+    g_SafetyKitStatus.voltStatus.pmsErrataStandbyWakeIgnoredMask = 0u;
+    g_SafetyKitStatus.voltStatus.pmsErrataTc007SampleCount = 0u;
+    g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount = 0u;
+    g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus = SAFETYKIT_PMS_ERRATA_STATUS_NOT_EVALUATED;
+    checkedMonStat1 = safetyKitPmsErrataReadSettledMonStat1();
+    vddp3Secondary = IfxPmsEvr_getAdcVddp3Result((float32)checkedMonStat1.B.ADC33V);
+    vddSecondary = IfxPmsEvr_getAdcVddResult((float32)checkedMonStat1.B.ADCCV);
+    tc007SamplesFresh =
+            (g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount == 0u) ? TRUE : FALSE;
+    checkedEvrStat.U = PMS_EVRSTAT.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataCheckedEvrStat = checkedEvrStat.U;
+    g_SafetyKitStatus.voltStatus.pmsErrataCheckedEvrMonStat1 = checkedMonStat1.U;
+    safetyKitPmsErrataCaptureRegisters();
+
+    /* PMS_TC.007: PBIST may miss VDDP3/VDD overvoltage before SMU alarm enable. */
+    tc007Vddp3Ov = (((tc007SamplesFresh != FALSE) &&
+            (vddp3Secondary >= PMS_MILLIVOLT_TO_VOLT(EVR33_OV_VAL_MILLIVOLT))) ||
+            (checkedEvrStat.B.OV33 != 0u)) ? TRUE : FALSE;
+    tc007VddOv = (((tc007SamplesFresh != FALSE) &&
+            (vddSecondary >= PMS_MILLIVOLT_TO_VOLT(EVRC_OV_VAL_MILLIVOLT))) ||
+            (checkedEvrStat.B.OVC != 0u)) ? TRUE : FALSE;
+
+    if ((tc007Vddp3Ov != FALSE) && (g_SafetyKitStatus.wakeupFromStandby == FALSE))
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDDP3_OV;
+    }
+    else if (tc007Vddp3Ov != FALSE)
+    {
+        standbyWakeIgnoredMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDDP3_OV;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    if ((tc007VddOv != FALSE) && (g_SafetyKitStatus.wakeupFromStandby == FALSE))
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDD_OV;
+    }
+    else if (tc007VddOv != FALSE)
+    {
+        standbyWakeIgnoredMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDD_OV;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    g_SafetyKitStatus.voltStatus.pmsErrataStandbyWakeIgnoredMask = standbyWakeIgnoredMask;
+
+    if ((tc007SamplesFresh == FALSE) && (g_SafetyKitStatus.wakeupFromStandby == FALSE))
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC007_MONSTAT1_STALE;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    /* PMS_TC.013: TC375TI with fSRI > 200 MHz requires VDD reset trim 0x58. */
+    passwd = IfxScuWdt_getSafetyWatchdogPassword();
+    IfxScuWdt_clearSafetyEndinit(passwd);
+    evrRstCon.U = PMS_EVRRSTCON.U;
+    evrRstCon.B.RSTCTRIM = PMS_TC013_RSTCTRIM_RECOMMENDED;
+    PMS_EVRRSTCON.U = evrRstCon.U;
+    IfxScuWdt_setSafetyEndinit(passwd);
+
+    if (PMS_EVRRSTCON.B.RSTCTRIM != PMS_TC013_RSTCTRIM_RECOMMENDED)
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TC013_RSTCTRIM;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    safetyKitPmsErrataUpdateStatus(failureMask);
+}
+
+static void safetyKitVerifyPmsTcH003Thresholds(void)
+{
+    uint32 failureMask = 0u;
+
+    if (PMS_EVROVMON2.B.PREOVVAL != PMS_TCH003_PREOVVAL_RECOMMENDED)
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TCH003_PREOVVAL;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    if (PMS_EVRUVMON2.B.PREUVVAL != PMS_TCH003_PREUVVAL_RECOMMENDED)
+    {
+        failureMask |= SAFETYKIT_PMS_ERRATA_FAIL_TCH003_PREUVVAL;
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
+    safetyKitPmsErrataUpdateStatus(failureMask);
+}
+
 /*
  * SM:PMS:VX_MONITOR_CFG and SM:PMS:MON_REDUNDANCY_CFG
  * */
@@ -102,6 +298,7 @@ void initVoltageMonitors(void)
     /* -20mV just to have a different limit as EVRUV*/
     PMS_HSMUVMON.B.EVRCUVVAL = (uint8) (((EVRC_UV_VAL_MILLIVOLT - 20) - 712.5) / 5);
     IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
+    safetyKitVerifyPmsTcH003Thresholds();
     /* Initialize Lowest and Highest variables for runtime minimum maximum runtime tracking */
     g_SafetyKitStatus.voltStatus.vextVoltageLowest      = 6.0f;
     g_SafetyKitStatus.voltStatus.vextVoltageHighest     = 0.0f;

@@ -1,6 +1,7 @@
 #include "LinSM.h"
 #include "LinIf.h"
 #include "Lin.h"
+#include "LinDiag.h"
 
 #define LINSM_MAX_CHANNELS 1u
 #define LINSM_WAKEUP_TICKS 30u
@@ -18,6 +19,8 @@ void LinSM_Init(void)
         LinSM_State[ch] = LINSM_NO_COMMUNICATION;
         LinSM_Timer[ch] = 0u;
     }
+
+    LinDiag_Init();
 }
 
 Std_ReturnType LinSM_RequestComMode(uint8 Channel, LinSM_StateType RequestedState)
@@ -32,7 +35,11 @@ Std_ReturnType LinSM_RequestComMode(uint8 Channel, LinSM_StateType RequestedStat
         case LINSM_FULL_COMMUNICATION:
             if (LinSM_State[Channel] == LINSM_SLEEP)
             {
-                (void)Lin_Wakeup(Channel);
+                if (Lin_Wakeup(Channel) != E_OK)
+                {
+                    LinDiag_ReportWakeupFailure(Channel);
+                    return E_NOT_OK;
+                }
                 LinSM_State[Channel] = LINSM_WAKEUP;
                 LinSM_Timer[Channel] = LINSM_WAKEUP_TICKS;
             }
@@ -51,6 +58,7 @@ Std_ReturnType LinSM_RequestComMode(uint8 Channel, LinSM_StateType RequestedStat
                 LinSM_Timer[Channel] = LINSM_WAKEUP_TICKS;
                 return E_OK;
             }
+            LinDiag_ReportSleepFailure(Channel);
             return E_NOT_OK;
 
         case LINSM_NO_COMMUNICATION:
@@ -84,6 +92,17 @@ void LinSM_MainFunction(void)
             if (Lin_GetState(ch) == LIN_SLEEP)
             {
                 LinSM_State[ch] = LINSM_SLEEP;
+                LinDiag_ReportFrameResult(ch, LINIF_SCHED_DIAG_REQ, 0x3Cu,
+                        LIN_PID_MASTER_REQUEST, 0u, FALSE, LIN_RES_OK);
+            }
+            else if (LinSM_Timer[ch] > 0u)
+            {
+                LinSM_Timer[ch]--;
+            }
+            else
+            {
+                LinDiag_ReportSleepFailure(ch);
+                LinSM_State[ch] = LINSM_NO_COMMUNICATION;
             }
         }
         else if (LinSM_State[ch] == LINSM_WAKEUP)

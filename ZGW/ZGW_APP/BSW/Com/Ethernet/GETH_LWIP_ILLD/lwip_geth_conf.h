@@ -107,8 +107,10 @@ extern void netif_status_cb(struct netif *netif);
 
 #define LWIP_GETH_RTOS_ENABLED      1
 
-/* Lab bring-up: keep lwIP netif link-up even if PHY status readout is wrong. */
-#define LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP 1
+/* Lab bring-up override only. Production diagnostics require real PHY link state. */
+#ifndef LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
+#define LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP 0
+#endif
 
 /* Callback function name */
 #define LWIP_GETH_NETIF_STATUS_CB_FUNCTION  netif_status_cb

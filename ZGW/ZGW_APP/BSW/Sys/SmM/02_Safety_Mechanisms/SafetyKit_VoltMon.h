@@ -65,6 +65,22 @@
 /*EVR Pre Reg*/
 #define PRE_OV_VAL_MILLIVOLT    ((float32) 1460 ) /* [mV], between 1430 and 1480 */
 #define PRE_UV_VAL_MILLIVOLT    ((float32) 1125 ) /* [mV], between 1100 and 1150 */
+
+#define SAFETYKIT_PMS_ERRATA_STATUS_NOT_EVALUATED   0u
+#define SAFETYKIT_PMS_ERRATA_STATUS_PASSED          1u
+#define SAFETYKIT_PMS_ERRATA_STATUS_FAILED          2u
+
+#define SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDDP3_OV    (1u << 0u)
+#define SAFETYKIT_PMS_ERRATA_FAIL_TC007_VDD_OV      (1u << 1u)
+#define SAFETYKIT_PMS_ERRATA_FAIL_TC013_RSTCTRIM    (1u << 2u)
+#define SAFETYKIT_PMS_ERRATA_FAIL_TCH003_PREOVVAL   (1u << 3u)
+#define SAFETYKIT_PMS_ERRATA_FAIL_TCH003_PREUVVAL   (1u << 4u)
+#define SAFETYKIT_PMS_ERRATA_FAIL_TC007_MONSTAT1_STALE \
+        (1u << 5u)
+
+#define PMS_TC013_RSTCTRIM_RECOMMENDED              0x58u
+#define PMS_TCH003_PREOVVAL_RECOMMENDED             0xFEu
+#define PMS_TCH003_PREUVVAL_RECOMMENDED             0xC4u
 /*********************************************************************************************************************/
 /*---------------------------------------------------Enumerations----------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -85,6 +101,19 @@ typedef struct
     float32 coreVoltageHighest;
     float32 coreVoltageLowest;
     float32 coreVoltageUvLimit;
+    uint8 pmsErrataCheckStatus;
+    uint32 pmsErrataFailureMask;
+    uint32 pmsErrataStandbyWakeIgnoredMask;
+    uint32 pmsErrataTc007SampleCount;
+    uint32 pmsErrataTc007RefreshTimeoutCount;
+    uint32 pmsErrataCheckedEvrStat;
+    uint32 pmsErrataCheckedEvrMonStat1;
+    uint32 pmsErrataEvrStat;
+    uint32 pmsErrataEvrAdcStat;
+    uint32 pmsErrataEvrMonStat1;
+    uint32 pmsErrataEvrRstCon;
+    uint32 pmsErrataEvrOvMon2;
+    uint32 pmsErrataEvrUvMon2;
 } VoltStatusType;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
@@ -92,6 +121,7 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+void initPmsErrataWorkarounds(void);
 void initVoltageMonitors(void);
 void getPmsVoltageMeasurements(void);
 #endif /* SAFETYKIT_VOLTMON_H_ */

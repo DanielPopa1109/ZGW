@@ -122,7 +122,7 @@ Lin_ResultType Lin_LowLevel_TransferFrame(uint8 Channel,
 
         if ((waitError != FALSE) && (error == LIN_RES_OK))
         {
-            error = LIN_RES_TIMEOUT;
+            error = LIN_RES_HEADER_ERROR;
         }
 
         if (error != LIN_RES_OK)
@@ -135,7 +135,7 @@ Lin_ResultType Lin_LowLevel_TransferFrame(uint8 Channel,
 
         if ((waitError != FALSE) && (error == LIN_RES_OK))
         {
-            error = LIN_RES_TIMEOUT;
+            error = LIN_RES_HEADER_ERROR;
         }
 
         return error;
@@ -193,7 +193,7 @@ Lin_ResultType Lin_LowLevel_TransferFrame(uint8 Channel,
     if ((error == LIN_RES_OK) &&
         (Lin_Ild.acknowledgmentFlags.txHeaderEnd == 0u))
     {
-        error = LIN_RES_TIMEOUT;
+        error = LIN_RES_HEADER_ERROR;
     }
 
     return error;
@@ -238,7 +238,7 @@ void Lin_LowLevel_SendByte(uint8 Channel, uint8 byte)
             if ((error == LIN_RES_OK) &&
                 (Lin_Ild.acknowledgmentFlags.txHeaderEnd == 0u))
             {
-                error = LIN_RES_TIMEOUT;
+                error = LIN_RES_HEADER_ERROR;
             }
 
             if (error != LIN_RES_OK)

@@ -31,7 +31,8 @@ typedef enum
     LIN_RES_PID_ERROR,
     LIN_RES_FRAMING_ERROR,
     LIN_RES_SYNC_ERROR,
-    LIN_RES_TIMEOUT
+    LIN_RES_TIMEOUT,
+    LIN_RES_HEADER_ERROR
 } Lin_ResultType;
 
 typedef struct

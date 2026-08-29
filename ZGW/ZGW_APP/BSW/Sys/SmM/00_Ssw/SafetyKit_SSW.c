@@ -52,10 +52,25 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define PMSWSTAT2_WAKE_UP_FLAGS_MASK     0xFF
+#define SAFETYKIT_STANDBY_WAKE_SOURCE_LBIST_RETAINED \
+        (1u << 8u)
+#define SAFETYKIT_STANDBY_WAKE_SOURCE_SCR_LATCH      \
+        (1u << 9u)
+#define SAFETYKIT_STANDBY_WAKE_LATCH_SOURCE_MASK     \
+        (SCR_STANDBY_WAKE_SOURCE_PMS | \
+         SCR_STANDBY_WAKE_SOURCE_SCR_XRAM | \
+         SCR_STANDBY_WAKE_SOURCE_APP_ARMED)
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
+volatile uint32 SafetyKit_StandbyWakeRawPmsWstat2;
+volatile uint8 SafetyKit_StandbyWakeScrReason;
+volatile uint8 SafetyKit_StandbyWakeRetained;
+volatile uint32 SafetyKit_StandbyWakeSourceMask;
+volatile uint8 SafetyKit_StandbyWakeLatchValid;
+volatile uint8 SafetyKit_StandbyWakeLatchSourceMask;
+volatile uint8 SafetyKit_StandbyWakeLatchPmsWstat2;
+volatile uint8 SafetyKit_StandbyWakeLatchScrReason;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -64,6 +79,8 @@
 /*********************************************************************************************************************/
 SafetyKitResetCode safetyKitEvaluateReset(void);
 boolean safetyKitEvaluateStandby(void);
+static void safetyKitClearStandbyWakeFlags(uint32 wakeFlags);
+static boolean safetyKitReadStandbyWakeLatch(uint8 *sourceMask, uint8 *pmsWakeFlags, uint8 *scrWakeReason);
 static uint32 safetyKitGetStartupFailureMask(boolean includeSmuStatus);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
@@ -100,7 +117,6 @@ static uint32 safetyKitGetStartupFailureMask(boolean includeSmuStatus)
     {
         failureMask |= MCUSM_SAFETYKIT_FAIL_MBIST;
     }
-
     if (includeSmuStatus != FALSE)
     {
         if (g_SafetyKitStatus.smuStatus.smuCoreKeysTestSts == fail)
@@ -188,6 +204,16 @@ void runSafeAppSwStartup(void)
 {
     McuSm_SswStartupCounter++;
 
+    g_SafetyKitStatus.wakeupFromStandby = safetyKitEvaluateStandby();
+    if (g_SafetyKitStatus.wakeupFromStandby != FALSE)
+    {
+        McuSm_SaveRetainedStateToScr();
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+
     safetyKitSswLbist();
 
     g_SafetyKitStatus.resetCode = safetyKitEvaluateReset();
@@ -213,10 +239,15 @@ void runSafeAppSwStartup(void)
     /* MBIST can include SCR XRAM; rewrite the handoff after the non-destructive test. */
     McuSm_SaveRetainedStateToScr();
     (void)McuSm_RestoreRetainedStateFromScr();
+    g_SafetyKitStatus.wakeupFromStandby =
+            (McuSm_SswStatusData.wakeupFromStandby != 0u) ? TRUE : FALSE;
+
+    initPmsErrataWorkarounds();
 
     safetyKitEnableAllSMUAlarms();
 
     safetyKitUpdateMcuSmStatusAndResetReaction(FALSE);
+    /* Standby wake latch support is disabled while using the older McuSm variant. */
 }
 /*
  * This function Evaluate the Reset and returns reset code which contains Reset type, trigger and reason details.
@@ -243,7 +274,8 @@ SafetyKitResetCode safetyKitEvaluateReset(void)
         rstStat.U = MODULE_SCU.RSTSTAT.U;
         rstCon.U = MODULE_SCU.RSTCON.U;
         McuSm_SswStatusData.rstStat = rstStat.U;
-        pmsStandbyWake = ((PMS_PMSWSTAT2.U & PMSWSTAT2_WAKE_UP_FLAGS_MASK) > 0u) ? TRUE : FALSE;
+        pmsStandbyWake = (((PMS_PMSWSTAT2.U & SCR_STANDBY_WAKE_PMSWSTAT2_WAKE_FLAGS_MASK) > 0u) ||
+                (McuSm_SswStatusData.wakeupFromStandby != 0u)) ? TRUE : FALSE;
 
         /* Evaluate the warm reset conditions first */
         if (rstStat.B.ESR0)
@@ -379,6 +411,34 @@ SafetyKitResetCode safetyKitEvaluateReset(void)
 /*
  * This function evaluates if software execution is continuing after being in Standby mode
  * */
+static void safetyKitClearStandbyWakeFlags(uint32 wakeFlags)
+{
+    if (wakeFlags != 0u)
+    {
+        uint16 endinitSfty_pw = IfxScuWdt_getSafetyWatchdogPassword();
+
+        IfxScuWdt_clearSafetyEndinit(endinitSfty_pw);
+        PMS_PMSWSTATCLR.U = wakeFlags;
+        IfxScuWdt_setSafetyEndinit(endinitSfty_pw);
+    }
+    else
+    {
+        /* Do nothing. */
+    }
+}
+
+static boolean safetyKitReadStandbyWakeLatch(uint8 *sourceMask, uint8 *pmsWakeFlags, uint8 *scrWakeReason)
+{
+    *sourceMask = 0u;
+    *pmsWakeFlags = 0u;
+    *scrWakeReason = 0u;
+    SafetyKit_StandbyWakeLatchValid = 0u;
+    SafetyKit_StandbyWakeLatchSourceMask = 0u;
+    SafetyKit_StandbyWakeLatchPmsWstat2 = 0u;
+    SafetyKit_StandbyWakeLatchScrReason = 0u;
+    return FALSE;
+}
+
 boolean safetyKitEvaluateStandby(void)
 {
     static boolean standbyEvaluated = FALSE;
@@ -386,23 +446,87 @@ boolean safetyKitEvaluateStandby(void)
 
     if(standbyEvaluated == FALSE)
     {
-        if ((PMS_PMSWSTAT2.U & PMSWSTAT2_WAKE_UP_FLAGS_MASK) > 0)
+        uint32 pmsWstat2 = PMS_PMSWSTAT2.U;
+        uint32 wakeFlags;
+        uint8 scrWakeReason = 0u;
+        uint8 retainedStandbyWake = McuSm_SswStatusData.wakeupFromStandby;
+        uint8 latchSourceMask = 0u;
+        uint8 latchPmsWakeFlags = 0u;
+        uint8 latchScrWakeReason = 0u;
+        boolean latchValid;
+        uint32 sourceMask = 0u;
+
+        /* Standby wake capture extension is disabled while using the older McuSm variant. */
+        wakeFlags = pmsWstat2 & SCR_STANDBY_WAKE_PMSWSTAT2_WAKE_FLAGS_MASK;
+
+        if ((McuSm_Trap4ScrRtcRecordValid != FALSE) &&
+                ((McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_FLAGS] & SCR_TIME_FLAG_ARMED) != 0u) &&
+                ((McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_FLAGS] & SCR_TIME_FLAG_CONSUMED) == 0u))
         {
-            /* Clear standby flag */
-            uint16 endinitSfty_pw = IfxScuWdt_getSafetyWatchdogPassword();
-
-            IfxScuWdt_clearSafetyEndinit(endinitSfty_pw);
-
-            PMS_PMSWSTATCLR.U |= (PMS_PMSWSTAT2.U & PMSWSTAT2_WAKE_UP_FLAGS_MASK);
-
-            IfxScuWdt_setSafetyEndinit(endinitSfty_pw);
-
-            comingFromStandby = TRUE;
+            scrWakeReason = McuSm_Trap4ScrRtcRecord[SCR_TIME_OFFSET_WAKE_REASON];
         }
         else
         {
-            comingFromStandby = FALSE;
+            /* Do nothing. */
         }
+
+        if (wakeFlags != 0u)
+        {
+            sourceMask |= SCR_STANDBY_WAKE_SOURCE_PMS;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        if (scrWakeReason != 0u)
+        {
+            sourceMask |= SCR_STANDBY_WAKE_SOURCE_SCR_XRAM;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        if ((retainedStandbyWake != 0u) &&
+                (MODULE_SCU.RSTSTAT.B.LBTERM != 0u) &&
+                (McuSm_SswStatusData.lbistAppSwReq != 0u))
+        {
+            sourceMask |= SAFETYKIT_STANDBY_WAKE_SOURCE_LBIST_RETAINED;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        latchValid = safetyKitReadStandbyWakeLatch(
+                &latchSourceMask,
+                &latchPmsWakeFlags,
+                &latchScrWakeReason);
+        if (latchValid != FALSE)
+        {
+            sourceMask |= (uint32)latchSourceMask;
+            sourceMask |= SAFETYKIT_STANDBY_WAKE_SOURCE_SCR_LATCH;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        comingFromStandby = (sourceMask != 0u) ? TRUE : FALSE;
+        McuSm_SswStatusData.wakeupFromStandby = (comingFromStandby != FALSE) ? 1u : 0u;
+
+        SafetyKit_StandbyWakeRawPmsWstat2 = pmsWstat2;
+        SafetyKit_StandbyWakeScrReason = scrWakeReason;
+        SafetyKit_StandbyWakeRetained = retainedStandbyWake;
+        SafetyKit_StandbyWakeSourceMask = sourceMask;
+
+        safetyKitClearStandbyWakeFlags(wakeFlags);
+        standbyEvaluated = TRUE;
+    }
+    else
+    {
+        /* Do nothing. */
     }
 
     return comingFromStandby;

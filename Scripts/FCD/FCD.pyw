@@ -40,12 +40,13 @@ FCD_TRACE_MIRROR_PORT = 54088
 FCD_TRACE_MIRROR_MAGIC = b"FCDT"
 DEFAULT_APP_START = 0xA0030000
 DEFAULT_APP_END = 0xA05CFFFF
-# Normal ZGW DoIP TransferData carries 4096 firmware bytes plus SID/BSC overhead.
+# Normal ZGW DoIP TransferData carries 4096 firmware bytes by default; the ECU
+# advertises the active maximum in RequestDownload.
 DEFAULT_BLOCK_SIZE = 4096
 TRANSFER_DATA_REQUEST_LIMIT = 256
 TRANSFER_DATA_OVERHEAD_BYTES = 2
 TRANSFER_DATA_MAX_CHUNK_SIZE = TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
-ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT = 4098
+ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT = 32770
 ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE = (
     ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
 )
@@ -90,9 +91,10 @@ TRACE_DRAIN_MAX_LINES = 100
 FAULT_MEMORY_REQUEST_SPACING_SECONDS = 0.02
 FAULT_MEMORY_DETAIL_TIMEOUT_SECONDS = 8.0
 
-POST_RESET_RECONNECT_DELAY_SECONDS = 1.0
+POST_RESET_RESPONSE_TIMEOUT_SECONDS = 0.1
+POST_RESET_RECONNECT_DELAY_SECONDS = 0.1
 POST_RESET_UDS_READY_TIMEOUT_SECONDS = 30.0
-POST_RESET_UDS_READY_RETRY_SECONDS = 0.5
+POST_RESET_UDS_READY_RETRY_SECONDS = 0.1
 
 # Lab ZGW CodingApp identifiers. These mirror APP/CodingApp/CodingApp.h.
 CODING_DID_STATUS = 0xF1C0
@@ -235,6 +237,9 @@ def _build_coding_parameter_names():
 
 CODING_PARAMETER_NAMES = _build_coding_parameter_names()
 CODING_PARAMETER_INDEX = {name: idx for idx, name in enumerate(CODING_PARAMETER_NAMES)}
+CODING_VISIBLE_PARAMETER_NAMES = tuple(
+    name for name in CODING_PARAMETER_NAMES if not name.startswith("(reserved")
+)
 CODING_RX_PARAMETER_COUNT = len([name for name in CODING_PARAMETER_NAMES if not name.startswith("TX_") and not name.startswith("(reserved")])
 CODING_RX_MASK_BYTES = (CODING_RX_PARAMETER_COUNT + 7) // 8
 CODING_TX_PDU_COUNT = len([name for name in CODING_PARAMETER_NAMES if name.startswith("TX_")])
@@ -262,7 +267,12 @@ def coding_parameter_index(name):
             return None
     return None
 
+
+def is_reserved_coding_parameter(name):
+    return str(name).strip().startswith("(reserved bit ")
+
 DEM_DTC_MCUSM_SW_ERROR = 0x010101
+DEM_DTC_PMS_ERRATA_STARTUP = 0x010102
 DEM_DTC_CODING_ECU_NOT_CODED = 0x023000
 DEM_DTC_CODING_INVALID = 0x023001
 DEM_DTC_AIMODEL_INPUT_INVALID = 0x024000
@@ -271,6 +281,40 @@ DEM_DTC_AIMODEL_DEADLINE_EXCEEDED = 0x024002
 DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE = 0x024003
 DEM_DTC_AIMODEL_CONSUMER_FAULT = 0x024100
 DEM_AIMODEL_CONSUMER_EVENT_COUNT = 75
+DEM_DTC_CAN_BUS_DIAG = 0x022100
+DEM_CAN_BUS_DIAG_EVENT_COUNT = 8
+DEM_DTC_CAN_CLASSIC_BUS_OFF = 0x022100
+DEM_DTC_CAN_CLASSIC_ERROR_PASSIVE = 0x022101
+DEM_DTC_CAN_CLASSIC_CONTROLLER_FAULT = 0x022102
+DEM_DTC_CAN_CLASSIC_PROTOCOL_ERROR = 0x022103
+DEM_DTC_CANFD_BUS_OFF = 0x022104
+DEM_DTC_CANFD_ERROR_PASSIVE = 0x022105
+DEM_DTC_CANFD_CONTROLLER_FAULT = 0x022106
+DEM_DTC_CANFD_PROTOCOL_ERROR = 0x022107
+DEM_DTC_LIN_BUS_DIAG = 0x022200
+DEM_LIN_BUS_DIAG_EVENT_COUNT = 5
+DEM_DTC_LIN1_HVDCDC_NO_COMMUNICATION = 0x022200
+DEM_DTC_LIN1_PROTOCOL_ERROR = 0x022201
+DEM_DTC_LIN1_CONTROLLER_FAULT = 0x022202
+DEM_DTC_LIN1_WAKEUP_FAILURE = 0x022203
+DEM_DTC_LIN1_SLEEP_FAILURE = 0x022204
+DEM_DTC_ETHERNET_DIAG = 0x022000
+DEM_ETHERNET_DIAG_EVENT_COUNT = 15
+DEM_DTC_ETH_LINK_LOST = 0x022000
+DEM_DTC_ETH_CTRL_DMA_FAILURE = 0x022001
+DEM_DTC_ETH_RX_COMM_FAILURE = 0x022002
+DEM_DTC_ETH_TX_COMM_FAILURE = 0x022003
+DEM_DTC_ETH_TCP_UNEXPECTED_TERMINATION = 0x022004
+DEM_DTC_ETH_TCP_ESTABLISHMENT_FAILURE = 0x022005
+DEM_DTC_ETH_UDP_SUPERVISION_TIMEOUT = 0x022006
+DEM_DTC_ETH_SERVICE_AVAILABILITY_FAILURE = 0x022007
+DEM_DTC_ETH_DOIP_COMM_FAILURE = 0x022008
+DEM_DTC_ETH_PARTNER_COMM_TERMINATED = 0x022009
+DEM_DTC_ETH_PHY_COMMUNICATION_FAULT = 0x02200A
+DEM_DTC_ETH_PHY_FAULT = 0x02200B
+DEM_DTC_ETH_NEGOTIATION_FAILURE = 0x02200C
+DEM_DTC_ETH_UNEXPECTED_LINK_MODE = 0x02200D
+DEM_DTC_ETH_RESOURCE_EXHAUSTION = 0x02200E
 DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT = 0x021000
 DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT = CODING_RX_PARAMETER_COUNT
 DEM_DTC_TIMESTAMP_DATA_SIZE = 22
@@ -278,12 +322,41 @@ MCUSM_SNAPSHOT_TIMESTAMP_OFFSET = 224
 
 STATIC_DTC_DESCRIPTIONS = {
     DEM_DTC_MCUSM_SW_ERROR: "MCUSM software error",
+    DEM_DTC_PMS_ERRATA_STARTUP: "PMS errata startup warning",
     DEM_DTC_CODING_ECU_NOT_CODED: "Coding ECU not coded",
     DEM_DTC_CODING_INVALID: "Coding invalid",
     DEM_DTC_AIMODEL_INPUT_INVALID: "AiModel input invalid or stale",
     DEM_DTC_AIMODEL_INFERENCE_INVALID: "AiModel inference invalid",
     DEM_DTC_AIMODEL_DEADLINE_EXCEEDED: "AiModel inference deadline exceeded",
     DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE: "AiModel output out of range",
+    DEM_DTC_CAN_CLASSIC_BUS_OFF: "ZGW_CAN_3 Bus-Off",
+    DEM_DTC_CAN_CLASSIC_ERROR_PASSIVE: "CAN Error Passive",
+    DEM_DTC_CAN_CLASSIC_CONTROLLER_FAULT: "CAN Controller Fault",
+    DEM_DTC_CAN_CLASSIC_PROTOCOL_ERROR: "CAN Excessive Protocol Error",
+    DEM_DTC_CANFD_BUS_OFF: "ZGW_CANFD_2 Bus-Off",
+    DEM_DTC_CANFD_ERROR_PASSIVE: "CANFD Error Passive",
+    DEM_DTC_CANFD_CONTROLLER_FAULT: "CANFD Controller Fault",
+    DEM_DTC_CANFD_PROTOCOL_ERROR: "CANFD Excessive Protocol Error",
+    DEM_DTC_LIN1_HVDCDC_NO_COMMUNICATION: "LIN1 Slave HVDCDC - No Communication",
+    DEM_DTC_LIN1_PROTOCOL_ERROR: "LIN1 Protocol Error",
+    DEM_DTC_LIN1_CONTROLLER_FAULT: "LIN1 Controller Fault",
+    DEM_DTC_LIN1_WAKEUP_FAILURE: "LIN1 Wakeup Failure",
+    DEM_DTC_LIN1_SLEEP_FAILURE: "LIN1 Sleep Transition Failure",
+    DEM_DTC_ETH_LINK_LOST: "ETH0 Link Down",
+    DEM_DTC_ETH_CTRL_DMA_FAILURE: "ETH0 MAC Controller Fault",
+    DEM_DTC_ETH_RX_COMM_FAILURE: "ETH0 Excessive RX Frame Errors",
+    DEM_DTC_ETH_TX_COMM_FAILURE: "ETH0 Excessive TX Errors",
+    DEM_DTC_ETH_TCP_UNEXPECTED_TERMINATION: "Ethernet TCP Unexpected Termination",
+    DEM_DTC_ETH_TCP_ESTABLISHMENT_FAILURE: "Ethernet TCP Establishment Failure",
+    DEM_DTC_ETH_UDP_SUPERVISION_TIMEOUT: "Ethernet UDP Supervision Timeout",
+    DEM_DTC_ETH_SERVICE_AVAILABILITY_FAILURE: "SOME/IP Service 0x1234 Instance 0x0001 - Unavailable",
+    DEM_DTC_ETH_DOIP_COMM_FAILURE: "DoIP Communication Fault",
+    DEM_DTC_ETH_PARTNER_COMM_TERMINATED: "Ethernet Remote Partner - No Communication",
+    DEM_DTC_ETH_PHY_COMMUNICATION_FAULT: "ETH0 PHY Communication Fault",
+    DEM_DTC_ETH_PHY_FAULT: "ETH0 PHY Hardware Fault",
+    DEM_DTC_ETH_NEGOTIATION_FAILURE: "ETH0 Auto-negotiation Failure",
+    DEM_DTC_ETH_UNEXPECTED_LINK_MODE: "ETH0 Unexpected Link Speed/Duplex",
+    DEM_DTC_ETH_RESOURCE_EXHAUSTION: "Ethernet Resource Exhaustion",
 }
 
 def is_aimodel_consumer_dtc(dtc):
@@ -302,6 +375,125 @@ def describe_aimodel_consumer_dtc(dtc):
 #   Dem_DefaultSnapshotDataCapture       (Dem_Cfg.c)
 GATEWAY_BUS_TEXT = {1: "CAN", 2: "CAN-FD", 3: "LIN"}
 GATEWAY_RX_DIAG_STATUS_TEXT = {0x00: "OK", 0x01: "TIMEOUT", 0x02: "INVALID"}
+CANDIAG_CONTROLLER_TEXT = {0: "ZGW_CAN_3", 1: "ZGW_CANFD_2"}
+CANDIAG_FAULT_TEXT = {
+    0: "Bus-Off",
+    1: "Error Passive",
+    2: "Controller Fault",
+    3: "Excessive Protocol Error",
+}
+CANDIAG_CAN_STATE_TEXT = {0: "UNINIT", 1: "READY", 2: "SLEEP", 3: "BUS_OFF"}
+CANDIAG_ERROR_STATE_TEXT = {
+    0: "ERROR_ACTIVE",
+    1: "ERROR_WARNING",
+    2: "ERROR_PASSIVE",
+    3: "BUS_OFF",
+}
+CANDIAG_CANSM_STATE_TEXT = {
+    0: "UNINIT",
+    1: "NO_COMMUNICATION",
+    2: "SILENT_COMMUNICATION",
+    3: "FULL_COMMUNICATION",
+    4: "BUS_OFF_CHECK",
+    5: "BUS_OFF_RECOVERY_L1",
+    6: "BUS_OFF_RECOVERY_L2",
+    7: "FAILED",
+}
+CANDIAG_COMM_MODE_TEXT = {0: "NO_COMMUNICATION", 1: "SILENT_COMMUNICATION", 2: "FULL_COMMUNICATION"}
+CANDIAG_PDU_MODE_TEXT = {0: "OFFLINE", 1: "RX_ONLINE", 2: "TX_ONLINE", 3: "ONLINE"}
+LINDIAG_CHANNEL_TEXT = {0: "LIN1"}
+LINDIAG_FAULT_TEXT = {
+    0: "Slave HVDCDC - No Communication",
+    1: "Protocol Error",
+    2: "Controller Fault",
+    3: "Wakeup Failure",
+    4: "Sleep Transition Failure",
+}
+LINDIAG_SCHEDULE_TEXT = {0: "Normal", 1: "Diagnostic Master Request", 2: "Diagnostic Slave Response"}
+LINDIAG_LINSM_STATE_TEXT = {
+    0: "UNINIT",
+    1: "NO_COMMUNICATION",
+    2: "FULL_COMMUNICATION",
+    3: "GOTO_SLEEP",
+    4: "SLEEP",
+    5: "WAKEUP",
+}
+LINDIAG_LIN_STATE_TEXT = {
+    0: "UNINIT",
+    1: "INIT",
+    2: "IDLE",
+    3: "TX_BREAK",
+    4: "TX_SYNC",
+    5: "TX_PID",
+    6: "TX_RESPONSE",
+    7: "RX_RESPONSE",
+    8: "SLEEP_PENDING",
+    9: "TX_SLEEP",
+    10: "SLEEP",
+    11: "WAKEUP",
+    12: "ERROR",
+}
+LINDIAG_RESULT_TEXT = {
+    0: "OK",
+    1: "NOT_OK",
+    2: "NO_RESPONSE",
+    3: "CHECKSUM_ERROR",
+    4: "PID_ERROR",
+    5: "FRAMING_ERROR",
+    6: "SYNC_ERROR",
+    7: "TIMEOUT",
+    8: "HEADER_ERROR",
+}
+LINDIAG_ERROR_CLASS_TEXT = {
+    0: "None",
+    1: "No response",
+    2: "Timeout",
+    3: "Checksum",
+    4: "PID/parity",
+    5: "Framing",
+    6: "Synchronization",
+    7: "Header transmission",
+    8: "Controller",
+    9: "Diagnostic schedule timeout",
+    10: "Schedule error",
+}
+LINDIAG_CHANNEL_STATE_TEXT = {
+    0: "IDLE",
+    1: "BUSY",
+    2: "ERROR",
+}
+LINDIAG_DIAG_STATE_TEXT = {
+    0: "IDLE",
+    1: "MRF_PENDING",
+    2: "MRF_ACTIVE",
+    3: "SRF_PENDING",
+    4: "SRF_ACTIVE",
+    5: "DONE",
+    6: "ERROR",
+}
+ETHDIAG_PROTOCOL_TEXT = {0: "UDP", 1: "TCP"}
+ETHDIAG_SOAD_STATE_TEXT = {
+    0: "CLOSED",
+    1: "OPEN",
+    2: "CONNECTED",
+    3: "RECONNECT",
+}
+ETHDIAG_PHY_STATE_TEXT = {
+    0: "UNINIT",
+    1: "RESET",
+    2: "WAIT_RESET_DONE",
+    3: "CONFIGURE",
+    4: "WAIT_AUTONEG",
+    5: "LINK_DOWN",
+    6: "LINK_UP",
+    7: "ERROR",
+}
+ETHDIAG_RESOURCE_FLAG_TEXT = [
+    (0x0001, "TX descriptor unavailable"),
+    (0x0002, "TX pbuf allocation failed"),
+    (0x0004, "TX pbuf chain allocation failed"),
+    (0x0008, "RX pbuf allocation failed"),
+]
 TIMEBASE_SOURCE_TEXT = {
     0: "default compile-time",
     1: "UDS routine",
@@ -364,6 +556,14 @@ MCUSM_FW_CHECK_RESULT_BITS = [
     (0x00000040, "LBIST SSH no-init accepted"),
     (0x00000080, "LBIST SSH init accepted"),
 ]
+PMS_ERRATA_FAILURE_BITS = [
+    (0x00000001, "TC007 VDDP3 OV"),
+    (0x00000002, "TC007 VDD OV"),
+    (0x00000004, "TC013 RSTCTRIM"),
+    (0x00000008, "TCH003 PREOVVAL"),
+    (0x00000010, "TCH003 PREUVVAL"),
+    (0x00000020, "TC007 MONSTAT1 stale"),
+]
 SAFETYKIT_RESET_TYPE_TEXT = {
     0: "cold power-on",
     1: "system",
@@ -408,12 +608,41 @@ SMU_STATUS_TEXT = {
 }
 DEM_EVENT_ID_NAMES = {
     1: "MCUSM software error",
-    2: "Coding ECU not coded",
-    3: "Coding invalid",
-    4: "AiModel input invalid or stale",
-    5: "AiModel inference invalid",
-    6: "AiModel inference deadline exceeded",
-    7: "AiModel output out of range",
+    2: "PMS errata startup warning",
+    3: "Coding ECU not coded",
+    4: "Coding invalid",
+    5: "AiModel input invalid or stale",
+    6: "AiModel inference invalid",
+    7: "AiModel inference deadline exceeded",
+    8: "AiModel output out of range",
+    9: "ETH0 Link Down",
+    10: "ETH0 MAC Controller Fault",
+    11: "ETH0 Excessive RX Frame Errors",
+    12: "ETH0 Excessive TX Errors",
+    13: "Ethernet TCP Unexpected Termination",
+    14: "Ethernet TCP Establishment Failure",
+    15: "Ethernet UDP Supervision Timeout",
+    16: "SOME/IP Service 0x1234 Instance 0x0001 - Unavailable",
+    17: "DoIP Communication Fault",
+    18: "Ethernet Remote Partner - No Communication",
+    19: "ETH0 PHY Communication Fault",
+    20: "ETH0 PHY Hardware Fault",
+    21: "ETH0 Auto-negotiation Failure",
+    22: "ETH0 Unexpected Link Speed/Duplex",
+    23: "Ethernet Resource Exhaustion",
+    24: "ZGW_CAN_3 Bus-Off",
+    25: "CAN Error Passive",
+    26: "CAN Controller Fault",
+    27: "CAN Excessive Protocol Error",
+    28: "ZGW_CANFD_2 Bus-Off",
+    29: "CANFD Error Passive",
+    30: "CANFD Controller Fault",
+    31: "CANFD Excessive Protocol Error",
+    32: "LIN1 Slave HVDCDC - No Communication",
+    33: "LIN1 Protocol Error",
+    34: "LIN1 Controller Fault",
+    35: "LIN1 Wakeup Failure",
+    36: "LIN1 Sleep Transition Failure",
 }
 
 ROUTINE_ERASE_MEMORY = 0x0001
@@ -682,6 +911,9 @@ def u32_be(data, offset):
         | (data[offset + 2] << 8)
         | data[offset + 3]
     )
+
+def ip4_to_text(value):
+    return ".".join(str((value >> shift) & 0xFF) for shift in (24, 16, 8, 0))
 
 def s32_be(data, offset):
     value = u32_be(data, offset)
@@ -1798,6 +2030,7 @@ class FcdApp:
         self.routed_bus_last_request_ts = {}
         self.routed_node_last_request_ts = {}
         self.coding_shared_client = None
+        self.progress_run_id = 0
         self.settings = self._load_settings_file()
 
         self._build_style()
@@ -2294,7 +2527,6 @@ class FcdApp:
         self.session_var = tk.StringVar(value="0x02")
 
         self._entry_row(options, 1, "Block size", self.block_size_var, 10, 0)
-        self._entry_row(options, 1, "FBL erase timeout", self.fbl_erase_timeout_var, 10, 2)
 
         columns = ("item", "value")
         self.payload_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="browse")
@@ -3253,7 +3485,7 @@ class FcdApp:
         # into plain words. (NRCs never reach here; they raise NegativeResponse.)
         explanation = self._explain_dtc_detail(dtc, expected_subfunction, data)
         if explanation:
-            return f"{explanation}   |   [rec 0x{record:02X}, raw {raw}]"
+            return f"{explanation}   |   [rec 0x{record:02X}]"
         return f"status=0x{status:02X} record=0x{record:02X} data={raw}"
 
     def _explain_dtc_detail(self, dtc, subfunction, data):
@@ -3267,6 +3499,14 @@ class FcdApp:
         try:
             if dtc == DEM_DTC_MCUSM_SW_ERROR:
                 return self._explain_mcusm_detail(data, is_snapshot)
+            if dtc == DEM_DTC_PMS_ERRATA_STARTUP:
+                return self._explain_pms_errata_detail(data, is_snapshot)
+            if DEM_DTC_CAN_BUS_DIAG <= dtc < (DEM_DTC_CAN_BUS_DIAG + DEM_CAN_BUS_DIAG_EVENT_COUNT):
+                return self._explain_can_bus_detail(dtc, data, is_snapshot)
+            if DEM_DTC_LIN_BUS_DIAG <= dtc < (DEM_DTC_LIN_BUS_DIAG + DEM_LIN_BUS_DIAG_EVENT_COUNT):
+                return self._explain_lin_bus_detail(dtc, data, is_snapshot)
+            if DEM_DTC_ETHERNET_DIAG <= dtc < (DEM_DTC_ETHERNET_DIAG + DEM_ETHERNET_DIAG_EVENT_COUNT):
+                return self._explain_ethernet_detail(dtc, data, is_snapshot)
             if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (
                     DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
                 return self._explain_gateway_detail(dtc, data, is_snapshot)
@@ -3283,6 +3523,186 @@ class FcdApp:
         except (IndexError, struct.error):
             return ""
         return ""
+
+    def _explain_ethernet_detail(self, dtc, data, is_snapshot):
+        if not is_snapshot:
+            return ""
+        timestamp_text = format_dtc_timestamp_data(data, "Ethernet DTC occurrence time")
+        if len(data) < 96:
+            return timestamp_text
+
+        local_ip = u32_be(data, 22)
+        remote_ip = u32_be(data, 26)
+        local_port = u16_be(data, 30)
+        remote_port = u16_be(data, 32)
+        socon_id = data[34]
+        connection_id = data[35]
+        protocol = data[36]
+        link_up = data[37]
+        rx_errors = u32_be(data, 38)
+        tx_errors = u32_be(data, 42)
+        dma_errors = u32_be(data, 46)
+        tcp_closes = u32_be(data, 50)
+        open_fails = u32_be(data, 54)
+        link_downs = u32_be(data, 58)
+        listen_socket = u32_be(data, 62)
+        active_socket = u32_be(data, 66)
+        soad_state = data[70]
+        phy_state = data[71]
+        phy_addr = data[72]
+        phy_init_done = data[73]
+        phy_autoneg_done = data[74]
+        phy_speed100 = data[75]
+        phy_full_duplex = data[76]
+        phy_reset_timeouts = u32_be(data, 77)
+        phy_autoneg_timeouts = u32_be(data, 81)
+        phy_mdio_errors = u32_be(data, 85)
+        resource_errors = u32_be(data, 89)
+        resource_flags = u16_be(data, 93)
+
+        parts = [self._describe_zgw_dtc(dtc)]
+        if timestamp_text:
+            parts.append(timestamp_text)
+        parts.extend([
+            f"Port=ETH0",
+            f"Link={'Up' if link_up else 'Down'}",
+            f"PHY=0x{phy_addr:02X}",
+            f"PHY state={ETHDIAG_PHY_STATE_TEXT.get(phy_state, phy_state)}",
+            f"PHY initDone={phy_init_done}, autonegDone={phy_autoneg_done}",
+            f"Speed={'100 Mbps' if phy_speed100 else '10 Mbps'}",
+            f"Duplex={'Full' if phy_full_duplex else 'Half'}",
+            f"SoCon={socon_id}, connection={connection_id}, protocol={ETHDIAG_PROTOCOL_TEXT.get(protocol, protocol)}",
+            f"SoAd={ETHDIAG_SOAD_STATE_TEXT.get(soad_state, soad_state)}",
+            f"Local={ip4_to_text(local_ip)}:{local_port}",
+            f"Remote={ip4_to_text(remote_ip)}:{remote_port}",
+            f"Sockets listen={listen_socket}, active={active_socket}",
+            f"RX errors={rx_errors}, TX errors={tx_errors}, DMA errors={dma_errors}",
+            f"TCP closes={tcp_closes}, socket open failures={open_fails}, link-down transitions={link_downs}",
+            f"PHY reset timeouts={phy_reset_timeouts}, autoneg timeouts={phy_autoneg_timeouts}, MDIO errors={phy_mdio_errors}",
+            f"Resource errors={resource_errors}, resource flags={flag_names(resource_flags, ETHDIAG_RESOURCE_FLAG_TEXT)} (0x{resource_flags:04X})",
+        ])
+        return " | ".join(parts)
+
+    def _explain_can_bus_detail(self, dtc, data, is_snapshot):
+        if not is_snapshot:
+            return ""
+        timestamp_text = format_dtc_timestamp_data(data, "CAN bus DTC occurrence time")
+        if len(data) < 32:
+            return timestamp_text
+        base = DEM_DTC_TIMESTAMP_DATA_SIZE
+        controller = data[base + 1]
+        fault = data[base + 2]
+        can_state = data[base + 3]
+        error_state = data[base + 4]
+        tx_error_counter = data[base + 5]
+        rx_error_counter = data[base + 6]
+        cansm_state = data[base + 7]
+        comm_mode = data[base + 8]
+        pdu_mode = data[base + 9]
+        bus_off_count = int.from_bytes(data[base + 10:base + 14], "big")
+        bus_text = CANDIAG_CONTROLLER_TEXT.get(controller, f"controller {controller}")
+        fault_text = CANDIAG_FAULT_TEXT.get(fault, f"fault {fault}")
+        parts = [f"{bus_text} {fault_text}"]
+        if timestamp_text:
+            parts.append(timestamp_text)
+        parts.extend([
+            f"controller={controller}",
+            f"CAN state={CANDIAG_CAN_STATE_TEXT.get(can_state, can_state)}",
+            f"error state={CANDIAG_ERROR_STATE_TEXT.get(error_state, error_state)}",
+            f"TEC={tx_error_counter}, REC={rx_error_counter}",
+            f"CanSM={CANDIAG_CANSM_STATE_TEXT.get(cansm_state, cansm_state)}",
+            f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
+            f"CanIf PDU mode={CANDIAG_PDU_MODE_TEXT.get(pdu_mode, pdu_mode)}",
+            f"bus-off count={bus_off_count}",
+        ])
+        if len(data) >= 48:
+            operational = data[base + 14]
+            rx_enabled = data[base + 15]
+            tx_enabled = data[base + 16]
+            controller_pending = data[base + 17]
+            recovered_pending = data[base + 18]
+            error_passive_fail = int.from_bytes(data[base + 19:base + 21], "big")
+            error_passive_pass = int.from_bytes(data[base + 21:base + 23], "big")
+            protocol_fail = int.from_bytes(data[base + 23:base + 25], "big")
+            protocol_pass = int.from_bytes(data[base + 25:base + 27], "big")
+            error_passive_seen = data[base + 27]
+            parts.extend([
+                f"operational={'yes' if operational else 'no'}",
+                f"normal RX enabled={'yes' if rx_enabled else 'no'}",
+                f"normal TX enabled={'yes' if tx_enabled else 'no'}",
+                f"controller fault pending={'yes' if controller_pending else 'no'}",
+                f"recovery pending={'yes' if recovered_pending else 'no'}",
+                f"error-passive debounce fail/pass={error_passive_fail}/{error_passive_pass}",
+                f"protocol-error debounce fail/pass={protocol_fail}/{protocol_pass}",
+                f"error-passive indication latched={'yes' if error_passive_seen else 'no'}",
+            ])
+        return " | ".join(parts)
+
+    def _explain_lin_bus_detail(self, dtc, data, is_snapshot):
+        if not is_snapshot:
+            return ""
+        timestamp_text = format_dtc_timestamp_data(data, "LIN bus DTC occurrence time")
+        if len(data) < 36:
+            return timestamp_text
+        base = DEM_DTC_TIMESTAMP_DATA_SIZE
+        channel = data[base + 1]
+        fault = data[base + 2]
+        frame_id = data[base + 3]
+        pid = data[base + 4]
+        slave_nad = data[base + 5]
+        schedule = data[base + 6]
+        linsm_state = data[base + 7]
+        comm_mode = data[base + 8]
+        lin_state = data[base + 9]
+        last_result = data[base + 10]
+        no_response_count = data[base + 11]
+        protocol_count = data[base + 12]
+        controller_count = data[base + 13]
+        wakeup_count = data[base + 14] if len(data) > (base + 14) else 0
+        sleep_count = data[base + 15] if len(data) > (base + 15) else 0
+        channel_unavailable = data[base + 16] if len(data) > (base + 16) else 0
+        error_class = data[base + 17] if len(data) > (base + 17) else 0
+        checksum_count = data[base + 18] if len(data) > (base + 18) else 0
+        pid_count = data[base + 19] if len(data) > (base + 19) else 0
+        framing_count = data[base + 20] if len(data) > (base + 20) else 0
+        sync_count = data[base + 21] if len(data) > (base + 21) else 0
+        header_count = data[base + 22] if len(data) > (base + 22) else 0
+        schedule_errors = u32_be(data, base + 23) if len(data) >= (base + 27) else 0
+        diag_timeouts = u32_be(data, base + 27) if len(data) >= (base + 31) else 0
+        linif_state = data[base + 31] if len(data) > (base + 31) else 0
+        diag_state = data[base + 32] if len(data) > (base + 32) else 0
+        comm_rx_enabled = data[base + 33] if len(data) > (base + 33) else 0
+        comm_tx_enabled = data[base + 34] if len(data) > (base + 34) else 0
+        slave_expected = data[base + 35] if len(data) > (base + 35) else 0
+        diag_schedule_active = data[base + 36] if len(data) > (base + 36) else 0
+        channel_text = LINDIAG_CHANNEL_TEXT.get(channel, f"LIN channel {channel}")
+        fault_text = LINDIAG_FAULT_TEXT.get(fault, f"fault {fault}")
+        parts = [f"{channel_text} {fault_text}"]
+        if timestamp_text:
+            parts.append(timestamp_text)
+        parts.extend([
+            f"channel={channel}",
+            f"Last PID=0x{pid:02X}",
+            f"Frame ID=0x{frame_id:02X}",
+            f"Slave NAD={slave_nad}",
+            f"Schedule={LINDIAG_SCHEDULE_TEXT.get(schedule, schedule)}",
+            f"LinSM={LINDIAG_LINSM_STATE_TEXT.get(linsm_state, linsm_state)}",
+            f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
+            f"LIN state={LINDIAG_LIN_STATE_TEXT.get(lin_state, lin_state)}",
+            f"Error type={LINDIAG_RESULT_TEXT.get(last_result, last_result)}",
+            f"Error class={LINDIAG_ERROR_CLASS_TEXT.get(error_class, error_class)}",
+            f"No-response counter={no_response_count}",
+            f"Protocol error counter={protocol_count}",
+            f"Controller fault counter={controller_count}",
+            f"Checksum/PID/Framing/Sync/Header={checksum_count}/{pid_count}/{framing_count}/{sync_count}/{header_count}",
+            f"Wakeup failures={wakeup_count}, sleep failures={sleep_count}",
+            f"LinIf state={LINDIAG_CHANNEL_STATE_TEXT.get(linif_state, linif_state)}",
+            f"Diag schedule={LINDIAG_DIAG_STATE_TEXT.get(diag_state, diag_state)}",
+            f"Schedule errors={schedule_errors}, diag timeouts={diag_timeouts}",
+            f"Normal communication rx/tx={comm_rx_enabled}/{comm_tx_enabled}",
+            f"Slave response expected={slave_expected}, diag schedule active={diag_schedule_active}, channel unavailable={channel_unavailable}",
+        ])
+        return " | ".join(parts)
 
     def _explain_aimodel_detail(self, dtc, data, is_snapshot):
         if not is_snapshot:
@@ -3530,6 +3950,57 @@ class FcdApp:
             ])
         return " | ".join(parts)
 
+    def _explain_pms_errata_detail(self, data, is_snapshot):
+        if len(data) < 76:
+            return ""
+        event_id = u16_be(data, 0)
+        version = data[2]
+        wakeup_from_standby = data[3]
+        reset_reason = u32_be(data, 4)
+        reset_info = u32_be(data, 8)
+        safety_mask = u32_be(data, 12)
+        failure_mask = u32_be(data, 16)
+        ignored_mask = u32_be(data, 20)
+        sample_count = u32_be(data, 24)
+        timeout_count = u32_be(data, 28)
+        checked_evrstat = u32_be(data, 32)
+        checked_monstat1 = u32_be(data, 36)
+        evrstat = u32_be(data, 40)
+        evradcstat = u32_be(data, 44)
+        evrmonstat1 = u32_be(data, 48)
+        evrrstcon = u32_be(data, 52)
+        evrovmon2 = u32_be(data, 56)
+        evruvmon2 = u32_be(data, 60)
+        reset_type = u32_be(data, 64)
+        reset_trigger = u32_be(data, 68)
+        ssw_reset_reason = u16_be(data, 72)
+        check_status = data[74]
+        fw_status = data[75]
+        parts = [
+            f"PMS errata startup warning (event id {event_id})",
+            f"capture version: {version}",
+            f"last reset reason: {reset_reason_name(reset_reason, reset_info)} (0x{reset_reason:08X})",
+            f"last reset information: 0x{reset_info:08X}",
+            f"SafetyKit failure mask: {flag_names(safety_mask, MCUSM_SAFETYKIT_FAILURE_BITS)} (0x{safety_mask:08X})",
+            f"PMS errata failure mask: {flag_names(failure_mask, PMS_ERRATA_FAILURE_BITS)} (0x{failure_mask:08X})",
+            f"PMS standby ignored mask: {flag_names(ignored_mask, PMS_ERRATA_FAILURE_BITS)} (0x{ignored_mask:08X})",
+            f"TC007 samples/refresh timeouts: {sample_count}/{timeout_count}",
+            (
+                f"SafetyKit reset: type {enum_name(reset_type, SAFETYKIT_RESET_TYPE_TEXT, 'type')}, "
+                f"trigger {enum_name(reset_trigger, SCU_RESET_TRIGGER_TEXT, 'trigger')}, "
+                f"reason 0x{ssw_reset_reason:04X}, standby wake={wakeup_from_standby}"
+            ),
+            f"PMS errata status={check_status}, FW-check status={fw_status}",
+            f"checked EVRSTAT/MONSTAT1: 0x{checked_evrstat:08X}/0x{checked_monstat1:08X}",
+            f"captured EVRSTAT/ADCSTAT/MONSTAT1: 0x{evrstat:08X}/0x{evradcstat:08X}/0x{evrmonstat1:08X}",
+            f"EVRRSTCON/EVROVMON2/EVRUVMON2: 0x{evrrstcon:08X}/0x{evrovmon2:08X}/0x{evruvmon2:08X}",
+        ]
+        if len(data) >= (76 + DEM_DTC_TIMESTAMP_DATA_SIZE):
+            timestamp_text = format_dtc_timestamp_data(data[76:])
+            if timestamp_text:
+                parts.append(timestamp_text)
+        return " | ".join(parts)
+
     def _explain_default_detail(self, data, is_snapshot):
         # Current ZGW coding DTC snapshots are timestamp-only. Keep the legacy
         # default snapshot decode below for older targets.
@@ -3604,6 +4075,15 @@ class FcdApp:
 
         if is_aimodel_consumer_dtc(dtc):
             return describe_aimodel_consumer_dtc(dtc)
+
+        if DEM_DTC_CAN_BUS_DIAG <= dtc < (DEM_DTC_CAN_BUS_DIAG + DEM_CAN_BUS_DIAG_EVENT_COUNT):
+            return STATIC_DTC_DESCRIPTIONS.get(dtc, "CAN bus diagnostic")
+
+        if DEM_DTC_LIN_BUS_DIAG <= dtc < (DEM_DTC_LIN_BUS_DIAG + DEM_LIN_BUS_DIAG_EVENT_COUNT):
+            return STATIC_DTC_DESCRIPTIONS.get(dtc, "LIN bus diagnostic")
+
+        if DEM_DTC_ETHERNET_DIAG <= dtc < (DEM_DTC_ETHERNET_DIAG + DEM_ETHERNET_DIAG_EVENT_COUNT):
+            return STATIC_DTC_DESCRIPTIONS.get(dtc, "Ethernet diagnostic")
 
         if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
             index = dtc - DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
@@ -3686,7 +4166,7 @@ class FcdApp:
         }
 
         ttk.Label(dialog, text="Coding Field").grid(row=0, column=0, sticky="w", padx=8, pady=6)
-        field = ttk.Combobox(dialog, textvariable=vars_["param"], values=CODING_PARAMETER_NAMES, width=70)
+        field = ttk.Combobox(dialog, textvariable=vars_["param"], values=CODING_VISIBLE_PARAMETER_NAMES, width=70)
         field.grid(row=0, column=1, sticky="ew", padx=8, pady=6)
         ttk.Label(dialog, text="Value").grid(row=1, column=0, sticky="w", padx=8, pady=6)
         ttk.Combobox(dialog, textvariable=vars_["expected"], values=("1", "0"), width=10).grid(
@@ -3726,7 +4206,7 @@ class FcdApp:
                     param_name = CODING_PARAMETER_NAMES[idx] if 0 <= idx < len(CODING_PARAMETER_NAMES) else ""
                 except (ValueError, TypeError):
                     param_name = ""
-            if param_name:
+            if param_name and not is_reserved_coding_parameter(param_name):
                 tree.insert("", "end", values=(param_name, item.get("expected", item.get("value", ""))))
         self.log(f"Imported coding JSON: {path}")
 
@@ -3822,6 +4302,8 @@ class FcdApp:
                 name = CODING_PARAMETER_NAMES[idx]
             else:
                 name = f"(reserved bit {idx})"
+            if is_reserved_coding_parameter(name):
+                continue
             tree.insert(
                 "", "end",
                 values=(name, "1" if expected else "0"),
@@ -3833,7 +4315,7 @@ class FcdApp:
         for name, _index, value in DUMMY_CODING_VALUES:
             tree.insert("", "end", values=(name, value))
 
-    def _send_ecu_reset_best_effort(self, send, label, timeout=5.0):
+    def _send_ecu_reset_best_effort(self, send, label, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS):
         try:
             return send(b"\x11\x01", label, timeout=timeout, allow_no_response=True)
         except NegativeResponse as exc:
@@ -3850,7 +4332,7 @@ class FcdApp:
         req = b"\x11\x01"
         self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
         try:
-            resp = client.send_uds(req, timeout=5.0)
+            resp = client.send_uds(req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS)
             self.log(f"RX ECUReset hardReset {reason}: {bytes_to_hex(resp)}")
         except Exception as exc:
             self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
@@ -4729,6 +5211,15 @@ class FcdApp:
             else:
                 self.log(f"RX {label}: ZGW transport complete {uds_request_log_text(response)}")
 
+    def _wait_routed_transport_acks_and_progress(self, client, expected_requests, progress_cb=None):
+        self._wait_routed_transport_acks(client, expected_requests)
+        if progress_cb is None:
+            return
+        for expected in expected_requests:
+            progress_count = expected[3] if len(expected) > 3 else 0
+            if progress_count:
+                progress_cb(progress_count)
+
     def _paced_grouped_no_wait_rounds(self, groups, client, rounds, progress_cb=None, drain_every_sends=0):
         bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
         ordered_buses = sorted(groups, key=lambda bus: bus_order.get(bus, 99))
@@ -4775,8 +5266,6 @@ class FcdApp:
         expected_requests = []
         for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
             self._sleep_until_monotonic(due)
-            if progress_count and progress_cb is not None:
-                progress_cb(progress_count)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
                 target,
@@ -4789,14 +5278,14 @@ class FcdApp:
             # sometimes acknowledge one step and then omit the next, which
             # should not fail a non-strict paced read/flash flow.
             no_response_only = self._target_is_simulated(target)
-            expected_requests.append((label, prefixed_request, no_response_only))
+            expected_requests.append((label, prefixed_request, no_response_only, progress_count))
             sends_since_drain += 1
             if drain_every_sends and sends_since_drain >= drain_every_sends:
-                self._wait_routed_transport_acks(client, expected_requests)
+                self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
                 expected_requests = []
                 sends_since_drain = 0
 
-        self._wait_routed_transport_acks(client, expected_requests)
+        self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
 
         return sends_since_drain
 
@@ -5997,9 +6486,13 @@ class FcdApp:
                     }
                     targets_by_name[ecu_name] = target_entry
 
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 02"})
+                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 03"})
                 step_no += 1
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "RoutineControl EraseApp", "request": "31 01 00 01"})
+                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "CommunicationControl", "request": "28 01 03"})
+                step_no += 1
+                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "ControlDTCSetting", "request": "85 02"})
+                step_no += 1
+                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 02"})
                 step_no += 1
 
                 for index, segment in enumerate(segments):
@@ -6061,18 +6554,19 @@ class FcdApp:
                     step_no += 1
                     tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "RequestTransferExit"})
                     step_no += 1
-                    tal_steps.append(
-                        {
-                            "step": step_no,
-                            "ecu": ecu_name,
-                            "service": "RoutineControl CRC",
-                            "rid": "0x0002",
-                            "address": int_hex(address, 8),
-                            "size": len(segment.data),
-                            "crc32": payload_entry["crc32"],
-                        }
-                    )
-                    step_no += 1
+                    if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and flash_kind != "FBL":
+                        tal_steps.append(
+                            {
+                                "step": step_no,
+                                "ecu": ecu_name,
+                                "service": "RoutineControl CRC",
+                                "rid": "0x0002",
+                                "address": int_hex(address, 8),
+                                "size": len(segment.data),
+                                "crc32": payload_entry["crc32"],
+                            }
+                        )
+                        step_no += 1
 
             fa = {
                 "schema": "FCD_FA_v1",
@@ -6339,48 +6833,45 @@ class FcdApp:
 
         client = self.require_client()
         start_time = time.monotonic()
-        progress_cb, complete_progress = self._make_package_progress(
+        progress_cb, complete_progress, stop_progress = self._make_package_progress(
             self._payloads_total_bytes(payloads),
             start_time,
         )
 
-        self._execute_zgw_programming_preamble(
-            client,
-            is_fbl=bool(self.flash_fbl_var.get() and fbl_payloads),
-        )
+        try:
+            self._execute_zgw_programming_preamble(
+                client,
+                is_fbl=bool(self.flash_fbl_var.get() and fbl_payloads),
+            )
 
-        if self.flash_fbl_var.get() and fbl_payloads:
-            for payload in fbl_payloads:
-                self._execute_payload(
-                    client,
-                    payload,
-                    is_fbl=True,
-                    progress_cb=progress_cb,
-                    strict_response=strict_response,
+            if self.flash_fbl_var.get() and fbl_payloads:
+                for payload in fbl_payloads:
+                    self._execute_payload(
+                        client,
+                        payload,
+                        is_fbl=True,
+                        progress_cb=progress_cb,
+                        strict_response=strict_response,
                 )
-            self._execute_hard_reset(client, "after FBL flash")
-            self._execute_status_readback(client, "after FBL reset")
+                self._execute_hard_reset(client, "after FBL flash")
+                send = self._make_uds_sender(client)
+                self._send_session(send, SESSION_DEFAULT, "Default Session after FBL flash")
+                self._send_session(send, SESSION_EXTENDED, "Extended Session after FBL flash")
 
-        if self.flash_appl_var.get() and appl_payloads:
-            for payload in appl_payloads:
-                self._execute_payload(
-                    client,
-                    payload,
-                    is_fbl=False,
-                    progress_cb=progress_cb,
-                    strict_response=strict_response,
+            if self.flash_appl_var.get() and appl_payloads:
+                for payload in appl_payloads:
+                    self._execute_payload(
+                        client,
+                        payload,
+                        is_fbl=False,
+                        progress_cb=progress_cb,
+                        strict_response=strict_response,
                 )
-            self._execute_hard_reset(client, "after APPL flash")
+                self._execute_hard_reset(client, "after APPL flash")
 
-        self._execute_post_programming_extended(client)
-
-        if self.flash_coding_var.get():
-            self._execute_coding_after_flash(client)
-
-        self._execute_final_readback(client)
-        send = self._make_uds_sender(client)
-        send(bytes([0x10, SESSION_DEFAULT]), "Default Session final")
-        complete_progress()
+            complete_progress()
+        finally:
+            stop_progress()
 
     def _run_flashing_test_once(self):
         payloads = self._selected_flash_payloads_or_raise()
@@ -6471,28 +6962,43 @@ class FcdApp:
 
     def _make_package_progress(self, total_units, start_time):
         maximum = max(1, int(total_units))
-        progress_state = {"units": 0, "render_pending": False}
+        self.progress_run_id += 1
+        run_id = self.progress_run_id
+        progress_state = {
+            "units": 0,
+            "active": True,
+            "last_rendered_units": -1,
+            "last_rendered_elapsed": -1,
+        }
         progress_lock = threading.Lock()
 
-        def render_progress():
+        def render_progress(force=False):
+            if run_id != self.progress_run_id:
+                return
             with progress_lock:
                 value = min(maximum, progress_state["units"])
-                progress_state["render_pending"] = False
+                active = progress_state["active"]
             elapsed = int(time.monotonic() - start_time)
+            if (not force) and value == progress_state["last_rendered_units"] and elapsed == progress_state["last_rendered_elapsed"]:
+                if active:
+                    self.root.after(200, render_progress)
+                return
             self.progress.configure(maximum=maximum, value=value)
             self.elapsed_var.set(f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
             self.progress.update_idletasks()
-
-        def queue_render_locked():
-            if progress_state["render_pending"]:
-                return
-            progress_state["render_pending"] = True
-            self.root.after(0, render_progress)
+            with progress_lock:
+                progress_state["last_rendered_units"] = value
+                progress_state["last_rendered_elapsed"] = elapsed
+            if active:
+                self.root.after(200, render_progress)
 
         def reset_progress():
+            if run_id != self.progress_run_id:
+                return
             self.progress.configure(maximum=maximum, value=0)
             elapsed = int(time.monotonic() - start_time)
             self.elapsed_var.set(f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
+            self.root.after(200, render_progress)
 
         self.root.after(0, reset_progress)
 
@@ -6504,14 +7010,19 @@ class FcdApp:
             with progress_lock:
                 if delta:
                     progress_state["units"] = min(maximum, progress_state["units"] + delta)
-                queue_render_locked()
 
         def complete():
             with progress_lock:
                 progress_state["units"] = maximum
-                queue_render_locked()
+                progress_state["active"] = False
+            self.root.after(0, lambda: render_progress(force=True))
 
-        return advance, complete
+        def stop():
+            with progress_lock:
+                progress_state["active"] = False
+            self.root.after(0, lambda: render_progress(force=True))
+
+        return advance, complete, stop
 
     def _execute_parallel_bundle(self, payloads, strict_response=False):
         manifest = self.package_manifest or {}
@@ -6521,7 +7032,7 @@ class FcdApp:
             by_node.setdefault(node_key, []).append(payload)
         targets = {t.get("node_name", ""): t for t in manifest.get("targets", [])}
         start_time = time.monotonic()
-        progress_cb, complete_progress = self._make_package_progress(
+        progress_cb, complete_progress, stop_progress = self._make_package_progress(
             self._payloads_total_bytes(payloads),
             start_time,
         )
@@ -6543,13 +7054,6 @@ class FcdApp:
                 progress_cb,
                 strict_response=strict_response,
             )
-            if self.flash_coding_var.get():
-                self._execute_parallel_coding(
-                    manifest,
-                    progress_cb,
-                    include_zgw=False,
-                    strict_response=strict_response,
-                )
 
             self._execute_parallel_flash_phase(
                 zgw_flash_events,
@@ -6567,17 +7071,11 @@ class FcdApp:
                 is_fbl=False,
                 strict_response=strict_response,
             )
-            if self.flash_coding_var.get():
-                self._execute_parallel_coding(
-                    manifest,
-                    progress_cb,
-                    include_zgw=True,
-                    only_zgw=True,
-                    strict_response=strict_response,
-                )
             completed = True
             complete_progress()
         finally:
+            if not completed:
+                stop_progress()
             self._update_elapsed(start_time)
             if keepalive_was_on and completed and not self.worker_stop.is_set():
                 self.start_keepalive()
@@ -6860,8 +7358,6 @@ class FcdApp:
         expected_requests = []
         for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
             self._sleep_until_monotonic(due)
-            if progress_count and progress_cb is not None:
-                progress_cb(progress_count)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
                 target,
@@ -6869,9 +7365,9 @@ class FcdApp:
                 label,
                 apply_pacing=(bus != "LIN"),
             )
-            expected_requests.append((label, prefixed_request, self._target_is_simulated(target)))
+            expected_requests.append((label, prefixed_request, self._target_is_simulated(target), progress_count))
 
-        self._wait_routed_transport_acks(client, expected_requests)
+        self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
         client.drain()
 
@@ -6942,8 +7438,6 @@ class FcdApp:
         expected_requests = []
         for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
             self._sleep_until_monotonic(due)
-            if progress_count and progress_cb is not None:
-                progress_cb(progress_count)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
                 target,
@@ -6951,9 +7445,9 @@ class FcdApp:
                 label,
                 apply_pacing=(bus != "LIN"),
             )
-            expected_requests.append((label, prefixed_request, self._target_is_simulated(target)))
+            expected_requests.append((label, prefixed_request, self._target_is_simulated(target), progress_count))
 
-        self._wait_routed_transport_acks(client, expected_requests)
+        self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
         client.drain()
 
@@ -7023,8 +7517,6 @@ class FcdApp:
         expected_requests = []
         for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
             self._sleep_until_monotonic(due)
-            if progress_count and progress_cb is not None:
-                progress_cb(progress_count)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
                 target,
@@ -7037,8 +7529,8 @@ class FcdApp:
             # sometimes acknowledge one step and then omit the next, which
             # should not fail a non-strict paced read/flash flow.
             no_response_only = self._target_is_simulated(target)
-            expected_requests.append((label, prefixed_request, no_response_only))
-        self._wait_routed_transport_acks(client, expected_requests)
+            expected_requests.append((label, prefixed_request, no_response_only, progress_count))
+        self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
 
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
         client.drain()
@@ -7049,21 +7541,11 @@ class FcdApp:
         def add(request, label, progress_count=0):
             sequence.append((bytes(request) if request is not None else None, label, progress_count))
 
-        def add_status(prefix):
-            for did, name in [
-                (DID_APP_SW_VERSION, "Read Software Version F101"),
-                (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
-                (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
-            ]:
-                add(b"\x22" + struct.pack(">H", did), f"{prefix}: {name}")
-
-        add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Default Session before flash")
-        add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session before flash")
-        add_status(f"{node_name}: Flash preamble")
-        add(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
-        add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
-        add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: Programming Session")
-        add_status(f"{node_name}: Programming pre-flash")
+        if is_fbl:
+            add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session before flash controls")
+            add(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
+            add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+            add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: Programming Session")
 
         configured_block_size = parse_int(self.block_size_var.get())
         block_size = max(8, min(ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE, configured_block_size))
@@ -7130,24 +7612,22 @@ class FcdApp:
                 transfer_exit += struct.pack(">I", expected_crc)
             add(transfer_exit, f"{node_name}: RequestTransferExit {block_name}")
 
-            if self.verify_crc_var.get():
+            if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and block_name != "FBL":
                 add(
                     b"\x31\x01"
                     + struct.pack(">H", ROUTINE_CHECK_MEMORY_CRC)
                     + struct.pack(">III", address, size, expected_crc),
                     f"{node_name}: RoutineControl CRC {block_name}",
                 )
+            elif self.verify_crc_var.get():
+                self.log(f"{node_name}: skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC")
             self.log(f"Flash dry-run routed queued: {label}")
 
         add(b"\x11\x01", f"{node_name}: ECUReset hardReset after {node_name} {'FBL' if is_fbl else 'APP'} flash")
         wait_steps = max(1, int(round(ROUTED_FLASH_POST_RESET_GAP_SECONDS / ROUTED_READ_CODING_SERVICE_GAP_SECONDS)))
         for _index in range(wait_steps):
             add(None, "")
-        add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Default Session after {node_name} {'FBL' if is_fbl else 'APP'} flash")
-        add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session after {node_name} {'FBL' if is_fbl else 'APP'} flash")
-        add_status(f"{node_name}: Post-{node_name} {'FBL' if is_fbl else 'APP'} flash")
-        add(b"\x28\x00\x03", f"{node_name}: CommunicationControl enableRxAndTx")
-        add(b"\x85\x01", f"{node_name}: ControlDTCSetting on")
+        add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Post-reset UDS readiness probe")
         return sequence
 
     def _parallel_target_addr(self, target, payloads=None):
@@ -7202,19 +7682,18 @@ class FcdApp:
             dry=False,
             strict_response=strict_response,
         )
+        if (not is_fbl) and target.get("_fcd_fbl_flash_reset_ready"):
+            return
         target_is_zgw = bool(target.get("is_zgw")) or str(node_name).upper() == "ZGW"
         if target_is_zgw:
             self._execute_zgw_flash_entry(send, node_name, is_fbl=is_fbl)
             return
-        self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session before flash")
-        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash")
-        self._read_standard_status(send, f"{node_name}: Flash preamble")
+        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls")
         send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
         if is_fbl:
             self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
-        self._read_standard_status(send, f"{node_name}: Programming pre-flash")
 
     def _execute_target_flash_postamble(self, client, target, reason, strict_response=False):
         node_name = target.get("node_name", "target")
@@ -7227,20 +7706,14 @@ class FcdApp:
         self._send_ecu_reset_best_effort(send, f"{node_name}: ECUReset hardReset after {reason}")
         if not getattr(send, "dry_run", False) and not self._target_is_simulated(target):
             self._recover_doip_after_reset(client, reason, require_current_client=False)
-            send = self._make_target_uds_sender(
-                client,
-                target,
-                dry=False,
-                strict_response=strict_response,
-            )
-        self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session after {reason}")
-        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session after {reason}")
-        self._read_standard_status(send, f"{node_name}: Post-{reason}")
-        send(b"\x28\x00\x03", f"{node_name}: CommunicationControl enableRxAndTx")
-        send(b"\x85\x01", f"{node_name}: ControlDTCSetting on")
+        else:
+            self._send_session(send, SESSION_DEFAULT, f"{node_name}: Post-reset UDS readiness probe")
+        if "FBL" in str(reason).upper():
+            target["_fcd_fbl_flash_reset_ready"] = True
 
     def _execute_parallel_coding(self, manifest, progress_cb, include_zgw=True, only_zgw=False, strict_response=False):
         targets = {t.get("node_name", ""): t for t in manifest.get("targets", [])}
+        live_descriptors = self._all_coding_descriptors()
         coding_events = [e for e in manifest.get("schedule", []) if e.get("phase") == "coding"]
         if only_zgw:
             coding_events = [e for e in coding_events if e.get("is_zgw")]
@@ -7252,8 +7725,17 @@ class FcdApp:
             work_by_bus = {}
             for event in events:
                 target = targets.get(event.get("node_name", ""), {})
-                if not target.get("coding_descriptor"):
+                node_name = str(target.get("node_name") or event.get("node_name", ""))
+                descriptor = target.get("coding_descriptor") or live_descriptors.get(node_name.upper())
+                if not descriptor:
+                    self.log(f"Execute Parallel Bundle: {node_name} has no configured coding values; skipped")
                     continue
+                if not hex_to_bytes(descriptor.get("mask_hex", "")):
+                    self.log(f"Execute Parallel Bundle: {node_name} coding mask is empty; skipped")
+                    continue
+                if target.get("coding_descriptor") is not descriptor:
+                    target = dict(target)
+                    target["coding_descriptor"] = descriptor
                 bus = bus_category(target.get("bus_type") or event.get("bus_type", "UNKNOWN"))
                 work_by_bus.setdefault(bus, []).append((event, target))
             for bus, work in work_by_bus.items():
@@ -7592,33 +8074,13 @@ class FcdApp:
         return f"Negative response for 0x{sid:02X}: NRC 0x{nrc:02X}" in str(exc)
 
     def _execute_zgw_flash_entry(self, send, node_name, is_fbl=False):
-        entry_prefix = f"{node_name}: Entry probe"
-        active_block = self._read_active_sw_block(send, entry_prefix, timeout=2.0)
-        active_session = self._read_active_diag_session(send, entry_prefix, timeout=2.0)
-
-        if active_block != ACTIVE_SW_BLOCK_FBL:
-            self.log(f"{node_name}: flash entry mode=APPL fresh")
-            self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session before flash")
-            self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash")
-            self._read_standard_status(send, f"{node_name}: Flash preamble")
-            send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
-            send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
-            self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
-            if is_fbl:
-                self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
-            self._read_standard_status(send, f"{node_name}: Programming pre-flash")
-            return
-
-        self.log(f"{node_name}: flash entry mode=FBL active")
-        if active_session != SESSION_PROGRAMMING:
-            self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
+        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls")
         send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+        self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
 
         if is_fbl:
             self.log(f"{node_name}: FBL RAM-updater entry deferred until 0x0200 block selection")
-
-        self._read_standard_status(send, f"{node_name}: Programming pre-flash")
 
     def _execute_zgw_programming_preamble(self, client, is_fbl=False):
         send = self._make_uds_sender(client)
@@ -7750,9 +8212,10 @@ class FcdApp:
                 expected_payload=b"\x00",
             )
         elif self.erase_var.get():
-            erase_request = b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size)
-            send(
-                erase_request,
+            self._run_flash_routine_control(
+                send,
+                ROUTINE_ERASE_MEMORY,
+                struct.pack(">II", address, size),
                 f"RoutineControl Erase {block_name}",
                 timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get())),
             )
@@ -7804,13 +8267,15 @@ class FcdApp:
             transfer_exit += struct.pack(">I", expected_crc)
         send(transfer_exit, f"RequestTransferExit {block_name}", timeout=15.0)
 
-        if self.verify_crc_var.get():
+        if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and not is_fbl:
             crc_request = (
                 b"\x31\x01"
                 + struct.pack(">H", ROUTINE_CHECK_MEMORY_CRC)
                 + struct.pack(">III", address, size, expected_crc)
             )
             send(crc_request, f"RoutineControl CRC {block_name}", timeout=30.0)
+        elif self.verify_crc_var.get():
+            self.log(f"Skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC")
 
         self.log(f"Flash complete: {label}")
 

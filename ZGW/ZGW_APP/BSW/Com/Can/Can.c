@@ -2,8 +2,10 @@
 #include "CanIf.h"
 #include <string.h>
 #include "IfxCpu.h"
+#include "IfxCpu_Intrinsics.h"
 #include "IfxScuWdt.h"
 #include "IfxPort_reg.h"
+#include "SafetyKit_InternalWatchdogs.h"
 #include "SysMgr.h"
 
 #define CAN_IRQ_PRIO_RX_CLASSIC       40u
@@ -23,6 +25,8 @@
 #define CAN_TX_HW_BUFFER_COUNT_CLASSIC 4u
 #define CAN_TX_HW_BUFFER_COUNT_FD      8u
 #define CAN_TX_HW_BUFFER_COUNT_MAX     CAN_TX_HW_BUFFER_COUNT_FD
+#define CAN_P33_PCSR_CLASSIC_RX_MASK   (1u << 5u)
+#define CAN_P33_PCSR_LOCK_WAIT_LIMIT   10000u
 
 typedef struct
 {
@@ -183,10 +187,16 @@ volatile uint32 Can_TxSendRetryCounter = 0u;
 volatile uint32 Can_TxProcessAttemptLimitCounter = 0u;
 volatile uint32 Can_TxPendingRecoveredCounter = 0u;
 volatile uint32 Can_TxPendingDropCounter = 0u;
+volatile uint32 Can_PcsrLockWaitCounter = 0u;
+volatile uint32 Can_PcsrLockTimeoutCounter = 0u;
+volatile uint32 Can_PcsrBeforeRelease = 0u;
+volatile uint32 Can_PcsrAfterRelease = 0u;
+volatile uint32 Can_PcsrLockTimeoutValue = 0u;
 
 static void Can_ReadRxFifo(uint8 controllerId);
 static void Can_ProcessRx(void);
 static void Can_RequeuePendingTx(uint8 controllerId);
+static boolean Can_WaitP33PcsrUnlocked(void);
 
 static void CanOnboard_TrcvSetNormalMode(void)
 {
@@ -199,17 +209,63 @@ static void CanOnboard_TrcvSetNormalMode(void)
     IfxPort_setPinLow(CAN_ONBOARD_TRCV_STB_PORT, CAN_ONBOARD_TRCV_STB_PIN);
 }
 
+static boolean Can_WaitP33PcsrUnlocked(void)
+{
+    uint32 waitCount = CAN_P33_PCSR_LOCK_WAIT_LIMIT;
+
+    while(P33_PCSR.B.LCK != 0u)
+    {
+        if(waitCount == 0u)
+        {
+            Can_PcsrLockTimeoutCounter++;
+            Can_PcsrLockTimeoutValue = P33_PCSR.U;
+            return FALSE;
+        }
+
+        Can_PcsrLockWaitCounter++;
+        serviceCpuWatchdog();
+        serviceSafetyWatchdog();
+        waitCount--;
+    }
+
+    return TRUE;
+}
+
 static void Can_ReleaseClassicRxPinFromScr(void)
 {
     uint16 safetyWdtPw;
+    uint8 safetyEndinitWasSet;
+
+    Can_PcsrBeforeRelease = P33_PCSR.U;
+
+    if(Can_WaitP33PcsrUnlocked() == FALSE)
+    {
+        Can_PcsrAfterRelease = P33_PCSR.U;
+        return;
+    }
+
+    if((P33_PCSR.U & CAN_P33_PCSR_CLASSIC_RX_MASK) == 0u)
+    {
+        Can_PcsrAfterRelease = P33_PCSR.U;
+        return;
+    }
 
     safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
-    IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
-    while(P33_PCSR.B.LCK)
+    safetyEndinitWasSet = (IfxScuWdt_getSafetyWatchdogEndInit() != 0u) ? 1u : 0u;
+
+    if(safetyEndinitWasSet != 0u)
     {
+        IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
     }
-    P33_PCSR.B.SEL5 = 0u;
-    IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    __ldmst(&P33_PCSR.U, CAN_P33_PCSR_CLASSIC_RX_MASK, 0u);
+    __dsync();
+    if(safetyEndinitWasSet != 0u)
+    {
+        IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    }
+
+    (void)Can_WaitP33PcsrUnlocked();
+    Can_PcsrAfterRelease = P33_PCSR.U;
 }
 
 static uint8 Can_GetTxBufferCount(uint8 controllerId)
@@ -779,8 +835,6 @@ static Std_ReturnType Can_RxQueuePop(Can_FrameType* frame)
 
 static void Can_InitClassicNode(void)
 {
-    Can_ReleaseClassicRxPinFromScr();
-
     IfxCan_Can_initNodeConfig(&Can_Hw.nodeConfigClassic, &Can_Hw.moduleClassic);
 
     Can_Hw.nodeConfigClassic.nodeId = IfxCan_NodeId_3;
@@ -1110,6 +1164,38 @@ static boolean Can_FindFreeTxBuffer(uint8 controllerId, IfxCan_Can_Node* node, u
     return FALSE;
 }
 
+static boolean Can_HasPendingTxWithSameMessageId(uint8 controllerId, const Can_PduType* pdu)
+{
+    boolean irqState;
+    boolean found = FALSE;
+    uint8 bufferIdx;
+    const Can_TxPendingType* pending;
+
+    if ((controllerId >= CAN_NUM_CONTROLLERS) || (pdu == NULL_PTR))
+    {
+        return FALSE;
+    }
+
+    irqState = Can_EnterCritical();
+
+    for (bufferIdx = 0u; (found == FALSE) && (bufferIdx < Can_GetTxBufferCount(controllerId)); bufferIdx++)
+    {
+        pending = &Can_TxPending[controllerId][bufferIdx];
+
+        if ((pending->active != FALSE) &&
+            (pending->pdu.id == pdu->id) &&
+            (pending->pdu.idType == pdu->idType) &&
+            (pending->pdu.frameType == pdu->frameType))
+        {
+            found = TRUE;
+        }
+    }
+
+    Can_ExitCritical(irqState);
+
+    return found;
+}
+
 static boolean Can_TxQueueHasReadyOtherController(uint8 controllerId)
 {
     boolean irqState;
@@ -1224,7 +1310,14 @@ static void Can_ProcessTxConfirmations(void)
 
                     if (Can_TxPending[controller][bufferIdx].ageTicks >= CAN_TX_HW_PENDING_TIMEOUT_TICKS)
                     {
-                        if (Can_CancelTxBuffer(node, txBufferId) != FALSE)
+                        if ((Can_TxPending[controller][bufferIdx].pdu.frameType == CAN_FRAME_FD) &&
+                                (Can_TxPending[controller][bufferIdx].pdu.dlc > CAN_CLASSIC_MAX_DLC))
+                        {
+                            /* TC37x Erratum MCMCAN_AI.024: do not cancel CAN FD frames above 8 bytes. */
+                            Can_TxPending[controller][bufferIdx].ageTicks = 0u;
+                            Can_Runtime[controller].txFailCounter++;
+                        }
+                        else if (Can_CancelTxBuffer(node, txBufferId) != FALSE)
                         {
                             if (IfxCan_Node_isTxBufferTransmissionOccured(node->node, txBufferId) != FALSE)
                             {
@@ -1323,6 +1416,19 @@ static void Can_ProcessTx(void)
         {
             (void)Can_TxQueueDrop();
             continue;
+        }
+
+        if (Can_HasPendingTxWithSameMessageId(pdu.controllerId, &pdu) != FALSE)
+        {
+            /* TC37x Erratum MCMCAN_AI.022: wait before requesting another same-ID TX buffer. */
+            /* TC37x Erratum MCMCAN_AI.023: serialize same-ID dedicated TX requests. */
+            if ((Can_TxQueueHasReadyOtherController(pdu.controllerId) != FALSE) &&
+                    (Can_TxQueueRotate() == E_OK))
+            {
+                continue;
+            }
+
+            return;
         }
 
         if (Can_FindFreeTxBuffer(pdu.controllerId, node, &txBufferIdx) == FALSE)

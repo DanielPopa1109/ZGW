@@ -267,6 +267,21 @@ static uint16 Dem_FindEventIndex(Dem_EventIdType eventId)
                     (eventId - DEM_EVENT_ID_AIMODEL_CONSUMER_FAULT_FIRST));
         }
 
+        if ((eventId >= DEM_EVENT_ID_CAN_BUS_DIAG_FIRST) &&
+                (eventId <= DEM_EVENT_ID_CAN_BUS_DIAG_LAST))
+        {
+            return (uint16)((eventId - DEM_EVENT_ID_CAN_BUS_DIAG_FIRST) +
+                    (DEM_STATIC_EVENT_COUNT - DEM_CAN_BUS_DIAG_EVENT_COUNT -
+                     DEM_LIN_BUS_DIAG_EVENT_COUNT));
+        }
+
+        if ((eventId >= DEM_EVENT_ID_LIN_BUS_DIAG_FIRST) &&
+                (eventId <= DEM_EVENT_ID_LIN_BUS_DIAG_LAST))
+        {
+            return (uint16)((eventId - DEM_EVENT_ID_LIN_BUS_DIAG_FIRST) +
+                    (DEM_STATIC_EVENT_COUNT - DEM_LIN_BUS_DIAG_EVENT_COUNT));
+        }
+
         if ((eventId >= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_FIRST) &&
                 (eventId <= DEM_EVENT_ID_GATEWAY_RX_MESSAGE_TIMEOUT_LAST))
         {
@@ -314,6 +329,22 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
                 (udsDtc < (baseDtc + (uint32)DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)))
         {
             return (uint16)(DEM_STATIC_EVENT_COUNT + DEM_AIMODEL_CONSUMER_EVENT_COUNT + (udsDtc - baseDtc));
+        }
+
+        baseDtc = DEM_DTC_CAN_BUS_DIAG & 0x00FFFFFFu;
+        if ((udsDtc >= baseDtc) &&
+                (udsDtc < (baseDtc + (uint32)DEM_CAN_BUS_DIAG_EVENT_COUNT)))
+        {
+            return (uint16)((DEM_STATIC_EVENT_COUNT - DEM_CAN_BUS_DIAG_EVENT_COUNT -
+                    DEM_LIN_BUS_DIAG_EVENT_COUNT) + (udsDtc - baseDtc));
+        }
+
+        baseDtc = DEM_DTC_LIN_BUS_DIAG & 0x00FFFFFFu;
+        if ((udsDtc >= baseDtc) &&
+                (udsDtc < (baseDtc + (uint32)DEM_LIN_BUS_DIAG_EVENT_COUNT)))
+        {
+            return (uint16)((DEM_STATIC_EVENT_COUNT - DEM_LIN_BUS_DIAG_EVENT_COUNT) +
+                    (udsDtc - baseDtc));
         }
 
         baseDtc = DEM_DTC_AIMODEL_CONSUMER_FAULT & 0x00FFFFFFu;

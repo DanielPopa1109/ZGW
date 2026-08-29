@@ -29,32 +29,111 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "SCR.h"
+#include "IfxCpu_Intrinsics.h"
 #include "IfxPms_reg.h"
+#include "IfxScuWdt.h"
 #include "SCR_AURIX_TC3x.h"
+
+#define IFXSCR_PMSWSTATCLR_SCRSTCLR_MASK 0x00010000u
+#define IFXSCR_PMSWCR4_SCR_DISABLE_MASK  0x01000000u
+#define IFXSCR_PMSWCR4_SCR_ENABLE_MASK   0x03000000u
+#define IFXSCR_PMSWCR0_SCRWKEN_MASK      0x20000000u
 
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+static uint8 IfxScr_clearSafetyEndinitIfSet(uint16 safetyWdtPw)
+{
+    uint8 safetyEndinitWasSet = (IfxScuWdt_getSafetyWatchdogEndInit() != 0u) ? 1u : 0u;
+
+    if(safetyEndinitWasSet != 0u)
+    {
+        IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+    }
+
+    return safetyEndinitWasSet;
+}
+
+static void IfxScr_restoreSafetyEndinitIfNeeded(uint16 safetyWdtPw, uint8 safetyEndinitWasSet)
+{
+    if(safetyEndinitWasSet != 0u)
+    {
+        IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    }
+}
+
+static void IfxScr_writePmsWcr4(uint32 value)
+{
+    uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    uint8 safetyEndinitWasSet = IfxScr_clearSafetyEndinitIfSet(safetyWdtPw);
+
+    PMS_PMSWCR4.U = value;
+    __dsync();
+    IfxScr_restoreSafetyEndinitIfNeeded(safetyWdtPw, safetyEndinitWasSet);
+}
+
+static void IfxScr_setPmsWcr4Bits(uint32 mask)
+{
+    uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    uint8 safetyEndinitWasSet = IfxScr_clearSafetyEndinitIfSet(safetyWdtPw);
+
+    PMS_PMSWCR4.U |= mask;
+    __dsync();
+    IfxScr_restoreSafetyEndinitIfNeeded(safetyWdtPw, safetyEndinitWasSet);
+}
+
+static void IfxScr_setPmsWcr0Bits(uint32 mask)
+{
+    uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    uint8 safetyEndinitWasSet = IfxScr_clearSafetyEndinitIfSet(safetyWdtPw);
+
+    PMS_PMSWCR0.U |= mask;
+    __dsync();
+    IfxScr_restoreSafetyEndinitIfNeeded(safetyWdtPw, safetyEndinitWasSet);
+}
+
+static uint8 IfxScr_clearResetStatusIfSet(void)
+{
+    if(PMS_PMSWSTAT.B.SCRST != 0u)
+    {
+        uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+        uint8 safetyEndinitWasSet = IfxScr_clearSafetyEndinitIfSet(safetyWdtPw);
+
+        PMS_PMSWSTATCLR.U = IFXSCR_PMSWSTATCLR_SCRSTCLR_MASK;
+        __dsync();
+        IfxScr_restoreSafetyEndinitIfNeeded(safetyWdtPw, safetyEndinitWasSet);
+        return 1u;
+    }
+
+    return 0u;
+}
+
 void IfxScr_copyProgram(void)
 {
-    volatile uint8* addr = ((volatile uint8*)PMS_XRAM);
-    volatile uint16* addr16 = ((volatile uint16*)(0xF0241FF8));
-
-    for (uint16 addrOffset = 0; addrOffset < SIZE_scr_xram; addrOffset++)
+    do
     {
-        *addr = scr_xram[addrOffset];
-        addr++;
-    }
+        volatile uint8* addr = ((volatile uint8*)PMS_XRAM);
+        volatile uint16* addr16 = ((volatile uint16*)(0xF0241FF8));
 
-    for(uint8 i = 0; i < 4; i++){
-        *(addr16 + i) = 0xAA55;
-    }
+        (void)IfxScr_clearResetStatusIfSet();
+
+        /* TC37x Erratum SCR_TC.019: retry SCR XRAM program copy if SCR reset overlaps it. */
+        for (uint16 addrOffset = 0; addrOffset < SIZE_scr_xram; addrOffset++)
+        {
+            *addr = scr_xram[addrOffset];
+            addr++;
+        }
+
+        for(uint8 i = 0; i < 4; i++){
+            *(addr16 + i) = 0xAA55;
+        }
+    } while(IfxScr_clearResetStatusIfSet() != 0u);
 }
 
 void IfxScr_disableSCR(void)
 {
     /* Disable SCR and disable 100MHz clock */
-    PMS_PMSWCR4.U = 0x01000000;
+    IfxScr_writePmsWcr4(IFXSCR_PMSWCR4_SCR_DISABLE_MASK);
     /* Confirm SCR is disabled */
     while(PMS_PMSWSTAT.B.SCR)
     {
@@ -63,10 +142,10 @@ void IfxScr_disableSCR(void)
 
 void IfxScr_enableSCR(void)
 {
-    PMS_PMSWCR4.U |= (0x0 << 6) | (0x1 << 25) | (0x1 << 24);
+    IfxScr_setPmsWcr4Bits(IFXSCR_PMSWCR4_SCR_ENABLE_MASK);
 
     /* SCR wake-up enable */
-    PMS_PMSWCR0.U |= (0x1 << 29);
+    IfxScr_setPmsWcr0Bits(IFXSCR_PMSWCR0_SCRWKEN_MASK);
     /* Confirm that SCR is enabled */
     while(!PMS_PMSWSTAT.B.SCR)
     {
@@ -75,13 +154,13 @@ void IfxScr_enableSCR(void)
 
 void IfxScr_init(uint8 boot_mode)
 {
-    PMS_PMSWCR4.U |= 0x3 | (boot_mode << 16);
+    IfxScr_setPmsWcr4Bits(0x3u | ((uint32)boot_mode << 16u));
     /* Wait for SCR to be reset */
     while(!PMS_PMSWSTAT.B.SCRST)
     {
     }
-    /* Clear reset status */
-    PMS_PMSWSTATCLR.B.SCRSTCLR = 1; 
+    /* TC37x Erratum SCR_TC.019: clear SCR reset status with a 32-bit status write. */
+    (void)IfxScr_clearResetStatusIfSet();
 
     /* The SCR should have booted up by and have status 0x80 */
     while(PMS_PMSWCR2.B.SCRINT != 0x80)

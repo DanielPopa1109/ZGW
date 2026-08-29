@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="core0_main"/>
+		<item key="selection" value="Fbl_FlashProgram"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
+			<item value="Fbl_FlashProgram"/>
+			<item value="program"/>
+			<item value="Program"/>
+			<item value="flash"/>
+			<item value="prgoram"/>
+			<item value="compat"/>
+			<item value="Fbl_EnableCpuSysconSafetyProtection"/>
+			<item value="trap7"/>
+			<item value="IfxSmu_Alarm_SMU_Safety_FfCorrectableErrorDetected"/>
 			<item value="core0_main"/>
 			<item value="performreset"/>
 			<item value="SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS"/>
 			<item value="FBL_BLU_STATE_IDLE"/>
 			<item value="dsram0"/>
 			<item value="LCF_FBL_LIVE_RODATA_SIZE"/>
-			<item value="cpu0_dlmu_nc"/>
-			<item value="core0_man"/>
-			<item value="FBL_STAGING_START_NC"/>
-			<item value="0xA05D0000"/>
-			<item value="FBL_START_NCACHED"/>
-			<item value="RAM_FLASH_ERASE_ADDR"/>
-			<item value="UDS_RID_ERASE_APP"/>
-			<item value="erase"/>
-			<item value="g_pageBuf"/>
 		</list>
 		<list key="replacehistory">
 		</list>

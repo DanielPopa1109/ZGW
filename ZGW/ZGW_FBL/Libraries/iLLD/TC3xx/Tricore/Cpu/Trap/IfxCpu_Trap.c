@@ -519,7 +519,9 @@ IFX_USED void IfxCpu_Trap_vectorTable0(void);
 #pragma ghs section
 #pragma ghs section text=".traptab_cpu0"
 #endif
-IFX_TRAP_RAM_CODE IFX_USED void IfxCpu_Trap_vectorTable0(void);
+/* Normal FBL traps must stay at __TRAPTAB_CPU0 in PFLASH. The direct FBL
+ * updater switches CPU_BTV separately to FblRamRuntime_TrapVectorTable in RAM. */
+IFX_USED void IfxCpu_Trap_vectorTable0(void);
 void IfxCpu_Trap_vectorTable0(void)
 {
 	/* Sets up the trap service routines for CPU0 */

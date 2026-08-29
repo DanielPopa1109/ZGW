@@ -158,6 +158,8 @@
 "Libraries/iLLD/TC3xx/Tricore/Cpu/Trap/IfxCpu_Trap.o"
 "Libraries/iLLD/TC3xx/Tricore/Cpu/Std/IfxCpu.o"
 "Libraries/iLLD/TC3xx/Tricore/Cpu/Irq/IfxCpu_Irq.o"
+"Libraries/iLLD/TC3xx/Tricore/Can/Std/IfxCan.o"
+"Libraries/iLLD/TC3xx/Tricore/Can/Can/IfxCan_Can.o"
 "Libraries/Infra/Ssw/TC3xx/Tricore/Ifx_Ssw_Infra.o"
 "Libraries/Infra/Ssw/TC3xx/Tricore/Ifx_Ssw_Tc0.o"
 "Libraries/Infra/Ssw/TC3xx/Tricore/Ifx_Ssw_Tc1.o"

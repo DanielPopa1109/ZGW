@@ -36,11 +36,11 @@ APP/GatewaySwc \
 APP/ParallelFlashSwc \
 APP/TimeSync \
 BSW/Com/Can \
+BSW/Com \
 BSW/Com/CanIf \
 BSW/Com/CanNm \
 BSW/Com/CanSM \
 BSW/Com/CanTp \
-BSW/Com \
 BSW/Com/ComM \
 BSW/Com/Ethernet \
 BSW/Com/Ethernet/GETH_LWIP_ILLD/lwip/src/api \

@@ -1,10 +1,12 @@
 #include "GatewaySwc.h"
 #include "CanIf.h"
+#include "CanDiag.h"
 #include "Com.h"
 #include "ComM.h"
 #include "Dcm.h"
 #include "Dem.h"
 #include "LinIf.h"
+#include "LinDiag.h"
 #include "SoAd.h"
 #include "Crc.h"
 #include "Nm.h"
@@ -319,6 +321,16 @@ Dcm_ReturnType GatewaySwc_SetDiagnosticCommunicationControl(uint8 controlType, u
         default:
             return DCM_NRC_SUBFUNCTION_NOT_SUPPORTED;
     }
+}
+
+boolean GatewaySwc_IsNormalCommunicationRxEnabled(void)
+{
+    return (GatewaySwc_NormalCommunicationRxEnabled != FALSE) ? TRUE : FALSE;
+}
+
+boolean GatewaySwc_IsNormalCommunicationTxEnabled(void)
+{
+    return (GatewaySwc_NormalCommunicationTxEnabled != FALSE) ? TRUE : FALSE;
 }
 
 Dcm_ReturnType DcmAppl_CommunicationControl(
@@ -727,13 +739,10 @@ void GatewaySwc_MainFunction(void)
 
     if (GatewaySwc_NormalCommunicationTxEnabled == FALSE)
     {
-        GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
+        GatewaySwc_NextEthPublishTimeNs = 0ull;
     }
-    else if (GatewaySwc_NextEthPublishTimeNs == 0ull)
-    {
-        GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
-    }
-    else if (nowNs >= GatewaySwc_NextEthPublishTimeNs)
+    else if ((GatewaySwc_NextEthPublishTimeNs == 0ull) ||
+            (nowNs >= GatewaySwc_NextEthPublishTimeNs))
     {
         GatewaySwc_PublishEthernetSummary();
         GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
@@ -1496,15 +1505,14 @@ static void GatewaySwc_McuStatusInit(void)
 static void GatewaySwc_McuStatusMainFunction(uint64 nowNs)
 {
 #if (GATEWAYSWC_MCU_STATUS_UDP_ENABLE == STD_ON)
-    if (GatewaySwc_McuStatusNextTxTimeNs == 0ull)
+    if ((GatewaySwc_McuStatusNextTxTimeNs == 0ull) ||
+            (nowNs >= GatewaySwc_McuStatusNextTxTimeNs))
     {
-        GatewaySwc_McuStatusNextTxTimeNs = nowNs + GATEWAYSWC_MCU_STATUS_TX_PERIOD_NS;
-    }
-    else if ((nowNs >= GatewaySwc_McuStatusNextTxTimeNs) &&
-            (GatewaySwc_McuStatusTxPending == 0u))
-    {
-        GatewaySwc_McuStatusSendPacket();
-        GatewaySwc_McuStatusUpdateNextTxDeadline(nowNs);
+        if (GatewaySwc_McuStatusTxPending == 0u)
+        {
+            GatewaySwc_McuStatusSendPacket();
+            GatewaySwc_McuStatusUpdateNextTxDeadline(nowNs);
+        }
     }
 #else
     (void)nowNs;
@@ -1983,6 +1991,81 @@ static void GatewaySwc_RequestNoCom(void)
     }
 }
 
+static boolean GatewaySwc_IsBusDiagnosticFailed(GatewaySwc_BusType bus)
+{
+    boolean failed;
+
+    switch (bus)
+    {
+        case GATEWAYSWC_BUS_LIN:
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_LIN1_HVDCDC_NO_COMMUNICATION, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_LIN1_PROTOCOL_ERROR, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_LIN1_CONTROLLER_FAULT, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            return FALSE;
+
+        case GATEWAYSWC_BUS_CAN:
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CAN_CLASSIC_BUS_OFF, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CAN_CLASSIC_ERROR_PASSIVE, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CAN_CLASSIC_CONTROLLER_FAULT, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CAN_CLASSIC_PROTOCOL_ERROR, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            return FALSE;
+
+        case GATEWAYSWC_BUS_CANFD:
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CANFD_BUS_OFF, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CANFD_ERROR_PASSIVE, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CANFD_CONTROLLER_FAULT, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            if ((Dem_GetEventFailed(DEM_EVENT_ID_CANFD_PROTOCOL_ERROR, &failed) == E_OK) &&
+                    (failed != FALSE))
+            {
+                return TRUE;
+            }
+            return FALSE;
+
+        default:
+            return FALSE;
+    }
+}
+
 static void GatewaySwc_ReportRxMessageTimeoutToDem(uint16 index, uint8 status)
 {
     Dem_EventStatusType desiredStatus;
@@ -2001,6 +2084,24 @@ static void GatewaySwc_ReportRxMessageTimeoutToDem(uint16 index, uint8 status)
     desiredStatus = ((status & GATEWAYSWC_RX_DIAG_STATUS_TIMEOUT) != 0u) ?
             DEM_EVENT_STATUS_FAILED :
             DEM_EVENT_STATUS_PASSED;
+
+    {
+        PduIdType pduId;
+        GatewaySwc_BusType bus;
+
+        if ((desiredStatus == DEM_EVENT_STATUS_FAILED) &&
+            (GatewaySwc_GetPduDiagConfig(index, &pduId, &bus) == E_OK) &&
+            (((bus == GATEWAYSWC_BUS_LIN) &&
+              (LinDiag_IsChannelUnavailable(LIN_CHANNEL_0) != FALSE)) ||
+             ((bus == GATEWAYSWC_BUS_CAN) &&
+              (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_CLASSIC) != FALSE)) ||
+             ((bus == GATEWAYSWC_BUS_CANFD) &&
+              (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_FD) != FALSE)) ||
+             (GatewaySwc_IsBusDiagnosticFailed(bus) != FALSE)))
+        {
+            return;
+        }
+    }
 
     if ((GatewaySwc_DemMessageTimeoutState[index] == GATEWAYSWC_DEM_STATE_UNKNOWN) &&
             (desiredStatus == DEM_EVENT_STATUS_PASSED))

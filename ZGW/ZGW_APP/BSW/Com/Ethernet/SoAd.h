@@ -99,6 +99,7 @@ extern volatile uint32 SoAd_OpenFailBindCounter;
 extern volatile uint32 SoAd_ApiLockCreateFailCounter;
 extern volatile uint32 SoAd_ApiLockTakeFailCounter;
 extern volatile uint32 SoAd_ApiLockGiveFailCounter;
+extern volatile uint32 SoAd_DiagSnapshotNoLockCounter;
 extern volatile uint8 SoAd_DebugState[SOAD_MAX_CONNECTIONS];
 #if SOAD_DEBUG_INSTRUMENTATION
 extern volatile uint8 SoAd_DebugRequestedOpen[SOAD_MAX_CONNECTIONS];

@@ -14,6 +14,7 @@
 #include "lwip/netif.h"
 #include "lwip/priv/raw_priv.h"
 #include "netif/ethernet.h"
+#include "IfxStm_reg.h"
 
 #define DOIP_TCP_PORT              13400u
 #define DOIP_UDP_PORT              13400u
@@ -43,6 +44,7 @@ static volatile uint32 g_tcpSessionCookie;
 
 static uint8 IFX_ALIGN(32) g_tcpStream[FBL_ETH_TCP_RX_STREAM_SIZE];
 static volatile uint16 g_tcpStreamLen;
+static volatile uint8 g_tcpRxPollPaused;
 
 static FblEth_RxItemType g_udpQ[FBL_ETH_UDP_RX_QUEUE_DEPTH];
 static volatile uint8 g_udpWr;
@@ -107,6 +109,19 @@ volatile uint32 g_FblEthTcpReceiveLastLenPtr;
 volatile uint32 g_FblEthTcpReceiveLastStreamPtr;
 volatile uint32 g_FblEthRxStage;
 volatile uint32 g_FblEthRxPollCallCount;
+volatile uint32 g_FblPerfRxFrameStartTick;
+volatile uint32 g_FblPerfRxFrameCompleteTick;
+volatile uint32 g_FblPerfCurrentTcpStreamLen;
+volatile uint32 g_FblPerfMaxTcpStreamLen;
+volatile uint32 g_FblPerfRxPollCount;
+volatile uint32 g_FblPerfTcpRecvCallbackCount;
+volatile uint32 g_FblPerfPbufCount;
+volatile uint32 g_FblPerfMaxPbufChain;
+volatile uint32 g_FblPerfTcpZeroWindowCount;
+volatile uint32 g_FblPerfTcpWindowMin = 0xFFFFFFFFu;
+volatile uint32 g_FblPerfTcpRetransmitIndicators;
+volatile uint32 g_FblPerfStreamCopyBytes;
+volatile uint32 g_FblPerfStreamMoveBytes;
 
 static void FblEth_RecordLocalAbort(uint32 reason);
 static void FblEth_UpdateTcpDebugState(void);
@@ -221,6 +236,19 @@ static void FblEth_MoveBytesLeft(uint8 *dst, const uint8 *src, uint16 len)
     }
 }
 
+static uint32 FblEth_CountPbufChain(const struct pbuf *p)
+{
+    const struct pbuf *q;
+    uint32 count = 0u;
+
+    for(q = p; q != NULL; q = q->next)
+    {
+        count++;
+    }
+
+    return count;
+}
+
 static void FblEth_SetBytes(uint8 *dst, uint8 value, uint16 len)
 {
     uint16 index;
@@ -270,6 +298,7 @@ static uint32 FblEth_ReadBe32(const uint8 *p)
 
 static void FblEth_ResetTcpStream(void)
 {
+    g_tcpRxPollPaused = 0u;
     g_tcpStreamLen = 0u;
     FblEth_SetBytes(g_tcpStream, 0u, (uint16)sizeof(g_tcpStream));
 }
@@ -330,19 +359,31 @@ static uint8 FblEth_QueueTcp(const struct pbuf *p)
         return 0u;
     }
 
+    if(g_tcpStreamLen == 0u)
+    {
+        g_FblPerfRxFrameStartTick = STM0_TIM0.U;
+        g_FblPerfRxFrameCompleteTick = 0u;
+    }
+
     for(q = p; q != NULL; q = q->next)
     {
         if(q->len > 0u)
         {
             FblEth_CopyBytes(&g_tcpStream[copied], (const uint8 *)q->payload, q->len);
+            g_FblPerfStreamCopyBytes += q->len;
             copied = (uint16)(copied + q->len);
         }
     }
 
     g_tcpStreamLen = copied;
+    g_FblPerfCurrentTcpStreamLen = g_tcpStreamLen;
     if(g_tcpStreamLen > g_FblTransferTcpStreamHighWatermark)
     {
         g_FblTransferTcpStreamHighWatermark = g_tcpStreamLen;
+    }
+    if(g_tcpStreamLen > g_FblPerfMaxTcpStreamLen)
+    {
+        g_FblPerfMaxTcpStreamLen = g_tcpStreamLen;
     }
 
     return 1u;
@@ -380,6 +421,12 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
 
     if(p != NULL)
     {
+        uint32 chainCount = FblEth_CountPbufChain(p);
+        g_FblPerfPbufCount += chainCount;
+        if(chainCount > g_FblPerfMaxPbufChain)
+        {
+            g_FblPerfMaxPbufChain = chainCount;
+        }
         g_FblEthTcpRecvCbLastPbufLen = p->len;
         g_FblEthTcpRecvCbLastPbufTotLen = p->tot_len;
         g_FblEthTcpRecvCbLastPbufRef = p->ref;
@@ -438,6 +485,11 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
     }
 
     g_FblEthTcpRecvCbStage = 8u;
+    g_FblPerfTcpRecvCallbackCount++;
+    if(g_FblPerfRxFrameStartTick == 0u)
+    {
+        g_FblPerfRxFrameStartTick = STM0_TIM0.U;
+    }
     if(FblEth_IsTcpPbufChainValid(p, &validatedTotLen) == 0u)
     {
         g_FblEthTcpRecvCbInvalidPbufCounter++;
@@ -455,6 +507,18 @@ static err_t FblEth_TcpRecvCb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, e
         }
     }
     g_FblEthTcpRecvCbStage = 10u;
+    if(tpcb->rcv_wnd == 0u)
+    {
+        g_FblPerfTcpZeroWindowCount++;
+    }
+    if((uint32)tpcb->rcv_wnd < g_FblPerfTcpWindowMin)
+    {
+        g_FblPerfTcpWindowMin = (uint32)tpcb->rcv_wnd;
+    }
+    if((tpcb->rtime >= 0) || (tpcb->nrtx != 0u))
+    {
+        g_FblPerfTcpRetransmitIndicators++;
+    }
     tcp_recved(tpcb, validatedTotLen);
     g_FblEthTcpRecvCbStage = 11u;
     pbuf_free(p);
@@ -678,16 +742,20 @@ void FblEth_Init(void)
 
 void FblEth_MainFunction(void)
 {
-    if(g_ethInitDone == 0u)
+    if((g_ethInitDone == 0u) || (g_tcpRxPollPaused != 0u))
     {
         return;
     }
 
     lwip_geth_Lwip_pollTimerFlags();
     g_FblEthRxStage = 1u;
-    g_FblEthRxPollCallCount++;
-    lwip_geth_Lwip_pollReceiveFlags();
-    lwip_geth_Lwip_watchRxProgress();
+    if(g_tcpRxPollPaused == 0u)
+    {
+        g_FblEthRxPollCallCount++;
+        g_FblPerfRxPollCount++;
+        lwip_geth_Lwip_pollReceiveFlags();
+        lwip_geth_Lwip_watchRxProgress();
+    }
     g_FblEthRxStage = 0u;
 }
 
@@ -695,13 +763,14 @@ void FblEth_PollReceiveOnly(void)
 {
     g_FblEthRxStage = 1u;
 
-    if(g_ethInitDone == 0u)
+    if((g_ethInitDone == 0u) || (g_tcpRxPollPaused != 0u))
     {
         g_FblEthRxStage = 0u;
         return;
     }
 
     g_FblEthRxPollCallCount++;
+    g_FblPerfRxPollCount++;
     g_FblEthRxStage = 2u;
     lwip_geth_Lwip_pollReceiveFlags();
     lwip_geth_Lwip_watchRxProgress();
@@ -735,6 +804,11 @@ uint8 FblEth_HasPendingTcpData(void)
         return 1u;
     }
     return 0u;
+}
+
+void FblEth_SetTcpRxPollPaused(uint8 paused)
+{
+    g_tcpRxPollPaused = (paused != 0u) ? 1u : 0u;
 }
 
 uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len)
@@ -797,6 +871,7 @@ uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len)
     g_FblEthTcpReceiveStage = 5u;
     *len = frameLen;
     FblEth_CopyBytes(buf, g_tcpStream, frameLen);
+    g_FblPerfStreamCopyBytes += frameLen;
     g_FblEthTcpReceiveStage = 6u;
 
     remaining = (uint16)(g_tcpStreamLen - frameLen);
@@ -805,14 +880,99 @@ uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len)
     {
         g_FblEthTcpReceiveStage = 7u;
         FblEth_MoveBytesLeft(g_tcpStream, &g_tcpStream[frameLen], remaining);
+        g_FblPerfStreamMoveBytes += remaining;
     }
 
     g_FblEthTcpReceiveStage = 8u;
     g_tcpStreamLen = remaining;
+    g_FblPerfCurrentTcpStreamLen = g_tcpStreamLen;
     g_FblEthTcpReceiveReturnCount++;
     g_FblEthTcpReceiveStage = 9u;
 
     return 1u;
+}
+
+uint8 FblEth_TcpPeekFrame(const uint8 **buf, uint16 *len)
+{
+    uint32 payloadLen;
+    uint32 frameLen32;
+
+    if((buf == NULL) || (len == NULL))
+    {
+        g_FblEthTcpReceiveNullArgCounter++;
+        g_FblEthTcpReceiveStage = 2u;
+        return 0u;
+    }
+
+    *buf = NULL;
+    *len = 0u;
+
+    if(g_tcpStreamLen < FBL_ETH_DOIP_HEADER_SIZE)
+    {
+        return 0u;
+    }
+
+    g_FblEthTcpReceiveCallCount++;
+    g_FblEthTcpReceiveStage = 1u;
+    g_FblEthTcpReceiveLastBufPtr = (uint32)buf;
+    g_FblEthTcpReceiveLastLenPtr = (uint32)len;
+    g_FblEthTcpReceiveLastStreamPtr = (uint32)g_tcpStream;
+    g_FblEthTcpReceiveLastStreamLen = g_tcpStreamLen;
+
+    payloadLen = FblEth_ReadBe32(&g_tcpStream[FBL_ETH_DOIP_PAYLOAD_LENGTH_OFFSET]);
+    if(payloadLen > ((uint32)sizeof(g_tcpStream) - FBL_ETH_DOIP_HEADER_SIZE))
+    {
+        g_FblEthTcpReceiveInvalidLenCounter++;
+        g_FblEthTcpReceiveStage = 4u;
+        FblEth_ResetTcpStream();
+        if(g_tcpRxOverflowCb != NULL)
+        {
+            g_tcpRxOverflowCb();
+        }
+        return 0u;
+    }
+
+    frameLen32 = payloadLen + FBL_ETH_DOIP_HEADER_SIZE;
+    if((uint32)g_tcpStreamLen < frameLen32)
+    {
+        return 0u;
+    }
+
+    *buf = g_tcpStream;
+    *len = (uint16)frameLen32;
+    g_FblPerfRxFrameCompleteTick = STM0_TIM0.U;
+    g_FblEthTcpReceiveLastOutLen = *len;
+    g_FblEthTcpReceiveStage = 5u;
+
+    return 1u;
+}
+
+void FblEth_TcpConsumeFrame(uint16 len)
+{
+    uint16 remaining;
+
+    if((len == 0u) || (len > g_tcpStreamLen))
+    {
+        g_FblEthTcpReceiveInvalidLenCounter++;
+        g_FblEthTcpReceiveStage = 4u;
+        FblEth_ResetTcpStream();
+        return;
+    }
+
+    remaining = (uint16)(g_tcpStreamLen - len);
+    g_FblEthTcpReceiveLastRemaining = remaining;
+    if(remaining > 0u)
+    {
+        g_FblEthTcpReceiveStage = 7u;
+        FblEth_MoveBytesLeft(g_tcpStream, &g_tcpStream[len], remaining);
+        g_FblPerfStreamMoveBytes += remaining;
+    }
+
+    g_FblEthTcpReceiveStage = 8u;
+    g_tcpStreamLen = remaining;
+    g_FblPerfCurrentTcpStreamLen = g_tcpStreamLen;
+    g_FblEthTcpReceiveReturnCount++;
+    g_FblEthTcpReceiveStage = 9u;
 }
 
 uint8 FblEth_UdpReceive(uint8 *buf, uint16 *len)
@@ -901,7 +1061,10 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             {
                 (void)tcp_output(pcb);
                 lwip_geth_Lwip_pollTimerFlags();
-                lwip_geth_Lwip_pollReceiveFlags();
+                if(g_tcpRxPollPaused == 0u)
+                {
+                    lwip_geth_Lwip_pollReceiveFlags();
+                }
             }
             else
             {
@@ -940,7 +1103,10 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             {
                 (void)tcp_output(pcb);
                 lwip_geth_Lwip_pollTimerFlags();
-                lwip_geth_Lwip_pollReceiveFlags();
+                if(g_tcpRxPollPaused == 0u)
+                {
+                    lwip_geth_Lwip_pollReceiveFlags();
+                }
             }
             else
             {
@@ -966,7 +1132,10 @@ void FblEth_TcpSend(const uint8 *buf, uint16 len)
             {
                 (void)tcp_output(pcb);
                 lwip_geth_Lwip_pollTimerFlags();
-                lwip_geth_Lwip_pollReceiveFlags();
+                if(g_tcpRxPollPaused == 0u)
+                {
+                    lwip_geth_Lwip_pollReceiveFlags();
+                }
             }
             else
             {
@@ -1014,13 +1183,35 @@ uint8 FblEth_TcpDrain(uint32 pollBudget)
         }
 
         lwip_geth_Lwip_pollTimerFlags();
-        lwip_geth_Lwip_pollReceiveFlags();
+        if(g_tcpRxPollPaused == 0u)
+        {
+            lwip_geth_Lwip_pollReceiveFlags();
+        }
         pollBudget--;
     }
 
     g_FblEthTcpDrainTimeoutCounter++;
     g_FblEthTcpLastDrainResult = 0u;
     return 0u;
+}
+
+uint8 FblEth_TcpFlushQueued(void)
+{
+    struct tcp_pcb *pcb = g_tcpActivePcb;
+
+    if(pcb == NULL)
+    {
+        return 1u;
+    }
+
+    (void)tcp_output(pcb);
+    lwip_geth_Lwip_pollTimerFlags();
+    if(g_tcpRxPollPaused == 0u)
+    {
+        lwip_geth_Lwip_pollReceiveFlags();
+    }
+
+    return ((g_tcpActivePcb == pcb) && (pcb->unsent == NULL)) ? 1u : 0u;
 }
 
 void FblEth_UdpSend(const uint8 *buf, uint16 len)
@@ -1072,49 +1263,54 @@ uint8 FblEth_RuntimeClosureOk(void)
     FBL_ETH_CLOSURE_CHECK(7u, FblEth_ReadBe32);
     FBL_ETH_CLOSURE_CHECK(8u, FblEth_NextTcpSessionCookie);
     FBL_ETH_CLOSURE_CHECK(9u, FblEth_IsTcpPbufChainValid);
-    FBL_ETH_CLOSURE_CHECK(10u, FblEth_IsActiveTcpSession);
-    FBL_ETH_CLOSURE_CHECK(11u, FblEth_OnTcpDisconnected);
-    FBL_ETH_CLOSURE_CHECK(12u, FblEth_QueueTcp);
-    FBL_ETH_CLOSURE_CHECK(13u, FblEth_QueueUdp);
-    FBL_ETH_CLOSURE_CHECK(14u, FblEth_TcpRecvCb);
-    FBL_ETH_CLOSURE_CHECK(15u, FblEth_TcpErrCb);
-    FBL_ETH_CLOSURE_CHECK(16u, FblEth_TcpAcceptCb);
-    FBL_ETH_CLOSURE_CHECK(17u, FblEth_UdpRecvCb);
-    FBL_ETH_CLOSURE_CHECK(18u, FblEth_MainFunction);
-    FBL_ETH_CLOSURE_CHECK(19u, FblEth_PollReceiveOnly);
-    FBL_ETH_CLOSURE_CHECK(20u, FblEth_PollTimerOnly);
-    FBL_ETH_CLOSURE_CHECK(21u, FblEth_TcpDrain);
-    FBL_ETH_CLOSURE_CHECK(22u, FblEth_TcpReceive);
-    FBL_ETH_CLOSURE_CHECK(23u, FblEth_TcpSend);
-    FBL_ETH_CLOSURE_CHECK(24u, FblEth_UdpReceive);
-    FBL_ETH_CLOSURE_CHECK(25u, FblEth_UdpSend);
+    FBL_ETH_CLOSURE_CHECK(10u, FblEth_CountPbufChain);
+    FBL_ETH_CLOSURE_CHECK(11u, FblEth_IsActiveTcpSession);
+    FBL_ETH_CLOSURE_CHECK(12u, FblEth_OnTcpDisconnected);
+    FBL_ETH_CLOSURE_CHECK(13u, FblEth_QueueTcp);
+    FBL_ETH_CLOSURE_CHECK(14u, FblEth_QueueUdp);
+    FBL_ETH_CLOSURE_CHECK(15u, FblEth_TcpRecvCb);
+    FBL_ETH_CLOSURE_CHECK(16u, FblEth_TcpErrCb);
+    FBL_ETH_CLOSURE_CHECK(17u, FblEth_TcpAcceptCb);
+    FBL_ETH_CLOSURE_CHECK(18u, FblEth_UdpRecvCb);
+    FBL_ETH_CLOSURE_CHECK(19u, FblEth_MainFunction);
+    FBL_ETH_CLOSURE_CHECK(20u, FblEth_PollReceiveOnly);
+    FBL_ETH_CLOSURE_CHECK(21u, FblEth_PollTimerOnly);
+    FBL_ETH_CLOSURE_CHECK(22u, FblEth_TcpDrain);
+    FBL_ETH_CLOSURE_CHECK(23u, FblEth_TcpFlushQueued);
+    FBL_ETH_CLOSURE_CHECK(24u, FblEth_TcpReceive);
+    FBL_ETH_CLOSURE_CHECK(25u, FblEth_TcpSend);
+    FBL_ETH_CLOSURE_CHECK(26u, FblEth_UdpReceive);
+    FBL_ETH_CLOSURE_CHECK(27u, FblEth_UdpSend);
+    FBL_ETH_CLOSURE_CHECK(28u, FblEth_TcpPeekFrame);
+    FBL_ETH_CLOSURE_CHECK(29u, FblEth_TcpConsumeFrame);
+    FBL_ETH_CLOSURE_CHECK(30u, FblEth_SetTcpRxPollPaused);
     if((g_tcpConnectedCb != NULL) &&
-       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpConnectedCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 26u; return 0u; }
+       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpConnectedCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 31u; return 0u; }
     if((g_tcpDisconnectedCb != NULL) &&
-       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpDisconnectedCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 27u; return 0u; }
+       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpDisconnectedCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 32u; return 0u; }
     if((g_tcpRxOverflowCb != NULL) &&
-       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpRxOverflowCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 28u; return 0u; }
-    FBL_ETH_CLOSURE_CHECK(29u, lwip_geth_netif_input_once);
-    FBL_ETH_CLOSURE_CHECK(30u, lwip_geth_netif_input);
+       (FblRamRuntime_IsExecutableAddress((uint32)g_tcpRxOverflowCb) == 0u)) { g_FblEthRuntimeClosureFailStep = 33u; return 0u; }
+    FBL_ETH_CLOSURE_CHECK(34u, lwip_geth_netif_input_once);
+    FBL_ETH_CLOSURE_CHECK(35u, lwip_geth_netif_input);
     if(lwip_geth_RamClosureIsValid() == 0u) { g_FblEthRuntimeClosureFailStep = 1000u + g_LwipGethRuntimeClosureFailStep; return 0u; }
-    FBL_ETH_CLOSURE_CHECK(31u, lwip_geth_Lwip_pollReceiveFlags);
-    FBL_ETH_CLOSURE_CHECK(32u, lwip_geth_Lwip_pollTimerFlags);
-    FBL_ETH_CLOSURE_CHECK(47u, lwip_geth_Lwip_watchRxProgress);
-    FBL_ETH_CLOSURE_CHECK(48u, lwip_geth_netif_recover_rx);
-    FBL_ETH_CLOSURE_CHECK(33u, tcp_output);
-    FBL_ETH_CLOSURE_CHECK(34u, tcp_write);
-    FBL_ETH_CLOSURE_CHECK(35u, pbuf_alloc);
-    FBL_ETH_CLOSURE_CHECK(36u, pbuf_free);
-    FBL_ETH_CLOSURE_CHECK(37u, udp_sendto);
-    FBL_ETH_CLOSURE_CHECK(38u, ethernet_output);
-    FBL_ETH_CLOSURE_CHECK(39u, FblRam_Memcpy);
-    FBL_ETH_CLOSURE_CHECK(40u, FblRam_Memset);
-    FBL_ETH_CLOSURE_CHECK(41u, FblRam_Memmove);
-    FBL_ETH_CLOSURE_CHECK(42u, FblRam_Memcmp);
-    FBL_ETH_CLOSURE_CHECK(43u, FblRam_Strlen);
-    FBL_ETH_CLOSURE_CHECK(44u, raw_input);
-    FBL_ETH_CLOSURE_CHECK(45u, ethernet_input);
-    FBL_ETH_CLOSURE_CHECK(46u, FblEth_RecordLocalAbort);
+    FBL_ETH_CLOSURE_CHECK(36u, lwip_geth_Lwip_pollReceiveFlags);
+    FBL_ETH_CLOSURE_CHECK(37u, lwip_geth_Lwip_pollTimerFlags);
+    FBL_ETH_CLOSURE_CHECK(38u, tcp_output);
+    FBL_ETH_CLOSURE_CHECK(39u, tcp_write);
+    FBL_ETH_CLOSURE_CHECK(40u, pbuf_alloc);
+    FBL_ETH_CLOSURE_CHECK(41u, pbuf_free);
+    FBL_ETH_CLOSURE_CHECK(42u, udp_sendto);
+    FBL_ETH_CLOSURE_CHECK(43u, ethernet_output);
+    FBL_ETH_CLOSURE_CHECK(44u, FblRam_Memcpy);
+    FBL_ETH_CLOSURE_CHECK(45u, FblRam_Memset);
+    FBL_ETH_CLOSURE_CHECK(46u, FblRam_Memmove);
+    FBL_ETH_CLOSURE_CHECK(47u, FblRam_Memcmp);
+    FBL_ETH_CLOSURE_CHECK(48u, FblRam_Strlen);
+    FBL_ETH_CLOSURE_CHECK(49u, raw_input);
+    FBL_ETH_CLOSURE_CHECK(50u, ethernet_input);
+    FBL_ETH_CLOSURE_CHECK(51u, FblEth_RecordLocalAbort);
+    FBL_ETH_CLOSURE_CHECK(52u, lwip_geth_Lwip_watchRxProgress);
+    FBL_ETH_CLOSURE_CHECK(53u, lwip_geth_netif_recover_rx);
 
 #undef FBL_ETH_CLOSURE_CHECK
 

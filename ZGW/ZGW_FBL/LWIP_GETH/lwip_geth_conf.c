@@ -110,7 +110,8 @@ const IfxGeth_Eth_Config LWIP_GETH_0_geth_lld_config =
         .queueEnable                        = TRUE,
         .storeAndForward                    = TRUE,
         .rxQueueSize                        = IfxGeth_QueueSize_8192Bytes,
-        .forwardErrorPacket                 = FALSE,
+        /* TC37x Erratum GETH_AI.013: forward RMII 10 Mbps error packets for software drop. */
+        .forwardErrorPacket                 = TRUE,
         .forwardUndersizedGoodPacket        = FALSE,
         .daBasedDmaChannelEnabled           = FALSE,
         .rxDmaChannelMap                    = IfxGeth_RxDmaChannel_0,

@@ -36,6 +36,7 @@ volatile uint32 SoAd_OpenFailBindCounter = 0u;
 volatile uint32 SoAd_ApiLockCreateFailCounter = 0u;
 volatile uint32 SoAd_ApiLockTakeFailCounter = 0u;
 volatile uint32 SoAd_ApiLockGiveFailCounter = 0u;
+volatile uint32 SoAd_DiagSnapshotNoLockCounter = 0u;
 volatile uint8 SoAd_DebugState[SOAD_MAX_CONNECTIONS];
 #if SOAD_DEBUG_INSTRUMENTATION
 volatile uint8 SoAd_DebugRequestedOpen[SOAD_MAX_CONNECTIONS];
@@ -951,36 +952,41 @@ void SoAd_MainFunction(void)
 Std_ReturnType SoAd_GetDiagSnapshot(SoAd_SoConIdType id, SoAd_DiagSnapshotType *snapshot)
 {
     const SoAd_SoConRuntimeType *rt;
+    const SoAd_SocketConnectionConfigType *cfg;
+    const SoAd_ConfigType *soAdCfg;
 
-    if ((snapshot == 0) || (id >= SOAD_MAX_CONNECTIONS) || (SoAd_Cfg == 0) ||
-            (id >= SoAd_Cfg->numConnections))
+    soAdCfg = SoAd_Cfg;
+
+    if ((snapshot == 0) || (id >= SOAD_MAX_CONNECTIONS) || (soAdCfg == 0) ||
+            (id >= soAdCfg->numConnections))
     {
         return E_NOT_OK;
     }
 
-    if (SoAd_Lock() == 0u)
-    {
-        return E_NOT_OK;
-    }
-
+    /* This API is called from core0 DCM snapshot capture. SoAd runtime is owned
+     * by core2, so taking SoAd_ApiMutex here would use the core2 FreeRTOS queue
+     * API from a core0 task and can corrupt the core2 event list. The snapshot
+     * is diagnostic only, so copy the current values without blocking.
+     */
+    SoAd_DiagSnapshotNoLockCounter++;
     rt = &SoAd_Runtime[id];
-    if (rt->cfg == 0)
+    cfg = rt->cfg;
+
+    if (cfg == 0)
     {
-        SoAd_Unlock();
         return E_NOT_OK;
     }
 
     snapshot->state = rt->state;
     snapshot->listenSock = rt->listenSock;
     snapshot->activeSock = rt->activeSock;
-    snapshot->localAddr.addr = SoAd_Ip4ToU32(rt->cfg->localAddr.addr);
-    snapshot->localAddr.port = rt->cfg->localAddr.port;
+    snapshot->localAddr.addr = SoAd_Ip4ToU32(cfg->localAddr.addr);
+    snapshot->localAddr.port = cfg->localAddr.port;
     snapshot->remoteAddr = rt->remoteAddr;
     snapshot->requestedOpen = rt->requestedOpen;
-    snapshot->protocol = (uint8)rt->cfg->protocol;
-    snapshot->upperLayer = (uint8)rt->cfg->upperLayer;
+    snapshot->protocol = (uint8)cfg->protocol;
+    snapshot->upperLayer = (uint8)cfg->upperLayer;
 
-    SoAd_Unlock();
     return E_OK;
 }
 

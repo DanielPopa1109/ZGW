@@ -85,6 +85,7 @@ typedef struct
 
 void CodingApp_Init(void);
 void CodingApp_MainFunction(void);
+void CodingApp_OnNvMReadAllComplete(void);
 void CodingApp_OnDemEventCleared(Dem_EventIdType eventId);
 
 boolean CodingApp_IsCoded(void);

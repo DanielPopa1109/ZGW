@@ -22,6 +22,11 @@ typedef enum
     ETHERNETDIAG_EVENT_SERVICE_AVAILABILITY_FAILURE,
     ETHERNETDIAG_EVENT_DOIP_COMM_FAILURE,
     ETHERNETDIAG_EVENT_PARTNER_COMM_TERMINATED,
+    ETHERNETDIAG_EVENT_PHY_COMMUNICATION_FAULT,
+    ETHERNETDIAG_EVENT_PHY_FAULT,
+    ETHERNETDIAG_EVENT_NEGOTIATION_FAILURE,
+    ETHERNETDIAG_EVENT_UNEXPECTED_LINK_MODE,
+    ETHERNETDIAG_EVENT_RESOURCE_EXHAUSTION,
     ETHERNETDIAG_EVENT_COUNT
 } EthernetDiagEventType;
 
@@ -57,6 +62,7 @@ typedef struct
     EthernetDiagConnectionId connectionId;
     uint8 soConId;
     uint8 mandatory;
+    uint8 diagnosticConnection;
     uint8 protocol;
     uint32 startupGraceMs;
     uint32 supervisionTimeoutMs;
@@ -99,6 +105,7 @@ void EthernetDiag_ReportPhyLink(boolean linkUp);
 void EthernetDiag_ReportDmaError(uint32 errorFlags);
 void EthernetDiag_ReportRxError(uint32 errorFlags);
 void EthernetDiag_ReportTxError(uint32 errorFlags);
+void EthernetDiag_ReportResourceExhaustion(uint32 reasonFlags);
 void EthernetDiag_ReportSocketConnected(EthernetDiagConnectionId id);
 void EthernetDiag_ReportSocketOpenFailed(EthernetDiagConnectionId id);
 void EthernetDiag_ReportSocketCloseRequested(EthernetDiagConnectionId id);

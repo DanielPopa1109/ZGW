@@ -173,6 +173,17 @@ void CodingApp_MainFunction(void)
     }
 }
 
+void CodingApp_OnNvMReadAllComplete(void)
+{
+    if (CodingApp_Status.initialized == FALSE)
+    {
+        return;
+    }
+
+    CodingApp_LoadFromNvRam();
+    CodingApp_UpdateDebug();
+}
+
 void CodingApp_OnDemEventCleared(Dem_EventIdType eventId)
 {
     if (eventId == DEM_EVENT_ID_CODING_ECU_NOT_CODED)

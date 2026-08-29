@@ -6,6 +6,7 @@
 
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
 #include "IfxPms_reg.h"
+#include "IfxScuWdt.h"
 #include "../../SCR/scr_time_shared.h"
 #endif
 
@@ -20,6 +21,7 @@
 #define TIMEBASE_STM_FREQUENCY_FALLBACK_HZ     100000000u
 #define TIMEBASE_CRITICAL_CORE_COUNT           6u
 #define TIMEBASE_CRITICAL_SPIN_TIMEOUT         10000u
+#define TIMEBASE_PMSWSTATCLR_SCRSTCLR_MASK     0x00010000u
 
 #define TIMEBASE_NVM_MAGIC                     0x54494D45u
 #define TIMEBASE_NVM_VERSION                   1u
@@ -109,6 +111,7 @@ static boolean TimeBase_IsNvMImageValid(const uint8 *image);
 static Std_ReturnType TimeBase_UpdateNvMImage(uint64 utcTimeNs, uint64 vehicleTimeNs, TimeBase_TimeSourceType source, uint32 syncStatus);
 #if (TIMESYNC_SCR_RTC_ENABLE == STD_ON)
 static volatile uint8 *TimeBase_GetScrRtcXram(void);
+static uint8 TimeBase_ClearScrResetStatusIfSet(void);
 static void TimeBase_ScrStoreU8(uint16 offset, uint8 value);
 static uint8 TimeBase_ScrLoadU8(uint16 offset);
 static uint32 TimeBase_ScrLoadU32FromImage(const uint8 *image, uint16 offset);
@@ -528,18 +531,54 @@ static volatile uint8 *TimeBase_GetScrRtcXram(void)
     return &((volatile uint8 *)PMS_XRAM)[SCR_TIME_XRAM_BASE];
 }
 
+static uint8 TimeBase_ClearScrResetStatusIfSet(void)
+{
+    if (PMS_PMSWSTAT.B.SCRST != 0u)
+    {
+        uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+        uint8 safetyEndinitWasSet = (IfxScuWdt_getSafetyWatchdogEndInit() != 0u) ? 1u : 0u;
+
+        if (safetyEndinitWasSet != 0u)
+        {
+            IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+        }
+        PMS_PMSWSTATCLR.U = TIMEBASE_PMSWSTATCLR_SCRSTCLR_MASK;
+        __dsync();
+        if (safetyEndinitWasSet != 0u)
+        {
+            IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+        }
+        return 1u;
+    }
+
+    return 0u;
+}
+
 static void TimeBase_ScrStoreU8(uint16 offset, uint8 value)
 {
     volatile uint8 *record = TimeBase_GetScrRtcXram();
 
-    record[offset] = value;
+    do
+    {
+        (void)TimeBase_ClearScrResetStatusIfSet();
+        /* TC37x Erratum SCR_TC.019: retry SCR XRAM write if SCR reset overlaps it. */
+        record[offset] = value;
+    } while (TimeBase_ClearScrResetStatusIfSet() != 0u);
 }
 
 static uint8 TimeBase_ScrLoadU8(uint16 offset)
 {
     volatile uint8 *record = TimeBase_GetScrRtcXram();
+    uint8 value;
 
-    return record[offset];
+    do
+    {
+        (void)TimeBase_ClearScrResetStatusIfSet();
+        /* TC37x Erratum SCR_TC.019: retry SCR XRAM read if SCR reset overlaps it. */
+        value = record[offset];
+    } while (TimeBase_ClearScrResetStatusIfSet() != 0u);
+
+    return value;
 }
 
 static uint32 TimeBase_ScrLoadU32FromImage(const uint8 *image, uint16 offset)

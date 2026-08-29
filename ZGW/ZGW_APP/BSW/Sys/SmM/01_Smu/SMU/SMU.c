@@ -127,6 +127,10 @@ uint16 nbrAlarmsThatTriggerIsr2 = 0u;
 uint16 nbrAlarmsThatTriggerNMI  = 0u;
 uint16 nbrAlarmsThatAreDisabled = 0u;
 
+#define SMU_AEXCLR_IRQ0_STS_AEM_MASK     ((uint32)((1u << 0u) | (1u << 16u)))
+#define SMU_AEXCLR_IRQ1_STS_AEM_MASK     ((uint32)((1u << 1u) | (1u << 17u)))
+#define SMU_AEXCLR_IRQ2_STS_AEM_MASK     ((uint32)((1u << 2u) | (1u << 18u)))
+
 #ifndef SMU_DEBUG_INSTRUMENTATION
 #define SMU_DEBUG_INSTRUMENTATION       0
 #endif
@@ -460,6 +464,16 @@ void safetyKitEnableAllSMUAlarms(void)
             {
                 /* Do nothing. */
             }
+
+            if(10u == alarmGroup && 16u == alarmPos)
+            {
+                continue;
+            }
+            else
+            {
+                // do nothing.
+            }
+
             /* Determine if there is already an alarm action configured for the alarm at position alarmPos
              * of group alarmGroup */
             IfxSmu_InternalAlarmAction alarmAction =
@@ -574,7 +588,9 @@ SmuStatusType coreAlarmReactionClearSMU(RuntimeAlarmHandle *activeAlarm)
     {
         IfxScuWdt_clearSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
-        SMU_AEXCLR.B.IRQ0CLR = 1u;
+        /* TC37x Erratum SMU_TC.H010: clear SMU flags with a 32-bit register write. */
+        /* TC37x Erratum SMU_TC.013: clear the matching AEM bit with the STS bit. */
+        SMU_AEXCLR.U = SMU_AEXCLR_IRQ0_STS_AEM_MASK;
 
         IfxScuWdt_setSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
@@ -589,7 +605,9 @@ SmuStatusType coreAlarmReactionClearSMU(RuntimeAlarmHandle *activeAlarm)
     {
         IfxScuWdt_clearSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
-        SMU_AEXCLR.B.IRQ1CLR = 1u;
+        /* TC37x Erratum SMU_TC.H010: clear SMU flags with a 32-bit register write. */
+        /* TC37x Erratum SMU_TC.013: clear the matching AEM bit with the STS bit. */
+        SMU_AEXCLR.U = SMU_AEXCLR_IRQ1_STS_AEM_MASK;
 
         IfxScuWdt_setSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
@@ -604,7 +622,9 @@ SmuStatusType coreAlarmReactionClearSMU(RuntimeAlarmHandle *activeAlarm)
     {
         IfxScuWdt_clearSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 
-        SMU_AEXCLR.B.IRQ2CLR = 1u;
+        /* TC37x Erratum SMU_TC.H010: clear SMU flags with a 32-bit register write. */
+        /* TC37x Erratum SMU_TC.013: clear the matching AEM bit with the STS bit. */
+        SMU_AEXCLR.U = SMU_AEXCLR_IRQ2_STS_AEM_MASK;
 
         IfxScuWdt_setSafetyEndinitInline(IfxScuWdt_getSafetyWatchdogPasswordInline ());
 

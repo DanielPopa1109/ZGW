@@ -1,0 +1,33 @@
+{
+  "schema": "FCD_PSDZDATA_v1",
+  "created": "2026-08-29T20:25:47",
+  "payload_format": "raw_bin",
+  "payloads": [
+    {
+      "ecu": "ZGW",
+      "node_name": "ZGW",
+      "bus_type": "ETHERNET",
+      "target_logical_address": "0x1001",
+      "address": "0xA0030000",
+      "size": 5898240,
+      "crc32": "0x847D2F82",
+      "file": "payloads\\ZGW_0_A0030000.bin",
+      "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex",
+      "source_address": "0x80030000",
+      "flash_kind": "APPL"
+    },
+    {
+      "ecu": "ZGW",
+      "node_name": "ZGW",
+      "bus_type": "ETHERNET",
+      "target_logical_address": "0x1001",
+      "address": "0xA0000000",
+      "size": 196608,
+      "crc32": "0x041D3153",
+      "file": "payloads\\ZGW_0_A0000000.bin",
+      "source_hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex",
+      "source_address": "0x80000000",
+      "flash_kind": "FBL"
+    }
+  ]
+}

@@ -4,6 +4,10 @@
 #include "EthSM.h"
 #include "SoAd.h"
 #include "TcpIpH.h"
+#include "GETH_LWIP_ILLD/lwip_geth_conf.h"
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+#include "GETH_LWIP_ILLD/lwip_geth_private_phy_dp83825i.h"
+#endif
 #include "APP/TimeSync/TimeBase.h"
 #include <string.h>
 
@@ -12,9 +16,14 @@
 #define ETHERNETDIAG_ERROR_WINDOW_MS        10000u
 #define ETHERNETDIAG_RX_ERROR_THRESHOLD     8u
 #define ETHERNETDIAG_TX_ERROR_THRESHOLD     5u
+#define ETHERNETDIAG_RESOURCE_THRESHOLD     8u
 #define ETHERNETDIAG_DEFAULT_HEALING_MS     30000u
 #define ETHERNETDIAG_DOIP_DEBOUNCE_MS       25000u
-#define ETHERNETDIAG_SNAPSHOT_DATA_SIZE     71u
+#define ETHERNETDIAG_PHY_DEBOUNCE_MS        1000u
+#define ETHERNETDIAG_NEGOTIATION_DEBOUNCE_MS 5000u
+#define ETHERNETDIAG_LINK_MODE_DEBOUNCE_MS  10000u
+#define ETHERNETDIAG_RESOURCE_DEBOUNCE_MS   30000u
+#define ETHERNETDIAG_SNAPSHOT_DATA_SIZE     96u
 #define ETHERNETDIAG_SNAPSHOT_LOCAL_IP_OFFSET           22u
 #define ETHERNETDIAG_SNAPSHOT_REMOTE_IP_OFFSET          26u
 #define ETHERNETDIAG_SNAPSHOT_LOCAL_PORT_OFFSET         30u
@@ -32,6 +41,17 @@
 #define ETHERNETDIAG_SNAPSHOT_LISTEN_SOCKET_OFFSET      62u
 #define ETHERNETDIAG_SNAPSHOT_ACTIVE_SOCKET_OFFSET      66u
 #define ETHERNETDIAG_SNAPSHOT_SOAD_STATE_OFFSET         70u
+#define ETHERNETDIAG_SNAPSHOT_PHY_STATE_OFFSET          71u
+#define ETHERNETDIAG_SNAPSHOT_PHY_ADDR_OFFSET           72u
+#define ETHERNETDIAG_SNAPSHOT_PHY_INIT_DONE_OFFSET      73u
+#define ETHERNETDIAG_SNAPSHOT_PHY_AUTONEG_DONE_OFFSET   74u
+#define ETHERNETDIAG_SNAPSHOT_PHY_SPEED100_OFFSET       75u
+#define ETHERNETDIAG_SNAPSHOT_PHY_FULL_DUPLEX_OFFSET    76u
+#define ETHERNETDIAG_SNAPSHOT_PHY_RESET_TIMEOUTS_OFFSET 77u
+#define ETHERNETDIAG_SNAPSHOT_PHY_AUTONEG_TIMEOUTS_OFFSET 81u
+#define ETHERNETDIAG_SNAPSHOT_PHY_MDIO_ERRORS_OFFSET    85u
+#define ETHERNETDIAG_SNAPSHOT_RESOURCE_ERRORS_OFFSET    89u
+#define ETHERNETDIAG_SNAPSHOT_LAST_RESOURCE_FLAGS_OFFSET 93u
 
 typedef struct
 {
@@ -81,6 +101,10 @@ static uint32 EthernetDiag_DmaErrorCounter;
 static uint32 EthernetDiag_TcpUnexpectedCloseCounter;
 static uint32 EthernetDiag_SocketOpenFailCounter;
 static uint32 EthernetDiag_LinkDownTransitionCounter;
+static uint16 EthernetDiag_ResourceWindowErrors;
+static uint32 EthernetDiag_ResourceWindowStartMs;
+static uint32 EthernetDiag_ResourceExhaustionCounter;
+static uint32 EthernetDiag_LastResourceFlags;
 static uint8 EthernetDiag_DoipActive;
 static uint8 EthernetDiag_DoipTimedOut;
 
@@ -230,6 +254,16 @@ void EthernetDiag_Init(void)
             ETHERNETDIAG_DOIP_DEBOUNCE_MS, 45000u);
     EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_PARTNER_COMM_TERMINATED, DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED,
             25000u, 45000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_PHY_COMMUNICATION_FAULT, DEM_EVENT_ID_ETH_PHY_COMMUNICATION_FAULT,
+            ETHERNETDIAG_PHY_DEBOUNCE_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_PHY_FAULT, DEM_EVENT_ID_ETH_PHY_FAULT,
+            ETHERNETDIAG_PHY_DEBOUNCE_MS, 60000u);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_NEGOTIATION_FAILURE, DEM_EVENT_ID_ETH_NEGOTIATION_FAILURE,
+            ETHERNETDIAG_NEGOTIATION_DEBOUNCE_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_UNEXPECTED_LINK_MODE, DEM_EVENT_ID_ETH_UNEXPECTED_LINK_MODE,
+            ETHERNETDIAG_LINK_MODE_DEBOUNCE_MS, ETHERNETDIAG_DEFAULT_HEALING_MS);
+    EthernetDiag_SetupEvent(ETHERNETDIAG_EVENT_RESOURCE_EXHAUSTION, DEM_EVENT_ID_ETH_RESOURCE_EXHAUSTION,
+            ETHERNETDIAG_RESOURCE_DEBOUNCE_MS, 60000u);
 
     for (i = 0u; (i < EthernetDiag_Config.connectionCount) && (i < 8u); i++)
     {
@@ -247,6 +281,7 @@ void EthernetDiag_Init(void)
 
     EthernetDiag_RxWindowStartMs = nowMs;
     EthernetDiag_TxWindowStartMs = nowMs;
+    EthernetDiag_ResourceWindowStartMs = nowMs;
     EthernetDiag_Initialized = TRUE;
 }
 
@@ -287,6 +322,10 @@ void EthernetDiag_MainFunction(void)
     boolean udpTimeout;
     boolean serviceLost;
     boolean partnerLost;
+    boolean phyCommFault;
+    boolean phyFault;
+    boolean negotiationFailure;
+    boolean unexpectedLinkMode;
 
     if (EthernetDiag_Initialized == FALSE)
     {
@@ -300,6 +339,29 @@ void EthernetDiag_MainFunction(void)
     udpTimeout = FALSE;
     serviceLost = FALSE;
     partnerLost = FALSE;
+    phyCommFault = FALSE;
+    phyFault = FALSE;
+    negotiationFailure = FALSE;
+    unexpectedLinkMode = FALSE;
+
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+    {
+        const lwip_geth_PhyDp83825i_StatusType *phyStatus;
+
+        phyStatus = lwip_geth_private_Phy_Dp83825i_getStatus();
+        if (phyStatus != NULL_PTR)
+        {
+            phyCommFault = ((phyStatus->mdioErrorCnt >= 3u) ||
+                    (phyStatus->resetTimeoutCnt > 0u)) ? TRUE : FALSE;
+            phyFault = (phyStatus->state == LWIP_GETH_PHY_DP83825I_STATE_ERROR) ? TRUE : FALSE;
+            negotiationFailure = ((phyStatus->initDone != 0u) &&
+                    (phyStatus->autonegTimeoutCnt > 0u) &&
+                    (phyStatus->linkUp == 0u)) ? TRUE : FALSE;
+            unexpectedLinkMode = ((phyStatus->linkUp != 0u) &&
+                    ((phyStatus->speed100 == 0u) || (phyStatus->fullDuplex == 0u))) ? TRUE : FALSE;
+        }
+    }
+#endif
 
     EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_LINK_LOST,
             ((allowed != FALSE) && (EthernetDiag_LinkUpSeen != FALSE) && (EthernetDiag_LinkUp == FALSE)) ? TRUE : FALSE);
@@ -320,6 +382,14 @@ void EthernetDiag_MainFunction(void)
         EthernetDiag_TxWindowStartMs = nowMs;
     }
 
+    if (EthernetDiag_Elapsed(nowMs, EthernetDiag_ResourceWindowStartMs, ETHERNETDIAG_ERROR_WINDOW_MS) != FALSE)
+    {
+        EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_RESOURCE_EXHAUSTION,
+                (EthernetDiag_ResourceWindowErrors >= ETHERNETDIAG_RESOURCE_THRESHOLD) ? TRUE : FALSE);
+        EthernetDiag_ResourceWindowErrors = 0u;
+        EthernetDiag_ResourceWindowStartMs = nowMs;
+    }
+
     for (i = 0u; (i < EthernetDiag_Config.connectionCount) && (i < 8u); i++)
     {
         const EthernetDiagConnectionConfigType *cfg = &EthernetDiag_Config.connections[i];
@@ -330,14 +400,16 @@ void EthernetDiag_MainFunction(void)
             continue;
         }
 
-        if ((cfg->protocol == TCPIP_PROTOCOL_TCP) &&
+        if ((cfg->diagnosticConnection == FALSE) &&
+                (cfg->protocol == TCPIP_PROTOCOL_TCP) &&
                 (rt->state == ETHERNETDIAG_CONN_FAULT_PENDING))
         {
             tcpUnexpected = TRUE;
             partnerLost = TRUE;
         }
 
-        if ((cfg->protocol == TCPIP_PROTOCOL_TCP) &&
+        if ((cfg->diagnosticConnection == FALSE) &&
+                (cfg->protocol == TCPIP_PROTOCOL_TCP) &&
                 (rt->openFailCount >= cfg->retryLimit) &&
                 (cfg->retryLimit > 0u))
         {
@@ -378,6 +450,11 @@ void EthernetDiag_MainFunction(void)
     EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_PARTNER_COMM_TERMINATED,
             ((EthernetDiag_LinkUp == FALSE) ||
              (EthernetDiag_Events[ETHERNETDIAG_EVENT_CTRL_DMA_FAILURE].reportedFailed != FALSE)) ? FALSE : partnerLost);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_PHY_COMMUNICATION_FAULT, phyCommFault);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_PHY_FAULT, phyFault);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_NEGOTIATION_FAILURE,
+            ((EthernetDiag_LinkUpSeen != FALSE) && (EthernetDiag_LinkUp == FALSE)) ? FALSE : negotiationFailure);
+    EthernetDiag_SetEventInput(ETHERNETDIAG_EVENT_UNEXPECTED_LINK_MODE, unexpectedLinkMode);
 
     for (i = 0u; i < ETHERNETDIAG_EVENT_COUNT; i++)
     {
@@ -443,6 +520,22 @@ void EthernetDiag_ReportTxError(uint32 errorFlags)
         if (EthernetDiag_TxErrorCounter < 0xFFFFFFFFu)
         {
             EthernetDiag_TxErrorCounter++;
+        }
+    }
+}
+
+void EthernetDiag_ReportResourceExhaustion(uint32 reasonFlags)
+{
+    if (reasonFlags != 0u)
+    {
+        EthernetDiag_LastResourceFlags = reasonFlags;
+        if (EthernetDiag_ResourceWindowErrors < 0xFFFFu)
+        {
+            EthernetDiag_ResourceWindowErrors++;
+        }
+        if (EthernetDiag_ResourceExhaustionCounter < 0xFFFFFFFFu)
+        {
+            EthernetDiag_ResourceExhaustionCounter++;
         }
     }
 }
@@ -614,7 +707,7 @@ Std_ReturnType EthernetDiag_CaptureSnapshotData(Dem_EventIdType eventId, uint8 *
     }
 
     if ((eventId < DEM_EVENT_ID_ETH_LINK_LOST) ||
-            (eventId > DEM_EVENT_ID_ETH_PARTNER_COMM_TERMINATED))
+            (eventId > DEM_EVENT_ID_ETH_DIAG_LAST))
     {
         return E_NOT_OK;
     }
@@ -667,6 +760,33 @@ Std_ReturnType EthernetDiag_CaptureSnapshotData(Dem_EventIdType eventId, uint8 *
     EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_LINK_DOWNS_OFFSET, EthernetDiag_LinkDownTransitionCounter);
     EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_LISTEN_SOCKET_OFFSET, (uint32)soAdSnapshot.listenSock);
     EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_ACTIVE_SOCKET_OFFSET, (uint32)soAdSnapshot.activeSock);
+
+#if (PHY_DEVICE_NAME == PHY_DP83825I)
+    {
+        const lwip_geth_PhyDp83825i_StatusType *phyStatus;
+
+        phyStatus = lwip_geth_private_Phy_Dp83825i_getStatus();
+        if (phyStatus != NULL_PTR)
+        {
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_STATE_OFFSET] = (uint8)phyStatus->state;
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_ADDR_OFFSET] = 0u;
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_INIT_DONE_OFFSET] = (uint8)phyStatus->initDone;
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_AUTONEG_DONE_OFFSET] = (uint8)phyStatus->autonegDone;
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_SPEED100_OFFSET] = (uint8)phyStatus->speed100;
+            buffer[ETHERNETDIAG_SNAPSHOT_PHY_FULL_DUPLEX_OFFSET] = (uint8)phyStatus->fullDuplex;
+            EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_PHY_RESET_TIMEOUTS_OFFSET,
+                    phyStatus->resetTimeoutCnt);
+            EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_PHY_AUTONEG_TIMEOUTS_OFFSET,
+                    phyStatus->autonegTimeoutCnt);
+            EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_PHY_MDIO_ERRORS_OFFSET,
+                    phyStatus->mdioErrorCnt);
+        }
+    }
+#endif
+    EthernetDiag_StoreU32(buffer, ETHERNETDIAG_SNAPSHOT_RESOURCE_ERRORS_OFFSET,
+            EthernetDiag_ResourceExhaustionCounter);
+    EthernetDiag_StoreU16(buffer, ETHERNETDIAG_SNAPSHOT_LAST_RESOURCE_FLAGS_OFFSET,
+            (uint16)(EthernetDiag_LastResourceFlags & 0xFFFFu));
 
     *length = ETHERNETDIAG_SNAPSHOT_DATA_SIZE;
     return E_OK;

@@ -78,7 +78,12 @@
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  100
 #define LWIP_GETH_OS_POLL_PERIOD_MS         (5U)
 #define LWIP_GETH_RX_POLL_BUDGET            (192U)
+#define LWIP_GETH_RX_STATUS_FATAL_BUS_ERROR_MASK (1u << 3u)
 #define LWIP_GETH_RX_STALL_RECOVERY_CYCLES  (200U)
+#if LWIP_GETH_RTOS_ENABLED && !LWIP_TCPIP_CORE_LOCKING
+#define LWIP_GETH_RX_CALLBACK_NOT_PENDING   (0U)
+#define LWIP_GETH_RX_CALLBACK_PENDING       (1U)
+#endif
 /* Use the 5 ms core2 poll path for RX. This keeps Ethernet active while
  * removing the ISR -> FreeRTOS task-notify path from AG7/17 investigations.
  */
@@ -152,6 +157,11 @@ volatile uint32 g_LwipRxStallLastRxControl;
 volatile uint32 g_LwipRxStallLastCurrentDesc;
 volatile uint32 g_LwipRxStallRecoverOkCounter;
 volatile uint32 g_LwipRxStallRecoverFailCounter;
+#if LWIP_GETH_RTOS_ENABLED && !LWIP_TCPIP_CORE_LOCKING
+volatile uint32 g_LwipRxInputCallbackPending;
+volatile uint32 g_LwipRxInputCallbackPostCounter;
+volatile uint32 g_LwipRxInputCallbackFailCounter;
+#endif
 
 /***********************************************************************************************************************
  * FUNCTION IMPLEMENTATIONS
@@ -276,6 +286,46 @@ static void lwip_geth_Lwip_forceNetifUpCb(void *ctx)
     (void)ctx;
     lwip_geth_Lwip_forceNetifUp();
 }
+
+static void lwip_geth_Lwip_pollReceiveFlagsCb(void *ctx)
+{
+    uint8 processed;
+    uint8 budget = LWIP_GETH_RX_POLL_BUDGET;
+
+    (void)ctx;
+    g_LwipRxInputCallbackPending = LWIP_GETH_RX_CALLBACK_NOT_PENDING;
+    g_LwipRxPollLoopCounter++;
+
+    do
+    {
+        processed = lwip_geth_netif_input_core_once(&g_Lwip.netif);
+
+        if (processed != 0u)
+        {
+            g_LwipRxPollPacketCounter++;
+        }
+
+        if (budget > 0u)
+        {
+            budget--;
+        }
+    } while ((processed != 0u) && (budget > 0u));
+
+    if ((processed != 0u) && (budget == 0u))
+    {
+        g_LwipRxPollBudgetHitCounter++;
+        g_LwipRxInputCallbackPending = LWIP_GETH_RX_CALLBACK_PENDING;
+        if (tcpip_try_callback(lwip_geth_Lwip_pollReceiveFlagsCb, NULL_PTR) == ERR_OK)
+        {
+            g_LwipRxInputCallbackPostCounter++;
+        }
+        else
+        {
+            g_LwipRxInputCallbackPending = LWIP_GETH_RX_CALLBACK_NOT_PENDING;
+            g_LwipRxInputCallbackFailCounter++;
+        }
+    }
+}
 #endif
 
 /** \brief Polling the timer event flags */
@@ -391,6 +441,23 @@ void lwip_geth_Lwip_pollTimerFlags(void)
 /** \brief Polling the ETH receive event flags */
 void lwip_geth_Lwip_pollReceiveFlags(void)
 {
+#if LWIP_GETH_RTOS_ENABLED && !LWIP_TCPIP_CORE_LOCKING
+    if (g_LwipRxInputCallbackPending == LWIP_GETH_RX_CALLBACK_PENDING)
+    {
+        return;
+    }
+
+    g_LwipRxInputCallbackPending = LWIP_GETH_RX_CALLBACK_PENDING;
+    if (tcpip_try_callback(lwip_geth_Lwip_pollReceiveFlagsCb, NULL_PTR) == ERR_OK)
+    {
+        g_LwipRxInputCallbackPostCounter++;
+    }
+    else
+    {
+        g_LwipRxInputCallbackPending = LWIP_GETH_RX_CALLBACK_NOT_PENDING;
+        g_LwipRxInputCallbackFailCounter++;
+    }
+#else
     uint8 processed;
     uint8 budget = LWIP_GETH_RX_POLL_BUDGET;
 
@@ -422,6 +489,7 @@ void lwip_geth_Lwip_pollReceiveFlags(void)
     {
         g_LwipRxPollBudgetHitCounter++;
     }
+#endif
 }
 
 static void lwip_geth_Lwip_recoverNetifFlags(void)
@@ -506,6 +574,15 @@ void lwip_geth_Lwip_watchRxProgress(void)
 
     statusErrorMask = lwip_geth_Lwip_getRxStatusErrorMask(ethernetif);
     g_LwipRxStallLastStatusErrorMask = statusErrorMask;
+
+    if ((statusErrorMask & LWIP_GETH_RX_STATUS_FATAL_BUS_ERROR_MASK) != 0u)
+    {
+        /* TC37x Erratum GETH_AI.008: discard pending data and reinitialize GETH after bus error. */
+        /* TC37x Erratum GETH_AI.010: do not rely on fatal-bus-error channel status. */
+        /* TC37x Erratum GETH_AI.011: reinitialize GETH after bus-error-related RX malfunction. */
+        lwip_geth_Lwip_recoverRxPath();
+        return;
+    }
 
     if (g_LwipRxRecoveryManualRequest != 0u)
     {

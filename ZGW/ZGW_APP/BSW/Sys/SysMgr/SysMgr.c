@@ -11,7 +11,9 @@
 #include "FreeRTOSConfig_core0.h"
 #include "Wdg.h"
 #include "SafetyKit_InternalWatchdogs.h"
+#include "IfxCpu_Intrinsics.h"
 #include "IfxPmsPm.h"
+#include "IfxScuWdt.h"
 #include "IfxStm.h"
 #include "IfxPort.h"
 #include "IfxPort_reg.h"
@@ -27,7 +29,13 @@
 #include "APP/TimeSync/TimeBase.h"
 #include "../../../SCR/scr_time_shared.h"
 
-#define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 2000u
+#ifdef SAFETYKIT_PMS_ERRATA_STATUS_FAILED
+#define SYSMGR_PMS_ERRATA_FEATURE_ENABLED 1u
+#else
+#define SYSMGR_PMS_ERRATA_FEATURE_ENABLED 0u
+#endif
+
+#define SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS 1000u
 #define SYSMGR_KEEP_AWAKE_WHILE_FULL_COM  1u
 /*
  * Backstop iteration cap for the GoSleep NvM drain loops.  GoSleep runs with
@@ -52,6 +60,7 @@
 #define SYSMGR_FAIL_DEM_SHUTDOWN          4u
 #define SYSMGR_FAIL_NVM_WRITEALL_REQ      5u
 #define SYSMGR_FAIL_NVM_DEM_WRITEALL      6u
+#define SYSMGR_FAIL_P33_PCSR_SCR_OWNER    7u
 #define SYSMGR_SCR_FAULT_ECC_DBE          0x01u
 #define SYSMGR_SCR_FAULT_WDT              0x02u
 #define SYSMGR_MCUSM_SOURCE_RESET         0x01u
@@ -65,17 +74,25 @@
     (SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE + SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE)
 #define SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE \
     (SYSMGR_MCUSM_SNAPSHOT_DATA_TIME_OFFSET + DEM_DTC_TIMESTAMP_DATA_SIZE)
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_VERSION 1u
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE    96u
+#define SYSMGR_PMSWSTATCLR_SCRSTCLR_MASK 0x00010000u
+#define SYSMGR_P33_PCSR_CLASSIC_RX_MASK   (1u << 5u)
+#define SYSMGR_P33_PCSR_LOCK_WAIT_LIMIT   10000u
 
 uint32 SysMgr_MainCounter = 0u;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-uint32 SysMgr_PostRunCounter = 1u;
 volatile uint32 SysMgr_BusActivityCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
 volatile uint32 SysMgr_GoSleepCounter = 0u;
 volatile uint32 SysMgr_NvMPreWriteAllWaitCounter = 0u;
 volatile uint32 SysMgr_NvMPostWriteAllWaitCounter = 0u;
 volatile uint32 SysMgr_NvMTimeoutCounter = 0u;
 volatile uint32 SysMgr_PcsrLockWaitCounter = 0u;
-volatile SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_INIT;
+volatile uint32 SysMgr_PcsrLockTimeoutCounter = 0u;
+volatile uint32 SysMgr_PcsrBeforeScrOwner = 0u;
+volatile uint32 SysMgr_PcsrAfterScrOwner = 0u;
+volatile uint32 SysMgr_PcsrLockTimeoutValue = 0u;
+volatile SysMgr_EcuState_t SysMgr_EcuState = SYSMGR_STARTUP;
 volatile uint8 SysMgr_NoBusActivity = 0u;
 float SysMgr_McuTemperature = 0u;
 volatile uint32 SysMgr_LastPmsWcr2Status = 0u;
@@ -97,6 +114,9 @@ void SysMgr_GoSleep(void);
 static boolean SysMgr_IsFullComActive(void);
 static void SysMgr_KeepRunState(void);
 static void SysMgr_GoSleepFailure(uint32 FailureInformation);
+static boolean SysMgr_WaitP33PcsrUnlocked(void);
+static boolean SysMgr_SetClassicRxPinOwnerScr(void);
+static uint8 SysMgr_ClearScrResetStatusIfSet(void);
 static uint8 SysMgr_ReadScrXramU8(uint16 offset);
 static void SysMgr_WriteScrXramU8(uint16 offset, uint8 value);
 static void SysMgr_CaptureScrFaultStatus(void);
@@ -152,27 +172,120 @@ static boolean SysMgr_IsFullComActive(void)
 static void SysMgr_KeepRunState(void)
 {
     SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-    SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
 
-    if ((SysMgr_EcuState == SYSMGR_POSTRUN) ||
-            (SysMgr_EcuState == SYSMGR_SLEEP))
+    if (SysMgr_EcuState == SYSMGR_GOSLEEP)
     {
         SysMgr_EcuState = SYSMGR_RUN;
     }
 }
 
+static boolean SysMgr_WaitP33PcsrUnlocked(void)
+{
+    uint32 waitCount = SYSMGR_P33_PCSR_LOCK_WAIT_LIMIT;
+
+    while(P33_PCSR.B.LCK != 0u)
+    {
+        if(waitCount == 0u)
+        {
+            SysMgr_PcsrLockTimeoutCounter++;
+            SysMgr_PcsrLockTimeoutValue = P33_PCSR.U;
+            return FALSE;
+        }
+
+        SysMgr_PcsrLockWaitCounter++;
+        serviceCpuWatchdog();
+        serviceSafetyWatchdog();
+        waitCount--;
+    }
+
+    return TRUE;
+}
+
+static boolean SysMgr_SetClassicRxPinOwnerScr(void)
+{
+    uint16 safetyWdtPw;
+    uint8 safetyEndinitWasSet;
+
+    SysMgr_PcsrBeforeScrOwner = P33_PCSR.U;
+
+    if(SysMgr_WaitP33PcsrUnlocked() == FALSE)
+    {
+        SysMgr_PcsrAfterScrOwner = P33_PCSR.U;
+        return FALSE;
+    }
+
+    safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+    safetyEndinitWasSet = (IfxScuWdt_getSafetyWatchdogEndInit() != 0u) ? 1u : 0u;
+
+    if(safetyEndinitWasSet != 0u)
+    {
+        IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+    }
+    __ldmst(&P33_PCSR.U, SYSMGR_P33_PCSR_CLASSIC_RX_MASK, SYSMGR_P33_PCSR_CLASSIC_RX_MASK);
+    __dsync();
+    if(safetyEndinitWasSet != 0u)
+    {
+        IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+    }
+
+    if(SysMgr_WaitP33PcsrUnlocked() == FALSE)
+    {
+        SysMgr_PcsrAfterScrOwner = P33_PCSR.U;
+        return FALSE;
+    }
+
+    SysMgr_PcsrAfterScrOwner = P33_PCSR.U;
+    return TRUE;
+}
+
+static uint8 SysMgr_ClearScrResetStatusIfSet(void)
+{
+    if (PMS_PMSWSTAT.B.SCRST != 0u)
+    {
+        uint16 safetyWdtPw = IfxScuWdt_getSafetyWatchdogPassword();
+        uint8 safetyEndinitWasSet = (IfxScuWdt_getSafetyWatchdogEndInit() != 0u) ? 1u : 0u;
+
+        if (safetyEndinitWasSet != 0u)
+        {
+            IfxScuWdt_clearSafetyEndinit(safetyWdtPw);
+        }
+        PMS_PMSWSTATCLR.U = SYSMGR_PMSWSTATCLR_SCRSTCLR_MASK;
+        __dsync();
+        if (safetyEndinitWasSet != 0u)
+        {
+            IfxScuWdt_setSafetyEndinit(safetyWdtPw);
+        }
+        return 1u;
+    }
+
+    return 0u;
+}
+
 static uint8 SysMgr_ReadScrXramU8(uint16 offset)
 {
     volatile uint8 *xram = (volatile uint8 *)PMS_XRAM;
+    uint8 value;
 
-    return xram[(uint16)(SCR_TIME_XRAM_BASE + offset)];
+    do
+    {
+        (void)SysMgr_ClearScrResetStatusIfSet();
+        /* TC37x Erratum SCR_TC.019: retry SCR XRAM read if SCR reset overlaps it. */
+        value = xram[(uint16)(SCR_TIME_XRAM_BASE + offset)];
+    } while (SysMgr_ClearScrResetStatusIfSet() != 0u);
+
+    return value;
 }
 
 static void SysMgr_WriteScrXramU8(uint16 offset, uint8 value)
 {
     volatile uint8 *xram = (volatile uint8 *)PMS_XRAM;
 
-    xram[(uint16)(SCR_TIME_XRAM_BASE + offset)] = value;
+    do
+    {
+        (void)SysMgr_ClearScrResetStatusIfSet();
+        /* TC37x Erratum SCR_TC.019: retry SCR XRAM write if SCR reset overlaps it. */
+        xram[(uint16)(SCR_TIME_XRAM_BASE + offset)] = value;
+    } while (SysMgr_ClearScrResetStatusIfSet() != 0u);
 }
 
 static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value)
@@ -517,6 +630,69 @@ Std_ReturnType SysMgr_CaptureMcuSmSnapshotData(
     return E_OK;
 }
 
+Std_ReturnType SysMgr_CapturePmsErrataSnapshotData(
+    Dem_EventIdType eventId,
+    uint8 *buffer,
+    uint16 *length
+)
+{
+    uint16 i;
+    uint8 *timeData;
+
+    if ((eventId != DEM_EVENT_ID_PMS_ERRATA_STARTUP) ||
+            (buffer == NULL_PTR) ||
+            (length == NULL_PTR) ||
+            (*length < SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE))
+    {
+        return E_NOT_OK;
+    }
+
+    for (i = 0u; i < SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE; i++)
+    {
+        buffer[i] = 0u;
+    }
+
+    SysMgr_StoreU16(buffer, 0u, eventId);
+    buffer[2] = SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_VERSION;
+    buffer[3] = McuSm_SswStatusData.wakeupFromStandby;
+    SysMgr_StoreU32(buffer, 4u, McuSm_LastResetReason);
+    SysMgr_StoreU32(buffer, 8u, McuSm_LastResetInformation);
+    SysMgr_StoreU32(buffer, 12u, McuSm_SafetyKitFailureMask);
+#if (SYSMGR_PMS_ERRATA_FEATURE_ENABLED != 0u)
+    SysMgr_StoreU32(buffer, 16u, g_SafetyKitStatus.voltStatus.pmsErrataFailureMask);
+    SysMgr_StoreU32(buffer, 20u, g_SafetyKitStatus.voltStatus.pmsErrataStandbyWakeIgnoredMask);
+    SysMgr_StoreU32(buffer, 24u, g_SafetyKitStatus.voltStatus.pmsErrataTc007SampleCount);
+    SysMgr_StoreU32(buffer, 28u, g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount);
+    SysMgr_StoreU32(buffer, 32u, g_SafetyKitStatus.voltStatus.pmsErrataCheckedEvrStat);
+    SysMgr_StoreU32(buffer, 36u, g_SafetyKitStatus.voltStatus.pmsErrataCheckedEvrMonStat1);
+    SysMgr_StoreU32(buffer, 40u, g_SafetyKitStatus.voltStatus.pmsErrataEvrStat);
+    SysMgr_StoreU32(buffer, 44u, g_SafetyKitStatus.voltStatus.pmsErrataEvrAdcStat);
+    SysMgr_StoreU32(buffer, 48u, g_SafetyKitStatus.voltStatus.pmsErrataEvrMonStat1);
+    SysMgr_StoreU32(buffer, 52u, g_SafetyKitStatus.voltStatus.pmsErrataEvrRstCon);
+    SysMgr_StoreU32(buffer, 56u, g_SafetyKitStatus.voltStatus.pmsErrataEvrOvMon2);
+    SysMgr_StoreU32(buffer, 60u, g_SafetyKitStatus.voltStatus.pmsErrataEvrUvMon2);
+#endif
+    SysMgr_StoreU32(buffer, 64u, McuSm_SswStatusData.resetType);
+    SysMgr_StoreU32(buffer, 68u, McuSm_SswStatusData.resetTrigger);
+    SysMgr_StoreU16(buffer, 72u, McuSm_SswStatusData.resetReason);
+#if (SYSMGR_PMS_ERRATA_FEATURE_ENABLED != 0u)
+    buffer[74] = g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus;
+#else
+    buffer[74] = 0u;
+#endif
+    buffer[75] = McuSm_SswStatusData.mcuFwcheckStatus;
+
+    timeData = &buffer[76u];
+    if (Dem_Cfg_CaptureTimestampTemperatureData(timeData, length,
+            DEM_SNAPSHOT_KIND_COMMON) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+
+    *length = SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE;
+    return E_OK;
+}
+
 void SysMgr_GoSleep(void)
 {
     uint16 cpuWdtPw;
@@ -738,14 +914,10 @@ void SysMgr_GoSleep(void)
     SRC_CAN1INT15.B.IOVCLR = 1;
     IfxCpu_setAllIdleExceptMasterCpu(IfxCpu_getCoreIndex());
 
-    /* Give SCR ownership of classic CAN RX before starting WCAN wake detection. */
-    IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
-    while(P33_PCSR.B.LCK)
+    if(SysMgr_SetClassicRxPinOwnerScr() == FALSE)
     {
-        SysMgr_PcsrLockWaitCounter++;
+        SysMgr_GoSleepFailure(SYSMGR_FAIL_P33_PCSR_SCR_OWNER);
     }
-    P33_PCSR.B.SEL5 = 1;
-    IfxScuWdt_setSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
 
     IfxScuWdt_clearSafetyEndinit(IfxScuWdt_getSafetyWatchdogPassword());
     IfxMtu_clearSram((IfxMtu_MbistSel)77);
@@ -785,6 +957,7 @@ void SysMgr_GoSleep(void)
     PMS_PMSWCR0.U = pmswcr0.U;
     SCU_PMSWCR1.B.IRADIS = 1u;
 
+    //McuSm_ArmStandbyWakeLatch();
     __dsync();
     SCU_PMCSR0.B.REQSLP = 0x03u;;
     __dsync();
@@ -839,6 +1012,19 @@ void SysMgr_ProcessResetDtc(void)
         {
             Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_PASSED);
         }
+
+#if (SYSMGR_PMS_ERRATA_FEATURE_ENABLED != 0u)
+        if (g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus == SAFETYKIT_PMS_ERRATA_STATUS_FAILED)
+        {
+            Dem_SetEventStatus(DEM_EVENT_ID_PMS_ERRATA_STARTUP, DEM_EVENT_STATUS_FAILED);
+        }
+        else
+        {
+            Dem_SetEventStatus(DEM_EVENT_ID_PMS_ERRATA_STARTUP, DEM_EVENT_STATUS_PASSED);
+        }
+#else
+        Dem_SetEventStatus(DEM_EVENT_ID_PMS_ERRATA_STARTUP, DEM_EVENT_STATUS_PASSED);
+#endif
     }
     else
     {
@@ -848,17 +1034,11 @@ void SysMgr_ProcessResetDtc(void)
 
 void SysMgr_EcuStateMachine(void)
 {
-    if(SYSMGR_INIT == SysMgr_EcuState)
-    {
-        SysMgr_EcuState = SYSMGR_STARTUP;
-    }
-
     if(SYSMGR_STARTUP == SysMgr_EcuState)
     {
         SysMgr_EcuState = SYSMGR_RUN;
         SysMgr_ProcessResetDtc();
         SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-        SysMgr_PostRunCounter = 1u;
     }
 
     if (SysMgr_IsFullComActive() != FALSE)
@@ -884,37 +1064,17 @@ void SysMgr_EcuStateMachine(void)
 
             if(0u == SysMgr_RunCounter)
             {
-                SysMgr_EcuState = SYSMGR_POSTRUN;
+                SysMgr_EcuState = SYSMGR_GOSLEEP;
             }
         }
         else
         {
             SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }
 
-    if(SYSMGR_POSTRUN == SysMgr_EcuState)
-    {
-        if(0u != SysMgr_NoBusActivity)
-        {
-            SysMgr_PostRunCounter--;
-
-            if(0u == SysMgr_PostRunCounter)
-            {
-                SysMgr_EcuState = SYSMGR_SLEEP;
-            }
-        }
-        else
-        {
-            SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_EcuState = SYSMGR_RUN;
-        }
-    }
-
-    if(SYSMGR_SLEEP == SysMgr_EcuState)
+    if(SYSMGR_GOSLEEP == SysMgr_EcuState)
     {
         if(0u != SysMgr_NoBusActivity)
         {
@@ -923,7 +1083,6 @@ void SysMgr_EcuStateMachine(void)
         else
         {
             SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
-            SysMgr_PostRunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
             SysMgr_EcuState = SYSMGR_RUN;
         }
     }

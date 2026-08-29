@@ -20,5 +20,5 @@
     "ETH:TimeSync:TimeSync:UtcTimeSeconds": "ETH | TimeSync | TimeSync | UtcTimeSeconds"
   },
   "view_mode": "Stacked",
-  "window_s": 30.0
+  "window_s": 60.0
 }

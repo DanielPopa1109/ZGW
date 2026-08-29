@@ -190,6 +190,9 @@ volatile uint32 lwip_geth_DebugRxCacheInvalidateCnt;
 volatile uint32 lwip_geth_DebugTxCacheWritebackCnt;
 volatile uint32 lwip_geth_DebugDmaCacheMaintSkippedCnt;
 volatile uint32 lwip_geth_LowLevelInputPacketCount;
+volatile uint32 g_FblPerfRxDescriptorProcessed;
+volatile uint32 g_FblPerfRxDescriptorStarvationCount;
+volatile uint32 g_FblPerfPbufAllocFailCount;
 
 volatile uint32 g_LwipRxStage;
 volatile uint32 g_LwipRxCurrentNetifPtr;
@@ -1420,6 +1423,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 
   if (len == 0)
   {
+    g_FblPerfRxDescriptorStarvationCount++;
     g_LwipRxStage = LWIP_GETH_RX_STAGE_IDLE;
     return (pbuf_t *)0;
   }
@@ -1485,6 +1489,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 //    lwip_geth_CacheInvalidateRange(src, (uint32)copyLen);
     lwip_geth_DebugLowLevelInputPacketCount++;
     lwip_geth_LowLevelInputPacketCount++;
+    g_FblPerfRxDescriptorProcessed++;
     g_LwipRxStage = LWIP_GETH_RX_STAGE_COPY;
     remaining = copyLen;
 
@@ -1554,6 +1559,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
   else
   {
     lwip_geth_DebugRxAllocFailCnt++;
+    g_FblPerfPbufAllocFailCount++;
     LINK_STATS_INC(link.memerr);
     LINK_STATS_INC(link.drop);
     lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);

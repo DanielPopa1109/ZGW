@@ -89,6 +89,7 @@
 #include <lwip/stats.h>
 #include <lwip/snmp.h>
 #include "netif/etharp.h"
+#include "netif/ethernet.h"
 #include "netif/ppp/pppoe.h"
 #include "Cpu/Std/IfxCpu_Intrinsics.h"
 #include "IfxGeth_Eth.h"
@@ -767,7 +768,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
 #endif
         LINK_STATS_INC(link.drop);
         LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugLowLevelOutputErrCnt);
-        EthernetDiag_ReportTxError(1u);
+        EthernetDiag_ReportResourceExhaustion(1u);
         return ERR_BUF;
     }
 
@@ -780,7 +781,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
 #endif
         LINK_STATS_INC(link.drop);
         LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugLowLevelOutputErrCnt);
-        EthernetDiag_ReportTxError(1u);
+        EthernetDiag_ReportResourceExhaustion(2u);
         return ERR_MEM;
     }
 
@@ -795,7 +796,7 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
 #endif
             LINK_STATS_INC(link.drop);
             LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugLowLevelOutputErrCnt);
-            EthernetDiag_ReportTxError(1u);
+            EthernetDiag_ReportResourceExhaustion(4u);
             return ERR_BUF;
         }
 
@@ -977,7 +978,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
     else
     {
         LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugRxAllocFailCnt);
-        EthernetDiag_ReportRxError(1u);
+        EthernetDiag_ReportResourceExhaustion(8u);
         LINK_STATS_INC(link.memerr);
         LINK_STATS_INC(link.drop);
         lwip_geth_FreeReceiveDescriptor(ethernetif, rxDescr);
@@ -996,7 +997,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
  * would never return. The task wrapper below loops; periodic software polling
  * can safely call this function once per cycle.
  */
-uint8 lwip_geth_netif_input_once(netif_t *netif)
+static uint8 lwip_geth_netif_input_once_with(netif_t *netif, netif_input_fn inputFn)
 {
     eth_hdr_t *ethhdr;
     pbuf_t    *p;
@@ -1025,7 +1026,7 @@ uint8 lwip_geth_netif_input_once(netif_t *netif)
         case ETHTYPE_PPPOEDISC:
         case ETHTYPE_PPPOE:
 #endif
-            inputRet = netif->input(p, netif);
+            inputRet = inputFn(p, netif);
             if (inputRet != ERR_OK)
             {
                 LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputFailCount);
@@ -1044,6 +1045,21 @@ uint8 lwip_geth_netif_input_once(netif_t *netif)
     }
 
     return 1u;
+}
+
+uint8 lwip_geth_netif_input_once(netif_t *netif)
+{
+    if (netif == NULL_PTR)
+    {
+        return 0u;
+    }
+
+    return lwip_geth_netif_input_once_with(netif, netif->input);
+}
+
+uint8 lwip_geth_netif_input_core_once(netif_t *netif)
+{
+    return lwip_geth_netif_input_once_with(netif, ethernet_input);
 }
 
 /**

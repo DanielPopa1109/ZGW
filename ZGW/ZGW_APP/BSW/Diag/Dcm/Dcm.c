@@ -129,15 +129,8 @@ static uint8 Dcm_NvMWriteAllOwnerSid = 0u;
  * tester has ACKed it. Resetting (and disabling interrupts) there races the
  * Ethernet transmit and drops the positive response, so the tester sees a
  * timeout instead of 51 01. Instead the reset is armed here and serviced from
- * Dcm_MainFunction with interrupts still enabled, giving lwIP/GETH several main
- * cycles to put the response on the wire (and retransmit if needed) first. */
-#define DCM_HARD_RESET_DELAY_TICKS 40u   /* ~200 ms at the 5 ms main period */
-#define DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS 600u /* ~3 s bounded NvM drain */
+ * Dcm_MainFunction after TX confirmation. */
 static uint8 Dcm_PendingHardReset = FALSE;
-static uint16 Dcm_HardResetCountdown = 0u;
-static uint16 Dcm_HardResetNvMDrainCountdown = 0u;
-static uint16 Dcm_HardResetNvMDrainElapsedTicks = 0u;
-static uint8 Dcm_HardResetDrainNvM = TRUE;
 
 volatile uint32 Dcm_DebugHardResetArmedCounter = 0u;
 volatile uint32 Dcm_DebugHardResetPerformedCounter = 0u;
@@ -481,7 +474,6 @@ static Dcm_ReturnType Dcm_DiagnosticSessionControl(uint8 connIdx, Dcm_OpStatusTy
 static Dcm_ReturnType Dcm_EcuReset(uint8 connIdx, Dcm_OpStatusType opStatus, uint8 resetType, uint8* respData, Dcm_PduLengthType* respLen);
 static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session);
 static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType);
-static void Dcm_ResetDelay(void);
 static Dcm_ReturnType Dcm_ClearDiagnosticInformation(uint8 connIdx, Dcm_OpStatusType opStatus, uint32 dtcGroup);
 static Dcm_ReturnType Dcm_ReadDtcInformation(uint8 connIdx, Dcm_OpStatusType opStatus, const uint8* reqData, Dcm_PduLengthType reqLen, uint8* respData, Dcm_PduLengthType* respLen);
 static Dcm_ReturnType Dcm_ReadDtcByStatusMask(uint8 subFunction, uint8 statusMask, uint8* respData, Dcm_PduLengthType* respLen);
@@ -784,8 +776,6 @@ void Dcm_ResetDoIPSession(void)
 void Dcm_MainFunction(void)
 {
     uint8 i;
-    NvM_StatusType nvmStatus;
-    uint8 waitForNvM;
 
     if (Dcm_ConfigPtr == NULL_PTR)
     {
@@ -842,56 +832,16 @@ void Dcm_MainFunction(void)
     }
 
     /* Serviced here, not in the TX confirmation callback, so the 0x51 hardReset
-     * response is actually transmitted and ACKed before the MCU resets. The
-     * countdown runs with interrupts enabled, letting lwIP/GETH flush (and
-     * retransmit) the response across several main cycles; only the final reset
-     * disables interrupts immediately before performReset. */
+     * response has completed its DCM/PduR confirmation path before reset. */
     if (Dcm_PendingHardReset == TRUE)
     {
-        if (Dcm_HardResetCountdown > 0u)
-        {
-            Dcm_HardResetCountdown--;
-        }
-        else
-        {
-            nvmStatus = NvM_GetStatus();
-            Dcm_DebugHardResetLastNvMStatus = (uint8)nvmStatus;
-
-            waitForNvM = FALSE;
-
-            if (Dcm_HardResetDrainNvM == FALSE)
-            {
-                Dcm_DebugHardResetNvMDrainSkipCounter++;
-            }
-            else if (((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL)) &&
-                    (Dcm_HardResetNvMDrainCountdown > 0u))
-            {
-                Dcm_HardResetNvMDrainCountdown--;
-                Dcm_HardResetNvMDrainElapsedTicks++;
-                Dcm_DebugHardResetNvMDrainWaitCounter++;
-                Dcm_DebugHardResetLastNvMDrainElapsedTicks = Dcm_HardResetNvMDrainElapsedTicks;
-                waitForNvM = TRUE;
-            }
-            else
-            {
-                if ((nvmStatus == NVM_BUSY) || (nvmStatus == NVM_BUSY_INTERNAL))
-                {
-                    Dcm_DebugHardResetNvMDrainTimeoutCounter++;
-                }
-            }
-
-            if (waitForNvM == FALSE)
-            {
-                Dcm_PendingHardReset = FALSE;
-                Dcm_DebugHardResetPerformedCounter++;
-                Dcm_DebugHardResetLastNvMDrainElapsedTicks = Dcm_HardResetNvMDrainElapsedTicks;
-                Dcm_ResetDelay();
-                SysMgr_ClearMcuSmSwErrorTriggerData();
-                McuSm_SaveRetainedStateToScr();
-                IfxCpu_disableInterrupts();
-                IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
-            }
-        }
+        Dcm_PendingHardReset = FALSE;
+        Dcm_DebugHardResetPerformedCounter++;
+        Dcm_DebugHardResetLastNvMStatus = (uint8)NvM_GetStatus();
+        SysMgr_ClearMcuSmSwErrorTriggerData();
+        McuSm_SaveRetainedStateToScr();
+        IfxCpu_disableInterrupts();
+        IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
     }
 
     Dcm_MainFunction_Counter++;
@@ -2075,7 +2025,6 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
     {
         McuSm_FBL_CommInterface = MCUSM_FBL_COMM_ETHERNET;
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_ACTIVE;
-        Dcm_ResetDelay();
         SysMgr_ClearMcuSmSwErrorTriggerData();
         McuSm_SaveRetainedStateToScr();
         /* Publish the requested transport to the SCR XRAM mailbox the FBL reads.
@@ -2106,28 +2055,13 @@ static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
          * the 0x51 response because it has only been buffered, not yet sent. */
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
         Dcm_PendingHardReset = TRUE;
-        Dcm_HardResetCountdown = DCM_HARD_RESET_DELAY_TICKS;
-        /* DoIP hard reset already drained NvM before the positive response. */
-        Dcm_HardResetDrainNvM = (busType == DCM_BUS_ETHERNET) ? FALSE : TRUE;
-        Dcm_HardResetNvMDrainCountdown = (Dcm_HardResetDrainNvM != FALSE) ?
-                DCM_HARD_RESET_NVM_DRAIN_TIMEOUT_TICKS : 0u;
-        Dcm_HardResetNvMDrainElapsedTicks = 0u;
         Dcm_DebugHardResetArmedCounter++;
-        Dcm_DebugHardResetLastDelayTicks = DCM_HARD_RESET_DELAY_TICKS;
-        Dcm_DebugHardResetLastNvMDrainTicks = Dcm_HardResetNvMDrainCountdown;
+        Dcm_DebugHardResetLastDelayTicks = 0u;
+        Dcm_DebugHardResetLastNvMDrainTicks = 0u;
         Dcm_DebugHardResetLastNvMDrainElapsedTicks = 0u;
-        Dcm_DebugHardResetLastDrainNvM = Dcm_HardResetDrainNvM;
+        Dcm_DebugHardResetLastDrainNvM = FALSE;
         Dcm_DebugHardResetLastBusType = (uint8)busType;
         Dcm_DebugHardResetLastNvMStatus = (uint8)NvM_GetStatus();
-    }
-}
-
-static void Dcm_ResetDelay(void)
-{
-    volatile uint32 delay;
-
-    for (delay = 0u; delay < 200000u; delay++)
-    {
     }
 }
 

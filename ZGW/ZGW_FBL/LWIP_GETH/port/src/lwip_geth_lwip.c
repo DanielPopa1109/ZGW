@@ -75,6 +75,7 @@
 #define IFX_LWIP_TCP_SLOW_PERIOD            (TCP_SLOW_INTERVAL / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_DHCP_COARSE_PERIOD         (DHCP_COARSE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
 #define IFX_LWIP_DHCP_FINE_PERIOD           (DHCP_FINE_TIMER_MSECS / IFX_LWIP_TIMER_TICK_MS)
+#define LWIP_GETH_RX_STATUS_FATAL_BUS_ERROR_MASK (1u << 3u)
 #define IFX_LWIP_LINK_PERIOD                (100U / IFX_LWIP_TIMER_TICK_MS) /* 100 ms */
 #define IFX_LWIP_EMAC_BLOCK_TIME_FOR_INPUT  ( ( portTickType ) 100 )
 #define LWIP_GETH_RX_POLL_BUDGET            (32U)
@@ -115,6 +116,7 @@
 #define LWIP_GETH_TX_BUFFER_BYTES     (IFXGETH_MAX_TX_DESCRIPTORS * IFXGETH_MAX_TX_BUFFER_SIZE)
 #define LWIP_GETH_DMA_BYTES           (LWIP_GETH_RX_DESCRIPTOR_BYTES + LWIP_GETH_TX_DESCRIPTOR_BYTES + \
                                        LWIP_GETH_RX_BUFFER_BYTES + LWIP_GETH_TX_BUFFER_BYTES)
+#define LWIP_GETH_RX_TCP_PAYLOAD_BYTES (IFXGETH_MAX_RX_DESCRIPTORS * TCP_MSS)
 
 LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_descriptor_count_nonzero, IFXGETH_MAX_RX_DESCRIPTORS > 0u);
 LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_descriptor_count_nonzero, IFXGETH_MAX_TX_DESCRIPTORS > 0u);
@@ -127,6 +129,7 @@ LWIP_GETH_STATIC_ASSERT(lwip_geth_tx_buffer_size_word_aligned, (IFXGETH_MAX_TX_B
 LWIP_GETH_STATIC_ASSERT(lwip_geth_dma_memory_fits_window, LWIP_GETH_DMA_BYTES <= AURIX_ETH_DMA_WINDOW_BYTES);
 LWIP_GETH_STATIC_ASSERT(lwip_geth_lwip_mem_alignment, (MEM_ALIGNMENT >= 4u) && ((MEM_ALIGNMENT % 4u) == 0u));
 LWIP_GETH_STATIC_ASSERT(lwip_geth_lwip_eth_pad_aligns_ip_header, ETH_PAD_SIZE == 2u);
+LWIP_GETH_STATIC_ASSERT(lwip_geth_rx_ring_holds_tcp_window, LWIP_GETH_RX_TCP_PAYLOAD_BYTES >= TCP_WND);
 
 static void lwip_geth_CopyBytes(void *destination, const void *source, uint32 length)
 {
@@ -536,6 +539,15 @@ void lwip_geth_Lwip_watchRxProgress(void)
 
   statusErrorMask = lwip_geth_Lwip_getRxStatusErrorMask(ethernetif);
   g_LwipRxStallLastStatusErrorMask = statusErrorMask;
+
+  if ((statusErrorMask & LWIP_GETH_RX_STATUS_FATAL_BUS_ERROR_MASK) != 0u)
+  {
+    /* TC37x Erratum GETH_AI.008: discard pending data and reinitialize GETH after bus error. */
+    /* TC37x Erratum GETH_AI.010: do not rely on fatal-bus-error channel status. */
+    /* TC37x Erratum GETH_AI.011: reinitialize GETH after bus-error-related RX malfunction. */
+    lwip_geth_Lwip_recoverRxPath();
+    return;
+  }
 
   if (g_LwipRxRecoveryManualRequest != 0u)
   {

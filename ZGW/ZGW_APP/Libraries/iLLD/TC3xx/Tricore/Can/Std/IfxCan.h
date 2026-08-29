@@ -1805,7 +1805,12 @@ IFX_INLINE void IfxCan_Node_acceptRemoteFrameswithExtendedId(Ifx_CAN_N *node)
 IFX_INLINE void IfxCan_Node_clearInterruptFlag(Ifx_CAN_N *node, IfxCan_Interrupt interrupt)
 {
     uint32 value = (1U << interrupt);
-    node->IR.U = value;
+
+    /* TC37x Erratum MCMCAN_AI.H001: repeat interrupt flag clear until it reads zero. */
+    do
+    {
+        node->IR.U = value;
+    } while ((node->IR.U & value) != 0U);
 }
 
 

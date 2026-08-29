@@ -91,6 +91,7 @@
 
 extern void Ifx_Ssw_Pms_Init(void);
 extern void Ifx_Ssw_Pms_InitCheck(void);
+extern void Ifx_Ssw_Pms_Tc013RstcTrim(void);
 
 /* Callout hook API macro for PMS Initialization.
  * This callout hook is referenced in Startup sequence. This need to be configured by application to
@@ -101,6 +102,7 @@ extern void Ifx_Ssw_Pms_InitCheck(void);
     {                                                      \
         Ifx_Ssw_jumpToFunctionWithLink(&Ifx_Ssw_Pms_Init); \
         IFX_CFG_SSW_CALLOUT_PMS_CHECK();                   \
+        Ifx_Ssw_jumpToFunctionWithLink(&Ifx_Ssw_Pms_Tc013RstcTrim); \
     }
 
 #if IFX_CFG_SSW_ENABLE_PMS_INIT_CHECK == 1U
