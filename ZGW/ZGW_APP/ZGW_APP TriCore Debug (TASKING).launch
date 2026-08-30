@@ -11,7 +11,7 @@
     <booleanAttribute key="isBringWinIdeaToTop" value="true"/>
     <booleanAttribute key="isLaunchInvisibleWinIdeaInstance" value="false"/>
     <booleanAttribute key="isShutDownWinIdeaAfterTerminate" value="false"/>
-    <booleanAttribute key="isVerboseMode" value="false"/>
+    <booleanAttribute key="isVerboseMode" value="true"/>
     <booleanAttribute key="isVerifyAfterDownload" value="false"/>
     <intAttribute key="org.eclipse.cdt.launch.ATTR_BUILD_BEFORE_LAUNCH_ATTR" value="2"/>
     <stringAttribute key="org.eclipse.cdt.launch.COREFILE_PATH" value=""/>

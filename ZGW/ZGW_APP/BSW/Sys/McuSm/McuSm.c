@@ -369,7 +369,7 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
 
     McuSm_ResetHookPerformCounter++;
 
-    IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+    IfxScuRcu_performReset(IfxScuRcu_ResetType_system, 0u);
 }
 
 static boolean McuSm_IsAddressInRange(uint32 address, uint32 rangeStart, uint32 rangeEnd)
@@ -1078,7 +1078,7 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo)
         McuSm_EndinitTimeoutCounter++;
     }
 
-    MODULE_SCU.RSTCON.B.SW = 2u;
+    MODULE_SCU.RSTCON.B.SW = 1u;
     password  = cpuwdg->CON0.B.PW;
     password ^= 0x003Fu;
 

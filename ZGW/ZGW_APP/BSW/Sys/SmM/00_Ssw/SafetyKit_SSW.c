@@ -242,8 +242,6 @@ void runSafeAppSwStartup(void)
     g_SafetyKitStatus.wakeupFromStandby =
             (McuSm_SswStatusData.wakeupFromStandby != 0u) ? TRUE : FALSE;
 
-    initPmsErrataWorkarounds();
-
     safetyKitEnableAllSMUAlarms();
 
     safetyKitUpdateMcuSmStatusAndResetReaction(FALSE);

@@ -276,7 +276,7 @@ RAM_HELPER_CODE void FblRam_RequestSystemReset(void)
 
     safetyPassword = FblRam_GetSafetyWatchdogPassword();
     FblRam_ClearSafetyEndinit(safetyPassword);
-    MODULE_SCU.RSTCON.B.SW = 2u;
+    MODULE_SCU.RSTCON.B.SW = 1u;
     FblRam_SetSafetyEndinit(safetyPassword);
 
     cpuPassword = FblRam_GetCpuWatchdogPassword();

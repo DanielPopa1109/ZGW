@@ -568,6 +568,7 @@ static Std_ReturnType GatewaySwc_GetPduDiagConfig(uint16 index, PduIdType *pduId
 static Std_ReturnType GatewaySwc_GetSignalDiagConfig(uint16 index, Com_SignalIdType *signalId, GatewaySwc_BusType *bus);
 static uint8 GatewaySwc_IsNmActiveForBus(GatewaySwc_BusType bus);
 static uint8 GatewaySwc_IsEthComActive(void);
+static boolean GatewaySwc_IsRxDiagSuppressedForBus(GatewaySwc_BusType bus);
 static void GatewaySwc_ProcessCore0Async(void);
 static void GatewaySwc_ProcessEthTxResults(void);
 static void GatewaySwc_ProcessEthRxQueue(void);
@@ -1835,7 +1836,8 @@ static void GatewaySwc_UpdateRxDiagnostics(void)
         }
 
         if ((CodingApp_IsRxMessageExpected(i) == FALSE) ||
-                (GatewaySwc_IsNmActiveForBus(bus) == FALSE))
+                (GatewaySwc_IsNmActiveForBus(bus) == FALSE) ||
+                (GatewaySwc_IsRxDiagSuppressedForBus(bus) != FALSE))
         {
             status = GATEWAYSWC_RX_DIAG_STATUS_OK;
         }
@@ -1891,7 +1893,8 @@ static void GatewaySwc_UpdateRxDiagnostics(void)
         }
 
         if ((CodingApp_IsCoded() == FALSE) ||
-                (GatewaySwc_IsNmActiveForBus(bus) == FALSE))
+                (GatewaySwc_IsNmActiveForBus(bus) == FALSE) ||
+                (GatewaySwc_IsRxDiagSuppressedForBus(bus) != FALSE))
         {
             status = GATEWAYSWC_RX_DIAG_STATUS_OK;
         }
@@ -2066,6 +2069,29 @@ static boolean GatewaySwc_IsBusDiagnosticFailed(GatewaySwc_BusType bus)
     }
 }
 
+static boolean GatewaySwc_IsRxDiagSuppressedForBus(GatewaySwc_BusType bus)
+{
+    if (GatewaySwc_IsBusDiagnosticFailed(bus) != FALSE)
+    {
+        return TRUE;
+    }
+
+    switch (bus)
+    {
+        case GATEWAYSWC_BUS_LIN:
+            return (LinDiag_IsChannelUnavailable(LIN_CHANNEL_0) != FALSE) ? TRUE : FALSE;
+
+        case GATEWAYSWC_BUS_CAN:
+            return (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_CLASSIC) != FALSE) ? TRUE : FALSE;
+
+        case GATEWAYSWC_BUS_CANFD:
+            return (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_FD) != FALSE) ? TRUE : FALSE;
+
+        default:
+            return FALSE;
+    }
+}
+
 static void GatewaySwc_ReportRxMessageTimeoutToDem(uint16 index, uint8 status)
 {
     Dem_EventStatusType desiredStatus;
@@ -2091,15 +2117,9 @@ static void GatewaySwc_ReportRxMessageTimeoutToDem(uint16 index, uint8 status)
 
         if ((desiredStatus == DEM_EVENT_STATUS_FAILED) &&
             (GatewaySwc_GetPduDiagConfig(index, &pduId, &bus) == E_OK) &&
-            (((bus == GATEWAYSWC_BUS_LIN) &&
-              (LinDiag_IsChannelUnavailable(LIN_CHANNEL_0) != FALSE)) ||
-             ((bus == GATEWAYSWC_BUS_CAN) &&
-              (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_CLASSIC) != FALSE)) ||
-             ((bus == GATEWAYSWC_BUS_CANFD) &&
-              (CanDiag_IsChannelUnavailable(CAN_CONTROLLER_FD) != FALSE)) ||
-             (GatewaySwc_IsBusDiagnosticFailed(bus) != FALSE)))
+            (GatewaySwc_IsRxDiagSuppressedForBus(bus) != FALSE))
         {
-            return;
+            desiredStatus = DEM_EVENT_STATUS_PASSED;
         }
     }
 

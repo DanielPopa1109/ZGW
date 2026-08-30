@@ -127,22 +127,9 @@ static uint8 Dcm_NvMWriteAllOwnerSid = 0u;
  * confirmation callback: that callback only signals that lwIP has accepted the
  * 0x51 response into its send buffer, not that GETH has transmitted and the
  * tester has ACKed it. Resetting (and disabling interrupts) there races the
- * Ethernet transmit and drops the positive response, so the tester sees a
- * timeout instead of 51 01. Instead the reset is armed here and serviced from
- * Dcm_MainFunction after TX confirmation. */
+ * Ethernet transmit and drops the positive response, so the reset is armed here
+ * and serviced from Dcm_MainFunction after the response path has unwound. */
 static uint8 Dcm_PendingHardReset = FALSE;
-
-volatile uint32 Dcm_DebugHardResetArmedCounter = 0u;
-volatile uint32 Dcm_DebugHardResetPerformedCounter = 0u;
-volatile uint32 Dcm_DebugHardResetNvMDrainSkipCounter = 0u;
-volatile uint32 Dcm_DebugHardResetNvMDrainWaitCounter = 0u;
-volatile uint32 Dcm_DebugHardResetNvMDrainTimeoutCounter = 0u;
-volatile uint16 Dcm_DebugHardResetLastDelayTicks = 0u;
-volatile uint16 Dcm_DebugHardResetLastNvMDrainTicks = 0u;
-volatile uint16 Dcm_DebugHardResetLastNvMDrainElapsedTicks = 0u;
-volatile uint8 Dcm_DebugHardResetLastDrainNvM = 0u;
-volatile uint8 Dcm_DebugHardResetLastBusType = 0xFFu;
-volatile uint8 Dcm_DebugHardResetLastNvMStatus = 0xFFu;
 
 /* ===================== Forward ===================== */
 static void Dcm_SendBusyRepeatIfPossible(uint8 connIdx, uint8 sid, Dcm_AddressingType addressing);
@@ -273,6 +260,7 @@ static void Dcm_StartProcessing(
 static void Dcm_ClearProcessing(uint8 connIdx);
 static Std_ReturnType Dcm_StartTx(uint8 connIdx);
 static uint16 Dcm_ConsumeElapsedTicks(uint8 connIdx);
+static void Dcm_PerformHardReset(void);
 static void Dcm_UpdatePendingTimers(uint8 connIdx, uint16 elapsedTicks);
 static uint8 Dcm_IsConnectionActive(uint8 connIdx);
 static uint8 Dcm_CanStartProtocol(uint8 connIdx);
@@ -593,7 +581,7 @@ static const Dcm_ServiceAccessType Dcm_ServiceAccessTable[] =
 {
         { DCM_SID_DIAGNOSTIC_SESSION_CONTROL, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
         { DCM_SID_ECU_RESET,                  DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
-        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, DCM_SESSION_MASK_EXTENDED },
+        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED },
         { DCM_SID_READ_DTC_INFORMATION,       DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED },
         { DCM_SID_READ_DATA_BY_IDENTIFIER,    DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
         { DCM_SID_COMMUNICATION_CONTROL,      DCM_SESSION_MASK_EXTENDED },
@@ -835,13 +823,7 @@ void Dcm_MainFunction(void)
      * response has completed its DCM/PduR confirmation path before reset. */
     if (Dcm_PendingHardReset == TRUE)
     {
-        Dcm_PendingHardReset = FALSE;
-        Dcm_DebugHardResetPerformedCounter++;
-        Dcm_DebugHardResetLastNvMStatus = (uint8)NvM_GetStatus();
-        SysMgr_ClearMcuSmSwErrorTriggerData();
-        McuSm_SaveRetainedStateToScr();
-        IfxCpu_disableInterrupts();
-        IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+        Dcm_PerformHardReset();
     }
 
     Dcm_MainFunction_Counter++;
@@ -1528,6 +1510,11 @@ static void Dcm_ClearProcessing(uint8 connIdx)
 
     c = &Dcm_Conn[connIdx];
 
+    if (c->pendingResetAfterResponse == TRUE)
+    {
+        Dcm_EcuResetAfterResponse(connIdx, c->resetAfterResponse);
+    }
+
     if ((Dcm_ConfigPtr != NULL_PTR) && (connIdx < Dcm_ConfigPtr->numConnections))
     {
         PduR_DcmReleaseNoResponse(Dcm_ConfigPtr->connections[connIdx].txPduId);
@@ -1580,6 +1567,11 @@ static Std_ReturnType Dcm_StartTx(uint8 connIdx)
 
     if (ret != E_OK)
     {
+        if (c->pendingResetAfterResponse == TRUE)
+        {
+            Dcm_EcuResetAfterResponse(connIdx, c->resetAfterResponse);
+        }
+
         c->state = DCM_CONN_TX_READY;
     }
 
@@ -1720,6 +1712,15 @@ static uint8 Dcm_GetSubFunction(uint8 rawSubFunction)
 static uint8 Dcm_IsSuppressPosRspBitSet(uint8 rawSubFunction)
 {
     return ((rawSubFunction & DCM_SUPPRESS_POS_RSP_MSG_INDICATION_BIT) != 0u) ? TRUE : FALSE;
+}
+
+static void Dcm_PerformHardReset(void)
+{
+    Dcm_PendingHardReset = FALSE;
+    SysMgr_ClearMcuSmSwErrorTriggerData();
+    McuSm_SaveRetainedStateToScr();
+    IfxCpu_disableInterrupts();
+    IfxScuRcu_performReset(IfxScuRcu_ResetType_system, 0u);
 }
 
 static Dcm_ReturnType Dcm_Service_ForwardStandard(
@@ -2033,35 +2034,19 @@ static void Dcm_SessionChangeAfterResponse(uint8 connIdx, uint8 session)
         McuSm_ArmFblProgrammingRequest();
         IfxCpu_disableInterrupts();
         IfxScuRcu_performReset(
-                IfxScuRcu_ResetType_application,
+                IfxScuRcu_ResetType_system,
                 (uint16)DCM_RESET_INFO_ENTER_FBL);
     }
 }
 
 static void Dcm_EcuResetAfterResponse(uint8 connIdx, uint8 resetType)
 {
-    Dcm_BusType busType;
-
-    busType = DCM_BUS_CAN_CLASSIC;
-    if ((Dcm_ConfigPtr != NULL_PTR) && (connIdx < Dcm_ConfigPtr->numConnections))
-    {
-        busType = Dcm_ConfigPtr->connections[connIdx].busType;
-    }
+    (void)connIdx;
 
     if (resetType == 0x01u)
     {
-        /* Arm the deferred reset instead of resetting inline. See the comment on
-         * Dcm_PendingHardReset: doing the reset here (on TX confirmation) drops
-         * the 0x51 response because it has only been buffered, not yet sent. */
         McuSm_FBL_ProgrammingRequest = MCUSM_FBL_PROGRAMMING_REQUEST_NONE;
         Dcm_PendingHardReset = TRUE;
-        Dcm_DebugHardResetArmedCounter++;
-        Dcm_DebugHardResetLastDelayTicks = 0u;
-        Dcm_DebugHardResetLastNvMDrainTicks = 0u;
-        Dcm_DebugHardResetLastNvMDrainElapsedTicks = 0u;
-        Dcm_DebugHardResetLastDrainNvM = FALSE;
-        Dcm_DebugHardResetLastBusType = (uint8)busType;
-        Dcm_DebugHardResetLastNvMStatus = (uint8)NvM_GetStatus();
     }
 }
 

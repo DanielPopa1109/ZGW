@@ -1058,10 +1058,6 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
         {
             EthernetDiag_ReportTxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
         }
-        else
-        {
-            EthernetDiag_ReportTxError(1u);
-        }
 
         SoAd_Unlock();
         return soAdResult;
@@ -1082,10 +1078,6 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
     if (soAdResult == SOAD_OK)
     {
         EthernetDiag_ReportTxActivity(EthernetDiag_GetConnectionIdForSoCon(id));
-    }
-    else
-    {
-        EthernetDiag_ReportTxError(1u);
     }
     SoAd_Unlock();
     return soAdResult;

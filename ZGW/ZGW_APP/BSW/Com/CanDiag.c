@@ -10,9 +10,10 @@
 #define CANDIAG_ERROR_PASSIVE_PASS_TICKS       40u
 #define CANDIAG_PROTOCOL_ERROR_FAIL_TICKS      200u
 #define CANDIAG_PROTOCOL_ERROR_PASS_TICKS      80u
+#define CANDIAG_BUS_OFF_RECOVERY_PASS_TICKS    40u
 #define CANDIAG_ERROR_COUNTER_HIGH_LIMIT       160u
 
-#define CANDIAG_SNAPSHOT_SIZE                  48u
+#define CANDIAG_SNAPSHOT_SIZE                  50u
 #define CANDIAG_SNAPSHOT_KIND_OFFSET           DEM_DTC_TIMESTAMP_DATA_SIZE
 #define CANDIAG_SNAPSHOT_CONTROLLER_OFFSET     (DEM_DTC_TIMESTAMP_DATA_SIZE + 1u)
 #define CANDIAG_SNAPSHOT_FAULT_OFFSET          (DEM_DTC_TIMESTAMP_DATA_SIZE + 2u)
@@ -45,6 +46,7 @@ typedef struct
     uint16 errorPassivePassTicks;
     uint16 protocolFailTicks;
     uint16 protocolPassTicks;
+    uint16 busOffRecoveryPassTicks;
     uint32 busOffCounter;
 } CanDiag_ChannelRuntimeType;
 
@@ -177,6 +179,7 @@ void CanDiag_Init(void)
         CanDiag_Runtime[controller].errorPassivePassTicks = 0u;
         CanDiag_Runtime[controller].protocolFailTicks = 0u;
         CanDiag_Runtime[controller].protocolPassTicks = 0u;
+        CanDiag_Runtime[controller].busOffRecoveryPassTicks = 0u;
         CanDiag_Runtime[controller].busOffCounter = 0u;
     }
 }
@@ -186,6 +189,8 @@ void CanDiag_ReportBusOff(uint8 controllerId)
     if (controllerId < CANDIAG_CHANNEL_COUNT)
     {
         CanDiag_Runtime[controllerId].busOffPending = TRUE;
+        CanDiag_Runtime[controllerId].recoveredPending = FALSE;
+        CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
         CanDiag_Runtime[controllerId].busOffCounter++;
     }
 }
@@ -225,13 +230,31 @@ static void CanDiag_ProcessBusOff(uint8 controllerId)
     if (CanDiag_Runtime[controllerId].busOffPending != FALSE)
     {
         CanDiag_Runtime[controllerId].busOffPending = FALSE;
+        CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
         CanDiag_Report(controllerId, CANDIAG_FAULT_BUS_OFF, DEM_EVENT_STATUS_FAILED);
     }
 
     if (CanDiag_Runtime[controllerId].recoveredPending != FALSE)
     {
         CanDiag_Runtime[controllerId].recoveredPending = FALSE;
-        CanDiag_Report(controllerId, CANDIAG_FAULT_BUS_OFF, DEM_EVENT_STATUS_PASSED);
+        CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
+    }
+
+    if (CanDiag_IsChannelOperational(controllerId) != FALSE)
+    {
+        if (CanDiag_Runtime[controllerId].busOffRecoveryPassTicks < CANDIAG_BUS_OFF_RECOVERY_PASS_TICKS)
+        {
+            CanDiag_Runtime[controllerId].busOffRecoveryPassTicks++;
+        }
+
+        if (CanDiag_Runtime[controllerId].busOffRecoveryPassTicks >= CANDIAG_BUS_OFF_RECOVERY_PASS_TICKS)
+        {
+            CanDiag_Report(controllerId, CANDIAG_FAULT_BUS_OFF, DEM_EVENT_STATUS_PASSED);
+        }
+    }
+    else
+    {
+        CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
     }
 }
 

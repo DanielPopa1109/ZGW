@@ -103,6 +103,7 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_PRIO_CORE2_QM_BSW      29u
 #define OS_TASK_PRIO_CORE2_APPL        28u
 #define OS_CORE2_MAIN_PERIOD_TICKS     pdMS_TO_TICKS_core2(5u)
+#define OS_ETH_STARTUP_INIT_YIELD_RETRIES 16u
 /*
  * Max Fls/Fee/NvM stack cycles ASIL_NVM runs per 5ms activation. Keep the batch
  * bounded to avoid monopolizing core0 while allowing QM tasks to run first.
@@ -201,6 +202,7 @@ volatile uint16 Os_CpuLoadPermille_core2 = OS_CPU_LOAD_INVALID_PERMILLE;
 volatile uint8 Os_EthStackInitialized = 0u;
 volatile uint8 Os_EthNetifReadyBeforeStackInit = 0u;
 volatile uint32 Os_EthNetifWaitLoops = 0u;
+volatile uint32 Os_EthStartupYieldRetries = 0u;
 volatile uint32 Os_Core2AsilApplStackHighWater = 0u;
 volatile uint32 Os_Core2QmBswStackHighWater = 0u;
 
@@ -1235,6 +1237,7 @@ static uint8 Os_TryInitEthStackCore2(void)
 void QM_BSW_Task_C2(void *pvParameters)
 {
     TickType_t_core2 lastWakeTime;
+    uint32 startupRetry;
 
     (void)pvParameters;
 
@@ -1246,8 +1249,36 @@ void QM_BSW_Task_C2(void *pvParameters)
     (void)LWIP_GETH_Init(lwip_geth_handle);
 
     Os_EthNetifWaitLoops = 0u;
-    (void)Os_TryInitEthStackCore2();
+    for (startupRetry = 0u;
+            (startupRetry < OS_ETH_STARTUP_INIT_YIELD_RETRIES) &&
+            (Os_TryInitEthStackCore2() == 0u);
+            startupRetry++)
+    {
+        Os_EthStartupYieldRetries++;
+        taskYIELD_core2();
+    }
+
     lastWakeTime = xTaskGetTickCount_core2();
+    if (Os_EthStackInitialized != 0u)
+    {
+        UdpNm_MainFunction();
+        EthTimeSync_MainFunction(5u);
+        Gptp_Lab_MainFunction(5u);
+        SomeIpSd_MainFunction(5);
+
+        lwip_geth_Lwip_pollTimerFlags();
+        lwip_geth_Lwip_pollReceiveFlags();
+        lwip_geth_Lwip_watchRxProgress();
+        TcpIp_MainFunction();
+        SoAd_MainFunction();
+        GatewaySwc_EthernetMainFunction();
+        DoIP_MainFunction(5);
+        PduR_DoIPCore2MainFunction();
+        SomeIp_MainFunction(5);
+
+        EthSM_MainFunction();
+        EthernetDiag_MainFunction();
+    }
 
     while(1)
     {

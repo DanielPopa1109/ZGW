@@ -70,6 +70,7 @@ void initSafetyKit(void)
     initDieTemperatureSensors();
     /* Initialize Secondary Voltage monitors and their threshold values */
     initVoltageMonitors();
+    initPmsErrataWorkarounds();
     safetyKitUpdateMcuSmStatusAndResetReaction(TRUE);
     /* Initialization of SafetyKit is done */
     g_SafetyKitStatus.safetyKitInitDone = TRUE;

@@ -4787,3 +4787,296 @@ Caused by: java.nio.channels.UnresolvedAddressException
 	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
 	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
 	... 29 more
+!SESSION 2026-08-29 22:36:10.687 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:36:13.372
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:36:13.525
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:36:13.670
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-08-29 22:36:15.861
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:44:23.502
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 929 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:44:27.091
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3588 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:44:27.366
+!MESSAGE Include paths were discovered in 268 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:45:11.825
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2477 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:45:11.911
+!MESSAGE Include paths were discovered in 76 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:51:43.413
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 963 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:51:47.510
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4094 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 22:51:47.678
+!MESSAGE Include paths were discovered in 163 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:02:43.853
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 689 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:02:47.428
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3573 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:02:47.584
+!MESSAGE Include paths were discovered in 152 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:03:15.975
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 676 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:03:16.022
+!MESSAGE Include paths were discovered in 43 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:21:48.847
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 656 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:21:52.346
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3497 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-29 23:21:52.491
+!MESSAGE Include paths were discovered in 142 milliseconds.
+!SESSION 2026-08-30 10:12:51.913 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:12:56.523
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:12:56.670
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:12:56.831
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-08-30 10:12:59.494
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:13:11.991
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 907 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:13:15.606
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3615 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:13:15.815
+!MESSAGE Include paths were discovered in 202 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:13:54.552
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2114 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:13:54.615
+!MESSAGE Include paths were discovered in 60 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:33:21.021
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1012 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:33:25.156
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4133 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:33:25.365
+!MESSAGE Include paths were discovered in 196 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:58:15.388
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 808 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:58:18.841
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3451 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 10:58:19.036
+!MESSAGE Include paths were discovered in 192 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:10:59.338
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:10:59.344
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 0 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:10:59.344
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:10:59.345
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 0 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:10:59.475
+!MESSAGE Include paths were discovered in 127 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:16:59.819
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 558 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:17:02.649
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2829 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:17:02.781
+!MESSAGE Include paths were discovered in 129 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:22:23.916
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 643 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:22:27.032
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3114 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 11:22:27.175
+!MESSAGE Include paths were discovered in 141 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 15:42:23.555
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 320 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 15:42:27.126
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3570 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 15:42:27.315
+!MESSAGE Include paths were discovered in 177 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 15:43:08.843
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2400 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 15:43:08.916
+!MESSAGE Include paths were discovered in 70 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:33:02.682
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1353 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:33:06.698
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4012 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:33:07.006
+!MESSAGE Include paths were discovered in 296 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:53:39.358
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 719 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:53:42.995
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3635 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 16:53:43.170
+!MESSAGE Include paths were discovered in 172 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:02:02.067
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 672 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:02:05.312
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3243 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:02:05.467
+!MESSAGE Include paths were discovered in 152 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:08:56.609
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 665 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:09:00.130
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3520 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:09:00.298
+!MESSAGE Include paths were discovered in 163 milliseconds.

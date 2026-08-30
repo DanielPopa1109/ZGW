@@ -74,13 +74,17 @@
     (SYSMGR_MCUSM_SNAPSHOT_DATA_HEADER_SIZE + SYSMGR_MCUSM_SNAPSHOT_DATA_DETAIL_SIZE)
 #define SYSMGR_MCUSM_SNAPSHOT_DATA_SIZE \
     (SYSMGR_MCUSM_SNAPSHOT_DATA_TIME_OFFSET + DEM_DTC_TIMESTAMP_DATA_SIZE)
-#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_VERSION 1u
-#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE    96u
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_VERSION 2u
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET  76u
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_COMMON_TIME_OFFSET 108u
+#define SYSMGR_PMS_ERRATA_SNAPSHOT_DATA_SIZE \
+    (SYSMGR_PMS_ERRATA_SNAPSHOT_COMMON_TIME_OFFSET + DEM_DTC_TIMESTAMP_DATA_SIZE)
 #define SYSMGR_PMSWSTATCLR_SCRSTCLR_MASK 0x00010000u
 #define SYSMGR_P33_PCSR_CLASSIC_RX_MASK   (1u << 5u)
 #define SYSMGR_P33_PCSR_LOCK_WAIT_LIMIT   10000u
 
 uint32 SysMgr_MainCounter = 0u;
+static boolean SysMgr_ResetDtcProcessed = FALSE;
 uint32 SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
 volatile uint32 SysMgr_BusActivityCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
 volatile uint32 SysMgr_GoSleepCounter = 0u;
@@ -125,6 +129,7 @@ static void SysMgr_ClearScrFaultTriggerData(void);
 static boolean SysMgr_HasScrFaultError(void);
 static void SysMgr_StoreU16(uint8 *buffer, uint16 offset, uint16 value);
 static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value);
+static void SysMgr_StoreU64(uint8 *buffer, uint16 offset, uint64 value);
 static uint8 SysMgr_GetMcuSmFaultSource(void);
 static uint32 SysMgr_GetLastTrapRegister(uint32 trap4Value, uint32 trap7Value);
 static uint32 SysMgr_GetTrap7AgRaw(uint32 group);
@@ -300,6 +305,18 @@ static void SysMgr_StoreU32(uint8 *buffer, uint16 offset, uint32 value)
     buffer[(uint16)(offset + 1u)] = (uint8)((value >> 16u) & 0xFFu);
     buffer[(uint16)(offset + 2u)] = (uint8)((value >> 8u) & 0xFFu);
     buffer[(uint16)(offset + 3u)] = (uint8)(value & 0xFFu);
+}
+
+static void SysMgr_StoreU64(uint8 *buffer, uint16 offset, uint64 value)
+{
+    buffer[offset] = (uint8)((value >> 56u) & 0xFFu);
+    buffer[(uint16)(offset + 1u)] = (uint8)((value >> 48u) & 0xFFu);
+    buffer[(uint16)(offset + 2u)] = (uint8)((value >> 40u) & 0xFFu);
+    buffer[(uint16)(offset + 3u)] = (uint8)((value >> 32u) & 0xFFu);
+    buffer[(uint16)(offset + 4u)] = (uint8)((value >> 24u) & 0xFFu);
+    buffer[(uint16)(offset + 5u)] = (uint8)((value >> 16u) & 0xFFu);
+    buffer[(uint16)(offset + 6u)] = (uint8)((value >> 8u) & 0xFFu);
+    buffer[(uint16)(offset + 7u)] = (uint8)(value & 0xFFu);
 }
 
 static uint32 SysMgr_GetLastTrapRegister(uint32 trap4Value, uint32 trap7Value)
@@ -638,6 +655,8 @@ Std_ReturnType SysMgr_CapturePmsErrataSnapshotData(
 {
     uint16 i;
     uint8 *timeData;
+    TimeBase_TimestampSnapshotType timestamp;
+    TimeBase_DateTimeType dateTime;
 
     if ((eventId != DEM_EVENT_ID_PMS_ERRATA_STARTUP) ||
             (buffer == NULL_PTR) ||
@@ -682,7 +701,30 @@ Std_ReturnType SysMgr_CapturePmsErrataSnapshotData(
 #endif
     buffer[75] = McuSm_SswStatusData.mcuFwcheckStatus;
 
-    timeData = &buffer[76u];
+    TimeBase_GetTimestampSnapshot(&timestamp);
+    SysMgr_StoreU64(buffer, SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET, timestamp.vehicle_time_ns);
+    SysMgr_StoreU64(buffer, (uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 8u), timestamp.utc_time_ns);
+    buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 16u)] =
+            (timestamp.utc_valid != FALSE) ? 1u : 0u;
+    buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 17u)] = timestamp.time_source;
+    SysMgr_StoreU32(buffer, (uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 18u),
+            timestamp.sync_status);
+
+    if ((timestamp.utc_valid != FALSE) &&
+            (TimeBase_ConvertUtcNsToDateTime(timestamp.utc_time_ns, &dateTime) == E_OK))
+    {
+        SysMgr_StoreU16(buffer, (uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 22u),
+                dateTime.year);
+        buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 24u)] = dateTime.month;
+        buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 25u)] = dateTime.day;
+        buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 26u)] = dateTime.hour;
+        buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 27u)] = dateTime.minute;
+        buffer[(uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 28u)] = dateTime.second;
+        SysMgr_StoreU16(buffer, (uint16)(SYSMGR_PMS_ERRATA_SNAPSHOT_TIME_OFFSET + 29u),
+                dateTime.millisecond);
+    }
+
+    timeData = &buffer[SYSMGR_PMS_ERRATA_SNAPSHOT_COMMON_TIME_OFFSET];
     if (Dem_Cfg_CaptureTimestampTemperatureData(timeData, length,
             DEM_SNAPSHOT_KIND_COMMON) != E_OK)
     {
@@ -981,40 +1023,58 @@ static void SysMgr_GoSleepFailure(uint32 FailureInformation)
 
 void SysMgr_ProcessResetDtc(void)
 {
-    if(0u == SysMgr_MainCounter)
+    if(SysMgr_ResetDtcProcessed == FALSE)
     {
         boolean scrFaultDetected = SysMgr_HasScrFaultError();
         boolean safetyKitFaultDetected = ((McuSm_SafetyKitFailureMask != 0u) ||
                 (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST)) ? TRUE : FALSE;
+        Std_ReturnType resetDtcStatus;
+
+        if ((Dem_IsReady() == FALSE) ||
+                (Dem_IsDtcSettingEnabled() == FALSE) ||
+                (TimeBase_IsUtcRestoredFromNvM() == FALSE))
+        {
+            return;
+        }
 
         if((0u != McuSm_LastResetReason) || (scrFaultDetected != FALSE) || (safetyKitFaultDetected != FALSE))
         {
-            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_FAILED);
+            resetDtcStatus = Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_FAILED);
 
-            if (scrFaultDetected != FALSE)
+            if (resetDtcStatus == E_OK)
             {
-                SysMgr_ClearScrFaultStatus();
-            }
-
-            if (safetyKitFaultDetected != FALSE)
-            {
-                if (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST)
+                if (scrFaultDetected != FALSE)
                 {
-                    McuSm_SafetyKitResetInhibit = 1u;
+                    SysMgr_ClearScrFaultStatus();
                 }
-                else
+
+                if (safetyKitFaultDetected != FALSE)
                 {
-                    McuSm_SafetyKitResetInhibit = 0u;
+                    if (McuSm_LastResetReason == MCUSM_RESET_REASON_SAFETYKIT_TEST)
+                    {
+                        McuSm_SafetyKitResetInhibit = 1u;
+                    }
+                    else
+                    {
+                        McuSm_SafetyKitResetInhibit = 0u;
+                    }
                 }
             }
         }
         else
         {
-            Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_PASSED);
+            resetDtcStatus = Dem_SetEventStatus(DEM_EVENT_ID_MCUSM_SW_ERROR, DEM_EVENT_STATUS_PASSED);
         }
 
+        if (resetDtcStatus != E_OK)
+        {
+            return;
+        }
+
+        SysMgr_ResetDtcProcessed = TRUE;
+
 #if (SYSMGR_PMS_ERRATA_FEATURE_ENABLED != 0u)
-        if (g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus == SAFETYKIT_PMS_ERRATA_STATUS_FAILED)
+        if (g_SafetyKitStatus.voltStatus.pmsErrataFailureMask != 0u)
         {
             Dem_SetEventStatus(DEM_EVENT_ID_PMS_ERRATA_STARTUP, DEM_EVENT_STATUS_FAILED);
         }
@@ -1037,7 +1097,6 @@ void SysMgr_EcuStateMachine(void)
     if(SYSMGR_STARTUP == SysMgr_EcuState)
     {
         SysMgr_EcuState = SYSMGR_RUN;
-        SysMgr_ProcessResetDtc();
         SysMgr_RunCounter = SYSMGR_BUS_ACTIVITY_TIMEOUT_TICKS;
     }
 
@@ -1091,6 +1150,7 @@ void SysMgr_EcuStateMachine(void)
 void SysMgr_MainFunction(void)
 {
     SysMgr_EcuStateMachine();
+    SysMgr_ProcessResetDtc();
 
     SysMgr_McuTemperature = g_SafetyKitStatus.dieTempStatus.dieTemperatureCore;
     getPmsVoltageMeasurements();

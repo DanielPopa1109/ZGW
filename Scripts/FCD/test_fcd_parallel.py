@@ -94,7 +94,7 @@ class FcdParallelTests(unittest.TestCase):
 
     def test_can_dtc_snapshot_detail(self):
         app = object.__new__(fcd_app_module.FcdApp)
-        data = bytearray(48)
+        data = bytearray(50)
         base = fcd_app_module.DEM_DTC_TIMESTAMP_DATA_SIZE
         data[base + 1] = 1
         data[base + 2] = 3
@@ -122,7 +122,7 @@ class FcdParallelTests(unittest.TestCase):
             bytes(data),
         )
         self.assertIn("ZGW_CANFD_2 Excessive Protocol Error", detail)
-        self.assertIn("CANFD Excessive Protocol Error", app._describe_zgw_dtc(fcd_app_module.DEM_DTC_CANFD_PROTOCOL_ERROR))
+        self.assertIn("ZGW_CANFD_2 Excessive Protocol Error", app._describe_zgw_dtc(fcd_app_module.DEM_DTC_CANFD_PROTOCOL_ERROR))
         self.assertIn("bus-off count=7", detail)
         self.assertIn("operational=no", detail)
         self.assertIn("normal TX enabled=no", detail)
@@ -140,6 +140,66 @@ class FcdParallelTests(unittest.TestCase):
             0x04,
         )
         self.assertIn("ZGW_CANFD_2 Error Passive", display)
+        self.assertNotIn("data=", display)
+
+    def test_all_can_bus_dtc_snapshot_details_are_readable(self):
+        app = object.__new__(fcd_app_module.FcdApp)
+        cases = [
+            (fcd_app_module.DEM_DTC_CAN_CLASSIC_BUS_OFF, 0, 0, "ZGW_CAN_3 Bus-Off"),
+            (fcd_app_module.DEM_DTC_CAN_CLASSIC_ERROR_PASSIVE, 0, 1, "ZGW_CAN_3 Error Passive"),
+            (fcd_app_module.DEM_DTC_CAN_CLASSIC_CONTROLLER_FAULT, 0, 2, "ZGW_CAN_3 Controller Fault"),
+            (fcd_app_module.DEM_DTC_CAN_CLASSIC_PROTOCOL_ERROR, 0, 3, "ZGW_CAN_3 Excessive Protocol Error"),
+            (fcd_app_module.DEM_DTC_CANFD_BUS_OFF, 1, 0, "ZGW_CANFD_2 Bus-Off"),
+            (fcd_app_module.DEM_DTC_CANFD_ERROR_PASSIVE, 1, 1, "ZGW_CANFD_2 Error Passive"),
+            (fcd_app_module.DEM_DTC_CANFD_CONTROLLER_FAULT, 1, 2, "ZGW_CANFD_2 Controller Fault"),
+            (fcd_app_module.DEM_DTC_CANFD_PROTOCOL_ERROR, 1, 3, "ZGW_CANFD_2 Excessive Protocol Error"),
+        ]
+        for dtc, controller, fault, expected_name in cases:
+            with self.subTest(dtc=f"0x{dtc:06X}"):
+                data = bytearray(50)
+                base = fcd_app_module.DEM_DTC_TIMESTAMP_DATA_SIZE
+                data[20] = 2
+                data[21] = 4
+                data[base + 1] = controller
+                data[base + 2] = fault
+                data[base + 3] = 1
+                data[base + 4] = 2 if fault == 1 else 0
+                data[base + 5] = 128 if fault in (1, 3) else 0
+                data[base + 6] = 0
+                data[base + 7] = 3
+                data[base + 8] = 2
+                data[base + 9] = 3
+                data[base + 10:base + 14] = (1 if fault == 0 else 0).to_bytes(4, "big")
+                response = (
+                    b"\x59\x04"
+                    + dtc.to_bytes(3, "big")
+                    + b"\x2F\xFF"
+                    + bytes(data)
+                )
+                display = app._decode_dtc_detail_response("CAN snapshot", response, dtc, 0x04)
+                self.assertIn(expected_name, display)
+                self.assertIn("CAN bus DTC occurrence time", display)
+                self.assertNotIn("data=", display)
+
+    def test_screenshot_canfd_error_passive_snapshot_is_readable(self):
+        app = object.__new__(fcd_app_module.FcdApp)
+        data = bytes.fromhex(
+            "00 07 A1 BC 34 CC 2C C2 18 D0 62 93 FA 44 10 A4 "
+            "01 01 10 CF 02 04 04 01 01 01 02 80 00 03 02 03 "
+            "00 00 00 00 01 01 01 00 00 00 64 00 00 00 00"
+        )
+        response = (
+            b"\x59\x04\x02\x21\x05\x2F\xFF"
+            + data
+        )
+        display = app._decode_dtc_detail_response(
+            "CANFD snapshot",
+            response,
+            fcd_app_module.DEM_DTC_CANFD_ERROR_PASSIVE,
+            0x04,
+        )
+        self.assertIn("ZGW_CANFD_2 Error Passive", display)
+        self.assertIn("TEC=128", display)
         self.assertNotIn("data=", display)
 
 

@@ -41,6 +41,7 @@ extern volatile uint32 TcpIp_LastRxRemoteAddr;
 extern volatile uint32 TcpIp_SendWouldBlockCounter;
 extern volatile uint32 TcpIp_SendPartialCloseCounter;
 extern volatile uint32 TcpIp_SendFatalCounter;
+extern volatile uint8 TcpIp_LastTxFailureIsFatal;
 
 void TcpIp_Init(void);
 void TcpIp_MainFunction(void);

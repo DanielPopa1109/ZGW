@@ -1044,6 +1044,18 @@ boolean TimeBase_IsUtcValid(void)
     return valid;
 }
 
+boolean TimeBase_IsUtcRestoredFromNvM(void)
+{
+    boolean restored;
+
+    TimeBase_EnterCritical();
+    restored = ((TimeBase_UtcMapping.utc_valid != FALSE) &&
+            ((TimeBase_UtcMapping.sync_status & TIMEBASE_SYNC_STATUS_NVM_RESTORED) != 0u)) ? TRUE : FALSE;
+    TimeBase_ExitCritical();
+
+    return restored;
+}
+
 uint64 TimeBase_GetUtcTimeNs(boolean *valid)
 {
     uint64 vehicleTimeNs;

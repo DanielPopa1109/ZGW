@@ -1,4 +1,4 @@
-21:29:19 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_FBL ****
+17:11:58 **** Clean-only build of configuration TriCore Debug (TASKING) for project ZGW_FBL ****
 amk -j12 clean 
 TASKING VX-toolset for AURIX Development Studio (non-commercial): program builder v1.1r8 Build 22011964
 rm -rf ./TIMER_STM/timer_stm.d ./TIMER_STM/timer_stm.o ./TIMER_STM/timer_stm.src ./TIMER_STM/timer_stm_conf.d ./TIMER_STM/timer_stm_conf.o ./TIMER_STM/timer_stm_conf.src
@@ -42,5 +42,5 @@ rm -rf ZGW_FBL_edited.hex
 rm -rf ZGW_FBL.siz ZGW_FBL.elf
  
 
-21:29:21 Build Finished. 0 errors, 0 warnings. (took 1s.354ms)
+17:11:59 Build Finished. 0 errors, 0 warnings. (took 401ms)
 

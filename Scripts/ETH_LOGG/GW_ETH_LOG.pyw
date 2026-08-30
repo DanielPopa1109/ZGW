@@ -2115,22 +2115,29 @@ class App(tk.Tk):
             self.log_file.write(line + "\n")
 
     def _write_csv_event(self, timestamp, protocol, src_ip, src_port, event):
-        if not self.csv_writer or event.get("kind") != "signal":
+        if not self.csv_writer or event.get("kind") not in ("signal", "scalar"):
             return
+        signal_id = event.get("signal_id")
+        if signal_id is None:
+            signal_id_dec = ""
+            signal_id_hex = ""
+        else:
+            signal_id_dec = signal_id
+            signal_id_hex = f"0x{int(signal_id):04X}"
         self.csv_writer.writerow([
             timestamp,
             protocol,
             src_ip,
             src_port,
-            "summary",
+            event.get("frame_name") or "summary",
             event.get("main_cycles", ""),
             event.get("index", ""),
-            event.get("entry_bus", ""),
+            event.get("entry_bus") or event.get("bus", ""),
             event.get("frame_id", ""),
             event.get("message", ""),
             event.get("signal", ""),
-            event.get("signal_id", ""),
-            f"0x{int(event.get('signal_id', 0)):04X}",
+            signal_id_dec,
+            signal_id_hex,
             event.get("raw", ""),
             event.get("value_text", ""),
             event.get("macro", ""),

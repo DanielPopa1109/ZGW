@@ -40,9 +40,9 @@ FCD_TRACE_MIRROR_PORT = 54088
 FCD_TRACE_MIRROR_MAGIC = b"FCDT"
 DEFAULT_APP_START = 0xA0030000
 DEFAULT_APP_END = 0xA05CFFFF
-# Normal ZGW DoIP TransferData carries 4096 firmware bytes by default; the ECU
+# Normal ZGW DoIP TransferData carries 32768 firmware bytes by default; the ECU
 # advertises the active maximum in RequestDownload.
-DEFAULT_BLOCK_SIZE = 4096
+DEFAULT_BLOCK_SIZE = 32768
 TRANSFER_DATA_REQUEST_LIMIT = 256
 TRANSFER_DATA_OVERHEAD_BYTES = 2
 TRANSFER_DATA_MAX_CHUNK_SIZE = TRANSFER_DATA_REQUEST_LIMIT - TRANSFER_DATA_OVERHEAD_BYTES
@@ -82,6 +82,7 @@ ROUTED_SEND_BACKPRESSURE_TIMEOUT_SECONDS = 30.0
 ROUTED_SEND_BACKPRESSURE_POLL_SECONDS = 0.050
 ROUTED_TRANSPORT_ACK_TIMEOUT_SECONDS = 120.0
 FBL_UPDATER_ENTRY_TIMEOUT_SECONDS = 30.0
+ZGW_FBL_SELECT_TRANSITION_TIMEOUT_SECONDS = 0.5
 FBL_ERASE_TIMEOUT_SECONDS = 120.0
 TRACE_DRAIN_MAX_LINES = 100
 
@@ -91,8 +92,9 @@ TRACE_DRAIN_MAX_LINES = 100
 FAULT_MEMORY_REQUEST_SPACING_SECONDS = 0.02
 FAULT_MEMORY_DETAIL_TIMEOUT_SECONDS = 8.0
 
-POST_RESET_RESPONSE_TIMEOUT_SECONDS = 0.1
+POST_RESET_RESPONSE_TIMEOUT_SECONDS = 10.0
 POST_RESET_RECONNECT_DELAY_SECONDS = 0.1
+POST_RESET_RECOVERY_POLL_SECONDS = 0.1
 POST_RESET_UDS_READY_TIMEOUT_SECONDS = 30.0
 POST_RESET_UDS_READY_RETRY_SECONDS = 0.1
 
@@ -330,13 +332,13 @@ STATIC_DTC_DESCRIPTIONS = {
     DEM_DTC_AIMODEL_DEADLINE_EXCEEDED: "AiModel inference deadline exceeded",
     DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE: "AiModel output out of range",
     DEM_DTC_CAN_CLASSIC_BUS_OFF: "ZGW_CAN_3 Bus-Off",
-    DEM_DTC_CAN_CLASSIC_ERROR_PASSIVE: "CAN Error Passive",
-    DEM_DTC_CAN_CLASSIC_CONTROLLER_FAULT: "CAN Controller Fault",
-    DEM_DTC_CAN_CLASSIC_PROTOCOL_ERROR: "CAN Excessive Protocol Error",
+    DEM_DTC_CAN_CLASSIC_ERROR_PASSIVE: "ZGW_CAN_3 Error Passive",
+    DEM_DTC_CAN_CLASSIC_CONTROLLER_FAULT: "ZGW_CAN_3 Controller Fault",
+    DEM_DTC_CAN_CLASSIC_PROTOCOL_ERROR: "ZGW_CAN_3 Excessive Protocol Error",
     DEM_DTC_CANFD_BUS_OFF: "ZGW_CANFD_2 Bus-Off",
-    DEM_DTC_CANFD_ERROR_PASSIVE: "CANFD Error Passive",
-    DEM_DTC_CANFD_CONTROLLER_FAULT: "CANFD Controller Fault",
-    DEM_DTC_CANFD_PROTOCOL_ERROR: "CANFD Excessive Protocol Error",
+    DEM_DTC_CANFD_ERROR_PASSIVE: "ZGW_CANFD_2 Error Passive",
+    DEM_DTC_CANFD_CONTROLLER_FAULT: "ZGW_CANFD_2 Controller Fault",
+    DEM_DTC_CANFD_PROTOCOL_ERROR: "ZGW_CANFD_2 Excessive Protocol Error",
     DEM_DTC_LIN1_HVDCDC_NO_COMMUNICATION: "LIN1 Slave HVDCDC - No Communication",
     DEM_DTC_LIN1_PROTOCOL_ERROR: "LIN1 Protocol Error",
     DEM_DTC_LIN1_CONTROLLER_FAULT: "LIN1 Controller Fault",
@@ -1236,6 +1238,7 @@ class DoipClient:
         self._last_request_ts = 0.0
         self.request_spacing_seconds = REQUEST_SPACING_SECONDS
         self.last_nrc78_count = 0
+        self.last_uds_request_sent = False
 
     @property
     def connected(self):
@@ -1268,14 +1271,15 @@ class DoipClient:
                     self.sock.setblocking(True)
                     self.sock.settimeout(self.timeout)
 
-    def connect(self):
+    def connect(self, timeout=None):
         self.close()
+        timeout = self.timeout if timeout is None else float(timeout)
         last_error = None
         for bind_ip in local_bind_candidates(self.host, self.local_ip):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 configure_low_latency_tcp(sock)
-                sock.settimeout(self.timeout)
+                sock.settimeout(timeout)
                 if bind_ip:
                     sock.bind((bind_ip, 0))
                 sock.connect((self.host, self.port))
@@ -1389,11 +1393,12 @@ class DoipClient:
         FCD_TRACE_MIRROR.emit_doip("R", payload_type, self.source_addr, self.target_addr, payload)
         return payload_type, payload
 
-    def routing_activation(self, activation_type=0x00):
+    def routing_activation(self, activation_type=0x00, timeout=None):
+        timeout = self.timeout if timeout is None else float(timeout)
         payload = struct.pack(">HB4s", self.source_addr, activation_type, b"\x00\x00\x00\x00")
         with self.lock:
-            self._send_frame(DOIP_PT_ROUTING_ACT_REQ, payload)
-            payload_type, response = self._recv_frame(time.monotonic() + self.timeout)
+            self._send_frame(DOIP_PT_ROUTING_ACT_REQ, payload, send_timeout=timeout)
+            payload_type, response = self._recv_frame(time.monotonic() + timeout)
         if payload_type != DOIP_PT_ROUTING_ACT_RES or len(response) < 5:
             raise DoipError(f"Unexpected routing activation response 0x{payload_type:04X}")
         tester, ecu, code = struct.unpack(">HHB", response[:5])
@@ -1420,8 +1425,10 @@ class DoipClient:
 
         with self.lock:
             self.last_nrc78_count = 0
+            self.last_uds_request_sent = False
             self._pace()
             self._send_frame(DOIP_PT_DIAG_MSG, payload)
+            self.last_uds_request_sent = True
             while True:
                 try:
                     payload_type, response = self._recv_frame(deadline)
@@ -1475,11 +1482,13 @@ class DoipClient:
     def send_uds_no_wait(self, request):
         payload = struct.pack(">HH", self.source_addr, self.target_addr) + bytes(request)
         with self.lock:
+            self.last_uds_request_sent = False
             self._send_frame(
                 DOIP_PT_DIAG_MSG,
                 payload,
                 send_timeout=ROUTED_SEND_BACKPRESSURE_TIMEOUT_SECONDS,
             )
+            self.last_uds_request_sent = True
             self._last_request_ts = time.monotonic()
 
     def recv_routed_transport_acks(self, expected_requests, timeout=None):
@@ -1565,8 +1574,10 @@ class DoipClient:
         ack_received = False
 
         with self.lock:
+            self.last_uds_request_sent = False
             self._pace()
             self._send_frame(DOIP_PT_DIAG_MSG, payload)
+            self.last_uds_request_sent = True
             while True:
                 recv_deadline = deadline
                 if ack_received:
@@ -1902,6 +1913,7 @@ class RawTcpUdsClient:
         self.lock = threading.Lock()
         self._last_request_ts = 0.0
         self.request_spacing_seconds = REQUEST_SPACING_SECONDS
+        self.last_uds_request_sent = False
 
     @property
     def connected(self):
@@ -1972,9 +1984,11 @@ class RawTcpUdsClient:
         nrc78_count = 0
         with self.lock:
             self.last_nrc78_count = 0
+            self.last_uds_request_sent = False
             self._pace()
             self.sock.settimeout(timeout)
             self.sock.sendall(bytes(request))
+            self.last_uds_request_sent = True
             FCD_TRACE_MIRROR.emit_raw_uds("T", self.source_addr, self.target_addr, request)
             if allow_no_response:
                 return b""
@@ -2798,10 +2812,13 @@ class FcdApp:
             )
         return RawTcpUdsClient(host=host, port=port, timeout=timeout, local_ip=local_ip)
 
-    def activate_doip(self, client):
+    def activate_doip(self, client, timeout=None, log_success=True):
         if isinstance(client, DoipClient):
-            ecu, code = client.routing_activation()
-            self.log(f"Routing activation OK: ecu={int_hex(ecu)} code=0x{code:02X}")
+            ecu, code = client.routing_activation(timeout=timeout)
+            if log_success:
+                self.log(f"Routing activation OK: ecu={int_hex(ecu)} code=0x{code:02X}")
+            return ecu, code
+        return None
 
     def _reconnect_cancelled(self, client, stop_event=None, require_current_client=True):
         if self.worker_stop.is_set():
@@ -2894,7 +2911,14 @@ class FcdApp:
             try:
                 return client.send_uds(request, timeout=timeout, allow_no_response=allow_no_response)
             except (OSError, TimeoutError, DoipError) as exc:
-                if allow_no_response:
+                request_sent = bool(getattr(client, "last_uds_request_sent", False))
+                reset_disconnect = (
+                    isinstance(exc, DoipError)
+                    and str(exc) in ("TCP connection closed", "Connection closed", "Not connected")
+                )
+                if allow_no_response and request_sent and (
+                    isinstance(exc, (OSError, TimeoutError)) or reset_disconnect
+                ):
                     return b""
                 if no_auto_retry or not isinstance(client, DoipClient) or retries >= max_retries:
                     raise
@@ -3360,20 +3384,17 @@ class FcdApp:
         self._run_vehicle_uds_action(
             "ClearDiagnosticInformation",
             [
-                (bytes([0x10, SESSION_EXTENDED]), "Extended Session for ClearDiagnosticInformation"),
                 (b"\x14\xff\xff\xff", "ClearDiagnosticInformation 14 FF FF FF"),
             ],
         )
 
     def hard_reset_clicked(self):
         requests = [
-            (bytes([0x10, SESSION_EXTENDED]), "Extended Session for hard reset"),
             (b"\x11\x01", "ECUReset hardReset"),
         ]
 
         def zgw_worker(send, target, client):
             node = self._target_label(target)
-            self._send_session(send, SESSION_EXTENDED, f"{node}: Extended Session for hard reset")
             self._send_ecu_reset_best_effort(send, f"{node}: ECUReset hardReset")
             self._recover_doip_after_reset(client, f"{node} hard reset", require_current_client=False)
 
@@ -3390,7 +3411,6 @@ class FcdApp:
 
         sink = {"lock": threading.Lock(), "rows": [], "summaries": []}
         requests = [
-            (bytes([0x10, SESSION_EXTENDED]), "Extended Session for fault-memory read"),
             (bytes([0x19, 0x01, 0xFF]), "19 01 FF reportNumberOfDTCByStatusMask"),
             (bytes([0x19, 0x02, status_mask]), f"19 02 {status_mask:02X} reportDTCByStatusMask"),
         ]
@@ -3422,7 +3442,6 @@ class FcdApp:
         ]
         sink = {"lock": threading.Lock(), "rows": [], "summaries": []}
         requests = [
-            (bytes([0x10, SESSION_EXTENDED]), "Extended Session for fault-memory read"),
             (bytes([0x19, 0x01, 0xFF]), "19 01 FF reportNumberOfDTCByStatusMask"),
             (bytes([0x19, 0x02, status_mask]), f"19 02 {status_mask:02X} reportDTCByStatusMask"),
         ]
@@ -3587,7 +3606,7 @@ class FcdApp:
         if not is_snapshot:
             return ""
         timestamp_text = format_dtc_timestamp_data(data, "CAN bus DTC occurrence time")
-        if len(data) < 32:
+        if len(data) < DEM_DTC_TIMESTAMP_DATA_SIZE + 14:
             return timestamp_text
         base = DEM_DTC_TIMESTAMP_DATA_SIZE
         controller = data[base + 1]
@@ -3615,7 +3634,7 @@ class FcdApp:
             f"CanIf PDU mode={CANDIAG_PDU_MODE_TEXT.get(pdu_mode, pdu_mode)}",
             f"bus-off count={bus_off_count}",
         ])
-        if len(data) >= 48:
+        if len(data) >= DEM_DTC_TIMESTAMP_DATA_SIZE + 28:
             operational = data[base + 14]
             rx_enabled = data[base + 15]
             tx_enabled = data[base + 16]
@@ -4328,35 +4347,143 @@ class FcdApp:
         # A hard reset response is best-effort: it may be a clean 51 01, a stale
         # frame left in the buffer, or nothing at all. The ZGW defers the actual
         # reset briefly after 51 01 so Ethernet can transmit the response, so wait
-        # before reconnecting or we can reconnect to the old pre-reset application.
+        # before polling or we can reconnect to the old pre-reset application.
         req = b"\x11\x01"
         self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
         try:
             resp = client.send_uds(req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS)
             self.log(f"RX ECUReset hardReset {reason}: {bytes_to_hex(resp)}")
         except Exception as exc:
+            if not bool(getattr(client, "last_uds_request_sent", False)):
+                raise FcdError(f"ECUReset hardReset {reason}: request was not sent ({exc})") from exc
+            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
+                raise FcdError(f"ECUReset hardReset {reason}: request was rejected ({exc})") from exc
             self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
         if isinstance(client, DoipClient):
-            self.log(
-                f"ECUReset hardReset {reason}: waiting {POST_RESET_RECONNECT_DELAY_SECONDS:.1f} s "
-                "before DoIP reconnect"
-            )
-            if self.worker_stop.wait(POST_RESET_RECONNECT_DELAY_SECONDS):
-                raise FcdError(f"ECUReset hardReset {reason}: cancelled by Disconnect button")
-            self.reconnect_doip(client, reason, require_current_client=require_current_client)
-            self._wait_for_post_reset_uds_ready(client, reason, require_current_client=require_current_client)
+            self._poll_doip_after_reset(client, reason, require_current_client=require_current_client)
+
+    def _poll_doip_after_reset(self, client, reason, require_current_client=True):
+        request = bytes([0x10, SESSION_DEFAULT])
+        self._poll_doip_after_reset_with_probe(
+            client,
+            reason,
+            request,
+            "Post-reset Default Session probe",
+            0x10,
+            require_current_client=require_current_client,
+        )
+
+    def _poll_doip_after_reset_with_probe(
+        self,
+        client,
+        reason,
+        request,
+        probe_label,
+        positive_sid,
+        require_current_client=True,
+    ):
+        deadline = time.monotonic() + POST_RESET_RESPONSE_TIMEOUT_SECONDS
+        attempt = 0
+        last_error = None
+
+        if not isinstance(client, DoipClient):
+            return
+
+        self.log(
+            f"DoIP poll after {reason}: probing every "
+            f"{POST_RESET_RECOVERY_POLL_SECONDS:.1f} s for up to "
+            f"{POST_RESET_RESPONSE_TIMEOUT_SECONDS:.1f} s"
+        )
+
+        client.close()
+        if require_current_client:
+            self.root.after(0, self._set_connected_status, False)
+
+        if POST_RESET_RECONNECT_DELAY_SECONDS > 0.0:
+            if self.worker_stop.wait(min(POST_RESET_RECONNECT_DELAY_SECONDS, POST_RESET_RESPONSE_TIMEOUT_SECONDS)):
+                raise FcdError(f"DoIP poll after {reason}: cancelled by Disconnect button")
+
+        while not self._reconnect_cancelled(client, require_current_client=require_current_client):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+
+            attempt += 1
+            attempt_start = time.monotonic()
+
+            try:
+                step_timeout = max(0.001, min(POST_RESET_RECOVERY_POLL_SECONDS, deadline - time.monotonic()))
+                client.connect(timeout=step_timeout)
+
+                step_timeout = max(0.001, min(POST_RESET_RECOVERY_POLL_SECONDS, deadline - time.monotonic()))
+                activation = self.activate_doip(client, timeout=step_timeout, log_success=False)
+
+                step_timeout = max(0.001, min(POST_RESET_RECOVERY_POLL_SECONDS, deadline - time.monotonic()))
+                response = client.send_uds(request, timeout=step_timeout)
+                require_positive_response(response, positive_sid)
+
+                if require_current_client:
+                    self.root.after(0, self._set_connected_status, True)
+                if activation is not None:
+                    ecu, code = activation
+                    self.log(f"Routing activation OK: ecu={int_hex(ecu)} code=0x{code:02X}")
+                self.log(f"DoIP reconnected after {reason}")
+                self.log(f"TX {probe_label}: {bytes_to_hex(request)}")
+                self.log(f"RX {probe_label}: {bytes_to_hex(response)}")
+                self.log(f"Post-reset UDS ready after {reason} on attempt {attempt}")
+                return
+            except (OSError, TimeoutError, FcdError) as exc:
+                last_error = exc
+                client.close()
+                if require_current_client:
+                    self.root.after(0, self._set_connected_status, False)
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+
+            wait_time = POST_RESET_RECOVERY_POLL_SECONDS - (time.monotonic() - attempt_start)
+            wait_time = min(max(0.0, wait_time), remaining)
+            if wait_time > 0.0 and self.worker_stop.wait(wait_time):
+                raise FcdError(f"DoIP poll after {reason}: cancelled by Disconnect button")
+
+        if self._reconnect_cancelled(client, require_current_client=require_current_client):
+            raise FcdError(f"DoIP poll after {reason}: cancelled by Disconnect button")
+        raise FcdError(
+            f"DoIP poll after {reason} timed out after "
+            f"{POST_RESET_RESPONSE_TIMEOUT_SECONDS:.1f} s: {last_error}"
+        )
 
     def _recover_doip_after_reset(self, client, reason, require_current_client=True):
         if not isinstance(client, DoipClient):
             return
-        self.log(
-            f"ECUReset hardReset {reason}: waiting {POST_RESET_RECONNECT_DELAY_SECONDS:.1f} s "
-            "before DoIP reconnect"
-        )
-        if self.worker_stop.wait(POST_RESET_RECONNECT_DELAY_SECONDS):
-            raise FcdError(f"ECUReset hardReset {reason}: cancelled by Disconnect button")
-        self.reconnect_doip(client, reason, require_current_client=require_current_client)
-        self._wait_for_post_reset_uds_ready(client, reason, require_current_client=require_current_client)
+        self._poll_doip_after_reset(client, reason, require_current_client=require_current_client)
+
+    def _execute_zgw_flash_hard_reset(self, client, reason, probe_target="ZGW", require_current_client=True):
+        req = b"\x11\x01"
+        self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
+        try:
+            resp = client.send_uds_suppress_positive(req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS)
+            if resp:
+                self.log(f"RX ECUReset hardReset {reason}: {bytes_to_hex(resp)}")
+            else:
+                self.log(f"RX ECUReset hardReset {reason}: DoIP ACK accepted; probing for {probe_target}")
+        except Exception as exc:
+            if not bool(getattr(client, "last_uds_request_sent", True)):
+                raise FcdError(f"ECUReset hardReset {reason}: request was not sent ({exc})") from exc
+            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
+                raise FcdError(f"ECUReset hardReset {reason}: request was rejected ({exc})") from exc
+            self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
+
+        if isinstance(client, DoipClient):
+            self._poll_doip_after_reset_with_probe(
+                client,
+                reason,
+                b"\x3E\x00",
+                f"Post-reset {probe_target} TesterPresent probe",
+                0x3E,
+                require_current_client=require_current_client,
+            )
 
     def _wait_for_post_reset_uds_ready(self, client, reason, timeout=POST_RESET_UDS_READY_TIMEOUT_SECONDS, require_current_client=True):
         request = bytes([0x10, SESSION_DEFAULT])
@@ -5063,12 +5190,6 @@ class FcdApp:
         node = self._target_label(target)
         rows = []
         summaries = []
-        send(
-            bytes([0x10, SESSION_EXTENDED]),
-            f"{node}: Extended Session for fault-memory read",
-            timeout=10.0,
-            allow_no_response=not strict_response,
-        )
         for request, label in [
             (bytes([0x19, 0x01, 0xFF]), f"{node}: 19 01 FF reportNumberOfDTCByStatusMask"),
             (bytes([0x19, 0x02, status_mask]), f"{node}: 19 02 {status_mask:02X} reportDTCByStatusMask"),
@@ -5435,38 +5556,8 @@ class FcdApp:
             ),
             (
                 post_reset_base + (1 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: b"\x22" + struct.pack(">H", CODING_DID_STATUS),
-                lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read CodingApp Status F1C0",
-            ),
-            (
-                post_reset_base + (2 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: b"\x22" + struct.pack(">H", DID_APP_SW_VERSION),
-                lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read Software Version F101",
-            ),
-            (
-                post_reset_base + (3 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK),
-                lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read Active Software Block F100",
-            ),
-            (
-                post_reset_base + (4 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION),
-                lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read Active Diagnostic Session F186",
-            ),
-            (
-                post_reset_base + (5 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: bytes([0x10, SESSION_CODING_REQUESTED]),
-                lambda target, _item: f"{target_node_name(target)}: Coding Session before Read Coding requested as 10 41",
-            ),
-            (
-                post_reset_base + (6 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
                 lambda _target, item: b"\x31\x01" + struct.pack(">H", item[4]),
                 lambda target, _item: f"{target_node_name(target)}: After Coding Reset: Read Coding start",
-            ),
-            (
-                post_reset_base + (7 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS),
-                lambda _target, _item: bytes([0x10, SESSION_DEFAULT]),
-                lambda target, _item: f"{target_node_name(target)}: Default Session after coding",
             ),
         )
         self._run_paced_routed_coding_rounds(prepared, client, rounds)
@@ -5805,7 +5896,6 @@ class FcdApp:
                 self._recover_doip_after_reset(client, f"{node_name} after coding", require_current_client=False)
             send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
             self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session after coding reset requested as 10 41")
-            self._read_post_coding_status_for_target(send, target, "After Coding Reset", required=strict_response)
             self._read_back_coding_for_target(
                 send,
                 target,
@@ -5813,7 +5903,6 @@ class FcdApp:
                 strict_response=strict_response,
                 expected_mask=mask if verify_coding_present else None,
             )
-            self._send_session(send, SESSION_DEFAULT, f"{node_name}: Default Session after coding")
         finally:
             self._release_coding_worker_client(client)
 
@@ -6852,11 +6941,10 @@ class FcdApp:
                         is_fbl=True,
                         progress_cb=progress_cb,
                         strict_response=strict_response,
-                )
-                self._execute_hard_reset(client, "after FBL flash")
+                    )
+                self._execute_zgw_flash_hard_reset(client, "after FBL flash", probe_target="FBL")
                 send = self._make_uds_sender(client)
                 self._send_session(send, SESSION_DEFAULT, "Default Session after FBL flash")
-                self._send_session(send, SESSION_EXTENDED, "Extended Session after FBL flash")
 
             if self.flash_appl_var.get() and appl_payloads:
                 for payload in appl_payloads:
@@ -6867,7 +6955,7 @@ class FcdApp:
                         progress_cb=progress_cb,
                         strict_response=strict_response,
                 )
-                self._execute_hard_reset(client, "after APPL flash")
+                self._execute_zgw_flash_hard_reset(client, "after APPL flash", probe_target="APP")
 
             complete_progress()
         finally:
@@ -7703,12 +7791,25 @@ class FcdApp:
             dry=False,
             strict_response=strict_response,
         )
+        target_is_zgw = bool(target.get("is_zgw")) or str(node_name).upper() == "ZGW"
+        reason_upper = str(reason).upper()
+        if target_is_zgw and ("FBL" in reason_upper or "APP" in reason_upper) and isinstance(client, DoipClient):
+            probe_target = "FBL" if "FBL" in reason_upper else "APP"
+            self._execute_zgw_flash_hard_reset(
+                client,
+                f"after {reason}",
+                probe_target=probe_target,
+                require_current_client=False,
+            )
+            if probe_target == "FBL":
+                target["_fcd_fbl_flash_reset_ready"] = True
+            return
         self._send_ecu_reset_best_effort(send, f"{node_name}: ECUReset hardReset after {reason}")
         if not getattr(send, "dry_run", False) and not self._target_is_simulated(target):
             self._recover_doip_after_reset(client, reason, require_current_client=False)
         else:
             self._send_session(send, SESSION_DEFAULT, f"{node_name}: Post-reset UDS readiness probe")
-        if "FBL" in str(reason).upper():
+        if "FBL" in reason_upper:
             target["_fcd_fbl_flash_reset_ready"] = True
 
     def _execute_parallel_coding(self, manifest, progress_cb, include_zgw=True, only_zgw=False, strict_response=False):
@@ -7922,7 +8023,10 @@ class FcdApp:
                         allow_no_response=no_response_ok,
                     )
                     send.last_nrc78_count = 0
-            except Exception:
+            except Exception as exc:
+                if no_response_ok and request == b"\x11\x01":
+                    self.log(f"RX {name}: reset request transport failed ({exc})")
+                    raise
                 if no_response_ok:
                     self.log(f"RX {name}: no response accepted")
                     return b""
@@ -8062,6 +8166,83 @@ class FcdApp:
             expected_payload=bytes([ACTIVE_SW_BLOCK_FBL]),
         )
 
+    def _validate_routine_control_response(self, response, rid, expected_payload, label):
+        if len(response) < 4 or response[0] != 0x71 or response[1] != 0x01:
+            raise FcdError(f"{label}: malformed RoutineControl response {bytes_to_hex(response)}")
+        echoed_rid = struct.unpack(">H", response[2:4])[0]
+        if echoed_rid != rid:
+            raise FcdError(
+                f"{label}: RoutineControl RID echo mismatch sent=0x{rid:04X} received=0x{echoed_rid:04X}"
+            )
+        if expected_payload is not None:
+            actual_payload = response[4 : 4 + len(expected_payload)]
+            if actual_payload != expected_payload:
+                raise FcdError(
+                    f"{label}: RoutineControl payload mismatch expected={bytes_to_hex(expected_payload)} "
+                    f"received={bytes_to_hex(response[4:])}"
+                )
+
+    def _select_zgw_fbl_software_block(self, client, send, label_prefix):
+        label = f"{label_prefix}: RoutineControl 0200 Select FBL software block"
+        request = b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_FBL])
+        expected_payload = bytes([ACTIVE_SW_BLOCK_FBL])
+        start = time.monotonic()
+        self.log(
+            f"{label}: routine=0x{ROUTINE_SELECT_SW_BLOCK:04X} "
+            f"request_time={datetime.now().isoformat(timespec='milliseconds')}"
+        )
+        self.log(f"TX {label}: {uds_request_log_text(request)}")
+
+        try:
+            response = client.send_uds(request, timeout=ZGW_FBL_SELECT_TRANSITION_TIMEOUT_SECONDS)
+            self.log(f"RX {label}: {bytes_to_hex(response)}")
+            self._validate_routine_control_response(
+                response,
+                ROUTINE_SELECT_SW_BLOCK,
+                expected_payload,
+                label,
+            )
+            elapsed = time.monotonic() - start
+            nrc78_count = getattr(client, "last_nrc78_count", 0)
+            self.log(
+                f"{label}: routine=0x{ROUTINE_SELECT_SW_BLOCK:04X} "
+                f"final=positive elapsed={elapsed:.3f}s nrc78={nrc78_count}"
+            )
+            return
+        except NegativeResponse as exc:
+            elapsed = time.monotonic() - start
+            self.log(
+                f"{label}: routine=0x{ROUTINE_SELECT_SW_BLOCK:04X} final=negative elapsed={elapsed:.3f}s "
+                f"nrc78=handled-by-transport nrc=0x{exc.nrc:02X}"
+            )
+            raise
+        except Exception as exc:
+            if not bool(getattr(client, "last_uds_request_sent", False)):
+                raise FcdError(f"{label}: request was not sent ({exc})") from exc
+            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
+                raise FcdError(f"{label}: request was rejected ({exc})") from exc
+            self.log(
+                f"{label}: transition response not available after "
+                f"{ZGW_FBL_SELECT_TRANSITION_TIMEOUT_SECONDS:.1f}s ({exc}); probing for FBL"
+            )
+
+        self._poll_doip_after_reset_with_probe(
+            client,
+            label,
+            b"\x3E\x00",
+            "Post-select FBL TesterPresent probe",
+            0x3E,
+            require_current_client=(self.client is client),
+        )
+        self._run_flash_routine_control(
+            send,
+            ROUTINE_SELECT_SW_BLOCK,
+            expected_payload,
+            label,
+            timeout=FBL_UPDATER_ENTRY_TIMEOUT_SECONDS,
+            expected_payload=expected_payload,
+        )
+
     def _read_standard_status(self, send, prefix):
         for did, name in [
             (DID_APP_SW_VERSION, "Read Software Version F101"),
@@ -8195,7 +8376,10 @@ class FcdApp:
             send = self._make_uds_sender(client)
 
         if is_fbl:
-            self._select_fbl_software_block(send, block_name)
+            if isinstance(client, DoipClient) and target_is_zgw:
+                self._select_zgw_fbl_software_block(client, send, block_name)
+            else:
+                self._select_fbl_software_block(send, block_name)
             self._run_flash_routine_control(
                 send,
                 ROUTINE_START_FBL_RAM_UPDATER,

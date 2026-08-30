@@ -244,18 +244,6 @@ extern volatile uint16 Dcm_DebugExtForwardLastLen;
 extern volatile uint8 Dcm_DebugExtForwardLastResult;
 #endif
 
-extern volatile uint32 Dcm_DebugHardResetArmedCounter;
-extern volatile uint32 Dcm_DebugHardResetPerformedCounter;
-extern volatile uint32 Dcm_DebugHardResetNvMDrainSkipCounter;
-extern volatile uint32 Dcm_DebugHardResetNvMDrainWaitCounter;
-extern volatile uint32 Dcm_DebugHardResetNvMDrainTimeoutCounter;
-extern volatile uint16 Dcm_DebugHardResetLastDelayTicks;
-extern volatile uint16 Dcm_DebugHardResetLastNvMDrainTicks;
-extern volatile uint16 Dcm_DebugHardResetLastNvMDrainElapsedTicks;
-extern volatile uint8 Dcm_DebugHardResetLastDrainNvM;
-extern volatile uint8 Dcm_DebugHardResetLastBusType;
-extern volatile uint8 Dcm_DebugHardResetLastNvMStatus;
-
 /* ===================== Weak application hooks ===================== */
 
 void DcmAppl_DiagnosticSessionChanged(

@@ -67,6 +67,7 @@ volatile uint32 TcpIp_LastRxRemoteAddr = 0u;
 volatile uint32 TcpIp_SendWouldBlockCounter = 0u;
 volatile uint32 TcpIp_SendPartialCloseCounter = 0u;
 volatile uint32 TcpIp_SendFatalCounter = 0u;
+volatile uint8 TcpIp_LastTxFailureIsFatal = 0u;
 
 static uint8 TcpIp_IsWouldBlockError(sint32 err)
 {
@@ -206,6 +207,7 @@ void TcpIp_Init(void)
     TcpIp_SendWouldBlockCounter = 0u;
     TcpIp_SendPartialCloseCounter = 0u;
     TcpIp_SendFatalCounter = 0u;
+    TcpIp_LastTxFailureIsFatal = 0u;
 }
 
 void TcpIp_MainFunction(void)
@@ -523,11 +525,13 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
     {
         TcpIp_LastSendResult = -1;
         TcpIp_LastTxLength = len;
+        TcpIp_LastTxFailureIsFatal = 0u;
         return -1;
     }
 
     TcpIp_LastSocketId = sock;
     TcpIp_LastTxLength = len;
+    TcpIp_LastTxFailureIsFatal = 0u;
     if (TcpIp_Lock() == 0u)
     {
         TcpIp_LastSendResult = -1;
@@ -565,8 +569,9 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
 
             if (TcpIp_IsWouldBlockError(lastErr) != 0u)
             {
-            TcpIp_SendWouldBlockCounter++;
-            break;
+                TcpIp_SendWouldBlockCounter++;
+                EthernetDiag_ReportResourceExhaustion(16u);
+                break;
             }
         }
 
@@ -584,6 +589,7 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         if (sent > 0u)
         {
             TcpIp_SendPartialCloseCounter++;
+            TcpIp_LastTxFailureIsFatal = 1u;
             EthernetDiag_ReportTxError(1u);
             (void)lwip_close(sock);
             slot->sock = TCPIP_INVALID_SOCKET;
@@ -593,6 +599,7 @@ sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)
         else if ((lastErr != 0) && (TcpIp_IsWouldBlockError(lastErr) == 0u))
         {
             TcpIp_SendFatalCounter++;
+            TcpIp_LastTxFailureIsFatal = 1u;
             EthernetDiag_ReportTxError(1u);
             (void)lwip_close(sock);
             slot->sock = TCPIP_INVALID_SOCKET;
@@ -624,6 +631,7 @@ sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
     {
         TcpIp_LastSendToResult = -1;
         TcpIp_LastTxLength = len;
+        TcpIp_LastTxFailureIsFatal = 0u;
         return -1;
     }
 
@@ -635,6 +643,7 @@ sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
     TcpIp_LastRemoteAddr = remoteAddr->addr;
     TcpIp_LastRemotePort = remoteAddr->port;
     TcpIp_LastTxLength = len;
+    TcpIp_LastTxFailureIsFatal = 0u;
     if (TcpIp_Lock() == 0u)
     {
         TcpIp_LastSendToResult = -1;
@@ -654,7 +663,17 @@ sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
     if (ret < 0)
     {
         TcpIp_LastSocketError = errno;
-        EthernetDiag_ReportTxError(1u);
+        if (TcpIp_IsWouldBlockError(TcpIp_LastSocketError) != 0u)
+        {
+            TcpIp_SendWouldBlockCounter++;
+            EthernetDiag_ReportResourceExhaustion(16u);
+        }
+        else
+        {
+            TcpIp_SendFatalCounter++;
+            TcpIp_LastTxFailureIsFatal = 1u;
+            EthernetDiag_ReportTxError(1u);
+        }
     }
 
     TcpIp_Unlock();

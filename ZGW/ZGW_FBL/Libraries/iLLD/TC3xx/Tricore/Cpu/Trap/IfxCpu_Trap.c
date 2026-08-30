@@ -301,7 +301,7 @@ static void FblTrap_Record(uint8 trapClass, uint32 tin, volatile const IfxCpu_Tr
 
 static void FblTrap_FatalReset(void)
 {
-    IfxScuRcu_performReset(IfxScuRcu_ResetType_application, 0u);
+    IfxScuRcu_performReset(IfxScuRcu_ResetType_system, 0u);
     for(;;)
     {
     }

@@ -60,6 +60,7 @@ uint64 TimeBase_GetVehicleTimeUs(void);
 uint32 TimeBase_GetVehicleTimeS(void);
 
 boolean TimeBase_IsUtcValid(void);
+boolean TimeBase_IsUtcRestoredFromNvM(void);
 uint64 TimeBase_GetUtcTimeNs(boolean *valid);
 void TimeBase_SetUtcTimeNs(uint64 utcNowNs);
 Std_ReturnType TimeBase_SetUtcTimeNsFromSource(uint64 utcNowNs, TimeBase_TimeSourceType source);
