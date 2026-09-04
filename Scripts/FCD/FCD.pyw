@@ -109,6 +109,21 @@ CODING_ROUTINE_READ_NVM = 0x0203
 CODING_ROUTINE_LOAD_DEFAULTS = 0x0204
 TIMESYNC_ROUTINE_SET_UTC = 0xF190
 TIMESYNC_ROUTINE_GET_STATUS = 0xF191
+ETH_STARTUP_TIMING_ROUTINE_GET = 0xF192
+NVM_TIMING_ROUTINE_GET = 0xF193
+CPU_PERF_ROUTINE_GET = 0xF194
+NVM_STATS_ROUTINE_GET = 0xF195
+
+NVM_STATS_BLOCK_NAMES = {
+    1: "DEM_PRIMARY",
+    2: "APP_DATA",
+    3: "TIMEBASE",
+    4: "ETH_STARTUP_TIMING",
+    5: "NVM_TIMING",
+    6: "MCU_STATUS",
+    7: "AIMODEL",
+    8: "NVM_STATS",
+}
 
 # The CodingApp routine result is a 10-byte status block (status/state/validation/
 # dirty/rxMessageExpectedCount[2]/generation[4]) followed by the coding bitmask -
@@ -179,6 +194,165 @@ MEMIF_JOB_TEXT = {
     0x03: "CANCELED",
     0x04: "BLOCK_INCONSISTENT",
     0x05: "BLOCK_INVALID",
+}
+
+ETH_STARTUP_TIMING_EVENT_TEXT = {
+    0: "Timing reference",
+    1: "Ethernet startup entered",
+    2: "Ethernet startup completed",
+    3: "GETH init entered",
+    4: "GETH init completed",
+    5: "GETH DMA init entered",
+    6: "GETH DMA init completed",
+    7: "GETH RX ready",
+    8: "GETH TX ready",
+    9: "RMII init entered",
+    10: "RMII init completed",
+    11: "MDIO init entered",
+    12: "MDIO init completed",
+    13: "PHY reset asserted",
+    14: "PHY reset released",
+    15: "PHY init entered",
+    16: "PHY init completed",
+    17: "PHY autoneg started",
+    18: "PHY autoneg wait entered",
+    19: "PHY autoneg wait exited",
+    20: "PHY autoneg completed",
+    21: "PHY link detected",
+    22: "lwIP init entered",
+    23: "lwIP init completed",
+    24: "tcpip thread ready",
+    25: "netif_add entered",
+    26: "netif_add completed",
+    27: "netif admin up",
+    28: "netif link up",
+    29: "TcpIp ready",
+    30: "SoAd init completed",
+    31: "DoIP init completed",
+    32: "Socket open requested",
+    33: "Socket ready",
+    34: "First MAC RX interrupt",
+    35: "First GETH RX descriptor",
+    36: "First lwIP RX input",
+    37: "First IP RX",
+    38: "First UDP RX",
+    39: "First TCP RX",
+    40: "First application RX",
+    41: "First DoIP RX",
+    42: "First ARP request",
+    43: "First ARP RX",
+    44: "First ARP resolved",
+    45: "First application TX request",
+    46: "First lwIP TX",
+    47: "First netif linkoutput",
+    48: "First GETH TX request",
+    49: "First DMA TX submit",
+    50: "First DMA TX complete",
+    51: "First TX success",
+}
+
+ETH_STARTUP_TIMING_RX_CLASS_TEXT = {
+    0: "none",
+    1: "ARP",
+    2: "IPv4/ICMP",
+    3: "IPv4/UDP",
+    4: "IPv4/TCP",
+    5: "DoIP",
+    6: "other",
+}
+
+ETH_STARTUP_TIMING_FLAG_TEXT = {
+    0x01: "STM frequency invalid",
+    0x02: "first DMA TX submit captured",
+    0x04: "first DMA TX complete captured",
+    0x08: "timestamp invalid",
+    0x10: "early capture rejected",
+}
+
+ETH_STARTUP_TIMING_DERIVED_DURATIONS = (
+    ("reference -> Ethernet startup entry", 0, 1),
+    ("GETH init duration", 3, 4),
+    ("DMA init duration", 5, 6),
+    ("RMII init duration", 9, 10),
+    ("MDIO init duration", 11, 12),
+    ("PHY reset duration", 13, 14),
+    ("PHY init duration", 15, 16),
+    ("PHY auto-negotiation duration", 17, 20),
+    ("auto-neg complete -> PHY link", 20, 21),
+    ("PHY link -> netif link", 21, 28),
+    ("netif link -> first RX", 28, 40),
+    ("netif link -> first application TX", 28, 45),
+    ("application TX -> lwIP", 45, 46),
+    ("lwIP -> linkoutput", 46, 47),
+    ("linkoutput -> GETH", 47, 48),
+    ("GETH -> DMA submit", 48, 49),
+    ("DMA submit -> TX complete", 49, 50),
+    ("reference -> first RX", 0, 40),
+    ("reference -> first successful TX", 0, 51),
+)
+
+NVM_TIMING_OPERATION_TEXT = {
+    0: "None",
+    1: "NvM_ReadBlock",
+    2: "NvM_WriteBlock",
+    3: "NvM_ReadAll",
+    4: "NvM_WriteAll",
+    5: "NvM_RestoreBlockDefaults",
+    6: "NvM_InvalidateNvBlock",
+    7: "NvM_StartDeferredDefaultImage",
+    8: "NvM_SetRamBlockStatus",
+}
+
+NVM_TIMING_STARTUP_TEXT = {
+    0: "Boot reference",
+    1: "NvM uninitialized/startup state",
+    2: "NvM_Init entry",
+    3: "NvM_Init completion",
+    4: "NvM_ReadAll request",
+    5: "NvM_ReadAll first NvM_MainFunction",
+    6: "NvM_ReadAll first MemIf request",
+    7: "NvM_ReadAll first Fee request",
+    8: "NvM_ReadAll first Fls request",
+    9: "NvM_ReadAll last Fls completion",
+    10: "NvM_ReadAll last Fee completion",
+    11: "NvM_ReadAll last MemIf completion",
+    12: "NvM_ReadAll completion",
+    13: "NvM ready",
+    14: "NvM_WriteAll request",
+    15: "NvM error completion",
+}
+
+CPU_PERF_MEASUREMENT_TEXT = {
+    0: "OS ASIL BSW task C0",
+    1: "OS ASIL NvM task C0",
+    2: "OS NvM startup main C0",
+    3: "OS NvM Fls main C0",
+    4: "OS NvM Fee main C0",
+    5: "OS NvM NvM main C0",
+    6: "NvM main step C0",
+    7: "Fee main step C0",
+    8: "Fls main step C0",
+    9: "CAN RX classic IRQ C0",
+    10: "CAN RX FD IRQ C0",
+    11: "Ethernet TX IRQ C2",
+    12: "Ethernet RX IRQ C2",
+    13: "OS QM BSW task C2",
+    14: "DoIP main C2",
+    15: "PduR DoIP core0 main C0",
+    16: "PduR DoIP core2 main C2",
+    17: "Dcm main C0",
+    18: "AI model main C1",
+    19: "CAN main C0",
+    20: "CanIf RxIndication C0",
+    21: "CanTp RxIndication C0",
+    22: "CanTp main C0",
+    23: "LinIf main C0",
+    24: "LinTp main C0",
+    25: "SoAd main C2",
+    26: "TcpIp main C2",
+    27: "Gateway main C0",
+    28: "Gateway Ethernet main C2",
+    29: "CRC32",
 }
 
 
@@ -566,6 +740,118 @@ PMS_ERRATA_FAILURE_BITS = [
     (0x00000010, "TCH003 PREUVVAL"),
     (0x00000020, "TC007 MONSTAT1 stale"),
 ]
+PMS_ERRATA_STATUS_TEXT = {
+    0: "NOT_EVALUATED",
+    1: "PASSED",
+    2: "FAILED",
+}
+PMS_EVRSTAT_FIELDS = [
+    ("EVRC", 0, 1, "flag"),
+    ("OVC", 1, 1, "flag"),
+    ("EVR33", 2, 1, "flag"),
+    ("OV33", 3, 1, "flag"),
+    ("OVSWD", 4, 1, "flag"),
+    ("UVC", 5, 1, "flag"),
+    ("UV33", 6, 1, "flag"),
+    ("UVSWD", 7, 1, "flag"),
+    ("SYNCLCK", 8, 1, "flag"),
+    ("EVR33VOK", 9, 1, "flag"),
+    ("RSTC", 13, 1, "flag"),
+    ("RST33", 14, 1, "flag"),
+    ("RSTSWD", 15, 1, "flag"),
+    ("EVRCSHLV", 16, 1, "flag"),
+    ("EVRCSHHV", 17, 1, "flag"),
+    ("EVR33SHLV", 18, 1, "flag"),
+    ("EVR33SHHV", 19, 1, "flag"),
+    ("SWDLVL", 20, 1, "flag"),
+    ("SDVOK", 21, 1, "flag"),
+    ("EVRCMOD", 22, 2, "field"),
+    ("OVPRE", 24, 1, "flag"),
+    ("OVSB", 25, 1, "flag"),
+    ("OVDDM", 26, 1, "flag"),
+    ("UVPRE", 27, 1, "flag"),
+    ("UVSB", 28, 1, "flag"),
+    ("UVDDM", 29, 1, "flag"),
+]
+PMS_EVRADCSTAT_FIELDS = [
+    ("ADCCV", 0, 8, "field"),
+    ("ADC33V", 8, 8, "field"),
+    ("ADCSWDV", 16, 8, "field"),
+    ("OVC", 24, 1, "flag"),
+    ("OV33", 25, 1, "flag"),
+    ("OVSWD", 26, 1, "flag"),
+    ("UVC", 27, 1, "flag"),
+    ("UV33", 28, 1, "flag"),
+    ("UVSWD", 29, 1, "flag"),
+]
+PMS_MONSTAT1_FIELDS = [
+    ("ADCCV", 0, 8, "field"),
+    ("ADC33V", 8, 8, "field"),
+    ("ADCSWDV", 16, 8, "field"),
+    ("ACTVCNT", 24, 6, "field"),
+]
+PMS_EVRRSTCON_FIELDS = [
+    ("RSTCTRIM", 0, 8, "field"),
+    ("RST33TRIM", 8, 8, "field"),
+    ("RSTSWDTRIM", 16, 8, "field"),
+    ("RSTCOFF", 24, 1, "flag"),
+    ("BPRSTCOFF", 25, 1, "flag"),
+    ("RST33OFF", 26, 1, "flag"),
+    ("BPRST33OFF", 27, 1, "flag"),
+    ("RSTSWDOFF", 28, 1, "flag"),
+    ("BPRSTSWDOFF", 29, 1, "flag"),
+    ("SLCK", 30, 1, "flag"),
+]
+PMS_OVMON2_FIELDS = [
+    ("PREOVVAL", 0, 8, "field"),
+    ("VDDMOVVAL", 8, 8, "field"),
+    ("SBOVVAL", 16, 8, "field"),
+    ("SLCK", 30, 1, "flag"),
+]
+PMS_UVMON2_FIELDS = [
+    ("PREUVVAL", 0, 8, "field"),
+    ("VDDMUVVAL", 8, 8, "field"),
+    ("SBUVVAL", 16, 8, "field"),
+    ("VDDMLVLSEL", 24, 6, "field"),
+    ("SLCK", 30, 1, "flag"),
+]
+PMS_REGISTER_FIELD_TABLES = {
+    "EVRSTAT": PMS_EVRSTAT_FIELDS,
+    "ADCSTAT": PMS_EVRADCSTAT_FIELDS,
+    "MONSTAT1": PMS_MONSTAT1_FIELDS,
+    "EVRRSTCON": PMS_EVRRSTCON_FIELDS,
+    "EVROVMON2": PMS_OVMON2_FIELDS,
+    "EVRUVMON2": PMS_UVMON2_FIELDS,
+}
+MCU_PACKET_FIELD_MAP = [
+    (0, 4, "Magic", "uint32 be ASCII 'ZMCU'"),
+    (4, 1, "Version", "uint8"),
+    (5, 1, "Message status", "uint8 GatewaySwc MCU status"),
+    (6, 2, "Packet length", "uint16 be bytes"),
+    (8, 4, "Sequence", "uint32 be"),
+    (12, 8, "Vehicle time", "uint64 be ns"),
+    (20, 1, "SafetyKit init done", "uint8 boolean"),
+    (21, 1, "Wakeup from standby", "uint8 boolean"),
+    (22, 2, "Reset type", "uint16 be SafetyKit reset type"),
+    (24, 2, "Reset trigger", "uint16 be SCU reset trigger"),
+    (26, 2, "Reset reason", "uint16 be"),
+    (28, 2, "VEXT", "uint16 be mV"),
+    (30, 2, "VDDP3", "uint16 be mV"),
+    (32, 2, "Core voltage", "uint16 be mV"),
+    (34, 2, "Core voltage highest", "uint16 be mV"),
+    (36, 2, "Core voltage lowest", "uint16 be mV"),
+    (38, 2, "Core undervoltage limit", "uint16 be mV"),
+    (40, 2, "PMS temperature", "sint16 be centi-deg C"),
+    (42, 2, "CPU core temperature", "sint16 be centi-deg C"),
+    (44, 2, "Temperature delta", "sint16 be centi-deg C"),
+    (46, 2, "Highest temperature", "sint16 be centi-deg C"),
+    (48, 2, "Lowest temperature", "sint16 be centi-deg C"),
+    (50, 2, "CPU load core0", "uint16 be permille"),
+    (52, 2, "CPU load core1", "uint16 be permille"),
+    (54, 2, "CPU load core2", "uint16 be permille"),
+    (56, 4, "Reserved", "zero-filled"),
+    (60, 4, "CRC32", "uint32 be over bytes 0..59"),
+]
 SAFETYKIT_RESET_TYPE_TEXT = {
     0: "cold power-on",
     1: "system",
@@ -655,12 +941,15 @@ ROUTINE_SELECT_SW_BLOCK = 0x0200
 DID_ACTIVE_SW_BLOCK = 0xF100
 DID_APP_SW_VERSION = 0xF101
 DID_ACTIVE_DIAG_SESSION = 0xF186
+DID_MCU_DATA_PACKET = 0xFCD1
 
 SESSION_DEFAULT = 0x01
 SESSION_PROGRAMMING = 0x02
 SESSION_EXTENDED = 0x03
+ACTIVE_SW_BLOCK_LEGACY_APP = 0x00
 ACTIVE_SW_BLOCK_APP = 0x01
 ACTIVE_SW_BLOCK_FBL = 0x02
+ACTIVE_SW_BLOCK_FBL_UPDATER = 0x03
 SESSION_CODING_REQUESTED = 0x41
 
 
@@ -722,6 +1011,48 @@ class NegativeResponse(FcdError):
             f"Negative response for 0x{sid:02X}: NRC 0x{nrc:02X} "
             f"({NRC_TEXT.get(nrc, 'Unknown')})"
         )
+
+
+class DiagnosticParserError(FcdError):
+    def __init__(self, message, response=b""):
+        self.response = bytes(response or b"")
+        super().__init__(message)
+
+
+@dataclass
+class DiagnosticAcquisitionResult:
+    key: str
+    item: str
+    service: str
+    identifier: str
+    request: bytes = b""
+    state: str = "NOT_ATTEMPTED"
+    attempted: bool = False
+    request_sent: bool = False
+    request_time: str = ""
+    completion_time: str = ""
+    duration_ms: float = 0.0
+    response: bytes = b""
+    positive_response: bool = False
+    negative_response: bool = False
+    nrc: int | None = None
+    timed_out: bool = False
+    transport_failure: bool = False
+    parser_failure: bool = False
+    invalid_response: bool = False
+    exception_occurred: bool = False
+    error_text: str = ""
+    response_pending_count: int = 0
+    parsed_data: object = None
+    value: str = ""
+
+    def to_report_row(self, node):
+        return {
+            "node": node,
+            "item": self.item,
+            "value": self.value or self.state,
+            "acquisition": self,
+        }
 
 
 @dataclass
@@ -807,6 +1138,10 @@ def ecu_name_from_hex_stem(stem):
                 name = name[: -len(suffix)]
                 changed = True
     return name
+
+
+def selection_text(enabled):
+    return "Yes" if bool(enabled) else "No"
 
 
 def current_layout_node_names(root_path):
@@ -900,6 +1235,9 @@ FCD_TRACE_MIRROR = FcdTraceMirror()
 def u16_be(data, offset):
     return (data[offset] << 8) | data[offset + 1]
 
+def u16_le(data, offset):
+    return data[offset] | (data[offset + 1] << 8)
+
 def s16_be(data, offset):
     value = u16_be(data, offset)
     if value >= 0x8000:
@@ -912,6 +1250,14 @@ def u32_be(data, offset):
         | (data[offset + 1] << 16)
         | (data[offset + 2] << 8)
         | data[offset + 3]
+    )
+
+def u32_le(data, offset):
+    return (
+        data[offset]
+        | (data[offset + 1] << 8)
+        | (data[offset + 2] << 16)
+        | (data[offset + 3] << 24)
     )
 
 def ip4_to_text(value):
@@ -927,6 +1273,12 @@ def u64_be(data, offset):
     value = 0
     for byte in data[offset:offset + 8]:
         value = (value << 8) | byte
+    return value
+
+def u64_le(data, offset):
+    value = 0
+    for shift, byte in enumerate(data[offset:offset + 8]):
+        value |= byte << (shift * 8)
     return value
 
 
@@ -954,6 +1306,60 @@ def format_dtc_timestamp_data(data, prefix="DTC occurrence time"):
     parts.append(f"snapshot version: {snapshot_version}")
     parts.append(f"snapshot kind: {snapshot_kind}")
     return ", ".join(parts)
+
+
+def format_pms_errata_time_data(data):
+    if len(data) < 32:
+        return ""
+    vehicle_ns = u64_be(data, 0)
+    utc_ns = u64_be(data, 8)
+    utc_valid = data[16]
+    source = data[17]
+    sync_status = u32_be(data, 18)
+    year = u16_be(data, 22)
+    month = data[24]
+    day = data[25]
+    hour = data[26]
+    minute = data[27]
+    second = data[28]
+    millisecond = u16_be(data, 29)
+    source_text = TIMEBASE_SOURCE_TEXT.get(source, f"source {source}")
+    parts = [
+        f"PMS capture time: vehicleTimeNs={vehicle_ns}",
+        f"utcNs={utc_ns}",
+        f"UTC valid={utc_valid}",
+        f"time source: {source_text} ({source})",
+        f"syncStatus=0x{sync_status:08X}",
+    ]
+    if utc_valid != 0 and year != 0:
+        parts.append(
+            f"UTC date/time {year:04d}-{month:02d}-{day:02d}T"
+            f"{hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}Z"
+        )
+    return ", ".join(parts)
+
+
+def mcu_status_text(value):
+    names = {
+        0: "disabled",
+        1: "waiting for Ethernet link",
+        2: "socket ready / transmitting",
+        3: "TX error",
+    }
+    return names.get(value, "unknown")
+
+
+def fcd_crc32_reflected(data, start_value=0, is_first_call=True):
+    crc = 0xFFFFFFFF if is_first_call else (~int(start_value) & 0xFFFFFFFF)
+    for byte in bytes(data):
+        crc ^= byte
+        for _ in range(8):
+            if crc & 1:
+                crc = (crc >> 1) ^ 0xEDB88320
+            else:
+                crc >>= 1
+            crc &= 0xFFFFFFFF
+    return (~crc) & 0xFFFFFFFF
 
 
 def flag_names(value, table, empty="none"):
@@ -1041,9 +1447,6 @@ def configure_low_latency_tcp(sock):
         pass
 
 
-def is_own_udp_packet(addr):
-    return addr and addr[0] in local_ipv4_addresses()
-
 def hex_to_bytes(text):
     cleaned = (
         text.replace("0x", "")
@@ -1118,14 +1521,6 @@ def uds_response_matches_request(response, request):
         return len(request) < 2 or (len(response) >= 2 and response[1] == request[1])
 
     return True
-
-
-def project_lab_key(seed, level):
-    key = seed ^ 0x6A09E667
-    key = (key + 0x13572468 + ((level & 0xFF) * 0x1F3D5B79)) & 0xFFFFFFFF
-    key = ((key << 3) | (key >> 29)) & 0xFFFFFFFF
-    key ^= (((seed << 16) & 0xFFFFFFFF) | (seed >> 16))
-    return key & 0xFFFFFFFF
 
 
 def parse_intel_hex(path):
@@ -1407,14 +1802,6 @@ class DoipClient:
         if code != 0x10:
             raise DoipError(f"Routing activation denied: 0x{code:02X}")
         return ecu, code
-
-    def alive_check(self):
-        with self.lock:
-            self._send_frame(DOIP_PT_ALIVE_CHECK_REQ, b"")
-            payload_type, response = self._recv_frame(time.monotonic() + self.timeout)
-        if payload_type != DOIP_PT_ALIVE_CHECK_RES or len(response) < 2:
-            raise DoipError("Unexpected alive-check response")
-        return struct.unpack(">H", response[:2])[0]
 
     def send_uds(self, request, timeout=None, allow_no_response=False):
         timeout = self.timeout if timeout is None else float(timeout)
@@ -1784,124 +2171,6 @@ class DoipClient:
             "gid": gid,
         }
 
-    @staticmethod
-    def ethernet_probe(host, doip_port=DEFAULT_PORT, timeout=3.0, local_ip="auto"):
-        doip_req = struct.pack(">BBHI", DOIP_PROTO_VER, DOIP_INV_PROTO_VER, DOIP_PT_VID_REQ, 0)
-        heartbeat = b"PCHeartbeat"
-        doip_port = int(doip_port)
-
-        targets = []
-        for target in [host, "192.168.1.10", "192.168.1.255", "255.255.255.255"]:
-            target = str(target).strip()
-            if target and target not in targets:
-                targets.append(target)
-
-        local_ips = local_ipv4_addresses()
-        sockets = []
-        results = []
-
-        def add_socket(bind_port=None, bind_ip=""):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setblocking(False)
-            if bind_port is not None:
-                try:
-                    sock.bind((bind_ip, int(bind_port)))
-                except OSError as exc:
-                    results.append({
-                        "kind": "bind-error",
-                        "from": f"{bind_ip or '0.0.0.0'}:{bind_port}",
-                        "detail": str(exc),
-                    })
-                    sock.bind((bind_ip, 0))
-            else:
-                sock.bind((bind_ip, 0))
-            sockets.append(sock)
-            return sock
-
-        # Bind RX before TX. Keep one ephemeral socket too, because the ECU may reply
-        # to the tester source port instead of fixed 13400.
-        rx_ports = []
-        for p in (doip_port, 30490, 30500, 30600):
-            if p not in rx_ports:
-                rx_ports.append(p)
-        for p in rx_ports:
-            add_socket(p)
-        tx_sockets = []
-        for bind_ip in local_bind_candidates(host or DEFAULT_HOST, local_ip):
-            tx_sockets.append(add_socket(None, bind_ip))
-
-        for target in targets:
-            for tx_sock in tx_sockets:
-                local = tx_sock.getsockname()[0]
-                for port, payload in ((30600, heartbeat), (doip_port, heartbeat), (doip_port, doip_req)):
-                    try:
-                        tx_sock.sendto(payload, (target, int(port)))
-                    except OSError as exc:
-                        results.append({
-                            "kind": "send-error",
-                            "from": f"{local}->{target}:{port}",
-                            "detail": str(exc),
-                        })
-
-        deadline = time.monotonic() + float(timeout)
-
-        try:
-            while time.monotonic() < deadline:
-                remaining = max(0.01, deadline - time.monotonic())
-                readable, _, _ = select.select(sockets, [], [], remaining)
-                if not readable:
-                    continue
-
-                for sock in readable:
-                    while True:
-                        try:
-                            data, addr = sock.recvfrom(4096)
-                        except BlockingIOError:
-                            break
-                        except OSError:
-                            break
-
-                        if addr[0] in local_ips:
-                            # Ignore our own broadcast packets. They previously looked like
-                            # false DoIP 0x0001 responses in the log.
-                            continue
-
-                        item = {
-                            "kind": "udp",
-                            "from": f"{addr[0]}:{addr[1]}",
-                            "ip": addr[0],
-                            "length": len(data),
-                            "data": bytes_to_hex(data[:32]),
-                        }
-
-                        if data == b"AURIXHeartbeatAck":
-                            item["kind"] = "aurix-heartbeat"
-
-                        elif len(data) >= 8:
-                            proto, inv, payload_type, payload_len = struct.unpack(">BBHI", data[:8])
-                            if proto == DOIP_PROTO_VER and inv == DOIP_INV_PROTO_VER:
-                                item["kind"] = f"doip-0x{payload_type:04X}"
-                                item["payload_len"] = payload_len
-                                if payload_type == DOIP_PT_VID_RES:
-                                    try:
-                                        item.update(DoipClient._parse_vehicle_identification(data, addr))
-                                    except DoipError as exc:
-                                        item["detail"] = str(exc)
-
-                        results.append(item)
-
-        finally:
-            for sock in sockets:
-                try:
-                    sock.close()
-                except OSError:
-                    pass
-
-        return results
-
-
 class RawTcpUdsClient:
     def __init__(self, host, port, timeout=3.0, local_ip="auto"):
         self.host = host
@@ -2198,6 +2467,7 @@ class FcdApp:
         outer.pack(fill="both", expand=True, padx=10, pady=10)
         outer.columnconfigure(1, weight=1)
         outer.columnconfigure(3, weight=1)
+        outer.rowconfigure(5, weight=1)
 
         self.host_var = tk.StringVar(value=DEFAULT_HOST)
         self.port_var = tk.StringVar(value=str(DEFAULT_PORT))
@@ -2226,14 +2496,27 @@ class FcdApp:
                 ("Connect", self.connect_clicked, None),
                 ("Disconnect", self.disconnect_clicked, None),
                 ("Sync Time", self.sync_time_clicked, None),
+                ("Read SW Versions", self.read_sw_versions_clicked, None),
+                ("Read MCU Data", self.read_mcu_data_packet_clicked, None),
+                ("Read ZGW Date/Time", self.read_zgw_datetime_clicked, None),
+                ("Read Active Session", self.read_active_session_clicked, None),
+                ("Read Active SW Block", self.read_active_sw_block_clicked, None),
+                ("Read Eth Timing", self.read_ethernet_startup_timing_clicked, None),
+                ("Read NvM Timing", self.read_nvm_timing_clicked, None),
+                ("Read NvM Stats", self.read_nvm_stats_clicked, None),
+                ("Clear NvM Stats", self.clear_nvm_stats_clicked, None),
+                ("Read CPU Perf", self.read_cpu_perf_clicked, None),
+                ("Generate Diagnostic Log", self.generate_diagnostic_log_clicked, None),
             ],
         )
 
         self.keepalive_var = tk.BooleanVar(value=True)
         self.keepalive_period_var = tk.StringVar(value="2.0")
 
-        node_frame = ttk.LabelFrame(outer, text="Vehicle nodes")
-        node_frame.grid(row=5, column=0, columnspan=4, sticky="nsew", padx=4, pady=8)
+        connection_pane = tk.PanedWindow(outer, orient=tk.VERTICAL, sashrelief=tk.RAISED)
+        connection_pane.grid(row=5, column=0, columnspan=4, sticky="nsew", padx=4, pady=8)
+
+        node_frame = ttk.LabelFrame(connection_pane, text="Vehicle nodes")
         node_frame.columnconfigure(0, weight=1)
         node_frame.rowconfigure(0, weight=1)
         self.connection_node_tree = ttk.Treeview(
@@ -2257,6 +2540,31 @@ class FcdApp:
         scroll = ttk.Scrollbar(node_frame, orient="vertical", command=self.connection_node_tree.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.connection_node_tree.configure(yscrollcommand=scroll.set)
+
+        read_frame = ttk.LabelFrame(connection_pane, text="Connection diagnostics")
+        read_frame.columnconfigure(0, weight=1)
+        read_frame.rowconfigure(0, weight=1)
+        self.connection_diag_tree = ttk.Treeview(
+            read_frame,
+            columns=("node", "item", "value"),
+            show="headings",
+            selectmode="browse",
+            height=7,
+        )
+        for col, text, width in [
+            ("node", "Node", 120),
+            ("item", "Read", 220),
+            ("value", "Value", 760),
+        ]:
+            self.connection_diag_tree.heading(col, text=text)
+            self.connection_diag_tree.column(col, width=width, stretch=(col == "value"))
+        self.connection_diag_tree.grid(row=0, column=0, sticky="nsew")
+        diag_scroll = ttk.Scrollbar(read_frame, orient="vertical", command=self.connection_diag_tree.yview)
+        diag_scroll.grid(row=0, column=1, sticky="ns")
+        self.connection_diag_tree.configure(yscrollcommand=diag_scroll.set)
+        self._attach_tree_tooltip(self.connection_diag_tree)
+        connection_pane.add(node_frame, minsize=120)
+        connection_pane.add(read_frame, minsize=100)
 
     def _build_diagnostics_tab(self):
         outer = ttk.Frame(self.diagnostics_tab)
@@ -2360,55 +2668,6 @@ class FcdApp:
 
         tree.bind("<Motion>", on_motion, add="+")
         tree.bind("<Leave>", hide, add="+")
-
-    def _build_svt_tab(self):
-        outer = ttk.Frame(self.svt_tab)
-        outer.pack(fill="both", expand=True, padx=10, pady=10)
-        outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(1, weight=1)
-
-        top = ttk.LabelFrame(outer, text="Vehicle Order")
-        top.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
-        for col in range(6):
-            top.columnconfigure(col, weight=1)
-
-        self.fa_project_var = tk.StringVar(value="ZGW_LAB")
-        self.fa_vin_var = tk.StringVar(value="LABTC375DOIP0001")
-        self.fa_type_var = tk.StringVar(value="ZGW")
-        self._entry_row(top, 0, "Project", self.fa_project_var, 18, 0)
-        self._entry_row(top, 0, "VIN", self.fa_vin_var, 22, 2)
-        self._entry_row(top, 1, "Type", self.fa_type_var, 12, 0)
-
-        svt_frame = ttk.LabelFrame(outer, text="SVT / ECU List")
-        svt_frame.grid(row=1, column=0, sticky="nsew", padx=4, pady=8)
-        svt_frame.columnconfigure(0, weight=1)
-        svt_frame.rowconfigure(0, weight=1)
-
-        columns = ("ecu", "target", "req", "resp", "did", "hex", "size", "crc")
-        self.svt_tree = ttk.Treeview(svt_frame, columns=columns, show="headings", selectmode="browse")
-        for col, text, width in [
-            ("use", "Use", 55),
-            ("ecu", "ECU", 150),
-            ("target", "Target", 90),
-            ("req", "Req ID", 80),
-            ("resp", "Resp ID", 80),
-            ("did", "DID", 80),
-            ("hex", "Source HEX", 360),
-            ("size", "Size", 90),
-            ("crc", "CRC32", 110),
-        ]:
-            self.svt_tree.heading(col, text=text)
-            self.svt_tree.column(col, width=width, stretch=(col == "hex"))
-        self.svt_tree.grid(row=0, column=0, sticky="nsew")
-        svt_scroll = ttk.Scrollbar(svt_frame, orient="vertical", command=self.svt_tree.yview)
-        svt_scroll.grid(row=0, column=1, sticky="ns")
-        self.svt_tree.configure(yscrollcommand=svt_scroll.set)
-
-        buttons = ttk.Frame(outer)
-        buttons.grid(row=2, column=0, sticky="w", padx=4, pady=6)
-        ttk.Button(buttons, text="Import SVT JSON", command=self.import_svt_clicked).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Export SVT JSON", command=self.export_svt_clicked).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Copy From Generator", command=self.copy_generator_to_svt).pack(side="left", padx=4)
 
     def _build_coding_tab(self):
         outer = ttk.Frame(self.coding_tab)
@@ -2705,38 +2964,6 @@ class FcdApp:
     def start_fault_memory_test_clicked(self):
         self._start_test_loop("Fault Memory Test", self.test_fault_iterations_var, self._run_fault_memory_test_once)
 
-    def _build_raw_tab(self):
-        outer = ttk.Frame(self.raw_tab)
-        outer.pack(fill="both", expand=True, padx=10, pady=10)
-        outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(1, weight=1)
-
-        top = ttk.Frame(outer)
-        top.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
-        top.columnconfigure(1, weight=1)
-        ttk.Label(top, text="UDS request bytes").grid(row=0, column=0, sticky="w", padx=4)
-        self.raw_request_var = tk.StringVar(value="10 03")
-        ttk.Entry(top, textvariable=self.raw_request_var).grid(row=0, column=1, sticky="ew", padx=4)
-        ttk.Button(top, text="Send", command=self.raw_send_clicked).grid(row=0, column=2, padx=4)
-
-        presets = ttk.Frame(outer)
-        presets.grid(row=2, column=0, sticky="w", padx=4, pady=8)
-        for label, data in [
-            ("10 01", "10 01"),
-            ("10 02", "10 02"),
-            ("10 03", "10 03"),
-            ("22 F1 86", "22 F1 86"),
-            ("27 01", "27 01"),
-            ("3E 00", "3E 00"),
-            ("85 02", "85 02"),
-        ]:
-            ttk.Button(presets, text=label, command=lambda value=data: self.raw_request_var.set(value)).pack(
-                side="left", padx=3
-            )
-
-        self.raw_response_text = tk.Text(outer, height=18, wrap="word", font=("Consolas", 10))
-        self.raw_response_text.grid(row=1, column=0, sticky="nsew", padx=4, pady=6)
-
     def _build_trace_tab(self):
         outer = ttk.LabelFrame(self.trace_frame, text="Trace")
         outer.pack(fill="both", expand=True, padx=2, pady=(8, 2))
@@ -2919,6 +3146,15 @@ class FcdApp:
                 if allow_no_response and request_sent and (
                     isinstance(exc, (OSError, TimeoutError)) or reset_disconnect
                 ):
+                    if isinstance(client, DoipClient) and not client.connected:
+                        self.log(f"{label}: transport closed after accepted no-response request; reconnecting")
+                        self.reconnect_doip(
+                            client,
+                            f"{label} accepted no-response recovery",
+                            log_success=False,
+                            deadline=time.monotonic() + POST_RESET_UDS_READY_TIMEOUT_SECONDS,
+                            require_current_client=require_current_client,
+                        )
                     return b""
                 if no_auto_retry or not isinstance(client, DoipClient) or retries >= max_retries:
                     raise
@@ -3040,102 +3276,6 @@ class FcdApp:
 
         self.worker("Connect", action)
 
-    def discover_doip_clicked(self):
-        def action():
-            local_ip = self.local_ip_var.get().strip() or "auto"
-            self.log(
-                "Local bind candidates: "
-                + ", ".join(ip or "OS default" for ip in local_bind_candidates(self.host_var.get().strip(), local_ip))
-            )
-            results = DoipClient.discover(
-                port=parse_int(self.port_var.get()),
-                timeout=float(self.timeout_var.get()),
-                extra_hosts=[self.host_var.get().strip(), "192.168.1.1", "192.168.1.10"],
-                local_ip=local_ip,
-            )
-            if not results:
-                raise FcdError(
-                    "No DoIP vehicle-identification response received on UDP 13400. "
-                    "That usually means the target is not running the DoIP/FBL server, "
-                    "the PC is on the wrong interface/subnet, or firewall/broadcast filtering is in the way."
-                )
-            for info in results:
-                self.log(
-                    "DoIP discovered: "
-                    f"ip={info['ip']} vin={info['vin']} logical={int_hex(info['logical_address'])} "
-                    f"eid={info['eid']} gid={info['gid']}"
-                )
-            first = results[0]
-            self.root.after(0, lambda: self.host_var.set(first["ip"]))
-            self.root.after(0, lambda: self.target_var.set(int_hex(first["logical_address"])))
-            self.root.after(0, lambda: self.fa_vin_var.set(first["vin"] or self.fa_vin_var.get()))
-
-        self.worker("Discover DoIP", action)
-
-    def ethernet_probe_clicked(self):
-        def action():
-            local_ip = self.local_ip_var.get().strip() or "auto"
-            self.log(
-                "Local bind candidates: "
-                + ", ".join(ip or "OS default" for ip in local_bind_candidates(self.host_var.get().strip(), local_ip))
-            )
-            results = DoipClient.ethernet_probe(
-                self.host_var.get().strip(),
-                doip_port=parse_int(self.port_var.get()),
-                timeout=float(self.timeout_var.get()),
-                local_ip=local_ip,
-            )
-
-            probe_reply_count = 0
-            generic_udp_count = 0
-            generic_udp_samples = []
-            for item in results:
-                kind = item.get("kind", "udp")
-                origin = item.get("from", "?")
-
-                if kind in ("bind-error", "send-error"):
-                    self.log(f"Probe {kind}: {origin} {item.get('detail', '')}".rstrip())
-                    continue
-
-                if kind == "aurix-heartbeat":
-                    probe_reply_count += 1
-                    self.log(f"Probe RX: AURIX heartbeat from {origin}")
-                elif kind == f"doip-0x{DOIP_PT_VID_RES:04X}":
-                    probe_reply_count += 1
-                    self.log(
-                        "Probe RX: DoIP Vehicle ID "
-                        f"from={origin} vin={item.get('vin', '')} "
-                        f"logical={int_hex(item.get('logical_address', 0))} "
-                        f"eid={item.get('eid', '')} gid={item.get('gid', '')}"
-                    )
-                    self.root.after(0, lambda value=item["ip"]: self.host_var.set(value))
-                    self.root.after(0, lambda value=item["logical_address"]: self.target_var.set(int_hex(value)))
-                    if item.get("vin"):
-                        self.root.after(0, lambda value=item["vin"]: self.fa_vin_var.set(value))
-                else:
-                    generic_udp_count += 1
-                    if len(generic_udp_samples) < 5:
-                        generic_udp_samples.append(
-                            f"{kind} from={origin} len={item.get('length', 0)} data={item.get('data', '')}"
-                        )
-
-            for sample in generic_udp_samples:
-                self.log(f"Probe RX: {sample}")
-            if generic_udp_count > len(generic_udp_samples):
-                self.log(
-                    f"Probe RX: {generic_udp_count - len(generic_udp_samples)} additional non-DoIP UDP frames suppressed"
-                )
-
-            if probe_reply_count == 0:
-                raise FcdError(
-                    f"No DoIP or heartbeat response to this probe. Received {generic_udp_count} background UDP "
-                    "frame(s), so PC RX sees the ZGW, but the ZGW did not answer FCD traffic. "
-                    "If ping reports 'Destination host unreachable' from the PC address, fix the ZGW ARP/RX path "
-                    "before retrying TCP DoIP."
-                )
-
-        self.worker("Probe Ethernet", action)
-
     def _set_connected_status(self, connected):
         if connected:
             self.conn_status_var.set("Connected")
@@ -3163,26 +3303,6 @@ class FcdApp:
         if self.client is None or not self.client.connected:
             raise FcdError("Connect first")
         return self.client
-
-    def routing_activation_clicked(self):
-        def action():
-            client = self.require_client()
-            if not isinstance(client, DoipClient):
-                raise FcdError("Routing activation is only for DoIP")
-            ecu, code = client.routing_activation()
-            self.log(f"Routing active: ECU 0x{ecu:04X}, code 0x{code:02X}")
-
-        self.worker("Routing Activation", action)
-
-    def alive_check_clicked(self):
-        def action():
-            client = self.require_client()
-            if not isinstance(client, DoipClient):
-                raise FcdError("Alive check is only for DoIP")
-            ecu = client.alive_check()
-            self.log(f"Alive response from ECU 0x{ecu:04X}")
-
-        self.worker("Alive Check", action)
 
     def _log_time_sync_status(self, response, prefix):
         if not isinstance(response, bytes) or len(response) < 44:
@@ -3246,36 +3366,6 @@ class FcdApp:
 
         self.worker("Sync Time", action)
 
-    def vehicle_id_clicked(self):
-        def action():
-            try:
-                info = DoipClient.vehicle_identification(
-                    self.host_var.get().strip(),
-                    parse_int(self.port_var.get()),
-                    float(self.timeout_var.get()),
-                    local_ip=self.local_ip_var.get().strip() or "auto",
-                )
-            except TimeoutError as exc:
-                raise FcdError(
-                    "No DoIP vehicle-identification response from the selected host. "
-                    "If the target is sending other Ethernet frames, APP/FBL is still not exposing DoIP UDP 13400."
-                ) from exc
-            self.log(
-                "Vehicle ID: "
-                f"from={info['from']} vin={info['vin']} logical={int_hex(info['logical_address'])} "
-                f"eid={info['eid']} gid={info['gid']}"
-            )
-            self.root.after(0, lambda: self.fa_vin_var.set(info["vin"] or self.fa_vin_var.get()))
-
-        self.worker("Vehicle Identification", action)
-
-    def toggle_keepalive(self):
-        # Kept for compatibility with older UI callbacks; tester present is automatic while connected.
-        if self.client is not None and self.client.connected:
-            self.start_keepalive()
-        else:
-            self.stop_keepalive(update_var=False)
-
     def start_keepalive(self):
         self.stop_keepalive(update_var=False)
         self.keepalive_stop.clear()
@@ -3295,6 +3385,7 @@ class FcdApp:
                 last_success_log = now
 
         def loop():
+            next_deadline = time.monotonic()
             while not self.keepalive_stop.is_set():
                 client = self.client
                 try:
@@ -3330,7 +3421,12 @@ class FcdApp:
                         self.log(f"TesterPresent ERROR: {exc}")
                         client.close()
                         self.root.after(0, self._set_connected_status, False)
-                self.keepalive_stop.wait(period)
+                next_deadline += period
+                now = time.monotonic()
+                if next_deadline <= now:
+                    missed_periods = int((now - next_deadline) / period) + 1
+                    next_deadline += missed_periods * period
+                self.keepalive_stop.wait(max(0.0, next_deadline - time.monotonic()))
 
         self.keepalive_thread = threading.Thread(target=loop, daemon=True)
         self.keepalive_thread.start()
@@ -3356,26 +3452,6 @@ class FcdApp:
         if update_var and hasattr(self, "keepalive_var"):
             self.keepalive_var.set(False)
 
-    def raw_send_clicked(self):
-        try:
-            request = hex_to_bytes(self.raw_request_var.get())
-        except Exception as exc:
-            messagebox.showerror(APP_NAME, str(exc))
-            return
-        if not request:
-            messagebox.showerror(APP_NAME, "Enter at least one request byte")
-            return
-
-        def zgw_worker(send, target, client):
-            self._raw_target_worker(send, target, client, request)
-
-        self._run_vehicle_uds_action("Raw UDS", [(request, "Raw")], zgw_worker=zgw_worker)
-
-    def _append_raw_response(self, request, response, node=None):
-        prefix = f"[{node}] " if node else ""
-        self.raw_response_text.insert("end", f"{prefix}> {bytes_to_hex(request)}\n{prefix}< {bytes_to_hex(response)}\n\n")
-        self.raw_response_text.see("end")
-
     def clear_dtc_results_clicked(self):
         self.dtc_tree.delete(*self.dtc_tree.get_children())
         self.dtc_summary_var.set("No fault memory read yet")
@@ -3399,6 +3475,2107 @@ class FcdApp:
             self._recover_doip_after_reset(client, f"{node} hard reset", require_current_client=False)
 
         self._run_vehicle_uds_action("Hard Reset", requests, zgw_worker=zgw_worker)
+
+    def _connection_diag_insert_rows(self, rows, clear=True):
+        if clear:
+            self.connection_diag_tree.delete(*self.connection_diag_tree.get_children())
+        for row in rows:
+            self.connection_diag_tree.insert(
+                "",
+                "end",
+                values=(row.get("node", ""), row.get("item", ""), row.get("value", "")),
+            )
+
+    def _decode_app_fbl_sw_version_payload(self, response):
+        payload = bytes(response[3:] if len(response) >= 3 else b"")
+        if len(payload) >= 6:
+            return (
+                f"APP {payload[0]}.{payload[1]}.{payload[2]}; "
+                f"FBL {payload[3]}.{payload[4]}.{payload[5]}"
+            )
+        text = payload.decode("ascii", errors="ignore").strip("\x00 ").strip()
+        if text:
+            return text
+        return bytes_to_hex(payload) if payload else "(empty)"
+
+    def _decode_coding_sw_version_payload(self, response):
+        payload = bytes(response[3:] if len(response) >= 3 else b"")
+        if len(payload) >= 2:
+            version = int.from_bytes(payload[:2], "big")
+            return f"Coding image version 0x{version:04X} ({version})"
+        return bytes_to_hex(payload) if payload else "(empty)"
+
+    def _decode_mcu_data_packet(self, payload):
+        payload = bytes(payload)
+        if len(payload) < 64:
+            raise FcdError(f"short MCU data packet payload len={len(payload)}")
+        magic = u32_be(payload, 0)
+        version = payload[4]
+        status = payload[5]
+        packet_len = u16_be(payload, 6)
+        sequence = u32_be(payload, 8)
+        vehicle_time_ns = u64_be(payload, 12)
+        safety_init_done = payload[20]
+        wakeup_from_standby = payload[21]
+        reset_type = u16_be(payload, 22)
+        reset_trigger = u16_be(payload, 24)
+        reset_reason = u16_be(payload, 26)
+        voltages = {
+            "VEXT": u16_be(payload, 28) / 1000.0,
+            "VDDP3": u16_be(payload, 30) / 1000.0,
+            "core": u16_be(payload, 32) / 1000.0,
+            "core_highest": u16_be(payload, 34) / 1000.0,
+            "core_lowest": u16_be(payload, 36) / 1000.0,
+            "core_uv_limit": u16_be(payload, 38) / 1000.0,
+        }
+        temperatures = {
+            "PMS": s16_be(payload, 40) / 100.0,
+            "core": s16_be(payload, 42) / 100.0,
+            "delta": s16_be(payload, 44) / 100.0,
+            "highest": s16_be(payload, 46) / 100.0,
+            "lowest": s16_be(payload, 48) / 100.0,
+        }
+        cpu_loads = {
+            "core0": u16_be(payload, 50) / 10.0,
+            "core1": u16_be(payload, 52) / 10.0,
+            "core2": u16_be(payload, 54) / 10.0,
+        }
+        reserved = payload[56:60]
+        crc = u32_be(payload, 60)
+        calculated_crc = fcd_crc32_reflected(payload[:60], 0, True)
+        return {
+            "magic": magic,
+            "version": version,
+            "message_status": status,
+            "message_status_text": mcu_status_text(status),
+            "packet_len": packet_len,
+            "sequence": sequence,
+            "vehicle_time_ns": vehicle_time_ns,
+            "safety_init_done": safety_init_done,
+            "wakeup_from_standby": wakeup_from_standby,
+            "reset_type": reset_type,
+            "reset_type_text": SAFETYKIT_RESET_TYPE_TEXT.get(reset_type, "unknown"),
+            "reset_trigger": reset_trigger,
+            "reset_trigger_text": SCU_RESET_TRIGGER_TEXT.get(reset_trigger, "unknown"),
+            "reset_reason": reset_reason,
+            "voltages": voltages,
+            "temperatures": temperatures,
+            "cpu_loads": cpu_loads,
+            "reserved": reserved,
+            "crc": crc,
+            "calculated_crc": calculated_crc,
+            "crc_valid": crc == calculated_crc,
+            "field_map": MCU_PACKET_FIELD_MAP,
+            "raw_hex": bytes_to_hex(payload),
+        }
+
+    def _format_mcu_data_packet_lines(self, packet):
+        if not packet:
+            return ["  (no data)"]
+        magic = packet.get("magic", 0)
+        magic_text = magic.to_bytes(4, "big", signed=False).decode("ascii", errors="replace")
+        return [
+            "  Packet:",
+            f"    Magic: {magic_text} (0x{magic:08X})",
+            f"    Version: {packet.get('version')}",
+            f"    Message status: {packet.get('message_status_text')} ({packet.get('message_status')})",
+            f"    Length: {packet.get('packet_len')} bytes",
+            f"    Sequence: {packet.get('sequence')}",
+            f"    Vehicle time: {packet.get('vehicle_time_ns')} ns",
+            "  Reset / Startup:",
+            f"    SafetyKit init done: {self._report_bool(packet.get('safety_init_done'))}",
+            f"    Wakeup from standby: {self._report_bool(packet.get('wakeup_from_standby'))}",
+            f"    Reset type: {packet.get('reset_type_text')} ({packet.get('reset_type')})",
+            f"    Reset trigger: {packet.get('reset_trigger_text')} ({packet.get('reset_trigger')})",
+            f"    Reset reason: 0x{packet.get('reset_reason', 0):04X}",
+            "  Power:",
+            f"    VEXT: {packet['voltages']['VEXT']:.3f} V",
+            f"    VDDP3: {packet['voltages']['VDDP3']:.3f} V",
+            f"    Core voltage: {packet['voltages']['core']:.3f} V",
+            f"    Core voltage highest: {packet['voltages']['core_highest']:.3f} V",
+            f"    Core voltage lowest: {packet['voltages']['core_lowest']:.3f} V",
+            f"    Core undervoltage limit: {packet['voltages']['core_uv_limit']:.3f} V",
+            "  Temperature:",
+            f"    PMS: {packet['temperatures']['PMS']:.2f} deg C",
+            f"    CPU core: {packet['temperatures']['core']:.2f} deg C",
+            f"    Delta: {packet['temperatures']['delta']:.2f} deg C",
+            f"    Highest: {packet['temperatures']['highest']:.2f} deg C",
+            f"    Lowest: {packet['temperatures']['lowest']:.2f} deg C",
+            "  CPU Load:",
+            f"    Core 0: {packet['cpu_loads']['core0']:.1f} %",
+            f"    Core 1: {packet['cpu_loads']['core1']:.1f} %",
+            f"    Core 2: {packet['cpu_loads']['core2']:.1f} %",
+            "  CRC:",
+            f"    Stored: 0x{packet.get('crc', 0):08X}",
+            f"    Calculated: 0x{packet.get('calculated_crc', 0):08X}",
+            f"    Valid: {self._report_bool(packet.get('crc_valid'))}",
+            f"  Reserved bytes 56..59: {bytes_to_hex(packet.get('reserved', b'')) or '00 00 00 00'}",
+        ]
+
+    def _decode_mcu_data_packet_payload(self, response):
+        if len(response) < 3:
+            raise FcdError(f"short MCU data packet response {bytes_to_hex(response)}")
+        payload = bytes(response[3:])
+        if len(payload) != 64:
+            return f"len={len(payload)} bytes: {bytes_to_hex(payload)}"
+        packet = self._decode_mcu_data_packet(payload)
+        return " | ".join(line.strip() for line in self._format_mcu_data_packet_lines(packet))
+
+    def _decode_active_session_value(self, response):
+        if len(response) < 4:
+            raise FcdError(f"short active diagnostic session response {bytes_to_hex(response)}")
+        session = response[3]
+        names = {
+            SESSION_DEFAULT: "Default",
+            SESSION_PROGRAMMING: "Programming",
+            SESSION_EXTENDED: "Extended",
+            SESSION_CODING_REQUESTED: "Coding",
+        }
+        return f"0x{session:02X} ({names.get(session, 'Unknown')})"
+
+    def _decode_active_sw_block_value(self, response):
+        if len(response) < 4:
+            raise FcdError(f"short active software block response {bytes_to_hex(response)}")
+        block = response[3]
+        names = {
+            ACTIVE_SW_BLOCK_LEGACY_APP: "ZGW_APP (legacy id)",
+            ACTIVE_SW_BLOCK_APP: "ZGW_APP",
+            ACTIVE_SW_BLOCK_FBL: "ZGW_FBL normal",
+            ACTIVE_SW_BLOCK_FBL_UPDATER: "ZGW_FBL updater",
+        }
+        return f"0x{block:02X} ({names.get(block, 'Unknown')})"
+
+    def _decode_time_status_value(self, response):
+        if not isinstance(response, bytes) or len(response) < 44:
+            raise FcdError(f"short ZGW time status response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+        data = response[4:]
+        vehicle_ns = int.from_bytes(data[0:8], "big")
+        utc_ns = int.from_bytes(data[8:16], "big")
+        utc_valid = data[16]
+        source = data[17]
+        sync_status = int.from_bytes(data[18:22], "big")
+        utc_text = "UTC invalid"
+        if utc_valid:
+            utc_dt = datetime.utcfromtimestamp(utc_ns / 1_000_000_000)
+            utc_text = utc_dt.isoformat(timespec="milliseconds") + "Z"
+        return (
+            f"{utc_text}; utcNs={utc_ns}; vehicleNs={vehicle_ns}; "
+            f"source={source}; syncStatus=0x{sync_status:08X}"
+        )
+
+    def _make_acquisition_result(self, key, item, service, identifier, request):
+        return DiagnosticAcquisitionResult(
+            key=key,
+            item=item,
+            service=service,
+            identifier=identifier,
+            request=bytes(request),
+            state="REQUEST_CREATED",
+        )
+
+    def _acq_log(self, result, extra=""):
+        suffix = f" {extra}" if extra else ""
+        self.log(
+            f"[FCD-DIAG] {result.item}: state={result.state}; "
+            f"service={result.service}; identifier={result.identifier}{suffix}"
+        )
+
+    def _finalize_acquisition_duration(self, result, started):
+        result.completion_time = datetime.now().isoformat(timespec="milliseconds")
+        result.duration_ms = (time.monotonic() - started) * 1000.0
+
+    def _classify_acquisition_exception(self, result, exc, sender=None):
+        result.exception_occurred = True
+        result.error_text = str(exc)
+        if isinstance(exc, NegativeResponse):
+            result.negative_response = True
+            result.nrc = exc.nrc
+            if exc.nrc == 0x78:
+                result.response_pending_count += 1
+                result.state = "FAILED_RESPONSE_PENDING"
+            elif exc.nrc in (0x11, 0x12, 0x31, 0x7E, 0x7F):
+                result.state = "FEATURE_NOT_SUPPORTED"
+            else:
+                result.state = "FAILED_NEGATIVE_RESPONSE"
+        elif isinstance(exc, TimeoutError):
+            result.timed_out = True
+            result.state = "FAILED_TIMEOUT"
+        elif isinstance(exc, (DoipError, NodeTimeout, OSError)):
+            result.transport_failure = True
+            result.state = "FAILED_CONNECTION_LOST" if "closed" in str(exc).lower() or "not connected" in str(exc).lower() else "FAILED_TRANSPORT"
+        elif isinstance(exc, (IndexError, struct.error)):
+            result.parser_failure = True
+            result.state = "FAILED_PARSER"
+        elif isinstance(exc, DiagnosticParserError):
+            result.parser_failure = True
+            result.invalid_response = True
+            if exc.response:
+                result.response = exc.response
+                result.positive_response = True
+            result.state = "FAILED_PARSER"
+        elif isinstance(exc, FcdError):
+            text = str(exc).lower()
+            if "short" in text or "length" in text or "truncated" in text:
+                result.invalid_response = True
+                result.state = "FAILED_RESPONSE_LENGTH"
+            elif "malformed" in text or "unexpected" in text or "bad " in text:
+                result.invalid_response = True
+                result.state = "FAILED_INVALID_RESPONSE"
+            else:
+                result.state = "FAILED_INTERNAL"
+        else:
+            result.state = "FAILED_INTERNAL"
+        if sender is not None and hasattr(sender, "last_nrc78_count"):
+            result.response_pending_count = max(result.response_pending_count, getattr(sender, "last_nrc78_count", 0))
+
+    def _acquire_uds_value(self, send, target, key, item, service, identifier, request, decoder, timeout=5.0, retry_read=False):
+        node = self._target_label(target)
+        result = self._make_acquisition_result(key, item, service, identifier, request)
+        started = time.monotonic()
+        result.request_time = datetime.now().isoformat(timespec="milliseconds")
+        result.attempted = True
+        result.state = "REQUEST_SENT"
+        self._acq_log(result, f"request={bytes_to_hex(result.request)}")
+        try:
+            response = send(
+                result.request,
+                f"{node}: {item}",
+                timeout=max(timeout, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+            result.request_sent = True
+            result.response_pending_count = getattr(send, "last_nrc78_count", 0)
+            result.state = "WAITING_FOR_RESPONSE"
+            if not response:
+                result.state = "FAILED_TIMEOUT" if not self._target_is_simulated(target) else "SKIPPED"
+                result.value = "NO RESPONSE ACCEPTED"
+                self._acq_log(result)
+                return result
+            result.response = bytes(response)
+            result.positive_response = True
+            result.state = "POSITIVE_RESPONSE_RECEIVED"
+            self._acq_log(result, f"response={bytes_to_hex(result.response[:32])}")
+            try:
+                parsed = decoder(response)
+                result.parsed_data = parsed
+                result.value = parsed if isinstance(parsed, str) else "PARSED"
+                result.state = "SUCCESS"
+            except Exception as parse_exc:
+                self._classify_acquisition_exception(result, parse_exc, send)
+            return result
+        except Exception as exc:
+            result.request_sent = bool(getattr(getattr(send, "__self__", None), "last_uds_request_sent", False)) or result.attempted
+            self._classify_acquisition_exception(result, exc, send)
+            if retry_read and result.state in ("FAILED_TIMEOUT", "FAILED_TRANSPORT", "FAILED_CONNECTION_LOST"):
+                result.error_text = f"{result.error_text}; retry not executed by generic wrapper"
+            return result
+        finally:
+            self._finalize_acquisition_duration(result, started)
+            self._acq_log(result, f"duration={result.duration_ms:.1f} ms")
+
+    def _acquire_callable(self, key, item, service, identifier, request, func):
+        result = self._make_acquisition_result(key, item, service, identifier, request)
+        started = time.monotonic()
+        result.request_time = datetime.now().isoformat(timespec="milliseconds")
+        result.attempted = True
+        result.state = "REQUEST_SENT"
+        self._acq_log(result, f"request={bytes_to_hex(result.request)}")
+        try:
+            parsed = func()
+            result.request_sent = True
+            if parsed is None:
+                result.state = "POSITIVE_RESPONSE_NO_MEASUREMENT"
+                result.value = "NO RESPONSE ACCEPTED"
+            else:
+                result.parsed_data = parsed
+                result.positive_response = True
+                result.state = "SUCCESS"
+                result.value = "PARSED"
+        except Exception as exc:
+            result.request_sent = True
+            self._classify_acquisition_exception(result, exc)
+        finally:
+            self._finalize_acquisition_duration(result, started)
+            self._acq_log(result, f"duration={result.duration_ms:.1f} ms")
+        return result
+
+    def _decode_eth_startup_timing_chunk(self, response):
+        if not isinstance(response, bytes) or len(response) < 32:
+            raise FcdError(f"short Ethernet startup timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+        if response[0] != 0x71 or response[1] not in (0x01, 0x03):
+            raise FcdError(f"unexpected Ethernet startup timing response {bytes_to_hex(response)}")
+        if int.from_bytes(response[2:4], "big") != ETH_STARTUP_TIMING_ROUTINE_GET:
+            raise FcdError(f"unexpected Ethernet startup timing routine response {bytes_to_hex(response)}")
+        payload = response[4:]
+        if len(payload) < 28:
+            raise FcdError(f"short Ethernet startup timing payload {bytes_to_hex(response)}")
+        magic_be = u32_be(payload, 0)
+        magic_le = u32_le(payload, 0)
+        if magic_be == 0x45544854:
+            byte_order = "big"
+            read_u16 = u16_be
+            read_u32 = u32_be
+            read_u64 = u64_be
+            magic = magic_be
+        elif magic_le == 0x45544854:
+            byte_order = "little"
+            read_u16 = u16_le
+            read_u32 = u32_le
+            read_u64 = u64_le
+            magic = magic_le
+        else:
+            raise FcdError(
+                f"bad Ethernet startup timing magic bytes {bytes_to_hex(payload[0:4])} "
+                f"(big=0x{magic_be:08X}, little=0x{magic_le:08X})"
+            )
+        version = read_u16(payload, 4)
+        total_events = read_u16(payload, 6)
+        stm_hz = read_u64(payload, 8)
+        reference_ticks = read_u64(payload, 16)
+        start_index = payload[24]
+        returned_count = payload[25]
+        flags = payload[26]
+        missed_locks = payload[27]
+        entries = []
+        integrity_reasons = []
+        offset = 28
+        entry_len = 20 if version >= 2 else 16
+        for entry_index in range(returned_count):
+            if len(payload) < offset + entry_len:
+                raise FcdError(f"truncated Ethernet startup timing entry {bytes_to_hex(response)}")
+            if version >= 2:
+                raw_event_id = read_u16(payload, offset)
+                raw_valid = read_u16(payload, offset + 2)
+                timestamp_ticks = read_u64(payload, offset + 4)
+                metadata = read_u32(payload, offset + 12)
+            else:
+                raw_event_id = payload[offset]
+                raw_valid = read_u16(payload, offset + 2)
+                timestamp_ticks = read_u64(payload, offset + 4)
+                metadata = 0
+            expected_event_id = start_index + entry_index
+            event_id = raw_event_id
+            if expected_event_id < total_events and event_id != expected_event_id:
+                event_id = expected_event_id
+            valid = raw_valid != 0
+            if version >= 2:
+                elapsed_us = None
+                elapsed_ms = None
+                invalid_reason = None
+                if valid and stm_hz and reference_ticks and timestamp_ticks >= reference_ticks:
+                    elapsed_us = ((timestamp_ticks - reference_ticks) * 1000000) // stm_hz
+                    elapsed_ms = elapsed_us / 1000.0
+                elif valid and reference_ticks and timestamp_ticks < reference_ticks:
+                    invalid_reason = "event timestamp precedes reference timestamp"
+                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+                elif valid and not stm_hz:
+                    invalid_reason = "STM frequency is zero"
+                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+                elif valid and not reference_ticks:
+                    invalid_reason = "reference timestamp is zero"
+                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+            else:
+                elapsed_us = read_u32(payload, offset + 12)
+                elapsed_ms = elapsed_us / 1000.0
+                invalid_reason = None
+            entries.append({
+                "event_id": event_id,
+                "raw_event_id": raw_event_id,
+                "name": ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f"Event {event_id}"),
+                "valid": valid,
+                "raw_valid": raw_valid,
+                "timestamp_ticks": timestamp_ticks,
+                "metadata": metadata,
+                "metadata_text": ETH_STARTUP_TIMING_RX_CLASS_TEXT.get(metadata, f"0x{metadata:08X}") if metadata else "",
+                "elapsed_us": elapsed_us,
+                "elapsed_ms": elapsed_ms,
+                "invalid_reason": invalid_reason,
+            })
+            offset += entry_len
+        flag_names = [
+            text for bit, text in ETH_STARTUP_TIMING_FLAG_TEXT.items()
+            if (flags & bit) != 0
+        ]
+        if flags & 0x08 and not integrity_reasons:
+            integrity_reasons.append("firmware reported timestamp invalid")
+        return {
+            "version": version,
+            "magic": magic,
+            "byte_order": byte_order,
+            "total_events": total_events,
+            "stm_hz": stm_hz,
+            "reference_ticks": reference_ticks,
+            "start_index": start_index,
+            "returned_count": returned_count,
+            "flags": flags,
+            "flag_names": flag_names,
+            "missed_locks": missed_locks,
+            "entries": entries,
+            "integrity_valid": len(integrity_reasons) == 0,
+            "integrity_reasons": integrity_reasons,
+        }
+
+    def _format_eth_startup_timing_value(self, timing):
+        if not timing:
+            return "NO DATA"
+        header = (
+            f"magic=0x{timing.get('magic', 0):08X}; version={timing.get('version')}; "
+            f"byteOrder={timing.get('byte_order', 'unknown')}; stmHz={timing.get('stm_hz')}; "
+            f"referenceTicks={timing.get('reference_ticks')}; flags=0x{timing.get('flags', 0):02X}; "
+            f"missedLocks={timing.get('missed_locks', 0)}"
+        )
+        event_parts = []
+        if timing.get("flag_names"):
+            event_parts.append("flags: " + ", ".join(timing["flag_names"]))
+        if timing.get("integrity_valid") is False:
+            reasons = timing.get("integrity_reasons", [])
+            event_parts.append("Measurement integrity: INVALID")
+            if reasons:
+                event_parts.append("Reason: " + "; ".join(reasons[:3]))
+        else:
+            event_parts.append("Measurement integrity: OK")
+        not_captured = 0
+        for entry in timing.get("entries", []):
+            if entry.get("valid"):
+                elapsed = entry.get("elapsed_ms")
+                if entry.get("invalid_reason"):
+                    elapsed_text = f"INVALID - {entry['invalid_reason']}"
+                else:
+                    elapsed_text = f"{elapsed:.3f} ms" if elapsed is not None else "elapsed unavailable"
+                meta_text = f" [{entry['metadata_text']}]" if entry.get("metadata_text") else ""
+                event_parts.append(
+                    f"{entry['event_id']:02d} {entry['name']}={elapsed_text}, "
+                    f"raw={entry['timestamp_ticks']} (0x{entry['timestamp_ticks']:016X}){meta_text}"
+                )
+            else:
+                not_captured += 1
+        for duration in timing.get("derived_durations", []):
+            elapsed = duration.get("elapsed_ms")
+            if elapsed is not None:
+                event_parts.append(f"{duration['label']}={elapsed:.3f} ms")
+        if not_captured:
+            event_parts.append(f"{not_captured} events not captured")
+        return header + "; " + "; ".join(event_parts)
+
+    def _finalize_eth_startup_timing(self, timing):
+        if not timing:
+            return timing
+        reference_ticks = timing.get("reference_ticks")
+        stm_hz = timing.get("stm_hz")
+        reasons = []
+        for entry in timing.get("entries", []):
+            if not entry.get("valid"):
+                continue
+            reason = None
+            timestamp_ticks = entry.get("timestamp_ticks")
+            if reference_ticks and timestamp_ticks is not None and int(timestamp_ticks) < int(reference_ticks):
+                reason = "event timestamp precedes reference timestamp"
+            elif not stm_hz:
+                reason = "STM frequency is zero"
+            elif not reference_ticks:
+                reason = "reference timestamp is zero"
+            entry["invalid_reason"] = reason
+            if reason:
+                entry["elapsed_us"] = None
+                entry["elapsed_ms"] = None
+                reasons.append(f"{entry.get('name', 'event')}: {reason}")
+            elif entry.get("elapsed_ms") is None and timestamp_ticks is not None:
+                entry["elapsed_us"] = ((int(timestamp_ticks) - int(reference_ticks)) * 1000000) // int(stm_hz)
+                entry["elapsed_ms"] = entry["elapsed_us"] / 1000.0
+        if timing.get("flags", 0) & 0x08 and not reasons:
+            reasons.append("firmware reported timestamp invalid")
+        timing["integrity_valid"] = len(reasons) == 0
+        timing["integrity_reasons"] = reasons
+        timing["derived_durations"] = self._derive_eth_startup_timing_durations(timing)
+        return timing
+
+    def _derive_eth_startup_timing_durations(self, timing):
+        if not timing or not timing.get("stm_hz"):
+            return []
+        by_id = {entry.get("event_id"): entry for entry in timing.get("entries", [])}
+        durations = []
+        for label, start_id, end_id in ETH_STARTUP_TIMING_DERIVED_DURATIONS:
+            start = by_id.get(start_id)
+            end = by_id.get(end_id)
+            value_ms = None
+            valid = (
+                start is not None and end is not None and
+                start.get("valid") and end.get("valid") and
+                not start.get("invalid_reason") and not end.get("invalid_reason")
+            )
+            if valid:
+                value_ms = self._ticks_delta_ms(
+                    end.get("timestamp_ticks"),
+                    start.get("timestamp_ticks"),
+                    timing.get("stm_hz"),
+                )
+            durations.append({"label": label, "start": start_id, "end": end_id, "elapsed_ms": value_ms})
+        return durations
+
+    def _read_ethernet_startup_timing(self, send, target):
+        node = self._target_label(target)
+        entries = []
+        merged = None
+        start_index = 0
+        while True:
+            request = (
+                b"\x31\x03"
+                + struct.pack(">H", ETH_STARTUP_TIMING_ROUTINE_GET)
+                + bytes([start_index, 11])
+            )
+            response = send(
+                request,
+                f"{node}: Read Ethernet Startup Timing",
+                timeout=max(5.0, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+            if not response:
+                return None
+            try:
+                chunk = self._decode_eth_startup_timing_chunk(response)
+            except Exception as exc:
+                raise DiagnosticParserError(
+                    f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X} positive response received, but payload parsing failed: {exc}",
+                    response,
+                ) from exc
+            if merged is None:
+                merged = dict(chunk)
+                merged["entries"] = []
+            entries.extend(chunk["entries"])
+            next_index = chunk["start_index"] + chunk["returned_count"]
+            if chunk["returned_count"] == 0 or next_index >= chunk["total_events"]:
+                break
+            start_index = next_index
+        merged["entries"] = entries
+        return self._finalize_eth_startup_timing(merged)
+
+    def _ticks_ms(self, ticks, stm_hz):
+        if not ticks or not stm_hz:
+            return None
+        return (int(ticks) * 1000.0) / float(stm_hz)
+
+    def _ticks_delta_ms(self, end_ticks, start_ticks, stm_hz):
+        if not end_ticks or not start_ticks or not stm_hz:
+            return None
+        if int(end_ticks) < int(start_ticks):
+            return None
+        return self._ticks_ms(int(end_ticks) - int(start_ticks), stm_hz)
+
+    def _decode_nvm_timing_response(self, response):
+        if not isinstance(response, bytes) or len(response) < 5:
+            raise FcdError(f"short NvM timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+        if response[0] != 0x71 or response[1] not in (0x01, 0x03):
+            raise FcdError(f"unexpected NvM timing response {bytes_to_hex(response)}")
+        if int.from_bytes(response[2:4], "big") != NVM_TIMING_ROUTINE_GET:
+            raise FcdError(f"unexpected NvM timing routine response {bytes_to_hex(response)}")
+        return response[4], response[5:]
+
+    def _decode_nvm_timing_summary(self, payload):
+        if len(payload) < 89:
+            raise FcdError("short NvM timing summary")
+        return {
+            "magic": int.from_bytes(payload[1:5], "big"),
+            "version": int.from_bytes(payload[5:7], "big"),
+            "history_size": int.from_bytes(payload[7:9], "big"),
+            "stm_hz": int.from_bytes(payload[9:17], "big"),
+            "boot_ticks": int.from_bytes(payload[17:25], "big"),
+            "flags": int.from_bytes(payload[25:29], "big"),
+            "history_write_index": int.from_bytes(payload[29:33], "big"),
+            "read_stats": {
+                "count": int.from_bytes(payload[33:37], "big"),
+                "min": int.from_bytes(payload[37:45], "big"),
+                "max": int.from_bytes(payload[45:53], "big"),
+                "total": int.from_bytes(payload[53:61], "big"),
+            },
+            "write_stats": {
+                "count": int.from_bytes(payload[61:65], "big"),
+                "min": int.from_bytes(payload[65:73], "big"),
+                "max": int.from_bytes(payload[73:81], "big"),
+                "total": int.from_bytes(payload[81:89], "big"),
+            },
+        }
+
+    def _decode_nvm_timing_startup(self, payload):
+        total = int.from_bytes(payload[2:4], "big")
+        stm_hz = int.from_bytes(payload[4:12], "big")
+        returned = payload[13]
+        entries = []
+        offset = 14
+        for _ in range(returned):
+            event_id = payload[offset]
+            valid = payload[offset + 1] != 0
+            ticks = int.from_bytes(payload[offset + 4:offset + 12], "big")
+            elapsed_us = int.from_bytes(payload[offset + 12:offset + 16], "big")
+            entries.append({
+                "event_id": event_id,
+                "name": NVM_TIMING_STARTUP_TEXT.get(event_id, f"Startup event {event_id}"),
+                "valid": valid,
+                "ticks": ticks,
+                "elapsed_us": elapsed_us,
+                "elapsed_ms": elapsed_us / 1000.0,
+            })
+            offset += 16
+        return total, stm_hz, entries
+
+    def _decode_nvm_timing_multi(self, payload):
+        return {
+            "operation": payload[1],
+            "result": payload[2],
+            "memif_result": payload[3],
+            "sequence": int.from_bytes(payload[5:7], "big"),
+            "active_block": int.from_bytes(payload[7:9], "big"),
+            "request": int.from_bytes(payload[9:17], "big"),
+            "first_main": int.from_bytes(payload[17:25], "big"),
+            "first_block": int.from_bytes(payload[25:33], "big"),
+            "first_memif": int.from_bytes(payload[33:41], "big"),
+            "first_fee": int.from_bytes(payload[41:49], "big"),
+            "first_fls": int.from_bytes(payload[49:57], "big"),
+            "last_fls_complete": int.from_bytes(payload[57:65], "big"),
+            "last_fee_complete": int.from_bytes(payload[65:73], "big"),
+            "completion": int.from_bytes(payload[73:81], "big"),
+            "nvm_cycles": int.from_bytes(payload[81:85], "big"),
+            "fee_cycles": int.from_bytes(payload[85:89], "big"),
+            "fls_cycles": int.from_bytes(payload[89:93], "big"),
+            "blocks_planned": int.from_bytes(payload[93:95], "big"),
+            "blocks_started": int.from_bytes(payload[95:97], "big"),
+            "blocks_done": int.from_bytes(payload[97:99], "big"),
+            "blocks_failed": int.from_bytes(payload[99:101], "big"),
+            "blocks_skipped": int.from_bytes(payload[101:103], "big"),
+            "flags": int.from_bytes(payload[105:109], "big"),
+        }
+
+    def _decode_nvm_timing_single(self, payload):
+        return {
+            "operation": payload[1],
+            "result": payload[2],
+            "memif_result": payload[3],
+            "block_id": int.from_bytes(payload[5:7], "big"),
+            "sequence": int.from_bytes(payload[7:9], "big"),
+            "request": int.from_bytes(payload[9:17], "big"),
+            "accepted": int.from_bytes(payload[17:25], "big"),
+            "first_main": int.from_bytes(payload[25:33], "big"),
+            "processing": int.from_bytes(payload[33:41], "big"),
+            "memif": int.from_bytes(payload[41:49], "big"),
+            "fee": int.from_bytes(payload[49:57], "big"),
+            "fls": int.from_bytes(payload[57:65], "big"),
+            "fls_complete": int.from_bytes(payload[65:73], "big"),
+            "completion": int.from_bytes(payload[73:81], "big"),
+            "nvm_cycles": int.from_bytes(payload[81:85], "big"),
+            "fee_cycles": int.from_bytes(payload[85:89], "big"),
+            "fls_cycles": int.from_bytes(payload[89:93], "big"),
+            "flags": int.from_bytes(payload[93:97], "big"),
+        }
+
+    def _read_nvm_timing(self, send, target):
+        def request(selector, *extra):
+            return send(
+                b"\x31\x03" + struct.pack(">H", NVM_TIMING_ROUTINE_GET) + bytes([selector, *extra]),
+                f"{self._target_label(target)}: Read AUTOSAR NvM Timing",
+                timeout=max(5.0, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+
+        response = request(0x00)
+        if not response:
+            return None
+        selector, payload = self._decode_nvm_timing_response(response)
+        summary = self._decode_nvm_timing_summary(bytes([selector]) + payload)
+        startup = []
+        start = 0
+        while start < 16:
+            response = request(0x01, start, 14)
+            selector, payload = self._decode_nvm_timing_response(response)
+            total, _stm, entries = self._decode_nvm_timing_startup(bytes([selector]) + payload)
+            startup.extend(entries)
+            start += len(entries)
+            if not entries or start >= total:
+                break
+        response = request(0x02)
+        selector, payload = self._decode_nvm_timing_response(response)
+        read_all = self._decode_nvm_timing_multi(bytes([selector]) + payload)
+        response = request(0x03)
+        selector, payload = self._decode_nvm_timing_response(response)
+        write_all = self._decode_nvm_timing_multi(bytes([selector]) + payload)
+        response = request(0x04)
+        selector, payload = self._decode_nvm_timing_response(response)
+        history_size = payload[0] if payload else summary.get("history_size", 0)
+        history = []
+        for idx in range(history_size):
+            response = request(0x10 + idx)
+            selector, payload = self._decode_nvm_timing_response(response)
+            history.append(self._decode_nvm_timing_single(bytes([selector]) + payload))
+        return {"summary": summary, "startup": startup, "read_all": read_all, "write_all": write_all, "history": history}
+
+    def _format_nvm_timing_lines(self, timing):
+        if not timing:
+            return ["  (no data)"]
+        summary = timing["summary"]
+        stm_hz = summary.get("stm_hz", 0)
+        lines = [
+            f"  STM frequency: {stm_hz / 1_000_000.0:.3f} MHz ({stm_hz} Hz)",
+            f"  Routine: 0x{NVM_TIMING_ROUTINE_GET:04X}; block history depth: {summary.get('history_size')}",
+            "  Startup:",
+        ]
+        for entry in timing.get("startup", []):
+            value = f"{entry['elapsed_ms']:.3f} ms" if entry.get("valid") else "NOT CAPTURED"
+            lines.append(f"    {entry['name']}: {value}")
+        for label, key in [("Last NvM_ReadAll", "read_all"), ("Last NvM_WriteAll", "write_all")]:
+            item = timing.get(key, {})
+            lines.append(f"  {label}:")
+            flags = item.get("flags", 0)
+            field_flags = {
+                "first_main": 0x00000001,
+                "first_memif": 0x00000004,
+                "first_fee": 0x00000008,
+                "first_fls": 0x00000010,
+                "last_fls_complete": 0x00000020,
+                "last_fee_complete": 0x00000020,
+                "completion": 0x00000040,
+            }
+            for field, text in [
+                ("request", "Request"),
+                ("first_main", "First NvM_MainFunction"),
+                ("first_memif", "First MemIf request"),
+                ("first_fee", "First Fee request"),
+                ("first_fls", "First Fls request"),
+                ("last_fls_complete", "Last Fls complete"),
+                ("last_fee_complete", "Last Fee complete"),
+                ("completion", "Completion"),
+            ]:
+                captured = field == "request" or (flags & field_flags.get(field, 0)) != 0
+                ms = self._ticks_delta_ms(item.get(field, 0), summary.get("boot_ticks", 0), stm_hz) if captured else None
+                lines.append(f"    {text}: {ms:.3f} ms" if ms is not None else f"    {text}: NOT CAPTURED")
+            total = self._ticks_delta_ms(item.get("completion", 0), item.get("request", 0), stm_hz) if (flags & 0x00000040) != 0 else None
+            lines.append(f"    Total: {total:.3f} ms" if total is not None else "    Total: NOT CAPTURED")
+            lines.append(f"    Cycles: NvM={item.get('nvm_cycles')} Fee={item.get('fee_cycles')} Fls={item.get('fls_cycles')}")
+            lines.append(f"    Blocks: planned={item.get('blocks_planned')} started={item.get('blocks_started')} done={item.get('blocks_done')} failed={item.get('blocks_failed')} skipped={item.get('blocks_skipped')}")
+            lines.append(f"    Result: {NVM_RESULT_TEXT.get(item.get('result'), item.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(item.get('memif_result'), item.get('memif_result'))}")
+        lines.append("  Recent NvM operations:")
+        for idx, entry in enumerate(timing.get("history", [])):
+            if entry.get("operation", 0) == 0 and entry.get("flags", 0) == 0:
+                continue
+            total = self._ticks_delta_ms(entry.get("completion", 0), entry.get("request", 0), stm_hz) if (entry.get("flags", 0) & 0x00000080) != 0 else None
+            lines.append(f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total={total:.3f} ms" if total is not None else f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total=NOT CAPTURED")
+            lines.append(f"        Result: {NVM_RESULT_TEXT.get(entry.get('result'), entry.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(entry.get('memif_result'), entry.get('memif_result'))}; cycles NvM={entry.get('nvm_cycles')} Fee={entry.get('fee_cycles')} Fls={entry.get('fls_cycles')}")
+        return lines
+
+    def _decode_nvm_stats_response(self, response):
+        if not isinstance(response, bytes) or len(response) < 5:
+            raise FcdError(f"short NvM statistics response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+        if response[0] != 0x71 or response[1] not in (0x01, 0x03, 0x04):
+            raise FcdError(f"unexpected NvM statistics response {bytes_to_hex(response)}")
+        if int.from_bytes(response[2:4], "big") != NVM_STATS_ROUTINE_GET:
+            raise FcdError(f"unexpected NvM statistics routine response {bytes_to_hex(response)}")
+        return response[1], response[4], response[5:]
+
+    @staticmethod
+    def _u64_list(payload, names):
+        if len(payload) < 8 * len(names):
+            raise FcdError("truncated NvM statistics payload")
+        return {name: int.from_bytes(payload[idx * 8:idx * 8 + 8], "big") for idx, name in enumerate(names)}
+
+    def _read_nvm_stats(self, send, target):
+        def request(selector, *extra):
+            return send(
+                b"\x31\x03" + struct.pack(">H", NVM_STATS_ROUTINE_GET) + bytes([selector, *extra]),
+                f"{self._target_label(target)}: Read NvM Lifetime Statistics",
+                timeout=max(5.0, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+
+        sections = {}
+        response = request(0x00)
+        if not response:
+            return None
+        _sub, selector, payload = self._decode_nvm_stats_response(response)
+        if selector != 0x00 or len(payload) < 20:
+            raise FcdError(f"bad NvM statistics summary {bytes_to_hex(response)}")
+        sections["summary"] = {
+            "magic": int.from_bytes(payload[0:4], "big"),
+            "version": int.from_bytes(payload[4:6], "big"),
+            "length": int.from_bytes(payload[6:8], "big"),
+            "block_count": int.from_bytes(payload[8:10], "big"),
+            "counter_width": int.from_bytes(payload[10:12], "big"),
+            "boot_count": int.from_bytes(payload[12:20], "big"),
+        }
+        names_by_selector = {
+            0x01: ("nvm", ["read_all", "write_all", "write_block_requests", "write_block_accepted", "write_block_rejected", "successful_logical_writes", "failed_logical_writes", "queue_rejections", "busy_rejections", "uninit_rejections", "invalid_block_rejections", "write_protection_rejections"]),
+            0x02: ("read", ["read_block_requests", "read_block_accepted", "read_block_rejected", "successful_reads", "read_failures", "crc_failures", "invalid_block_reads", "restored_defaults", "fee_integrity_failures", "fee_invalid_missing_block_reads"]),
+            0x03: ("write", ["invalidation_requests", "invalidation_successes", "invalidation_failures", "erase_requests"]),
+            0x04: ("fee", ["write_requests", "successful_logical_writes", "failed_logical_writes", "invalidation_requests", "invalidation_successes", "deferred_format_events", "scan_recovery_events"]),
+            0x06: ("fls", ["page_write_count", "write_bytes", "erase_sector_count", "erase_bytes", "failed_jobs", "write_failures", "erase_failures", "read_failures", "dmu_busy_rejects", "dmu_timeouts"]),
+        }
+        for selector_value, (section_name, names) in names_by_selector.items():
+            _sub, selector, payload = self._decode_nvm_stats_response(request(selector_value))
+            if selector != selector_value:
+                raise FcdError(f"NvM statistics selector mismatch {selector}")
+            sections[section_name] = self._u64_list(payload, names)
+        _sub, selector, payload = self._decode_nvm_stats_response(request(0x05))
+        sections["gc"] = self._u64_list(payload[:40], ["gc_count", "sector_switch_count", "copied_blocks", "copied_payload_bytes", "copied_physical_bytes"])
+        sections["gc"].update({
+            "max_copied_blocks": int.from_bytes(payload[40:44], "big"),
+            "max_copied_payload_bytes": int.from_bytes(payload[44:48], "big"),
+            "max_copied_physical_bytes": int.from_bytes(payload[48:52], "big"),
+        })
+        _sub, selector, payload = self._decode_nvm_stats_response(request(0x07))
+        sections["errors"] = {
+            "last_nvm_error": int.from_bytes(payload[0:4], "big"),
+            "last_fee_error": int.from_bytes(payload[4:8], "big"),
+            "last_fls_error": int.from_bytes(payload[8:12], "big"),
+            "last_memif_result": int.from_bytes(payload[12:16], "big"),
+        }
+        _sub, selector, payload = self._decode_nvm_stats_response(request(0x08))
+        sections["utilization"] = {
+            "active_fee_free_bytes": int.from_bytes(payload[0:4], "big"),
+            "active_fee_append_offset": int.from_bytes(payload[4:8], "big"),
+            "max_fee_append_offset": int.from_bytes(payload[8:12], "big"),
+            "min_fee_free_bytes": int.from_bytes(payload[12:16], "big"),
+        }
+        block_count = sections["summary"]["block_count"]
+        blocks = []
+        start = 0
+        while start < block_count:
+            _sub, selector, payload = self._decode_nvm_stats_response(request(0x09, start, 8))
+            returned = payload[1] if len(payload) >= 2 else 0
+            offset = 2
+            for _ in range(returned):
+                block_id = int.from_bytes(payload[offset:offset + 2], "big")
+                blocks.append({"id": block_id, "excluded": payload[offset + 2] != 0, "count": int.from_bytes(payload[offset + 4:offset + 12], "big")})
+                offset += 12
+            if returned == 0:
+                break
+            start += returned
+        sections["per_block"] = blocks
+        return sections
+
+    def _format_bytes_value(self, value):
+        if value in (0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF):
+            return "NOT CAPTURED"
+        if value >= 1024 * 1024:
+            return f"{value} bytes ({value / (1024 * 1024):.2f} MiB)"
+        if value >= 1024:
+            return f"{value} bytes ({value / 1024:.2f} KiB)"
+        return f"{value} bytes"
+
+    def _format_u32_hex_or_not_captured(self, value):
+        if value == 0xFFFFFFFF:
+            return "NOT CAPTURED"
+        return f"0x{value:08X}"
+
+    def _format_nvm_stats_lines(self, stats):
+        if not stats:
+            return ["  (no data)"]
+        s = stats["summary"]; n = stats["nvm"]; r = stats["read"]; w = stats["write"]; fee = stats["fee"]; gc = stats["gc"]; fls = stats["fls"]
+        lines = [
+            "  NvM Lifetime Statistics:",
+            f"    Routine: 0x{NVM_STATS_ROUTINE_GET:04X}; version={s['version']}; imageLength={s['length']}; blocks={s['block_count']}; counterWidth={s['counter_width']}",
+            f"    Boot count: {s['boot_count']}",
+            f"    ReadAll executions: {n['read_all']}",
+            f"    WriteAll executions: {n['write_all']}",
+            f"    WriteBlock requests/accepted/rejected: {n['write_block_requests']}/{n['write_block_accepted']}/{n['write_block_rejected']}",
+            f"    Successful/failed logical writes: {n['successful_logical_writes']}/{n['failed_logical_writes']}",
+            f"    Read requests/success/failure: {r['read_block_requests']}/{r['successful_reads']}/{r['read_failures']}",
+            f"    Integrity/defaults/invalid reads: crc={r['crc_failures']} defaults={r['restored_defaults']} invalid={r['invalid_block_reads']} feeIntegrity={r['fee_integrity_failures']}",
+            f"    Busy/uninit/invalid/protected rejections: {n['busy_rejections']}/{n['uninit_rejections']}/{n['invalid_block_rejections']}/{n['write_protection_rejections']}",
+            f"    Invalidations request/success/failure: {w['invalidation_requests']}/{w['invalidation_successes']}/{w['invalidation_failures']}; erase API requests={w['erase_requests']}",
+            "  Fee Statistics:",
+            f"    Logical writes request/success/failure: {fee['write_requests']}/{fee['successful_logical_writes']}/{fee['failed_logical_writes']}",
+            f"    Invalidations request/success: {fee['invalidation_requests']}/{fee['invalidation_successes']}",
+            f"    GC count/sector switches/copied blocks: {gc['gc_count']}/{gc['sector_switch_count']}/{gc['copied_blocks']}",
+            f"    GC copied payload: {self._format_bytes_value(gc['copied_payload_bytes'])}; physical records: {self._format_bytes_value(gc['copied_physical_bytes'])}",
+            f"    Max GC copied blocks/payload/physical: {gc['max_copied_blocks']}/{self._format_bytes_value(gc['max_copied_payload_bytes'])}/{self._format_bytes_value(gc['max_copied_physical_bytes'])}",
+            "  DFLASH Physical Statistics:",
+            f"    Page programs: {fls['page_write_count']}; programmed: {self._format_bytes_value(fls['write_bytes'])}",
+            f"    Sector erases: {fls['erase_sector_count']}; erased: {self._format_bytes_value(fls['erase_bytes'])}",
+            f"    Fls failures write/erase/read/total: {fls['write_failures']}/{fls['erase_failures']}/{fls['read_failures']}/{fls['failed_jobs']}",
+            f"    DMU busy rejects/timeouts: {fls['dmu_busy_rejects']}/{fls['dmu_timeouts']}",
+            "  Fee Utilization:",
+            f"    Active append offset: {self._format_u32_hex_or_not_captured(stats['utilization']['active_fee_append_offset'])}; free={self._format_bytes_value(stats['utilization']['active_fee_free_bytes'])}",
+            f"    Max append offset: {self._format_u32_hex_or_not_captured(stats['utilization']['max_fee_append_offset'])}; min free={self._format_bytes_value(stats['utilization']['min_fee_free_bytes'])}",
+            "  Per-Block Successful NvM Writes:",
+        ]
+        for block in stats.get("per_block", []):
+            name = NVM_STATS_BLOCK_NAMES.get(block["id"], f"BLOCK_{block['id']}")
+            suffix = " excluded/self" if block.get("excluded") else str(block["count"])
+            lines.append(f"    Block {block['id']} - {name}: {suffix}")
+        return lines
+
+    def _decode_cpu_perf_chunk(self, response):
+        if not isinstance(response, bytes) or len(response) < 20:
+            raise FcdError(f"short CPU performance response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+        if response[0] != 0x71 or response[1] not in (0x01, 0x03):
+            raise FcdError(f"unexpected CPU performance response {bytes_to_hex(response)}")
+        if int.from_bytes(response[2:4], "big") != CPU_PERF_ROUTINE_GET:
+            raise FcdError(f"unexpected CPU performance routine response {bytes_to_hex(response)}")
+        payload = response[4:]
+        if len(payload) < 16:
+            raise FcdError(f"short CPU performance payload {bytes_to_hex(response)}")
+        magic = int.from_bytes(payload[0:4], "big")
+        if magic != 0x43504631:
+            raise FcdError(f"bad CPU performance magic 0x{magic:08X}")
+        version = int.from_bytes(payload[4:6], "big")
+        total = int.from_bytes(payload[6:8], "big")
+        start_id = payload[8]
+        returned = payload[9]
+        entry_len = int.from_bytes(payload[10:12], "big")
+        counter_mask = int.from_bytes(payload[12:16], "big")
+        if entry_len < 56:
+            raise FcdError(f"bad CPU performance entry length {entry_len}")
+        entries = []
+        offset = 16
+        for _ in range(returned):
+            if len(payload) < offset + entry_len:
+                raise FcdError(f"truncated CPU performance entry {bytes_to_hex(response)}")
+            measurement_id = payload[offset]
+            entries.append({
+                "id": measurement_id,
+                "name": CPU_PERF_MEASUREMENT_TEXT.get(measurement_id, f"Measurement {measurement_id}"),
+                "valid": payload[offset + 1] != 0,
+                "core": payload[offset + 2],
+                "last_cycles": int.from_bytes(payload[offset + 4:offset + 8], "big"),
+                "min_cycles": int.from_bytes(payload[offset + 8:offset + 12], "big"),
+                "max_cycles": int.from_bytes(payload[offset + 12:offset + 16], "big"),
+                "avg_cycles": int.from_bytes(payload[offset + 16:offset + 20], "big"),
+                "last_instructions": int.from_bytes(payload[offset + 20:offset + 24], "big"),
+                "avg_instructions": int.from_bytes(payload[offset + 24:offset + 28], "big"),
+                "cpi_x1000": int.from_bytes(payload[offset + 28:offset + 32], "big"),
+                "sample_count": int.from_bytes(payload[offset + 32:offset + 36], "big"),
+                "overflow_count": int.from_bytes(payload[offset + 36:offset + 40], "big"),
+                "last_ns": int.from_bytes(payload[offset + 40:offset + 44], "big"),
+                "avg_ns": int.from_bytes(payload[offset + 44:offset + 48], "big"),
+                "total_bytes": int.from_bytes(payload[offset + 48:offset + 56], "big"),
+            })
+            offset += entry_len
+        return {
+            "version": version,
+            "total": total,
+            "start_id": start_id,
+            "returned": returned,
+            "entry_len": entry_len,
+            "counter_mask": counter_mask,
+            "entries": entries,
+        }
+
+    def _read_cpu_perf(self, send, target):
+        node = self._target_label(target)
+        entries = []
+        merged = None
+        start_id = 0
+        while True:
+            response = send(
+                b"\x31\x03" + struct.pack(">H", CPU_PERF_ROUTINE_GET) + bytes([start_id, 4]),
+                f"{node}: Read CPU Performance Counters",
+                timeout=max(5.0, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+            if not response:
+                return None
+            chunk = self._decode_cpu_perf_chunk(response)
+            if merged is None:
+                merged = dict(chunk)
+                merged["entries"] = []
+            entries.extend(chunk["entries"])
+            next_id = chunk["start_id"] + chunk["returned"]
+            if chunk["returned"] == 0 or next_id >= chunk["total"]:
+                break
+            start_id = next_id
+        merged["entries"] = entries
+        return merged
+
+    def _format_cpu_perf_lines(self, perf):
+        if not perf:
+            return ["  (no data)"]
+        entries = [entry for entry in perf.get("entries", []) if entry.get("valid")]
+        entries.sort(key=lambda entry: (entry.get("avg_ns", 0), entry.get("avg_cycles", 0)), reverse=True)
+        zero_cycle_count = sum(
+            1 for entry in entries
+            if entry.get("sample_count", 0) and entry.get("avg_cycles", 0) == 0 and entry.get("avg_ns", 0) == 0
+        )
+        lines = [
+            f"  Routine: 0x{CPU_PERF_ROUTINE_GET:04X}; version={perf.get('version')}; captured={len(entries)}/{perf.get('total')}; counterMask=0x{perf.get('counter_mask', 0):08X}",
+        ]
+        if zero_cycle_count:
+            lines.append(f"  Note: {zero_cycle_count} counters have samples but no measured duration; firmware may not include STM-backed CPU perf yet.")
+        for entry in entries:
+            cpi = entry.get("cpi_x1000", 0) / 1000.0
+            time_text = (
+                f"last/avg={entry.get('last_ns')} ns/{entry.get('avg_ns')} ns"
+                if entry.get("avg_ns", 0)
+                else "duration=NOT CAPTURED"
+            )
+            cycle_text = (
+                f"; cycles last/min/max/avg={entry.get('last_cycles')}/{entry.get('min_cycles')}/{entry.get('max_cycles')}/{entry.get('avg_cycles')}"
+                if entry.get("avg_cycles", 0)
+                else ""
+            )
+            cpi_text = f"; CPI={cpi:.3f}" if entry.get("cpi_x1000", 0) else ""
+            byte_text = f"; bytes={entry.get('total_bytes')}" if entry.get("total_bytes", 0) else ""
+            overflow_text = f"; overflows={entry.get('overflow_count')}" if entry.get("overflow_count", 0) else ""
+            lines.append(
+                f"  {entry['id']:02d} {entry['name']} core={entry.get('core')} "
+                f"samples={entry.get('sample_count')} {time_text}"
+                f"{cycle_text}{cpi_text}{overflow_text}{byte_text}"
+            )
+        return lines or ["  (no captured samples)"]
+
+    def _read_single_connection_diagnostic(self, send, target, item, request, decoder, timeout=5.0):
+        node = self._target_label(target)
+        try:
+            response = send(
+                request,
+                f"{node}: {item}",
+                timeout=max(timeout, float(self.timeout_var.get())),
+                allow_no_response=self._target_is_simulated(target),
+            )
+            if not response:
+                value = "NO RESPONSE ACCEPTED"
+            else:
+                value = decoder(response)
+            self.log(f"{node}: {item}: {value}")
+            return {"node": node, "item": item, "value": value}
+        except NegativeResponse as exc:
+            value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+            self.log(f"{node}: {item}: {value}")
+            return {"node": node, "item": item, "value": value}
+        except Exception as exc:
+            if not self._target_is_simulated(target):
+                raise
+            value = f"ERROR: {exc}"
+            self.log(f"{node}: {item}: {value}")
+            return {"node": node, "item": item, "value": value}
+
+    def _run_connection_diagnostic_read(self, action_name, specs, session=None):
+        sink = {"lock": threading.Lock(), "rows": []}
+
+        def worker(target):
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                if session is not None:
+                    self._send_session(
+                        send,
+                        session,
+                        f"{self._target_label(target)}: {action_name} session 0x{session:02X}",
+                        timeout=5.0,
+                    )
+                rows = []
+                for item, request, decoder, timeout in specs:
+                    rows.append(self._read_single_connection_diagnostic(send, target, item, request, decoder, timeout))
+                with sink["lock"]:
+                    sink["rows"].extend(rows)
+            finally:
+                self._release_coding_worker_client(client)
+
+        def on_complete():
+            with sink["lock"]:
+                rows = list(sink["rows"])
+            self.root.after(0, self._connection_diag_insert_rows, rows, True)
+
+        def action():
+            self._run_vehicle_coding_action_once(action_name, worker)
+            on_complete()
+
+        self.worker(action_name, action)
+
+    def read_sw_versions_clicked(self):
+        specs = [
+            ("Read SW Versions (FBL, APP)", b"\x22" + struct.pack(">H", DID_APP_SW_VERSION), self._decode_app_fbl_sw_version_payload, 5.0),
+            ("Read SW Version (Coding)", b"\x22" + struct.pack(">H", CODING_DID_VERSION), self._decode_coding_sw_version_payload, 5.0),
+        ]
+        self._run_connection_diagnostic_read("Read SW Versions", specs, session=SESSION_EXTENDED)
+
+    def read_mcu_data_packet_clicked(self):
+        specs = [
+            ("Read MCU Data Packet", b"\x22" + struct.pack(">H", DID_MCU_DATA_PACKET), self._decode_mcu_data_packet_payload, 5.0),
+        ]
+        self._run_connection_diagnostic_read("Read MCU Data Packet", specs, session=SESSION_EXTENDED)
+
+    def read_zgw_datetime_clicked(self):
+        specs = [
+            ("Read Current Date and Time calculated by ZGW", b"\x31\x03" + struct.pack(">H", TIMESYNC_ROUTINE_GET_STATUS), self._decode_time_status_value, 5.0),
+        ]
+        self._run_connection_diagnostic_read("Read ZGW Date/Time", specs, session=SESSION_EXTENDED)
+
+    def read_active_session_clicked(self):
+        specs = [
+            ("Read Active Diagnostic Session", b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION), self._decode_active_session_value, 5.0),
+        ]
+        self._run_connection_diagnostic_read("Read Active Diagnostic Session", specs)
+
+    def read_active_sw_block_clicked(self):
+        specs = [
+            ("Read Active Software Block", b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK), self._decode_active_sw_block_value, 5.0),
+        ]
+        self._run_connection_diagnostic_read("Read Active Software Block", specs, session=SESSION_EXTENDED)
+
+    def read_ethernet_startup_timing_clicked(self):
+        sink = {"lock": threading.Lock(), "rows": []}
+
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                try:
+                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read Ethernet Startup Timing session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    timing = self._read_ethernet_startup_timing(send, target)
+                    value = self._format_eth_startup_timing_value(timing) if timing else "NO RESPONSE ACCEPTED"
+                except NegativeResponse as exc:
+                    value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+                except Exception as exc:
+                    if not self._target_is_simulated(target):
+                        raise
+                    value = f"ERROR: {exc}"
+                self.log(f"{node}: Read Ethernet Startup Timing: {value}")
+                with sink["lock"]:
+                    sink["rows"].append({"node": node, "item": "Read Ethernet Startup Timing", "value": value})
+            finally:
+                self._release_coding_worker_client(client)
+
+        def action():
+            self._run_vehicle_coding_action_once("Read Ethernet Startup Timing", worker)
+            with sink["lock"]:
+                rows = list(sink["rows"])
+            self.root.after(0, self._connection_diag_insert_rows, rows, True)
+
+        self.worker("Read Ethernet Startup Timing", action)
+
+    def _insert_connection_diag_row(self, sink, node, item, value):
+        with sink["lock"]:
+            sink["rows"].append({"node": node, "item": item, "value": value})
+
+    def read_nvm_timing_clicked(self):
+        sink = {"lock": threading.Lock(), "rows": []}
+
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                try:
+                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read AUTOSAR NvM Timing session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    timing = self._read_nvm_timing(send, target)
+                    value = " | ".join(self._format_nvm_timing_lines(timing)) if timing else "NO RESPONSE ACCEPTED"
+                except NegativeResponse as exc:
+                    value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+                except Exception as exc:
+                    if not self._target_is_simulated(target):
+                        raise
+                    value = f"ERROR: {exc}"
+                self.log(f"{node}: Read AUTOSAR NvM Timing: {value}")
+                with sink["lock"]:
+                    sink["rows"].append({"node": node, "item": "Read AUTOSAR NvM Timing", "value": value})
+            finally:
+                self._release_coding_worker_client(client)
+
+        def action():
+            self._run_vehicle_coding_action_once("Read AUTOSAR NvM Timing", worker)
+            with sink["lock"]:
+                rows = list(sink["rows"])
+            self.root.after(0, self._connection_diag_insert_rows, rows, True)
+
+        self.worker("Read AUTOSAR NvM Timing", action)
+
+    def read_nvm_stats_clicked(self):
+        sink = {"lock": threading.Lock(), "rows": []}
+
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                try:
+                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    stats = self._read_nvm_stats(send, target)
+                    value = " | ".join(self._format_nvm_stats_lines(stats)) if stats else "NO RESPONSE ACCEPTED"
+                except NegativeResponse as exc:
+                    value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+                except Exception as exc:
+                    if not self._target_is_simulated(target):
+                        raise
+                    value = f"ERROR: {exc}"
+                self.log(f"{node}: Read NvM Lifetime Statistics: {value}")
+                with sink["lock"]:
+                    sink["rows"].append({"node": node, "item": "Read NvM Lifetime Statistics", "value": value})
+            finally:
+                self._release_coding_worker_client(client)
+
+        def action():
+            self._run_vehicle_coding_action_once("Read NvM Lifetime Statistics", worker)
+            with sink["lock"]:
+                rows = list(sink["rows"])
+            self.root.after(0, self._connection_diag_insert_rows, rows, True)
+
+        self.worker("Read NvM Lifetime Statistics", action)
+
+    def clear_nvm_stats_clicked(self):
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                self._send_session(send, SESSION_EXTENDED, f"{node}: Clear NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                response = send(
+                    b"\x31\x04" + struct.pack(">H", NVM_STATS_ROUTINE_GET),
+                    f"{node}: Clear NvM Lifetime Statistics",
+                    timeout=max(5.0, float(self.timeout_var.get())),
+                    allow_no_response=self._target_is_simulated(target),
+                )
+                if response:
+                    sub, selector, _payload = self._decode_nvm_stats_response(response)
+                    value = "OK" if sub == 0x04 and selector == 0x7F else bytes_to_hex(response)
+                else:
+                    value = "NO RESPONSE ACCEPTED"
+                self.log(f"{node}: Clear NvM Lifetime Statistics: {value}")
+            finally:
+                self._release_coding_worker_client(client)
+
+        self.worker("Clear NvM Lifetime Statistics", lambda: self._run_vehicle_coding_action_once("Clear NvM Lifetime Statistics", worker))
+
+    def read_cpu_perf_clicked(self):
+        sink = {"lock": threading.Lock(), "rows": []}
+
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                try:
+                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read CPU Performance Counters session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    perf = self._read_cpu_perf(send, target)
+                    value = " | ".join(self._format_cpu_perf_lines(perf)) if perf else "NO RESPONSE ACCEPTED"
+                except NegativeResponse as exc:
+                    value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+                except Exception as exc:
+                    if not self._target_is_simulated(target):
+                        raise
+                    value = f"ERROR: {exc}"
+                self.log(f"{node}: Read CPU Performance Counters: {value}")
+                with sink["lock"]:
+                    sink["rows"].append({"node": node, "item": "Read CPU Performance Counters", "value": value})
+            finally:
+                self._release_coding_worker_client(client)
+
+        def action():
+            self._run_vehicle_coding_action_once("Read CPU Performance Counters", worker)
+            with sink["lock"]:
+                rows = list(sink["rows"])
+            self.root.after(0, self._connection_diag_insert_rows, rows, True)
+
+        self.worker("Read CPU Performance Counters", action)
+
+    def _format_diag_log_rows(self, rows):
+        lines = []
+        for row in rows:
+            lines.append(f"  {row.get('item', '')}: {row.get('value', '')}")
+        return lines or ["  (no data)"]
+
+    def _report_rule(self, char="="):
+        return char * 70
+
+    def _report_major(self, title):
+        return ["", self._report_rule("="), title, self._report_rule("="), ""]
+
+    def _report_minor(self, title):
+        return ["", title, "-" * len(title), ""]
+
+    def _report_field(self, label, value, indent=0):
+        return f"{' ' * indent}{label + ':':<30} {value}"
+
+    def _report_bool(self, value):
+        if isinstance(value, str):
+            value = value.strip().lower() in ("1", "true", "yes", "y")
+        return "Yes" if bool(value) else "No"
+
+    def _report_enum(self, raw):
+        text = str(raw).strip()
+        plain = text.replace("_", " ").replace("-", " ").lower()
+        plain = " ".join(word.upper() if word in ("can", "lin", "pdu", "rx", "tx") else word.capitalize() for word in plain.split())
+        return f"{plain} ({text})" if text and plain.upper().replace(" ", "_") != text else text
+
+    def _report_uds_status_lines(self, status_text, indent=2):
+        try:
+            status = int(str(status_text).strip(), 16)
+        except Exception:
+            return [self._report_field("DTC status", status_text, indent)]
+        flag_names_short = [
+            ("TF", 0),
+            ("TFTOC", 1),
+            ("PDTC", 2),
+            ("CDTC", 3),
+            ("TNCSLC", 4),
+            ("TFSLC", 5),
+            ("TNCTOC", 6),
+            ("WIR", 7),
+        ]
+        active = " | ".join(name for name, bit in flag_names_short if status & (1 << bit))
+        suffix = f" ({active})" if active else " (none)"
+        return [self._report_field("DTC status", f"0x{status:02X}{suffix}", indent)]
+
+    def _snapshot_parts(self, snapshot):
+        return [part.strip() for part in str(snapshot or "").split("|") if part.strip() and not part.strip().startswith("[rec ")]
+
+    def _snapshot_value(self, parts, prefix):
+        for part in parts:
+            if part.startswith(prefix):
+                return part[len(prefix):].strip()
+        return ""
+
+    def _format_timestamp_part(self, part):
+        text = str(part)
+        if "UTC " in text:
+            utc = text.split("UTC ", 1)[1].split(",", 1)[0].strip().replace("T", " ").replace("Z", " UTC")
+            return utc
+        if "UTC date/time " in text:
+            utc = text.split("UTC date/time ", 1)[1].split(",", 1)[0].strip().replace("T", " ").replace("Z", " UTC")
+            return utc
+        return text
+
+    def _report_mask_lines(self, label, value_text, table, indent=2):
+        text = str(value_text or "").strip()
+        try:
+            value = int(text.rsplit("(", 1)[1].split(")", 1)[0], 16) if "(" in text else int(text, 0)
+        except Exception:
+            return [self._report_field(label, text, indent)]
+        lines = [self._report_field(label, f"0x{value:08X}" + (" (none)" if value == 0 else ""), indent)]
+        if value:
+            for mask, name in table:
+                if value & mask:
+                    lines.append(f"{' ' * (indent + 2)}- {name}")
+        return lines
+
+    def _pms_register_decode_text(self, name, value):
+        fields = PMS_REGISTER_FIELD_TABLES.get(name)
+        if fields is None:
+            return f"0x{value:08X}"
+        flags = []
+        scalars = []
+        for field_name, shift, width, kind in fields:
+            mask = (1 << width) - 1
+            field_value = (value >> shift) & mask
+            if kind == "flag":
+                if field_value:
+                    flags.append(field_name)
+            else:
+                scalars.append(f"{field_name}=0x{field_value:X}")
+        suffix_parts = []
+        if flags:
+            suffix_parts.append("set: " + ", ".join(flags))
+        if scalars:
+            suffix_parts.append("; ".join(scalars))
+        suffix = f" ({'; '.join(suffix_parts)})" if suffix_parts else ""
+        return f"0x{value:08X}{suffix}"
+
+    def _report_pms_register_group(self, label, register_names, value_text, indent=2):
+        text = str(value_text or "").strip()
+        raw_values = [item.strip() for item in text.split("/") if item.strip()]
+        if len(raw_values) != len(register_names):
+            return [self._report_field(label, text, indent)]
+        lines = [self._report_field(label, "", indent)]
+        for name, raw in zip(register_names, raw_values):
+            try:
+                value = int(raw, 16) if raw.lower().startswith("0x") else int(raw, 0)
+            except Exception:
+                lines.append(self._report_field(name, raw, indent + 2))
+                continue
+            lines.append(self._report_field(name, self._pms_register_decode_text(name, value), indent + 2))
+        return lines
+
+    def _report_unavailable_lines(self, title, request):
+        return [
+            *self._report_minor(title),
+            self._report_field("Status", "Data unavailable", 0),
+            self._report_field("Request", request, 2),
+            self._report_field("Result", "NOT_ATTEMPTED", 2),
+        ]
+
+    def _report_failure_lines(self, title, row, request):
+        value = str(row.get("value", "") if isinstance(row, dict) else row).strip()
+        if not value:
+            return self._report_unavailable_lines(title, request)
+        lines = [*self._report_minor(title), self._report_field("Status", "Data unavailable", 0)]
+        lines.append(self._report_field("Request", request, 2))
+        if value.startswith("NRC "):
+            lines.append(self._report_field("ECU response", value, 2))
+        elif value == "NO RESPONSE ACCEPTED":
+            lines.append(self._report_field("ECU response", "No response accepted by FCD", 2))
+        elif value.startswith("ERROR:"):
+            lines.append(self._report_field("FCD result", value, 2))
+        else:
+            lines.append(self._report_field("Result", value, 2))
+        return lines
+
+    def _report_acquisition_lines(self, result):
+        if not isinstance(result, DiagnosticAcquisitionResult):
+            return []
+        lines = [self._report_field("Acquisition", f"{result.identifier} - {result.state} ({result.duration_ms:.1f} ms)")]
+        if result.state == "SUCCESS":
+            return lines
+        if result.response_pending_count:
+            lines.append(self._report_field("ResponsePending count", result.response_pending_count, 2))
+        if result.response:
+            lines.append(self._report_field("Response", bytes_to_hex(result.response[:64]), 2))
+        if result.negative_response:
+            nrc_text = NRC_TEXT.get(result.nrc, "Unknown")
+            lines.append(self._report_field("NRC", f"0x{result.nrc:02X} - {nrc_text}", 2))
+        if result.error_text:
+            lines.append(self._report_field("Error", result.error_text, 2))
+        return lines
+
+    def _diagnostic_result_row(self, node, result):
+        if isinstance(result.parsed_data, dict):
+            return result.parsed_data
+        return result.to_report_row(node)
+
+    def _format_diag_log_dtc_report(self, rows):
+        if not rows:
+            return ["No DTCs reported by the ECU for the requested status mask."]
+        lines = []
+        pdm_rows = [r for r in rows if str(r.get("description", "")).startswith("Message Timeout: CANFD_PDM1")]
+        if pdm_rows:
+            lines.extend(self._report_minor("PDM1 Communication Loss"))
+            lines.append(f"Count: {len(pdm_rows)}")
+            lines.append("  DTC       Status  Message")
+            lines.append("  --------  ------  -----------------------------------")
+            for row in pdm_rows:
+                lines.append(f"  {row.get('dtc', ''):<8}  {row.get('status', ''):<6}  {str(row.get('description', '')).replace('Message Timeout: ', '')}")
+        for row in rows:
+            dtc = row.get("dtc", "")
+            desc = row.get("description", "")
+            status = row.get("status", "")
+            snapshot = row.get("snapshot_data", "")
+            parts = self._snapshot_parts(snapshot)
+            lines.extend(["", "-" * 70, f"DTC {dtc} - {desc}", "-" * 70, ""])
+            lines.extend(self._report_uds_status_lines(status, 2))
+            lines.append("")
+            occurrence = next((p for p in parts if "DTC occurrence time:" in p or "DTC occurrence time" in p), "")
+            if occurrence:
+                lines.append("Occurrence:")
+                lines.append(self._report_field("UTC time", self._format_timestamp_part(occurrence), 2))
+                for key in ("vehicleTimeNs=", "utcNs=", "MCU temperature:"):
+                    if key in occurrence:
+                        tail = occurrence.split(key, 1)[1].split(",", 1)[0].strip()
+                        label = {"vehicleTimeNs=": "Vehicle time", "utcNs=": "UTC raw time", "MCU temperature:": "MCU temperature"}[key]
+                        unit = " ns" if key != "MCU temperature:" else ""
+                        lines.append(self._report_field(label, f"{tail}{unit}", 2))
+                lines.append("")
+            if "Bus-Off" in desc or "Error Passive" in desc:
+                lines.append("Controller condition:")
+                for prefix, label in [
+                    ("controller=", "Controller"),
+                    ("CAN state=", "CAN state"),
+                    ("error state=", "Error state"),
+                    ("TEC=", "CAN error counters"),
+                    ("CanSM=", "CanSM state"),
+                    ("ComM=", "ComM state"),
+                    ("CanIf PDU mode=", "CanIf PDU mode"),
+                    ("bus-off count=", "Bus-off occurrences"),
+                    ("operational=", "Operational"),
+                    ("normal RX enabled=", "Normal RX requested"),
+                    ("normal TX enabled=", "Normal TX requested"),
+                ]:
+                    value = self._snapshot_value(parts, prefix)
+                    if value:
+                        if prefix in ("CanSM=", "ComM=", "CanIf PDU mode=", "CAN state=", "error state="):
+                            value = self._report_enum(value)
+                        elif prefix in ("operational=", "normal RX enabled=", "normal TX enabled="):
+                            value = self._report_bool(value)
+                        if prefix == "TEC=":
+                            tec = value.split(",", 1)[0].strip()
+                            rec = value.split("REC=", 1)[1].strip() if "REC=" in value else ""
+                            lines.append(self._report_field("Transmit Error Counter (TEC)", tec, 2))
+                            if rec:
+                                lines.append(self._report_field("Receive Error Counter (REC)", rec, 2))
+                        else:
+                            lines.append(self._report_field(label, value, 2))
+            elif "LIN1" in desc:
+                lines.append("LIN channel condition:")
+                for prefix, label in [
+                    ("channel=", "Channel"),
+                    ("Last PID=", "Last PID"),
+                    ("LinSM=", "LinSM state"),
+                    ("ComM=", "ComM state"),
+                    ("LIN state=", "LIN state"),
+                    ("Error type=", "Error type"),
+                    ("No-response counter=", "No-response events"),
+                    ("Schedule errors=", "Schedule errors / diag timeouts"),
+                    ("Slave response expected=", "Slave response expected / channel unavailable"),
+                ]:
+                    value = self._snapshot_value(parts, prefix)
+                    if value:
+                        if prefix in ("LinSM=", "ComM=", "LIN state=", "Error type="):
+                            value = self._report_enum(value)
+                        lines.append(self._report_field(label, value, 2))
+            elif "AiModel" in desc:
+                lines.append("AI Model Status:")
+                for prefix, label in [
+                    ("input ", "Input voltage / validity"),
+                    ("inference valid=", "Inference valid / sequence"),
+                    ("channel ", "Channel / predicted class"),
+                    ("measured=", "Measured/rated/predicted current"),
+                    ("fault probabilities=", "Fault probabilities"),
+                    ("limits:", "Limit flags"),
+                    ("timing:", "Timing"),
+                ]:
+                    value = self._snapshot_value(parts, prefix)
+                    if value:
+                        lines.append(self._report_field(label, value, 2))
+            elif "PMS errata" in desc:
+                lines.append("PMS Errata Monitoring:")
+                for prefix, label in [
+                    ("PMS errata failure mask:", "PMS errata failure mask"),
+                    ("PMS standby ignored mask:", "PMS standby ignored mask"),
+                    ("TC007 samples/refresh timeouts:", "TC007 samples / refresh timeouts"),
+                    ("SafetyKit reset:", "SafetyKit reset"),
+                    ("PMS errata status=", "PMS/FW-check status"),
+                    ("checked EVRSTAT/MONSTAT1:", "Checked EVRSTAT/MONSTAT1"),
+                    ("captured EVRSTAT/ADCSTAT/MONSTAT1:", "Captured EVRSTAT/ADCSTAT/MONSTAT1"),
+                    ("EVRRSTCON/EVROVMON2/EVRUVMON2:", "Raw PMS registers"),
+                ]:
+                    value = self._snapshot_value(parts, prefix)
+                    if value:
+                        if prefix in ("PMS errata failure mask:", "PMS standby ignored mask:"):
+                            lines.extend(self._report_mask_lines(label, value, PMS_ERRATA_FAILURE_BITS, 2))
+                            continue
+                        if prefix == "PMS errata status=":
+                            pms = value.split(",", 1)[0].strip()
+                            fw = value.split("FW-check status=", 1)[1].strip() if "FW-check status=" in value else ""
+                            try:
+                                pms_i = int(pms, 0)
+                                lines.append(self._report_field("PMS errata status", f"{PMS_ERRATA_STATUS_TEXT.get(pms_i, 'UNKNOWN')} ({pms_i})", 2))
+                            except Exception:
+                                lines.append(self._report_field("PMS errata status", pms, 2))
+                            if fw:
+                                try:
+                                    fw_i = int(fw, 0)
+                                    lines.append(self._report_field("Firmware check status", f"{SSW_STATUS_TEXT.get(fw_i, 'UNKNOWN')} ({fw_i})", 2))
+                                except Exception:
+                                    lines.append(self._report_field("Firmware check status", fw, 2))
+                            continue
+                        if prefix == "checked EVRSTAT/MONSTAT1:":
+                            lines.extend(self._report_pms_register_group(label, ("EVRSTAT", "MONSTAT1"), value, 2))
+                            continue
+                        if prefix == "captured EVRSTAT/ADCSTAT/MONSTAT1:":
+                            lines.extend(self._report_pms_register_group(label, ("EVRSTAT", "ADCSTAT", "MONSTAT1"), value, 2))
+                            continue
+                        if prefix == "EVRRSTCON/EVROVMON2/EVRUVMON2:":
+                            lines.extend(self._report_pms_register_group(label, ("EVRRSTCON", "EVROVMON2", "EVRUVMON2"), value, 2))
+                            continue
+                        lines.append(self._report_field(label, value, 2))
+            elif "Message Timeout" in desc:
+                msg = desc.replace("Message Timeout: ", "")
+                lines.append("Communication timeout:")
+                lines.append(self._report_field("Missing message", msg, 2))
+            if not any(key in desc for key in ("Bus-Off", "Error Passive", "LIN1", "AiModel", "PMS errata", "Message Timeout")):
+                decoded = [p for p in parts if p and not p.startswith(str(desc))]
+                if decoded:
+                    lines.append("Snapshot:")
+                    for part in decoded:
+                        if ":" in part:
+                            key, value = part.split(":", 1)
+                            lines.append(self._report_field(key.strip(), value.strip(), 2))
+                        elif "=" in part:
+                            key, value = part.split("=", 1)
+                            lines.append(self._report_field(key.strip(), value.strip(), 2))
+                        else:
+                            lines.append(f"  {part}")
+        return lines
+
+    def _format_executive_summary(self, data):
+        rows = data.get("dtcs", [])
+        lines = [self._report_field("Overall status", "FAULTS PRESENT" if rows else "NO FAULTS REPORTED")]
+        lines.append(self._report_field("Active DTCs", len(rows)))
+        pdm = [r for r in rows if "CANFD_PDM1" in str(r.get("description", ""))]
+        key_faults = []
+        for row in rows:
+            desc = row.get("description", "")
+            if "Bus-Off" in desc:
+                key_faults.append(desc)
+            elif "Error Passive" in desc:
+                key_faults.append(desc)
+            elif "LIN1" in desc:
+                key_faults.append(desc)
+            elif "AiModel" in desc:
+                key_faults.append(desc)
+            elif "PMS errata" in desc:
+                key_faults.append(desc)
+        if pdm:
+            key_faults.append(f"{len(pdm)}x PDM1 message timeout")
+        if key_faults:
+            lines.extend(["", "Key active faults:"])
+            lines.extend(f"  - {item}" for item in key_faults)
+        return lines
+
+    def _format_diag_log_dtc_rows(self, rows):
+        if not rows:
+            return ["  No DTCs reported."]
+        lines = []
+        for row in rows:
+            lines.append(
+                f"  {row.get('dtc', '')} [{row.get('status', '')}] "
+                f"{row.get('description', '')}"
+            )
+            snapshot = str(row.get("snapshot_data", "")).strip()
+            if snapshot:
+                lines.append(f"    Snapshot: {snapshot}")
+        return lines
+
+    def _format_diag_log_eth_timing(self, timing_rows):
+        if not timing_rows:
+            return ["  (no data)"]
+        lines = []
+        for timing in timing_rows:
+            if isinstance(timing, dict) and "entries" in timing:
+                lines.append(
+                    f"  magic=0x{timing.get('magic', 0):08X} version={timing.get('version')} "
+                    f"byteOrder={timing.get('byte_order', 'unknown')} stmHz={timing.get('stm_hz')} "
+                    f"referenceTicks={timing.get('reference_ticks')} flags=0x{timing.get('flags', 0):02X} "
+                    f"missedLocks={timing.get('missed_locks', 0)}"
+                )
+                if timing.get("flag_names"):
+                    lines.append(f"  Flags: {', '.join(timing['flag_names'])}")
+                if timing.get("integrity_valid") is False:
+                    lines.append("  Measurement integrity: INVALID")
+                    for reason in timing.get("integrity_reasons", [])[:5]:
+                        lines.append(f"  Reason: {reason}")
+                else:
+                    lines.append("  Measurement integrity: OK")
+                lines.append(f"  Reference raw ticks: {timing.get('reference_ticks')} (0x{timing.get('reference_ticks', 0):016X})")
+                for entry in timing.get("entries", []):
+                    if entry.get("valid"):
+                        elapsed = entry.get("elapsed_ms")
+                        if entry.get("invalid_reason"):
+                            elapsed_text = f"INVALID - {entry['invalid_reason']}"
+                        else:
+                            elapsed_text = f"{elapsed:.3f} ms" if elapsed is not None else "elapsed unavailable"
+                        meta_text = f", metadata={entry['metadata_text']}" if entry.get("metadata_text") else ""
+                        lines.append(
+                            f"  {entry['event_id']:02d} {entry['name']}: "
+                            f"{elapsed_text}, raw ticks={entry['timestamp_ticks']}, "
+                            f"raw hex=0x{entry['timestamp_ticks']:016X}{meta_text}"
+                        )
+                    else:
+                        lines.append(f"  {entry['event_id']:02d} {entry['name']}: not captured")
+                for duration in timing.get("derived_durations", []):
+                    elapsed = duration.get("elapsed_ms")
+                    if elapsed is not None:
+                        lines.append(f"  {duration['label']}: {elapsed:.3f} ms")
+            elif isinstance(timing, dict):
+                lines.append(f"  {timing.get('item', 'Ethernet Startup Timing')}: {timing.get('value', '')}")
+            else:
+                lines.append(f"  {timing}")
+        return lines
+
+    def _format_diag_log_cpu_perf(self, perf_rows):
+        if not perf_rows:
+            return ["  (no data)"]
+        lines = []
+        for perf in perf_rows:
+            if isinstance(perf, dict) and "entries" in perf:
+                lines.extend(self._format_cpu_perf_lines(perf))
+            elif isinstance(perf, dict):
+                lines.append(f"  {perf.get('item', 'CPU Performance Counters')}: {perf.get('value', '')}")
+            else:
+                lines.append(f"  {perf}")
+        return lines
+
+    def _format_diag_log_mcu_data(self, packet_rows):
+        if not packet_rows:
+            return ["  (no data)"]
+        lines = []
+        for packet in packet_rows:
+            if isinstance(packet, dict) and "magic" in packet:
+                lines.extend(self._format_mcu_data_packet_lines(packet))
+                raw_hex = packet.get("raw_hex", "")
+                if raw_hex:
+                    lines.append(f"  Raw: {raw_hex}")
+            elif isinstance(packet, dict):
+                lines.append(f"  {packet.get('item', 'Read MCU Data Packet')}: {packet.get('value', '')}")
+            else:
+                lines.append(f"  {packet}")
+        return lines
+
+    def _format_diag_log_nvm_stats(self, stats_rows):
+        if not stats_rows:
+            return ["  (no data)"]
+        lines = []
+        for stats in stats_rows:
+            if isinstance(stats, dict) and "summary" in stats:
+                lines.extend(self._format_nvm_stats_lines(stats))
+            elif isinstance(stats, dict):
+                lines.append(f"  {stats.get('item', 'NvM Lifetime Statistics')}: {stats.get('value', '')}")
+            else:
+                lines.append(f"  {stats}")
+        return lines
+
+    def _write_diagnostic_log_file(self, collected):
+        out_dir = SCRIPT_DIR / "DiagnosticLogs"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = out_dir / f"DiagnosticLog_{stamp}.txt"
+        created = datetime.now().isoformat(timespec="seconds")
+
+        lines = [
+            self._report_rule("="),
+            "FCD DIAGNOSTIC REPORT",
+            self._report_rule("="),
+            "",
+            self._report_field("Report generated", created),
+            self._report_field("VIN", self.fa_vin_var.get()),
+            self._report_field("ECU", ", ".join(sorted(collected, key=lambda name: name.upper())) or "ZGW"),
+            "",
+        ]
+        for node in sorted(collected, key=lambda name: name.upper()):
+            data = collected[node]
+            acquisitions = data.get("acquisitions", {})
+            lines.extend(self._report_major(f"1. EXECUTIVE DIAGNOSTIC SUMMARY - {node}"))
+            lines.extend(self._format_executive_summary(data))
+
+            lines.extend(self._report_major("2. DTC DETAILS"))
+            lines.extend(self._format_diag_log_dtc_report(data.get("dtcs", [])))
+
+            lines.extend(self._report_major("3. ECU / SOFTWARE INFORMATION"))
+            for row in data.get("time", []):
+                lines.extend(self._report_minor("Current ECU Time"))
+                lines.append(self._report_field(row.get("item", "Time"), row.get("value", "")))
+            lines.extend(self._report_minor("Software Versions"))
+            sw_rows = data.get("sw_versions", [])
+            if sw_rows:
+                for row in sw_rows:
+                    lines.append(self._report_field(row.get("item", "Software"), row.get("value", "")))
+            else:
+                lines.extend(self._report_failure_lines("Software Versions", {}, "ReadDataByIdentifier 0x22 DID 0xF101 / 0xF1C3"))
+
+            lines.extend(self._report_major("4. MCU STATUS"))
+            mcu_packets = [p for p in data.get("mcu_data", []) if isinstance(p, dict) and "magic" in p]
+            if mcu_packets:
+                lines.extend(self._format_diag_log_mcu_data(mcu_packets))
+            else:
+                rows = data.get("mcu_data", [])
+                lines.extend(self._report_failure_lines("MCU Data Packet", rows[0] if rows else {}, "ReadDataByIdentifier 0x22 DID 0xFCD1"))
+
+            lines.extend(self._report_major("5. ETHERNET STARTUP TIMING"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("eth_startup_timing")))
+            eth_rows = data.get("eth_startup_timing", [])
+            if eth_rows and isinstance(eth_rows[0], dict) and "entries" in eth_rows[0]:
+                lines.extend(self._format_diag_log_eth_timing(eth_rows))
+            elif "eth_startup_timing" not in acquisitions:
+                lines.extend(self._report_failure_lines("Ethernet Startup Timing", eth_rows[0] if eth_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}"))
+
+            lines.extend(self._report_major("6. AUTOSAR NVM TIMING"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("nvm_timing")))
+            nvm_lines = data.get("nvm_timing_lines", [])
+            if nvm_lines:
+                text = "\n".join(nvm_lines).strip()
+                if text.startswith(("NRC ", "ERROR:", "NO RESPONSE")):
+                    if "nvm_timing" not in acquisitions:
+                        lines.extend(self._report_failure_lines("AUTOSAR NvM Timing", {"value": text}, f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"))
+                else:
+                    lines.extend(nvm_lines)
+            elif "nvm_timing" not in acquisitions:
+                lines.extend(self._report_unavailable_lines("AUTOSAR NvM Timing", f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"))
+
+            lines.extend(self._report_major("7. NVM LIFETIME STATISTICS"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("nvm_stats")))
+            stats_rows = data.get("nvm_stats", [])
+            if stats_rows and isinstance(stats_rows[0], dict) and "summary" in stats_rows[0]:
+                lines.extend(self._format_diag_log_nvm_stats(stats_rows))
+            elif "nvm_stats" not in acquisitions:
+                lines.extend(self._report_failure_lines("NvM Lifetime Statistics", stats_rows[0] if stats_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{NVM_STATS_ROUTINE_GET:04X}"))
+
+            lines.extend(self._report_major("8. CPU PERFORMANCE COUNTERS"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("cpu_perf")))
+            perf_rows = data.get("cpu_perf", [])
+            if perf_rows and isinstance(perf_rows[0], dict) and "entries" in perf_rows[0]:
+                lines.extend(self._format_diag_log_cpu_perf(perf_rows))
+            elif "cpu_perf" not in acquisitions:
+                lines.extend(self._report_failure_lines("CPU Performance Counters", perf_rows[0] if perf_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{CPU_PERF_ROUTINE_GET:04X}"))
+
+            lines.extend(self._report_major("9. CODING INFORMATION"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("coding_readout")))
+            coding_rows = data.get("coding", [])
+            if coding_rows:
+                for row in coding_rows:
+                    lines.append(self._report_field(row.get("item", "Coding read-out"), row.get("value", "")))
+            elif "coding_readout" not in acquisitions:
+                lines.extend(self._report_unavailable_lines("Coding Read-Out", f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_READ_NVM:04X}"))
+            lines.extend(self._report_acquisition_lines(acquisitions.get("coding_check")))
+            check_rows = data.get("check_coding", [])
+            if check_rows:
+                for row in check_rows:
+                    lines.append(self._report_field(row.get("item", "Coding validation"), row.get("value", "")))
+            elif "coding_check" not in acquisitions:
+                lines.extend(self._report_unavailable_lines("Check Coding Result", f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_VALIDATE:04X}"))
+
+            lines.extend(self._report_major("10. DIAGNOSTIC SESSION / PROGRAMMING STATE"))
+            for row in data.get("active_session", []):
+                lines.append(self._report_field(row.get("item", "Active session"), row.get("value", "")))
+            for row in data.get("active_sw_block", []):
+                lines.append(self._report_field(row.get("item", "Active software block"), row.get("value", "")))
+
+            lines.extend(self._report_major("11. DATA AVAILABILITY / UNSUPPORTED MEASUREMENTS"))
+            for title, key, request in [
+                ("Ethernet Startup Timing", "eth_startup_timing", f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}"),
+                ("AUTOSAR NvM Timing", "nvm_timing_lines", f"Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"),
+                ("NvM Lifetime Statistics", "nvm_stats", f"Routine 0x{NVM_STATS_ROUTINE_GET:04X}"),
+                ("CPU Performance Counters", "cpu_perf", f"Routine 0x{CPU_PERF_ROUTINE_GET:04X}"),
+                ("Coding Read-Out", "coding", f"Routine 0x{CODING_ROUTINE_READ_NVM:04X}"),
+                ("Check Coding Result", "check_coding", f"Routine 0x{CODING_ROUTINE_VALIDATE:04X}"),
+            ]:
+                acq_key = {
+                    "eth_startup_timing": "eth_startup_timing",
+                    "nvm_timing_lines": "nvm_timing",
+                    "nvm_stats": "nvm_stats",
+                    "cpu_perf": "cpu_perf",
+                    "coding": "coding_readout",
+                    "check_coding": "coding_check",
+                }[key]
+                result = acquisitions.get(acq_key)
+                if result:
+                    lines.append(self._report_field(title, f"{result.state} ({result.duration_ms:.1f} ms)"))
+                else:
+                    lines.append(self._report_field(title, f"NOT_ATTEMPTED; no scheduled result for {request}"))
+            lines.append("")
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def generate_diagnostic_log_clicked(self):
+        try:
+            status_mask = parse_int(self.dtc_status_mask_var.get())
+            if status_mask < 0 or status_mask > 0xFF:
+                raise ValueError("Status mask must be one byte")
+        except Exception as exc:
+            messagebox.showerror(APP_NAME, str(exc))
+            return
+
+        collected = {}
+        collected_lock = threading.Lock()
+
+        def add_node_data(node, key, value):
+            with collected_lock:
+                collected.setdefault(node, {}).setdefault(key, [])
+                if isinstance(value, list):
+                    collected[node][key].extend(value)
+                else:
+                    collected[node][key].append(value)
+
+        def set_acquisition(node, result):
+            with collected_lock:
+                collected.setdefault(node, {}).setdefault("acquisitions", {})
+                collected[node]["acquisitions"][result.key] = result
+
+        def worker(target):
+            node = self._target_label(target)
+            client = self._coding_worker_client(target)
+            try:
+                send = self._make_target_uds_sender(client, target, dry=False)
+                with collected_lock:
+                    collected.setdefault(node, {}).setdefault("acquisitions", {})
+                self.log(f"{node}: Generate Diagnostic Log collection started")
+                self._send_session(
+                    send,
+                    SESSION_EXTENDED,
+                    f"{node}: Generate Diagnostic Log Extended Session",
+                    timeout=5.0,
+                )
+
+                fault_sink = {"lock": threading.Lock(), "rows": [], "summaries": []}
+                self._read_fault_memory_target_worker(send, target, client, status_mask, fault_sink)
+                with fault_sink["lock"]:
+                    add_node_data(node, "dtcs", list(fault_sink["rows"]))
+
+                time_row = self._read_single_connection_diagnostic(
+                    send,
+                    target,
+                    "Read Current Date and Time calculated by ZGW",
+                    b"\x31\x03" + struct.pack(">H", TIMESYNC_ROUTINE_GET_STATUS),
+                    self._decode_time_status_value,
+                    5.0,
+                )
+                add_node_data(node, "time", time_row)
+
+                for item, request, decoder in [
+                    ("Read SW Versions (FBL, APP)", b"\x22" + struct.pack(">H", DID_APP_SW_VERSION), self._decode_app_fbl_sw_version_payload),
+                    ("Read SW Version (Coding)", b"\x22" + struct.pack(">H", CODING_DID_VERSION), self._decode_coding_sw_version_payload),
+                ]:
+                    add_node_data(
+                        node,
+                        "sw_versions",
+                        self._read_single_connection_diagnostic(send, target, item, request, decoder, 5.0),
+                    )
+
+                try:
+                    response = send(
+                        b"\x22" + struct.pack(">H", DID_MCU_DATA_PACKET),
+                        f"{node}: Read MCU Data Packet",
+                        timeout=max(5.0, float(self.timeout_var.get())),
+                        allow_no_response=self._target_is_simulated(target),
+                    )
+                    if response:
+                        packet = self._decode_mcu_data_packet(bytes(response[3:]))
+                        add_node_data(node, "mcu_data", packet)
+                        self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: collected")
+                    else:
+                        add_node_data(
+                            node,
+                            "mcu_data",
+                            {"item": "Read MCU Data Packet", "value": "NO RESPONSE ACCEPTED"},
+                        )
+                        self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: NO RESPONSE ACCEPTED")
+                except NegativeResponse as exc:
+                    value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
+                    add_node_data(node, "mcu_data", {"item": "Read MCU Data Packet", "value": value})
+                    self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: {value}")
+                except Exception as exc:
+                    if not self._target_is_simulated(target):
+                        raise
+                    value = f"ERROR: {exc}"
+                    add_node_data(node, "mcu_data", {"item": "Read MCU Data Packet", "value": value})
+                    self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: {value}")
+
+                add_node_data(
+                    node,
+                    "active_session",
+                    self._read_single_connection_diagnostic(
+                        send,
+                        target,
+                        "Read Active Diagnostic Session",
+                        b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION),
+                        self._decode_active_session_value,
+                        5.0,
+                    ),
+                )
+                add_node_data(
+                    node,
+                    "active_sw_block",
+                    self._read_single_connection_diagnostic(
+                        send,
+                        target,
+                        "Read Active Software Block",
+                        b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK),
+                        self._decode_active_sw_block_value,
+                        5.0,
+                    ),
+                )
+
+                eth_result = self._acquire_callable(
+                    "eth_startup_timing",
+                    "Ethernet Startup Timing",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}",
+                    b"\x31\x03" + struct.pack(">H", ETH_STARTUP_TIMING_ROUTINE_GET) + b"\x00\x0B",
+                    lambda: self._read_ethernet_startup_timing(send, target),
+                )
+                set_acquisition(node, eth_result)
+                add_node_data(node, "eth_startup_timing", self._diagnostic_result_row(node, eth_result))
+
+                nvm_timing_result = self._acquire_callable(
+                    "nvm_timing",
+                    "AUTOSAR NvM Timing",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{NVM_TIMING_ROUTINE_GET:04X}",
+                    b"\x31\x03" + struct.pack(">H", NVM_TIMING_ROUTINE_GET) + b"\x00",
+                    lambda: self._read_nvm_timing(send, target),
+                )
+                set_acquisition(node, nvm_timing_result)
+                with collected_lock:
+                    collected.setdefault(node, {})["nvm_timing_lines"] = (
+                        self._format_nvm_timing_lines(nvm_timing_result.parsed_data)
+                        if nvm_timing_result.state == "SUCCESS"
+                        else [f"  {nvm_timing_result.state}: {nvm_timing_result.error_text or nvm_timing_result.value}"]
+                    )
+
+                nvm_stats_result = self._acquire_callable(
+                    "nvm_stats",
+                    "NvM Lifetime Statistics",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{NVM_STATS_ROUTINE_GET:04X}",
+                    b"\x31\x03" + struct.pack(">H", NVM_STATS_ROUTINE_GET) + b"\x00",
+                    lambda: self._read_nvm_stats(send, target),
+                )
+                set_acquisition(node, nvm_stats_result)
+                add_node_data(node, "nvm_stats", self._diagnostic_result_row(node, nvm_stats_result))
+
+                cpu_perf_result = self._acquire_callable(
+                    "cpu_perf",
+                    "CPU Performance Counters",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{CPU_PERF_ROUTINE_GET:04X}",
+                    b"\x31\x03" + struct.pack(">H", CPU_PERF_ROUTINE_GET) + b"\x00\x04",
+                    lambda: self._read_cpu_perf(send, target),
+                )
+                set_acquisition(node, cpu_perf_result)
+                add_node_data(node, "cpu_perf", self._diagnostic_result_row(node, cpu_perf_result))
+
+                rid = parse_int(self.coding_read_nvm_rid_var.get())
+                coding_result = self._acquire_callable(
+                    "coding_readout",
+                    "Coding Read-Out",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{rid:04X}",
+                    b"\x31\x03" + struct.pack(">H", rid),
+                    lambda: bytes_to_hex(self._parse_read_coding_result(
+                        self._request_read_coding_routine(send, rid, node, phase="Diagnostic Log", timeout=20.0)
+                    )),
+                )
+                set_acquisition(node, coding_result)
+                add_node_data(node, "coding", coding_result.to_report_row(node))
+
+                validate_rid = parse_int(self.coding_validate_rid_var.get())
+                check_result = self._acquire_callable(
+                    "coding_check",
+                    "Check Coding Result",
+                    "RoutineControl (0x31)",
+                    f"Routine 0x{validate_rid:04X}",
+                    b"\x31\x01" + struct.pack(">H", validate_rid),
+                    lambda: self._describe_coding_routine_response(self._run_coding_routine(
+                        send,
+                        validate_rid,
+                        b"",
+                        f"{node}: Generate Diagnostic Log Check Coding",
+                        timeout=20.0,
+                    )),
+                )
+                set_acquisition(node, check_result)
+                add_node_data(node, "check_coding", check_result.to_report_row(node))
+                self.log(f"{node}: Generate Diagnostic Log collection completed")
+            except Exception as exc:
+                self.log(f"{node}: Generate Diagnostic Log collection aborted: {exc}")
+                for key, item, routine_id in [
+                    ("eth_startup_timing", "Ethernet Startup Timing", ETH_STARTUP_TIMING_ROUTINE_GET),
+                    ("nvm_timing", "AUTOSAR NvM Timing", NVM_TIMING_ROUTINE_GET),
+                    ("nvm_stats", "NvM Lifetime Statistics", NVM_STATS_ROUTINE_GET),
+                    ("cpu_perf", "CPU Performance Counters", CPU_PERF_ROUTINE_GET),
+                    ("coding_readout", "Coding Read-Out", parse_int(self.coding_read_nvm_rid_var.get())),
+                    ("coding_check", "Check Coding Result", parse_int(self.coding_validate_rid_var.get())),
+                ]:
+                    with collected_lock:
+                        exists = key in collected.setdefault(node, {}).setdefault("acquisitions", {})
+                    if exists:
+                        continue
+                    result = self._make_acquisition_result(
+                        key,
+                        item,
+                        "RoutineControl (0x31)",
+                        f"Routine 0x{routine_id:04X}",
+                        b"\x31\x03" + struct.pack(">H", routine_id),
+                    )
+                    result.state = "SKIPPED_TRANSPORT_UNAVAILABLE"
+                    result.error_text = f"Earlier diagnostic step aborted collection before this acquisition: {exc}"
+                    result.completion_time = datetime.now().isoformat(timespec="milliseconds")
+                    set_acquisition(node, result)
+            finally:
+                self._release_coding_worker_client(client)
+
+        def action():
+            self._run_vehicle_coding_action_once("Generate Diagnostic Log", worker)
+            with collected_lock:
+                snapshot = {node: dict(data) for node, data in collected.items()}
+            path = self._write_diagnostic_log_file(snapshot)
+            self.log(f"Generate Diagnostic Log: wrote {path}")
+            self.root.after(0, messagebox.showinfo, APP_NAME, f"Diagnostic log written:\n{path}")
+
+        self.worker("Generate Diagnostic Log", action)
 
     def read_fault_memory_clicked(self):
         try:
@@ -3793,7 +5970,7 @@ class FcdApp:
                 cycle_ticks = u16_be(data, 12)
                 timeout_ticks = u16_be(data, 14)
                 return " | ".join([
-                    f"RX message timeout — {name} (COM PDU id {object_id}) on {bus_text}",
+                    f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
                     f"current status: {status_text}",
                     f"expected RX every {cycle_ticks} ticks, declared lost after {timeout_ticks} ticks",
                     f"ECU main-loop count when captured: {main_cycles}",
@@ -3810,7 +5987,7 @@ class FcdApp:
         main_cycles = u32_be(data, 12)
         if is_message:
             return " | ".join([
-                f"RX message timeout — {name} (COM PDU id {object_id}) on {bus_text}",
+                f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
                 f"timeout limit: {threshold} ticks",
                 f"ECU main-loop count when captured: {main_cycles}",
             ])
@@ -4014,8 +6191,14 @@ class FcdApp:
             f"captured EVRSTAT/ADCSTAT/MONSTAT1: 0x{evrstat:08X}/0x{evradcstat:08X}/0x{evrmonstat1:08X}",
             f"EVRRSTCON/EVROVMON2/EVRUVMON2: 0x{evrrstcon:08X}/0x{evrovmon2:08X}/0x{evruvmon2:08X}",
         ]
-        if len(data) >= (76 + DEM_DTC_TIMESTAMP_DATA_SIZE):
-            timestamp_text = format_dtc_timestamp_data(data[76:])
+        common_time_offset = 76
+        if version >= 2 and len(data) >= 108:
+            pms_time_text = format_pms_errata_time_data(data[76:108])
+            if pms_time_text:
+                parts.append(pms_time_text)
+            common_time_offset = 108
+        if len(data) >= (common_time_offset + DEM_DTC_TIMESTAMP_DATA_SIZE):
+            timestamp_text = format_dtc_timestamp_data(data[common_time_offset:])
             if timestamp_text:
                 parts.append(timestamp_text)
         return " | ".join(parts)
@@ -4033,7 +6216,7 @@ class FcdApp:
         name = DEM_EVENT_ID_NAMES.get(event_id, f"event id {event_id}")
         if is_snapshot:
             text = (
-                f"Generic snapshot — {name} (event id {event_id}); "
+                f"Generic snapshot ? {name} (event id {event_id}); "
                 "no signal data is captured for this event, remaining bytes are reserved/zero"
             )
             if len(data) >= 48:
@@ -4042,7 +6225,7 @@ class FcdApp:
                     text = f"{text} | snapshot detail: {detail}"
             return text
         return (
-            f"Generic snapshot detail record #{data[3]} — {name} (event id {event_id}); "
+            f"Generic snapshot detail record #{data[3]} ? {name} (event id {event_id}); "
             "occurrence/aging bookkeeping only, no payload"
         )
 
@@ -4343,25 +6526,6 @@ class FcdApp:
                 return b""
             raise
 
-    def _tolerant_ecu_reset(self, client, reason, require_current_client=True):
-        # A hard reset response is best-effort: it may be a clean 51 01, a stale
-        # frame left in the buffer, or nothing at all. The ZGW defers the actual
-        # reset briefly after 51 01 so Ethernet can transmit the response, so wait
-        # before polling or we can reconnect to the old pre-reset application.
-        req = b"\x11\x01"
-        self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
-        try:
-            resp = client.send_uds(req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS)
-            self.log(f"RX ECUReset hardReset {reason}: {bytes_to_hex(resp)}")
-        except Exception as exc:
-            if not bool(getattr(client, "last_uds_request_sent", False)):
-                raise FcdError(f"ECUReset hardReset {reason}: request was not sent ({exc})") from exc
-            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
-                raise FcdError(f"ECUReset hardReset {reason}: request was rejected ({exc})") from exc
-            self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
-        if isinstance(client, DoipClient):
-            self._poll_doip_after_reset(client, reason, require_current_client=require_current_client)
-
     def _poll_doip_after_reset(self, client, reason, require_current_client=True):
         request = bytes([0x10, SESSION_DEFAULT])
         self._poll_doip_after_reset_with_probe(
@@ -4484,59 +6648,6 @@ class FcdApp:
                 0x3E,
                 require_current_client=require_current_client,
             )
-
-    def _wait_for_post_reset_uds_ready(self, client, reason, timeout=POST_RESET_UDS_READY_TIMEOUT_SECONDS, require_current_client=True):
-        request = bytes([0x10, SESSION_DEFAULT])
-        deadline = time.monotonic() + float(timeout)
-        attempt = 0
-        last_error = None
-
-        if not isinstance(client, DoipClient):
-            return
-
-        self.log(f"Post-reset UDS readiness after {reason}: waiting up to {timeout:.1f} s")
-
-        while not self._reconnect_cancelled(client, require_current_client=require_current_client):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0.0:
-                break
-
-            attempt += 1
-            try:
-                if attempt == 1 or attempt % 5 == 0:
-                    self.log(f"TX Post-reset Default Session probe: {bytes_to_hex(request)}")
-                response = client.send_uds(request, timeout=max(0.5, min(2.0, remaining)))
-                if attempt == 1 or attempt % 5 == 0:
-                    self.log(f"RX Post-reset Default Session probe: {bytes_to_hex(response)}")
-                require_positive_response(response, 0x10)
-                self.log(f"Post-reset UDS ready after {reason}")
-                return
-            except Exception as exc:
-                last_error = exc
-                if attempt == 1 or attempt % 5 == 0:
-                    self.log(f"Post-reset UDS not ready after {reason}: attempt {attempt} failed ({exc})")
-
-                client.close()
-                self.root.after(0, self._set_connected_status, False)
-
-                remaining = deadline - time.monotonic()
-                if remaining <= 0.0:
-                    break
-                if self.worker_stop.wait(min(POST_RESET_UDS_READY_RETRY_SECONDS, remaining)):
-                    raise FcdError(f"Post-reset UDS readiness after {reason}: cancelled by Disconnect button")
-
-                try:
-                    self.reconnect_doip(
-                        client,
-                        f"{reason} UDS readiness",
-                        deadline=deadline,
-                        require_current_client=require_current_client,
-                    )
-                except FcdError as reconnect_exc:
-                    last_error = reconnect_exc
-                    break
-
-        raise FcdError(f"Post-reset UDS did not become ready after {reason}: {last_error}")
 
     def _parse_read_coding_result(self, result_resp):
         # Strip 0x71 + sub-function echo + 2-byte routine id, then the 10-byte status
@@ -5094,16 +7205,6 @@ class FcdApp:
             action_name,
             lambda: self._run_vehicle_uds_action_once(action_name, requests, zgw_worker, on_complete),
         )
-
-    def _raw_target_worker(self, send, target, client, request):
-        node = self._target_label(target)
-        response = send(
-            bytes(request),
-            f"{node}: Raw",
-            timeout=float(self.timeout_var.get()),
-            allow_no_response=True,
-        )
-        self.root.after(0, self._append_raw_response, bytes(request), response or b"", node)
 
     def _routed_dtc_detail_read(self, send, node, dtc, subfunction, detail_name, strict_response=False):
         request = bytes([
@@ -5665,7 +7766,7 @@ class FcdApp:
                 response = base_send(
                     request,
                     name,
-                    timeout=BUS_TARGET_DIAG_TIMEOUT_SECONDS,
+                    timeout=timeout or BUS_TARGET_DIAG_TIMEOUT_SECONDS,
                     allow_no_response=allow_no_response or simulated,
                 )
                 send_zgw.last_nrc78_count = getattr(base_send, "last_nrc78_count", 0)
@@ -5941,126 +8042,9 @@ class FcdApp:
 
     def code_ecu_clicked(self):
         self._run_vehicle_coding_action("Code Vehicle", self._code_target)
-        return
-        write_rid = parse_int(self.coding_write_all_rid_var.get())
-        check_rid = parse_int(self.coding_validate_rid_var.get())
-        read_rid = parse_int(self.coding_read_nvm_rid_var.get())
-        # Build the mask from the table up front so a malformed row aborts before we
-        # touch the ECU. The mask is pushed as the Write Coding routine option record.
-        mask = self._coding_rows_to_mask()
-
-        def action():
-            client = self.require_client()
-            # Pause automatic tester present for the whole sequence: it shares the DoIP
-            # socket and would race the worker's requests (causing frame desync), and it
-            # would flood errors while the ECU is reset and TCP is briefly down.
-            keepalive_was_on = bool(self.keepalive_var.get()) or self.keepalive_is_running()
-            if keepalive_was_on:
-                self.stop_keepalive(update_var=False)
-                self.log("Code ECU: paused automatic tester present for the coding sequence")
-
-            # Clear any frame left buffered before the keepalive was stopped, so the
-            # first request below reads its own response and not a stale one.
-            client.drain()
-            sequence_ok = False
-            send = None
-
-            try:
-                # The full coding procedure is always transmitted.
-                send = self._make_uds_sender(client, dry=False)
-
-                # --- Code the ECU from the coding session ---
-                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
-                self._run_coding_routine(send, write_rid, mask, "Write Coding", timeout=90.0)
-                self._run_coding_routine(send, check_rid, b"", "Check Coding", timeout=20.0)
-
-                # --- Hard reset so the ECU re-evaluates the persisted coding ---
-                self._tolerant_ecu_reset(client, "Code ECU reset")
-                # A fresh sender after reconnect keeps using the live socket.
-                send = self._make_uds_sender(client, dry=False)
-
-                # --- Read back the standard status and the persisted coding ---
-                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session after coding reset requested as 10 41")
-                self._read_coding_app_status(send, "Code ECU", required=True)
-                for did, name in [
-                    (DID_APP_SW_VERSION, "Read Software Version F101"),
-                    (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
-                    (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
-                ]:
-                    send(b"\x22" + struct.pack(">H", did), f"Code ECU: {name}")
-
-                result_resp = self._request_read_coding_routine(send, read_rid, "Code ECU", timeout=10.0)
-                coding_payload = self._parse_read_coding_result(result_resp)
-                self.root.after(0, self._load_mask_to_coding_tree, coding_payload)
-
-                # --- Leave the ECU in the default session ---
-                self._send_session(send, SESSION_DEFAULT, "Default Session")
-                sequence_ok = True
-            except Exception:
-                if send is not None and self.client is client and client.connected:
-                    self._read_coding_app_status(send, "Code ECU")
-                raise
-            finally:
-                if keepalive_was_on and sequence_ok and self.client is not None and self.client.connected:
-                    self.start_keepalive()
-                elif (not sequence_ok) and (self.client is client) and (not client.connected):
-                    self.client = None
-                    self.root.after(0, self._set_connected_status, False)
-
-        self.worker("Code ECU", action)
 
     def read_current_coding_clicked(self):
         self._run_vehicle_coding_action("Read Coding", self._read_coding_for_target)
-        return
-        rid = parse_int(self.coding_read_nvm_rid_var.get())
-
-        def action():
-            client = self.require_client()
-            keepalive_was_on = bool(self.keepalive_var.get()) or self.keepalive_is_running()
-            if keepalive_was_on:
-                self.stop_keepalive(update_var=False)
-                self.log("Read Coding: paused automatic tester present for the read sequence")
-
-            client.drain()
-            sequence_ok = False
-
-            try:
-                # Enter the extended session first, the same way the post-flash readback
-                # flow (_execute_final_readback) does, so coding is read from a diagnostic
-                # session rather than the default session of a fresh ethernet connection.
-                session_req = bytes([0x10, SESSION_EXTENDED])
-                self.log(f"TX Extended Session: {bytes_to_hex(session_req)}")
-                session_resp = client.send_uds(session_req, timeout=10.0)
-                self.log(f"RX Extended Session: {bytes_to_hex(session_resp)}")
-                require_positive_response(session_resp, 0x10)
-
-                # Coding is read back through the CodingApp read-NVM RoutineControl
-                # (0x0203): 31 01 starts it, 31 03 fetches the result. CodingApp returns a
-                # 10-byte status block (CodingApp_FillRoutineResponse) followed by the
-                # rxMessageExpected bitmask - see CodingApp_RoutineControl in CodingApp.c.
-                start_req = b"\x31\x01" + struct.pack(">H", rid)
-                self.log(f"TX Read Coding start: {bytes_to_hex(start_req)}")
-                start_resp = client.send_uds(start_req, timeout=20.0)
-                self.log(f"RX Read Coding start: {bytes_to_hex(start_resp)}")
-                require_positive_response(start_resp, 0x31)
-
-                result_req = b"\x31\x03" + struct.pack(">H", rid)
-                self.log(f"TX Read Coding result: {bytes_to_hex(result_req)}")
-                result_resp = client.send_uds(result_req, timeout=20.0)
-                self.log(f"RX Read Coding result: {bytes_to_hex(result_resp)}")
-                require_positive_response(result_resp, 0x31)
-
-                coding_payload = self._parse_read_coding_result(result_resp)
-                self.root.after(0, self._load_mask_to_coding_tree, coding_payload)
-                sequence_ok = True
-            finally:
-                if keepalive_was_on and sequence_ok and self.client is not None and self.client.connected:
-                    self.start_keepalive()
-                elif (not sequence_ok) and (self.client is client) and (not client.connected):
-                    self.client = None
-                    self.root.after(0, self._set_connected_status, False)
-
-        self.worker("Read Coding", action)
 
     def save_current_coding_clicked(self):
         def action():
@@ -6090,68 +8074,11 @@ class FcdApp:
 
         self.worker("Save Current Coding", action)
 
-    def write_coding_config_clicked(self):
-        if not messagebox.askyesno(APP_NAME, "Write coding via CodingApp routine 0x0202?"):
-            return
-
-        def action():
-            client = self.require_client()
-            # Write/check coding run from the coding session (10 41), matching the
-            # post-flash coding flow (_execute_coding_after_flash). Coding is never a
-            # dry run, so the session request is always sent for real.
-            send = self._make_uds_sender(client, dry=False)
-            try:
-                self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
-                mask = self._coding_rows_to_mask()
-                # The coding mask is delivered as the option record of the Write Coding
-                # routine start (0x0202). WriteDataByIdentifier (0x2E) is no longer
-                # supported by the ZGW - writes go through RoutineControl. Check Coding
-                # (0x0201) takes no option record.
-                self._run_coding_routine(send, parse_int(self.coding_write_all_rid_var.get()), mask, "Write Coding", timeout=90.0)
-                self._run_coding_routine(send, parse_int(self.coding_validate_rid_var.get()), b"", "Check Coding", timeout=20.0)
-            except Exception:
-                if self.client is client and client.connected:
-                    self._read_coding_app_status(send, "Write Coding")
-                raise
-
-        self.worker("Write Coding", action)
-
     def load_default_coding_clicked(self):
         self._run_vehicle_coding_action("Load Coding Default", self._load_default_for_target)
-        return
-        if not messagebox.askyesno(APP_NAME, "Load ECU default coding via routine 0x0204?"):
-            return
-        rid = parse_int(self.coding_defaults_rid_var.get())
-
-        def action():
-            client = self.require_client()
-            # Loading default coding is a coding write routine; run it from the coding
-            # session (10 41) so the ZGW does not reject 0x31 in the default session.
-            # Coding is never a dry run - send the session and routine for real.
-            send = self._make_uds_sender(client, dry=False)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
-            send(b"\x31\x01" + struct.pack(">H", rid), "Load Coding Default", timeout=20.0)
-
-        self.worker("Load Coding Default", action)
 
     def check_coding_clicked(self):
         self._run_vehicle_coding_action("Check Coding", self._check_coding_for_target)
-        return
-        rid = parse_int(self.coding_validate_rid_var.get())
-        def action():
-            client = self.require_client()
-            # Check coding runs from the coding session (10 41), matching the
-            # post-flash coding flow (_execute_coding_after_flash). Coding is never a
-            # dry run, so the session request is always sent for real.
-            send = self._make_uds_sender(client, dry=False)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
-            for control_type, label in [(0x01, "start"), (0x03, "result")]:
-                req = bytes([0x31, control_type]) + struct.pack(">H", rid)
-                self.log(f"TX Check Coding {label}: {bytes_to_hex(req)}")
-                resp = client.send_uds(req, timeout=20.0)
-                self.log(f"RX Check Coding {label}: {bytes_to_hex(resp)}")
-                require_positive_response(resp, 0x31)
-        self.worker("Check Coding", action)
 
     def browse_gen_output_clicked(self):
         path = filedialog.askdirectory(initialdir=self.gen_output_var.get() or str(Path.cwd()))
@@ -6205,7 +8132,7 @@ class FcdApp:
                 "",
                 "end",
                 values=(
-                    "☑" if target.get("simulated_enabled", True) else "☐",
+                    selection_text(target.get("simulated_enabled", True)),
                     node.node_name,
                     node.bus_type,
                     target.get("extended_diag_address", ""),
@@ -6343,7 +8270,7 @@ class FcdApp:
             return
         target["simulated_enabled"] = not bool(target.get("simulated_enabled", True))
         values = list(self.node_tree.item(iid, "values"))
-        values[0] = "☑" if target["simulated_enabled"] else "☐"
+        values[0] = selection_text(target["simulated_enabled"])
         self.node_tree.item(iid, values=values)
         return "break"
 
@@ -6393,25 +8320,6 @@ class FcdApp:
         )
         self.generator_rows[iid] = row
 
-    def edit_hex_clicked(self):
-        selection = self.generator_tree.selection()
-        if not selection:
-            return
-        iid = selection[0]
-        row = self.generator_rows.get(iid)
-        if not row:
-            return
-        updated = self._hex_row_dialog(row)
-        if updated:
-            self.generator_rows[iid] = updated
-            self.generator_tree.item(
-                iid,
-                values=(
-                    updated["ecu"],
-                    updated["hex"],
-                ),
-            )
-
     def remove_hex_clicked(self):
         for iid in self.generator_tree.selection():
             self.generator_rows.pop(iid, None)
@@ -6430,69 +8338,27 @@ class FcdApp:
         self.generator_tree.move(iid, "", new_index)
         self.generator_tree.selection_set(iid)
 
-    def _hex_row_dialog(self, row):
-        dialog = tk.Toplevel(self.root)
-        dialog.title("HEX ECU Mapping")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        result = {}
-        fields = ["ecu", "target", "req", "resp", "did", "base", "hex"]
-        labels = {
-            "ecu": "ECU name",
-            "target": "DoIP target",
-            "req": "CAN request ID",
-            "resp": "CAN response ID",
-            "did": "Coding DID",
-            "base": "Download base",
-            "hex": "HEX file",
-        }
-        vars_ = {key: tk.StringVar(value=row.get(key, "")) for key in fields}
-        for idx, key in enumerate(fields):
-            ttk.Label(dialog, text=labels[key]).grid(row=idx, column=0, sticky="w", padx=8, pady=5)
-            ttk.Entry(dialog, textvariable=vars_[key], width=78).grid(row=idx, column=1, sticky="ew", padx=8, pady=5)
-            if key == "hex":
-                ttk.Button(dialog, text="Browse", command=lambda: self._browse_dialog_file(vars_["hex"])).grid(
-                    row=idx, column=2, padx=6, pady=5
-                )
-
-        def ok():
-            candidate = {key: vars_[key].get().strip() for key in fields}
-            try:
-                parse_int(candidate["target"])
-                if candidate["req"]:
-                    parse_int(candidate["req"])
-                if candidate["resp"]:
-                    parse_int(candidate["resp"])
-                if candidate["did"]:
-                    parse_int(candidate["did"])
-                if candidate["base"]:
-                    parse_int(candidate["base"])
-                if not candidate["ecu"]:
-                    raise ValueError("ECU name is required")
-                if not candidate["hex"]:
-                    raise ValueError("HEX file is required")
-            except Exception as exc:
-                messagebox.showerror(APP_NAME, str(exc), parent=dialog)
-                return
-            result.update(candidate)
-            dialog.destroy()
-
-        ttk.Button(dialog, text="OK", command=ok).grid(row=len(fields), column=0, padx=8, pady=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(row=len(fields), column=1, sticky="w", padx=8, pady=10)
-        dialog.wait_window()
-        return result or None
-
-    def _browse_dialog_file(self, var):
-        path = filedialog.askopenfilename(filetypes=[("Intel HEX", "*.hex;*.ihex"), ("All files", "*.*")])
-        if path:
-            var.set(path)
-
     def generate_files_clicked(self):
         def action():
             if not self.generator_rows:
                 raise FcdError("Add at least one HEX file")
+            local_node_rows = None
             if not self.node_rows:
-                self.discover_nodes_clicked()
+                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parent.parent)
+                persisted_nodes = self.settings.get("data_editor", {}).get("nodes", {})
+                local_node_rows = []
+                for node in discovered_nodes:
+                    target = node_to_target(node)
+                    persisted = persisted_nodes.get(node.node_name, {})
+                    if "selected" in persisted:
+                        target["simulated_enabled"] = bool(persisted["selected"])
+                    target["node_kind"] = str(persisted.get("node_kind", target.get("node_kind", "Simulated")))
+                    if "extended_diag_address" in persisted:
+                        target["extended_diag_address"] = str(persisted["extended_diag_address"])
+                    elif not target.get("extended_diag_address"):
+                        target["extended_diag_address"] = default_extended_diag_address(node.node_name, node.bus_type)
+                    local_node_rows.append(target)
+                self.root.after(0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs))
             out_root = Path(self.gen_output_var.get()).expanduser()
             package_dir = out_root / f"FCD_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             payload_dir = package_dir / "payloads"
@@ -6506,7 +8372,8 @@ class FcdApp:
             self._sync_coding_tabs_from_nodes()
             coding_descriptors = self._all_coding_descriptors()
             all_targets_by_name = {}
-            for t in self.node_rows.values():
+            source_node_rows = local_node_rows if local_node_rows is not None else self.node_rows.values()
+            for t in source_node_rows:
                 if not t.get("simulated_enabled", True):
                     continue
                 target = dict(t)
@@ -6540,6 +8407,7 @@ class FcdApp:
                 hex_path = Path(row["hex"])
                 source_ecu_name = str(row.get("ecu") or hex_path.stem).strip()
                 ecu_name = ecu_name_from_hex_stem(source_ecu_name)
+                ecu_key = ecu_name.upper()
                 flash_kind = "FBL" if "FBL" in source_ecu_name.upper() else "APPL"
                 segments = parse_intel_hex(hex_path)
                 if not segments:
@@ -6558,7 +8426,7 @@ class FcdApp:
                     "segments": [],
                 }
                 ecus.append(ecu)
-                target_entry = targets_by_name.get(ecu_name)
+                target_entry = targets_by_name.get(ecu_key)
                 if target_entry is None:
                     target_entry = {
                         "node_name": ecu_name,
@@ -6573,7 +8441,7 @@ class FcdApp:
                         "payload_blocks": [],
                         "coding_descriptor": {},
                     }
-                    targets_by_name[ecu_name] = target_entry
+                    targets_by_name[ecu_key] = target_entry
 
                 tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 03"})
                 step_no += 1
@@ -6697,124 +8565,6 @@ class FcdApp:
             self.root.after(0, lambda: self.pkg_dir_var.set(str(bundle_path)))
 
         self.worker("Generate FCD Files", action)
-
-    def copy_generator_to_svt(self):
-        self.svt_tree.delete(*self.svt_tree.get_children())
-        for row in self.generator_rows.values():
-            size = ""
-            crc = ""
-            try:
-                segments = parse_intel_hex(row["hex"])
-                total = sum(len(seg.data) for seg in segments)
-                crc_value = 0
-                for seg in segments:
-                    crc_value = binascii.crc32(seg.data, crc_value)
-                size = str(total)
-                crc = int_hex(crc_value & 0xFFFFFFFF, 8)
-            except Exception:
-                pass
-            self.svt_tree.insert(
-                "",
-                "end",
-                values=(row["ecu"], row["target"], row["req"], row["resp"], row["did"], row["hex"], size, crc),
-            )
-
-    def import_svt_clicked(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json"), ("All files", "*.*")])
-        if not path:
-            return
-        with open(path, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        self.svt_tree.delete(*self.svt_tree.get_children())
-        for ecu in data.get("ecus", []):
-            self.svt_tree.insert(
-                "",
-                "end",
-                values=(
-                    ecu.get("name", ""),
-                    ecu.get("target_logical_address", ""),
-                    ecu.get("can_request_id", ""),
-                    ecu.get("can_response_id", ""),
-                    ecu.get("coding_did", ""),
-                    ecu.get("source_hex", ""),
-                    sum(int(seg.get("size", 0)) for seg in ecu.get("segments", [])),
-                    "",
-                ),
-            )
-        self.log(f"Imported SVT: {path}")
-
-    def export_svt_clicked(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
-        if not path:
-            return
-        ecus = []
-        for iid in self.svt_tree.get_children():
-            values = self.svt_tree.item(iid, "values")
-            ecus.append(
-                {
-                    "name": values[0],
-                    "target_logical_address": values[1],
-                    "can_request_id": values[2],
-                    "can_response_id": values[3],
-                    "coding_did": values[4],
-                    "source_hex": values[5],
-                }
-            )
-        data = {"schema": "FCD_SVT_v1", "created": datetime.now().isoformat(timespec="seconds"), "ecus": ecus}
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2)
-        self.log(f"Exported SVT: {path}")
-
-    def browse_package_clicked(self):
-        path = filedialog.askdirectory(initialdir=self.pkg_dir_var.get() or self.gen_output_var.get() or str(Path.cwd()))
-        if path:
-            self.pkg_dir_var.set(path)
-
-    def load_package_clicked(self):
-        package_dir = Path(self.pkg_dir_var.get()).expanduser()
-        psdz_path = package_dir / "fcd_psdzdata.json"
-        if not psdz_path.exists():
-            messagebox.showerror(APP_NAME, f"Missing {psdz_path}")
-            return
-        with psdz_path.open("r", encoding="utf-8") as handle:
-            psdz = json.load(handle)
-        self.package_dir = package_dir
-        self.package_payloads = psdz.get("payloads", [])
-        self.payload_enabled = {}
-        self.payload_tree.delete(*self.payload_tree.get_children())
-        for index, item in enumerate(self.package_payloads):
-            iid = self.payload_tree.insert(
-                "",
-                "end",
-                values=(
-                    "☑",
-                    item.get("ecu", ""),
-                    item.get("target_logical_address", ""),
-                    item.get("address", ""),
-                    item.get("size", ""),
-                    item.get("crc32", ""),
-                    item.get("file", ""),
-                ),
-            )
-            self.payload_enabled[iid] = True
-        self.log(f"Loaded package: {package_dir} ({len(self.package_payloads)} payloads)")
-
-    def payload_tree_click(self, event):
-        region = self.payload_tree.identify("region", event.x, event.y)
-        if region != "cell":
-            return
-        column = self.payload_tree.identify_column(event.x)
-        if column != "#1":
-            return
-        iid = self.payload_tree.identify_row(event.y)
-        if not iid:
-            return
-        enabled = not self.payload_enabled.get(iid, True)
-        self.payload_enabled[iid] = enabled
-        values = list(self.payload_tree.item(iid, "values"))
-        values[0] = "☑" if enabled else "☐"
-        self.payload_tree.item(iid, values=values)
-        return "break"
 
     def selected_payloads(self):
         out = []
@@ -7812,144 +9562,6 @@ class FcdApp:
         if "FBL" in reason_upper:
             target["_fcd_fbl_flash_reset_ready"] = True
 
-    def _execute_parallel_coding(self, manifest, progress_cb, include_zgw=True, only_zgw=False, strict_response=False):
-        targets = {t.get("node_name", ""): t for t in manifest.get("targets", [])}
-        live_descriptors = self._all_coding_descriptors()
-        coding_events = [e for e in manifest.get("schedule", []) if e.get("phase") == "coding"]
-        if only_zgw:
-            coding_events = [e for e in coding_events if e.get("is_zgw")]
-        elif not include_zgw:
-            coding_events = [e for e in coding_events if not e.get("is_zgw")]
-        lanes = {}
-        for slot in sorted({e.get("time_slot", 0) for e in coding_events}):
-            events = [e for e in coding_events if e.get("time_slot", 0) == slot]
-            work_by_bus = {}
-            for event in events:
-                target = targets.get(event.get("node_name", ""), {})
-                node_name = str(target.get("node_name") or event.get("node_name", ""))
-                descriptor = target.get("coding_descriptor") or live_descriptors.get(node_name.upper())
-                if not descriptor:
-                    self.log(f"Execute Parallel Bundle: {node_name} has no configured coding values; skipped")
-                    continue
-                if not hex_to_bytes(descriptor.get("mask_hex", "")):
-                    self.log(f"Execute Parallel Bundle: {node_name} coding mask is empty; skipped")
-                    continue
-                if target.get("coding_descriptor") is not descriptor:
-                    target = dict(target)
-                    target["coding_descriptor"] = descriptor
-                bus = bus_category(target.get("bus_type") or event.get("bus_type", "UNKNOWN"))
-                work_by_bus.setdefault(bus, []).append((event, target))
-            for bus, work in work_by_bus.items():
-                lanes.setdefault(bus, []).append((slot, work))
-
-        if not lanes:
-            return
-
-        lane_text = ", ".join(
-            f"{bus}:{len(tasks)} slot(s)"
-            for bus, tasks in sorted(lanes.items())
-        )
-        self.log(f"Execute Parallel Bundle: coding bus lanes={lane_text}")
-
-        shared_paced_client = None
-
-        def run_lane(bus, tasks):
-            for slot, work in tasks:
-                self._execute_parallel_coding_slot_work(
-                    slot,
-                    bus,
-                    work,
-                    shared_paced_client,
-                    strict_response,
-                )
-
-        try:
-            if (
-                self.transport_var.get() == "DoIP"
-                and any(
-                    self._can_run_paced_coding_slot("Code Vehicle", work)
-                    for tasks in lanes.values()
-                    for _slot, work in tasks
-                )
-            ):
-                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
-                shared_paced_client.drain()
-                self.log("Execute Parallel Bundle: coding uses one DoIP TCP connection for routed bus schedule")
-
-            if len(lanes) == 1:
-                bus, tasks = next(iter(lanes.items()))
-                run_lane(bus, tasks)
-                return
-
-            with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-                futures = [
-                    executor.submit(run_lane, bus, tasks)
-                    for bus, tasks in lanes.items()
-                ]
-                for future in as_completed(futures):
-                    future.result()
-        finally:
-            if shared_paced_client is not None:
-                shared_paced_client.close()
-
-    def _execute_parallel_coding_slot_work(self, slot, bus, work, shared_client, strict_response=False):
-        if not work:
-            return shared_client
-
-        if (
-            self.transport_var.get() == "DoIP"
-            and self._can_run_paced_coding_slot("Code Vehicle", work)
-        ):
-            owns_client = False
-            if shared_client is None:
-                shared_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                shared_client.request_spacing_seconds = max(shared_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
-                shared_client.drain()
-                owns_client = True
-                self.log(f"Execute Parallel Bundle: coding bus={bus} uses one DoIP TCP connection for routed requests")
-            nodes = ", ".join(f"{event.get('node_name', '')}({event.get('bus_type', 'UNKNOWN')})" for event, _target in work)
-            self.log(f"Execute Parallel Bundle: coding slot {slot} bus={bus} parallel nodes={nodes}")
-            try:
-                self._run_paced_code_vehicle_slot(slot, work, shared_client)
-            finally:
-                if owns_client:
-                    shared_client.close()
-                    shared_client = None
-            return shared_client
-
-        self.log(
-            f"Execute Parallel Bundle: coding slot {slot} bus={bus} "
-            f"nodes={', '.join(event.get('node_name', '') for event, _target in work)}"
-        )
-        with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-            futures = [
-                executor.submit(
-                    self._execute_coding_descriptor_worker,
-                    target,
-                    self._strict_response_for_target(target, strict_response),
-                )
-                for _event, target in work
-            ]
-            for future in as_completed(futures):
-                future.result()
-        return shared_client
-
-    def _execute_coding_descriptor_worker(self, target, strict_response=False):
-        descriptor = target.get("coding_descriptor", {})
-        mask = hex_to_bytes(descriptor.get("mask_hex", ""))
-        if not mask:
-            return
-        target_addr = self._parallel_target_addr(target)
-        client = self._new_parallel_client(target_addr)
-        try:
-            send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{target.get('node_name')}: Coding Session requested as 10 41")
-            self._run_coding_routine(send, parse_int(descriptor.get("write_routine", int_hex(CODING_ROUTINE_WRITE_ALL))), mask, f"{target.get('node_name')}: Write Coding", timeout=90.0)
-            self._run_coding_routine(send, parse_int(descriptor.get("validate_routine", int_hex(CODING_ROUTINE_VALIDATE))), b"", f"{target.get('node_name')}: Check Coding", timeout=20.0)
-        finally:
-            client.close()
-
     def _payload_is_fbl(self, payload):
         flash_kind = str(payload.get("flash_kind", "")).strip().upper()
         if flash_kind:
@@ -8070,19 +9682,6 @@ class FcdApp:
         self.log(f"{prefix}: active_session=0x{session:02X}")
         return session
 
-    def _read_active_sw_block(self, send, prefix, timeout=2.0):
-        response = send(
-            b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK),
-            f"{prefix}: Read Active Software Block F100",
-            timeout=timeout,
-        )
-        require_positive_response(response, 0x22)
-        if (len(response) < 4) or (response[1] != 0xF1) or (response[2] != 0x00):
-            raise FcdError(f"{prefix}: malformed active-sw-block DID response {bytes_to_hex(response)}")
-        block = response[3]
-        self.log(f"{prefix}: active_sw_block=0x{block:02X}")
-        return block
-
     def _ensure_session(self, send, session, label, timeout=3.0):
         try:
             return self._send_session(send, session, label, timeout=timeout)
@@ -8103,21 +9702,7 @@ class FcdApp:
                 f"{label}: requested session 0x{session:02X}, active session is 0x{active_session:02X}"
             ) from session_exc
 
-    def _try_send_session(self, send, session, label, timeout=3.0):
-        try:
-            return send(bytes([0x10, session & 0xFF]), label, timeout=timeout, allow_no_response=True)
-        except Exception as exc:
-            self.log(f"{label}: no usable response ({exc}); continuing")
-            return b""
-
-    def _try_send(self, send, request, label, timeout=3.0):
-        try:
-            return send(request, label, timeout=timeout, allow_no_response=True)
-        except Exception as exc:
-            self.log(f"{label}: no usable response ({exc}); continuing")
-            return b""
-
-    def _run_flash_routine_control(self, send, rid, option, label, timeout, expected_payload=None):
+    def _run_flash_routine_control(self, send, rid, option, label, timeout, expected_payload=None, allow_no_response=False):
         request = b"\x31\x01" + struct.pack(">H", rid) + bytes(option or b"")
         expected_payload = bytes(expected_payload) if expected_payload is not None else None
         start = time.monotonic()
@@ -8126,7 +9711,7 @@ class FcdApp:
         )
 
         try:
-            response = send(request, label, timeout=timeout)
+            response = send(request, label, timeout=timeout, allow_no_response=allow_no_response)
         except NegativeResponse as exc:
             elapsed = time.monotonic() - start
             self.log(
@@ -8135,6 +9720,16 @@ class FcdApp:
             )
             raise
 
+        if not response:
+            if allow_no_response:
+                elapsed = time.monotonic() - start
+                nrc78_count = getattr(send, "last_nrc78_count", 0)
+                self.log(
+                    f"{label}: routine=0x{rid:04X} final=no-response-accepted "
+                    f"elapsed={elapsed:.3f}s nrc78={nrc78_count}"
+                )
+                return b""
+            raise FcdError(f"{label}: no RoutineControl response accepted")
         if len(response) < 4 or response[0] != 0x71 or response[1] != 0x01:
             raise FcdError(f"{label}: malformed RoutineControl response {bytes_to_hex(response)}")
         echoed_rid = struct.unpack(">H", response[2:4])[0]
@@ -8167,6 +9762,8 @@ class FcdApp:
         )
 
     def _validate_routine_control_response(self, response, rid, expected_payload, label):
+        if not response:
+            raise FcdError(f"{label}: no RoutineControl response accepted")
         if len(response) < 4 or response[0] != 0x71 or response[1] != 0x01:
             raise FcdError(f"{label}: malformed RoutineControl response {bytes_to_hex(response)}")
         echoed_rid = struct.unpack(">H", response[2:4])[0]
@@ -8248,11 +9845,9 @@ class FcdApp:
             (DID_APP_SW_VERSION, "Read Software Version F101"),
             (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
             (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
+            (DID_MCU_DATA_PACKET, "Read MCU Data Packet FCD1"),
         ]:
             send(b"\x22" + struct.pack(">H", did), f"{prefix}: {name}")
-
-    def _is_nrc(self, exc, sid, nrc):
-        return f"Negative response for 0x{sid:02X}: NRC 0x{nrc:02X}" in str(exc)
 
     def _execute_zgw_flash_entry(self, send, node_name, is_fbl=False):
         self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls")
@@ -8266,54 +9861,6 @@ class FcdApp:
     def _execute_zgw_programming_preamble(self, client, is_fbl=False):
         send = self._make_uds_sender(client)
         self._execute_zgw_flash_entry(send, "ZGW", is_fbl=is_fbl)
-
-    def _execute_start_fbl_ram_updater(self, client):
-        send = self._make_uds_sender(client)
-        self._select_fbl_software_block(send, "FBL updater entry")
-        self._run_flash_routine_control(
-            send,
-            ROUTINE_START_FBL_RAM_UPDATER,
-            b"",
-            "RoutineControl 0155 Start FBL RAM Updater",
-            timeout=FBL_UPDATER_ENTRY_TIMEOUT_SECONDS,
-        )
-
-    def _execute_status_readback(self, client, prefix):
-        send = self._make_uds_sender(client)
-        self._read_standard_status(send, prefix)
-
-    def _execute_hard_reset(self, client, reason):
-        self._tolerant_ecu_reset(client, reason)
-
-    def _execute_post_programming_extended(self, client):
-        send = self._make_uds_sender(client)
-        self._send_session(send, SESSION_DEFAULT, "Default Session after programming")
-        self._send_session(send, SESSION_EXTENDED, "Extended Session after programming")
-        self._read_standard_status(send, "Post-programming")
-        send(b"\x28\x00\x03", "CommunicationControl enableRxAndTx")
-        send(b"\x85\x01", "ControlDTCSetting on")
-
-    def _execute_coding_after_flash(self, client):
-        # Match the Coding tab: send the generated coding mask as the Write Coding
-        # routine option record. Without it, the ECU only receives "31 01 02 02".
-        mask = self._coding_rows_to_mask()
-        send = self._make_uds_sender(client)
-        self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session requested as 10 41")
-        self._run_coding_routine(send, CODING_ROUTINE_WRITE_ALL, mask, "Write Coding", timeout=90.0)
-        self._run_coding_routine(send, CODING_ROUTINE_VALIDATE, b"", "Check Coding", timeout=20.0)
-        self._execute_hard_reset(client, "after coding")
-
-    def _execute_final_readback(self, client):
-        send = self._make_uds_sender(client)
-        self._ensure_session(send, SESSION_CODING_REQUESTED, "Coding Session after coding reset requested as 10 41")
-        self._read_coding_app_status(send, "Final", required=True)
-        for did, name in [
-            (DID_APP_SW_VERSION, "Read Software Version F101"),
-            (DID_ACTIVE_SW_BLOCK, "Read Active Software Block F100"),
-            (DID_ACTIVE_DIAG_SESSION, "Read Active Diagnostic Session F186"),
-        ]:
-            send(b"\x22" + struct.pack(">H", did), f"Final: {name}")
-        self._request_read_coding_routine(send, CODING_ROUTINE_READ_NVM, "Final", timeout=10.0)
 
     def _read_payload_data(self, payload):
         if payload.get("data_base64"):
@@ -8394,6 +9941,7 @@ class FcdApp:
                 f"RoutineControl Erase {block_name}",
                 timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get())),
                 expected_payload=b"\x00",
+                allow_no_response=isinstance(client, DoipClient) and target_is_zgw,
             )
         elif self.erase_var.get():
             self._run_flash_routine_control(
@@ -8402,6 +9950,7 @@ class FcdApp:
                 struct.pack(">II", address, size),
                 f"RoutineControl Erase {block_name}",
                 timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get())),
+                allow_no_response=isinstance(client, DoipClient) and target_is_zgw,
             )
 
         req_download = b"\x34\x00\x44" + struct.pack(">II", address, size)

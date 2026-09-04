@@ -16,20 +16,20 @@
 #define GTMTOM_PWM_CLOCK_SOURCE            IfxGtm_Tom_Ch_ClkSrc_cmuFxclk0
 #define GTMTOM_PWM_OUTPUT_PIN              IfxGtm_TOM0_4_TOUT9_P00_0_OUT
 
-typedef enum
+enum
 {
     GTMTOM_CONTROL_MODE_RAW_TICKS = 0u,
     GTMTOM_CONTROL_MODE_FREQ_DUTY_PERMILLE = 1u,
     GTMTOM_CONTROL_MODE_FREQ_DUTY_PPM = 2u
-} GtmTom_ControlModeType;
+};
 
-typedef enum
+enum
 {
     GTMTOM_BURST_IDLE = 0u,
     GTMTOM_BURST_ARMED = 1u,
     GTMTOM_BURST_ACTIVE = 2u,
     GTMTOM_BURST_DONE = 3u
-} GtmTom_BurstStateType;
+};
 
 void GtmTom_Init(void);
 void GtmTom_MainFunction(void);

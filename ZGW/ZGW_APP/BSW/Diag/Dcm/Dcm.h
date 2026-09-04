@@ -120,13 +120,14 @@ typedef struct
 #define DCM_DID_ACTIVE_SOFTWARE_BLOCK                 0xF100u
 #define DCM_DID_APPLICATION_SOFTWARE_VERSION          0xF101u
 #define DCM_DID_ACTIVE_DIAGNOSTIC_SESSION               0xF186u
+#define DCM_DID_MCU_DATA_PACKET                       0xFCD1u
 
-#define DCM_ACTIVE_SOFTWARE_BLOCK_APP                   0x00u
+#define DCM_ACTIVE_SOFTWARE_BLOCK_APP                   0x01u
 
-#define DCM_APP_SW_VERSION_MAJOR                        1u
+#define DCM_APP_SW_VERSION_MAJOR                        2u
 #define DCM_APP_SW_VERSION_MINOR                        0u
 #define DCM_APP_SW_VERSION_PATCH                        0u
-#define DCM_FBL_SW_VERSION_MAJOR                        1u
+#define DCM_FBL_SW_VERSION_MAJOR                        2u
 #define DCM_FBL_SW_VERSION_MINOR                        0u
 #define DCM_FBL_SW_VERSION_PATCH                        0u
 

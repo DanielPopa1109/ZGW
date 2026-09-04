@@ -7,15 +7,6 @@
 #define OS_CPU_LOAD_INVALID_PERCENT     0xFFu
 #define OS_CPU_LOAD_INVALID_PERMILLE    0xFFFFu
 
-typedef struct
-{
-    uint8 valid;
-    uint8 percent;
-    uint16 permille;
-    uint32 runtimeDelta;
-    uint32 idleRuntimeDelta;
-} Os_CpuLoadType;
-
 extern void Os_Init_C0(void);
 extern void Os_Init_C1(void);
 extern void Os_Init_C2(void);
@@ -40,8 +31,6 @@ extern volatile uint32 Os_EthNetifWaitLoops;
 extern volatile uint32 Os_Core2AsilApplStackHighWater;
 extern volatile uint32 Os_Core2QmBswStackHighWater;
 
-uint8 Os_GetCpuLoadPercent(uint8 CoreId);
 uint16 Os_GetCpuLoadPermille(uint8 CoreId);
-void Os_GetCpuLoadSnapshot(uint8 CoreId, Os_CpuLoadType *CpuLoad);
 
 #endif /* OS_H */

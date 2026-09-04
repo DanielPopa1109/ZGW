@@ -7,6 +7,7 @@
 #include "IfxPort_reg.h"
 #include "SafetyKit_InternalWatchdogs.h"
 #include "SysMgr.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #define CAN_IRQ_PRIO_RX_CLASSIC       40u
 #define CAN_IRQ_PRIO_RX_FD            41u
@@ -1536,11 +1537,15 @@ static void Can_ProcessRx(void)
 
 void Can_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_CAN_MAIN_C0, &cpuPerfCtx);
     Can_MainFunction_BusOff();
     Can_MainFunction_Mode();
     Can_MainFunction_Read();
     Can_MainFunction_Write();
     Can_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_CAN_MAIN_C0, &cpuPerfCtx);
 }
 
 void Can_MainFunction_BusOff(void)
@@ -1800,13 +1805,21 @@ void Can_DisableControllerInterrupts(uint8 Controller)
 IFX_INTERRUPT(Can_IrqRxClassic, 0, CAN_IRQ_PRIO_RX_CLASSIC);
 void Can_IrqRxClassic(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_CAN_IRQ_RX_CLASSIC_C0, &cpuPerfCtx);
     Can_IsrRxClassic();
+    CpuPerf_Stop(CPUPERF_ID_CAN_IRQ_RX_CLASSIC_C0, &cpuPerfCtx);
 }
 
 IFX_INTERRUPT(Can_IrqRxFd, 0, CAN_IRQ_PRIO_RX_FD);
 void Can_IrqRxFd(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_CAN_IRQ_RX_FD_C0, &cpuPerfCtx);
     Can_IsrRxFd();
+    CpuPerf_Stop(CPUPERF_ID_CAN_IRQ_RX_FD_C0, &cpuPerfCtx);
 }
 
 IFX_INTERRUPT(Can_IrqBusOffClassic, 0, CAN_IRQ_PRIO_BUSOFF_CLASSIC);

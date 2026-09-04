@@ -43,7 +43,6 @@ void LinDiag_ReportFrameResult(uint8 channel,
                                uint8 publisherNad,
                                uint8 slaveResponseExpected,
                                Lin_ResultType result);
-void LinDiag_ReportControllerFault(uint8 channel);
 void LinDiag_ReportWakeupFailure(uint8 channel);
 void LinDiag_ReportSleepFailure(uint8 channel);
 

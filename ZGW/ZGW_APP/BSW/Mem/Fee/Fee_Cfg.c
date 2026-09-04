@@ -20,5 +20,35 @@ const Fee_BlockConfigType Fee_BlockConfig[FEE_CONFIGURED_BLOCKS] =
         NVM_BLOCK_TIMEBASE_LENGTH,
         FEE_BLOCK_NATIVE,
         FALSE
+    },
+    {
+        NVM_BLOCK_ID_ETH_STARTUP_TIMING,
+        NVM_BLOCK_ETH_STARTUP_TIMING_LENGTH,
+        FEE_BLOCK_NATIVE,
+        FALSE
+    },
+    {
+        NVM_BLOCK_ID_NVM_TIMING,
+        NVM_BLOCK_NVM_TIMING_LENGTH,
+        FEE_BLOCK_NATIVE,
+        FALSE
+    },
+    {
+        NVM_BLOCK_ID_MCU_STATUS,
+        NVM_BLOCK_MCU_STATUS_LENGTH,
+        FEE_BLOCK_NATIVE,
+        FALSE
+    },
+    {
+        NVM_BLOCK_ID_AIMODEL,
+        NVM_BLOCK_AIMODEL_LENGTH,
+        FEE_BLOCK_NATIVE,
+        FALSE
+    },
+    {
+        NVM_BLOCK_ID_NVM_STATS,
+        NVM_BLOCK_NVM_STATS_LENGTH,
+        FEE_BLOCK_NATIVE,
+        FALSE
     }
 };

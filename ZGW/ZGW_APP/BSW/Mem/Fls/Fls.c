@@ -4,6 +4,9 @@
 #include "IfxFlash.h"
 #include "IfxScuWdt.h"
 #include "IfxCpu.h"
+#include "BSW/Mem/Nvm/NvMTiming.h"
+#include "BSW/Mem/Nvm/NvMStats.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #define FLS_API_INIT               (0x00u)
 #define FLS_API_ERASE              (0x01u)
@@ -111,8 +114,6 @@ volatile uint32 Fls_DFlashWriteCounter = 0u;
 volatile uint32 Fls_DmuWaitCounter = 0u;
 volatile uint32 Fls_DmuWaitTimeoutCounter = 0u;
 volatile uint32 Fls_DmuWaitBusyCounter = 0u;
-volatile uint32 Fls_DmuWaitEndinitOpenCounter = 0u;
-volatile uint32 Fls_DmuWaitEndinitCloseCounter = 0u;
 volatile uint32 Fls_DmuWaitLastLoops = 0u;
 volatile uint32 Fls_DmuWaitLastStatus = 0u;
 volatile uint32 Fls_DmuWaitConsecutiveBusyCounter = 0u;
@@ -235,6 +236,7 @@ static Std_ReturnType Fls_CheckDmuReadyForCommand(Fls_AddressType address)
     {
         Fls_DmuBusyRejectCounter++;
         Fls_DmuRejectAddress = address;
+        NvMStats_RecordFlsDmuBusyReject();
         return E_NOT_OK;
     }
 
@@ -272,6 +274,7 @@ static Fls_DmuPollResultType Fls_PollDmuReady(void)
         {
             Fls_DmuWaitTimeoutCounter++;
             Fls_RecordDmuStuck(status);
+            NvMStats_RecordFlsDmuTimeout();
             result = FLS_DMU_POLL_ERROR;
         }
     }
@@ -354,7 +357,13 @@ static Std_ReturnType Fls_CopyReadableRange(Fls_AddressType address, uint8 *targ
 
 static void Fls_FinishJob(MemIf_JobResultType result)
 {
+    if (result == MEMIF_JOB_FAILED)
+    {
+        NvMStats_RecordFlsError(FLS_API_MAIN, FLS_E_VERIFY, Fls_State.start + Fls_State.progress);
+        NvMStats_RecordFlsJobFailure((uint32)Fls_State.job);
+    }
     Fls_State.result = result;
+    NvMTiming_FlsComplete((uint8)result);
     Fls_State.status = MEMIF_IDLE;
     Fls_State.job = FLS_JOB_NONE;
     Fls_State.phase = FLS_PHASE_IDLE;
@@ -516,6 +525,7 @@ Std_ReturnType Fls_Erase(Fls_AddressType TargetAddress, Fls_LengthType Length)
     Fls_State.phaseProgress = 0u;
     Fls_State.src = NULL_PTR;
     Fls_State.dst = NULL_PTR;
+    NvMTiming_FlsRequest(NVMTIMING_OP_WRITE_BLOCK, TargetAddress, Length);
     return E_OK;
 }
 
@@ -562,6 +572,7 @@ Std_ReturnType Fls_Write(Fls_AddressType TargetAddress, const uint8 *SourceAddre
     Fls_State.phaseProgress = 0u;
     Fls_State.src = SourceAddressPtr;
     Fls_State.dst = NULL_PTR;
+    NvMTiming_FlsRequest(NVMTIMING_OP_WRITE_BLOCK, TargetAddress, Length);
     return E_OK;
 }
 
@@ -603,6 +614,7 @@ Std_ReturnType Fls_Read(Fls_AddressType SourceAddress, uint8 *TargetAddressPtr, 
     Fls_State.phaseProgress = 0u;
     Fls_State.src = NULL_PTR;
     Fls_State.dst = TargetAddressPtr;
+    NvMTiming_FlsRequest(NVMTIMING_OP_READ_BLOCK, SourceAddress, Length);
     return E_OK;
 }
 
@@ -695,6 +707,7 @@ long long Fls_MainFunction_Counter = 0;
 
 static void Fls_MainFunctionStep(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     Fls_AddressType current;
     const uint8 *src;
     uint8 *dst;
@@ -705,6 +718,8 @@ static void Fls_MainFunctionStep(void)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_FLS_MAIN_STEP_C0, &cpuPerfCtx);
 
     current = Fls_State.start + Fls_State.progress;
 
@@ -771,6 +786,7 @@ static void Fls_MainFunctionStep(void)
 #endif
                     Fls_LastWrittenDFlashAddress = current;
                     Fls_DFlashWriteCounter++;
+                    NvMStats_RecordFlsPageWrite(FLS_DFLASH0_PAGE_SIZE);
                     Fls_State.progress += FLS_DFLASH0_PAGE_SIZE;
                     Fls_State.phase = FLS_PHASE_IDLE;
                     Fls_State.phaseProgress = 0u;
@@ -820,6 +836,7 @@ static void Fls_MainFunctionStep(void)
                     Fls_State.phase = FLS_PHASE_ERASE_VERIFY_WAIT;
                     Fls_State.phaseProgress = 0u;
 #else
+                    NvMStats_RecordFlsEraseSector(FLS_DFLASH0_SECTOR_SIZE);
                     Fls_State.progress += FLS_DFLASH0_SECTOR_SIZE;
                     Fls_State.phase = FLS_PHASE_IDLE;
                     if (Fls_State.progress >= Fls_State.length)
@@ -844,6 +861,7 @@ static void Fls_MainFunctionStep(void)
                         break;
                     }
 #endif
+                    NvMStats_RecordFlsEraseSector(FLS_DFLASH0_SECTOR_SIZE);
                     Fls_State.progress += FLS_DFLASH0_SECTOR_SIZE;
                     Fls_State.phase = FLS_PHASE_IDLE;
                     Fls_State.phaseProgress = 0u;
@@ -865,6 +883,7 @@ static void Fls_MainFunctionStep(void)
             break;
     }
 
+    CpuPerf_Stop(CPUPERF_ID_FLS_MAIN_STEP_C0, &cpuPerfCtx);
 }
 
 void Fls_MainFunction(void)
@@ -909,4 +928,5 @@ void Fls_MainFunction(void)
     } while (stepBudget > 0u);
 
     Fls_MainFunction_Counter++;
+    NvMTiming_FlsMainCycle();
 }

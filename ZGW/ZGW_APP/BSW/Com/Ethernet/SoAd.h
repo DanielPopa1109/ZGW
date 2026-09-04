@@ -90,7 +90,6 @@ void SoAd_MainFunction(void);
 uint8 SoAd_OpenSoCon(SoAd_SoConIdType id);
 void SoAd_CloseSoCon(SoAd_SoConIdType id);
 void SoAd_AbortTcpConnection(SoAd_SoConIdType id);
-sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len);
 Std_ReturnType SoAd_GetDiagSnapshot(SoAd_SoConIdType id, SoAd_DiagSnapshotType *snapshot);
 
 extern volatile uint32 SoAd_OpenFailNoLinkCounter;

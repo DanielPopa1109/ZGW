@@ -55,6 +55,7 @@
 #include "lwip/acd.h"
 #include "lwip/prot/iana.h"
 #include "netif/ethernet.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 
 #include <string.h>
 
@@ -454,6 +455,7 @@ etharp_update_arp_entry(struct netif *netif, const ip4_addr_t *ipaddr, struct et
   {
     /* mark it stable */
     arp_table[i].state = ETHARP_STATE_STABLE;
+    EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_ARP_RESOLVED, ETHSTARTUPTIMING_RX_ARP);
   }
 
   /* record network interface */
@@ -1207,6 +1209,7 @@ err_t
 etharp_request(struct netif *netif, const ip4_addr_t *ipaddr)
 {
   LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("etharp_request: sending ARP request.\n"));
+  EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_ARP_REQUEST, ETHSTARTUPTIMING_RX_ARP);
   return etharp_request_dst(netif, ipaddr, &ethbroadcast);
 }
 

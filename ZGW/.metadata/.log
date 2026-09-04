@@ -5080,3 +5080,1296 @@ Caused by: java.nio.channels.UnresolvedAddressException
 
 !ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-30 17:09:00.298
 !MESSAGE Include paths were discovered in 163 milliseconds.
+!SESSION 2026-08-31 18:11:06.756 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:10.584
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:10.748
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:10.911
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-08-31 18:11:13.408
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:22.119
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 757 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:25.722
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3602 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:11:25.895
+!MESSAGE Include paths were discovered in 169 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:12:02.813
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1924 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:12:02.847
+!MESSAGE Include paths were discovered in 32 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:12:25.240
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1771 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 18:12:25.276
+!MESSAGE Include paths were discovered in 33 milliseconds.
+!SESSION 2026-08-31 19:42:55.851 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 19:42:58.408
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 19:42:58.564
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 19:42:58.704
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-08-31 19:43:00.710
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 2 0 2026-08-31 19:43:00.719
+!MESSAGE Unable to initialize Analytics Service.
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 4 0 2026-08-31 19:43:00.719
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.<init>(AnalyticsService.java:69)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.getInstance(AnalyticsService.java:98)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 7 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 2 0 2026-08-31 19:43:00.742
+!MESSAGE Unable to initialize Notification Service.
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-08-31 19:43:00.743
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.<init>(NotificationService.java:68)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.getInstance(NotificationService.java:93)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.send(AnalyticsService.java:196)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.sendError(AnalyticsService.java:119)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 9 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-08-31 19:43:00.780
+!MESSAGE NullPointerException
+!STACK 0
+java.lang.NullPointerException
+	at com.google.common.base.Preconditions.checkNotNull(Preconditions.java:892)
+	at com.google.api.client.util.Preconditions.checkNotNull(Preconditions.java:125)
+	at com.google.api.client.http.GenericUrl.buildAuthority(GenericUrl.java:389)
+	at com.google.api.client.http.GenericUrl.build(GenericUrl.java:374)
+	at com.google.api.client.http.HttpRequest.execute(HttpRequest.java:883)
+	at com.infineon.aurix.buildsystem.notification.NotificationService$NotificationGetJob.run(NotificationService.java:234)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+!SESSION 2026-08-31 23:36:18.281 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:20.921
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:21.062
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:21.213
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-08-31 23:36:23.532
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 2 0 2026-08-31 23:36:23.559
+!MESSAGE Unable to initialize Analytics Service.
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 4 0 2026-08-31 23:36:23.559
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.<init>(AnalyticsService.java:69)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.getInstance(AnalyticsService.java:98)
+	at com.infineon.aurix.buildsystem.AnalyticsUtils.send(AnalyticsUtils.java:24)
+	at com.infineon.aurix.buildsystem.Analytics.sendToolStarted(Analytics.java:6)
+	at com.infineon.aurix.buildsystem.AurixIDEStartup.earlyStartup(AurixIDEStartup.java:25)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.runEarlyStartup(EarlyStartupRunnable.java:79)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.run(EarlyStartupRunnable.java:55)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.ui.internal.Workbench$39.run(Workbench.java:2699)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 12 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:35.925
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 598 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:39.892
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3966 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:36:40.128
+!MESSAGE Include paths were discovered in 228 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:37:19.932
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1822 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-08-31 23:37:19.973
+!MESSAGE Include paths were discovered in 40 milliseconds.
+!SESSION 2026-09-01 08:45:18.956 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:23.181
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:23.338
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:23.494
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-01 08:45:25.500
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:30.648
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:30.652
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:30.652
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:30.653
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 0 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:45:31.048
+!MESSAGE Include paths were discovered in 392 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:48:34.317
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 842 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:48:38.587
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4267 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 08:48:38.731
+!MESSAGE Include paths were discovered in 141 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 14:06:38.880
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 403 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 14:06:43.314
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4432 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 14:06:43.472
+!MESSAGE Include paths were discovered in 157 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 14:07:21.045
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2282 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 14:07:21.111
+!MESSAGE Include paths were discovered in 63 milliseconds.
+!SESSION 2026-09-01 23:56:09.953 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:13.723
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:13.884
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:14.033
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-01 23:56:16.575
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:26.925
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 738 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:30.912
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3986 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:56:31.174
+!MESSAGE Include paths were discovered in 253 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:57:16.331
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2585 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-01 23:57:16.372
+!MESSAGE Include paths were discovered in 38 milliseconds.
+!SESSION 2026-09-02 11:24:48.456 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 11:24:53.879
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 11:24:54.021
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 11:24:54.156
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-02 11:24:57.134
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 2 0 2026-09-02 11:24:57.151
+!MESSAGE Unable to initialize Analytics Service.
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 4 0 2026-09-02 11:24:57.159
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.<init>(AnalyticsService.java:69)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.getInstance(AnalyticsService.java:98)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 7 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 2 0 2026-09-02 11:24:57.181
+!MESSAGE Unable to initialize Notification Service.
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-09-02 11:24:57.181
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.<init>(NotificationService.java:68)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.getInstance(NotificationService.java:93)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.send(AnalyticsService.java:196)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.sendError(AnalyticsService.java:119)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 9 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-09-02 11:24:57.244
+!MESSAGE NullPointerException
+!STACK 0
+java.lang.NullPointerException
+	at com.google.common.base.Preconditions.checkNotNull(Preconditions.java:892)
+	at com.google.api.client.util.Preconditions.checkNotNull(Preconditions.java:125)
+	at com.google.api.client.http.GenericUrl.buildAuthority(GenericUrl.java:389)
+	at com.google.api.client.http.GenericUrl.build(GenericUrl.java:374)
+	at com.google.api.client.http.HttpRequest.execute(HttpRequest.java:883)
+	at com.infineon.aurix.buildsystem.notification.NotificationService$NotificationGetJob.run(NotificationService.java:234)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+!SESSION 2026-09-02 13:56:30.863 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 13:56:34.439
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 13:56:34.617
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 13:56:34.754
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-02 13:56:37.416
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 2 0 2026-09-02 13:56:37.420
+!MESSAGE Unable to initialize Analytics Service.
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 4 0 2026-09-02 13:56:37.421
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.<init>(AnalyticsService.java:69)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.getInstance(AnalyticsService.java:98)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 7 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 2 0 2026-09-02 13:56:37.434
+!MESSAGE Unable to initialize Notification Service.
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-09-02 13:56:37.434
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.<init>(NotificationService.java:68)
+	at com.infineon.aurix.buildsystem.notification.NotificationService.getInstance(NotificationService.java:93)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.send(AnalyticsService.java:196)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.sendError(AnalyticsService.java:119)
+	at com.infineon.aurix.buildsystem.Logger.logError(Logger.java:34)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:47)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 9 more
+
+!ENTRY com.infineon.aurix.buildsystem.notification 4 0 2026-09-02 13:56:37.494
+!MESSAGE NullPointerException
+!STACK 0
+java.lang.NullPointerException
+	at com.google.common.base.Preconditions.checkNotNull(Preconditions.java:892)
+	at com.google.api.client.util.Preconditions.checkNotNull(Preconditions.java:125)
+	at com.google.api.client.http.GenericUrl.buildAuthority(GenericUrl.java:389)
+	at com.google.api.client.http.GenericUrl.build(GenericUrl.java:374)
+	at com.google.api.client.http.HttpRequest.execute(HttpRequest.java:883)
+	at com.infineon.aurix.buildsystem.notification.NotificationService$NotificationGetJob.run(NotificationService.java:234)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+!SESSION 2026-09-02 16:06:19.605 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:24.671
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:24.852
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:24.986
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-02 16:06:28.427
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 2 0 2026-09-02 16:06:28.454
+!MESSAGE Unable to initialize Analytics Service.
+
+!ENTRY com.infineon.aurix.buildsystem.analytics 4 0 2026-09-02 16:06:28.454
+!MESSAGE java.net.MalformedURLException: no protocol: 
+!STACK 0
+java.lang.IllegalArgumentException: java.net.MalformedURLException: no protocol: 
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:679)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:125)
+	at com.google.api.client.http.GenericUrl.<init>(GenericUrl.java:108)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.<init>(AnalyticsService.java:69)
+	at com.infineon.aurix.buildsystem.analytics.AnalyticsService.getInstance(AnalyticsService.java:98)
+	at com.infineon.aurix.buildsystem.AnalyticsUtils.send(AnalyticsUtils.java:24)
+	at com.infineon.aurix.buildsystem.Analytics.sendToolStarted(Analytics.java:6)
+	at com.infineon.aurix.buildsystem.AurixIDEStartup.earlyStartup(AurixIDEStartup.java:25)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.runEarlyStartup(EarlyStartupRunnable.java:79)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.run(EarlyStartupRunnable.java:55)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.ui.internal.Workbench$39.run(Workbench.java:2699)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.MalformedURLException: no protocol: 
+	at java.base/java.net.URL.<init>(URL.java:772)
+	at java.base/java.net.URL.<init>(URL.java:654)
+	at java.base/java.net.URL.<init>(URL.java:590)
+	at com.google.api.client.http.GenericUrl.parseURL(GenericUrl.java:677)
+	... 12 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:38.864
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 564 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:42.825
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3960 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:43.056
+!MESSAGE Include paths were discovered in 224 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:58.165
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1885 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:06:58.208
+!MESSAGE Include paths were discovered in 40 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:12:04.903
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 648 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:12:07.722
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2816 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 16:12:07.881
+!MESSAGE Include paths were discovered in 156 milliseconds.
+!SESSION 2026-09-02 23:08:36.781 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:08:42.789
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:08:42.991
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:08:43.121
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-02 23:08:45.783
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:09:03.077
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 754 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:09:07.281
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4202 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:09:07.511
+!MESSAGE Include paths were discovered in 225 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:09:22.013
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1751 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:09:22.056
+!MESSAGE Include paths were discovered in 41 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:10:29.197
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 312 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:10:32.613
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3414 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:10:32.747
+!MESSAGE Include paths were discovered in 131 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:11:54.087
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 472 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:11:56.588
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2497 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:11:56.684
+!MESSAGE Include paths were discovered in 94 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:12:47.641
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 327 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:12:50.034
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2393 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:12:50.146
+!MESSAGE Include paths were discovered in 110 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:13:16.764
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 520 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:13:19.320
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2555 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:13:19.527
+!MESSAGE Include paths were discovered in 203 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:15:09.634
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 455 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:15:12.073
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 2437 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-02 23:15:12.206
+!MESSAGE Include paths were discovered in 132 milliseconds.
+!SESSION 2026-09-03 10:26:47.167 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:26:51.099
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:26:51.238
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:26:51.394
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-03 10:26:54.414
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:27:09.005
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1064 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:27:14.219
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 5213 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:27:14.498
+!MESSAGE Include paths were discovered in 272 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:27:32.078
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2461 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:27:32.141
+!MESSAGE Include paths were discovered in 59 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:51:33.739
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 560 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:51:36.956
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3214 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:51:37.117
+!MESSAGE Include paths were discovered in 154 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:52:11.622
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 357 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:52:15.556
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3933 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:52:15.782
+!MESSAGE Include paths were discovered in 221 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:52:50.375
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2001 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:52:50.425
+!MESSAGE Include paths were discovered in 48 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:53:11.710
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 743 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:53:15.129
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3417 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:53:15.285
+!MESSAGE Include paths were discovered in 151 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:53:44.028
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 643 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 10:53:44.087
+!MESSAGE Include paths were discovered in 56 milliseconds.
+!SESSION 2026-09-03 11:06:29.066 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:06:32.047
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:06:32.213
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:06:32.357
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-03 11:06:35.315
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:08:05.283
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:08:05.286
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 0 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:08:05.287
+!MESSAGE Project index is not complete, and cannot be used for boosting.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:08:05.288
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 0 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:08:05.759
+!MESSAGE Include paths were discovered in 468 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:10:29.030
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 729 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:10:33.406
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4373 milliseconds. (incremental boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 11:10:33.664
+!MESSAGE Include paths were discovered in 254 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:36:35.816
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 383 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:36:39.342
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3524 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:36:39.543
+!MESSAGE Include paths were discovered in 198 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:37:18.685
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2360 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:37:18.736
+!MESSAGE Include paths were discovered in 48 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:47:29.539
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 371 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:47:33.729
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 4189 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:47:33.880
+!MESSAGE Include paths were discovered in 148 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:48:14.612
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 2019 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-03 13:48:14.649
+!MESSAGE Include paths were discovered in 35 milliseconds.
+!SESSION 2026-09-04 21:24:18.124 -----------------------------------------------
+eclipse.buildId=1.10.36
+java.version=21.0.5
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=en_US
+Framework arguments:  -perspective com.infineon.aurix.buildmanager.perspective.c
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 -perspective com.infineon.aurix.buildmanager.perspective.c
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:21.786
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc4-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:21.931
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc2-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:22.056
+!MESSAGE Cannot open remote device description from URL https://itools.infineon.com/aurix_ide/ADS/com.infineon.aurix.buildsystem/1.10.36/tc3-hardware.json. Resource does not exist
+
+!ENTRY com.infineon.aurix.buildsystem 4 0 2026-09-04 21:24:24.408
+!MESSAGE ConnectException
+!STACK 0
+java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:951)
+	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
+	at com.infineon.aurix.buildsystem.IFXNetworkUtils$1.run(IFXNetworkUtils.java:44)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1041)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.AsyncSSLConnection.connectAsync(AsyncSSLConnection.java:56)
+	at java.net.http/jdk.internal.net.http.Http1Exchange.sendHeadersAsync(Http1Exchange.java:312)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$8(Exchange.java:581)
+	at java.net.http/jdk.internal.net.http.Exchange.checkFor407(Exchange.java:452)
+	at java.net.http/jdk.internal.net.http.Exchange.lambda$responseAsyncImpl0$9(Exchange.java:585)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl0(Exchange.java:585)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsyncImpl(Exchange.java:428)
+	at java.net.http/jdk.internal.net.http.Exchange.responseAsync(Exchange.java:420)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:413)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsyncImpl$7(MultiExchange.java:454)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandleStage(CompletableFuture.java:950)
+	at java.base/java.util.concurrent.CompletableFuture.handle(CompletableFuture.java:2372)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsyncImpl(MultiExchange.java:444)
+	at java.net.http/jdk.internal.net.http.MultiExchange.lambda$responseAsync0$2(MultiExchange.java:346)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl$DelegatingExecutor.execute(HttpClientImpl.java:177)
+	at java.base/java.util.concurrent.CompletableFuture.completeAsync(CompletableFuture.java:2719)
+	at java.net.http/jdk.internal.net.http.MultiExchange.responseAsync(MultiExchange.java:299)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.sendAsync(HttpClientImpl.java:1049)
+	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:930)
+	... 3 more
+Caused by: java.nio.channels.UnresolvedAddressException
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:137)
+	at java.base/sun.nio.ch.Net.checkAddress(Net.java:145)
+	at java.base/sun.nio.ch.SocketChannelImpl.checkRemote(SocketChannelImpl.java:842)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:865)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 29 more
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:31.977
+!MESSAGE Boosting configuration SCR Debug (SDCC) of project ZGW_APP boosted in 1054 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:35.523
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_APP boosted in 3545 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:24:35.727
+!MESSAGE Include paths were discovered in 199 milliseconds.
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:25:12.633
+!MESSAGE Boosting configuration TriCore Debug (TASKING) of project ZGW_FBL boosted in 1782 milliseconds. (full boost)
+
+!ENTRY com.infineon.aurix.buildsystem 1 0 2026-09-04 21:25:12.670
+!MESSAGE Include paths were discovered in 34 milliseconds.

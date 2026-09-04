@@ -66,7 +66,6 @@ Std_ReturnType LinIf_Transmit(PduIdType LinIfTxPduId,
                               PduLengthType len);
 
 Std_ReturnType LinIf_SetDiagRequest(const uint8 data[8]);
-Std_ReturnType LinIf_GetDiagResponse(uint8 data[8]);
 
 LinIf_DiagStateType LinIf_GetDiagState(void);
 void LinIf_DiagFrameDone(uint8 success);

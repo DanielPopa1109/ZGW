@@ -4,8 +4,6 @@
 #include "../Com.h"
 #include "../ComM/ComM.h"
 
-#include <string.h>
-
 #define CANNM_NUM_CHANNELS              2u
 #define CANNM_NM3_ACTIVE_VALUE          0xFFu
 #define CANNM_TX_PERIOD_TICKS           20u
@@ -33,8 +31,6 @@ typedef struct
     uint16 repeatTimer;
     uint16 readySleepTimer;
     uint16 prepareSleepTimer;
-    uint8 userData[CANNM_USER_DATA_LEN];
-    uint8 userDataLen;
 } CanNm_ChannelStateType;
 
 static const CanNm_ChannelConfigType CanNm_ChannelConfig[CANNM_NUM_CHANNELS] =
@@ -130,18 +126,7 @@ static void CanNm_WriteNm3Signal(uint8 index, uint8 nm3Pn1)
 
 static void CanNm_TransmitNmPdu(uint8 index)
 {
-    const CanNm_ChannelStateType* rt = &CanNm_ChannelState[index];
-    uint8 nm3Pn1;
-
-    /* The generated NM3 COM frames are the NM carriers in this lab stack.
-     * They expose PN1 as a single byte, so CanNm user data is bounded to that
-     * byte and the normal COM/PduR route sends the CAN frame.
-     */
-    nm3Pn1 = (rt->userDataLen > 0u) ?
-             rt->userData[0u] :
-             CANNM_NM3_ACTIVE_VALUE;
-
-    CanNm_WriteNm3Signal(index, nm3Pn1);
+    CanNm_WriteNm3Signal(index, CANNM_NM3_ACTIVE_VALUE);
 }
 
 static void CanNm_HandleReleasedNetwork(uint8 index)
@@ -206,10 +191,6 @@ void CanNm_Init(void)
         CanNm_ChannelState[i].repeatTimer = 0u;
         CanNm_ChannelState[i].readySleepTimer = 0u;
         CanNm_ChannelState[i].prepareSleepTimer = 0u;
-        CanNm_ChannelState[i].userDataLen = 0u;
-        (void)memset(CanNm_ChannelState[i].userData,
-                     0,
-                     sizeof(CanNm_ChannelState[i].userData));
     }
 
     CanNm_Initialized = TRUE;
@@ -337,76 +318,6 @@ Std_ReturnType CanNm_GetState(uint8 channel,
 
     *state = CanNm_ChannelState[index].state;
     *mode = CanNm_ChannelState[index].mode;
-    return E_OK;
-}
-
-Std_ReturnType CanNm_PassiveStartUp(uint8 channel)
-{
-    uint8 index;
-
-    if ((CanNm_Initialized == FALSE) ||
-        (CanNm_FindChannelIndex(channel, &index) == FALSE))
-    {
-        return E_NOT_OK;
-    }
-
-    ComM_Nm_NetworkStartIndication(channel);
-    CanNm_EnterNetwork(index, TRUE);
-    return E_OK;
-}
-
-Std_ReturnType CanNm_SetUserData(uint8 channel, const uint8* data, uint8 len)
-{
-    uint8 index;
-
-    if ((CanNm_Initialized == FALSE) ||
-        (CanNm_FindChannelIndex(channel, &index) == FALSE) ||
-        ((data == NULL_PTR) && (len != 0u)) ||
-        (len > CANNM_USER_DATA_LEN))
-    {
-        return E_NOT_OK;
-    }
-
-    if (len != 0u)
-    {
-        (void)memcpy(CanNm_ChannelState[index].userData, data, len);
-    }
-
-    CanNm_ChannelState[index].userDataLen = len;
-    if (CanNm_ChannelState[index].localRequested != FALSE)
-    {
-        CanNm_TransmitNmPdu(index);
-        CanNm_ChannelState[index].txTimer = CANNM_TX_RELOAD_TICKS;
-    }
-    return E_OK;
-}
-
-Std_ReturnType CanNm_GetUserData(uint8 channel, uint8* data, uint8* len)
-{
-    uint8 index;
-    uint8 copyLen;
-
-    if ((CanNm_Initialized == FALSE) ||
-        (data == NULL_PTR) ||
-        (len == NULL_PTR) ||
-        (CanNm_FindChannelIndex(channel, &index) == FALSE))
-    {
-        return E_NOT_OK;
-    }
-
-    copyLen = CanNm_ChannelState[index].userDataLen;
-
-    if (*len < copyLen)
-    {
-        return E_NOT_OK;
-    }
-
-    if (copyLen != 0u)
-    {
-        (void)memcpy(data, CanNm_ChannelState[index].userData, copyLen);
-    }
-
-    *len = copyLen;
     return E_OK;
 }
 

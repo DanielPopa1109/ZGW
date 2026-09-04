@@ -1,0 +1,454 @@
+======================================================================
+FCD DIAGNOSTIC REPORT
+======================================================================
+
+Report generated:              2026-09-03T16:51:47
+VIN:                           LABTC375DOIP0001
+ECU:                           ZGW
+
+
+======================================================================
+1. EXECUTIVE DIAGNOSTIC SUMMARY - ZGW
+======================================================================
+
+Overall status:                FAULTS PRESENT
+Active DTCs:                   6
+
+Key active faults:
+  - PMS errata startup warning
+  - AiModel input invalid or stale
+  - ZGW_CAN_3 Bus-Off
+  - ZGW_CANFD_2 Error Passive
+  - LIN1 Wakeup Failure
+  - LIN1 Sleep Transition Failure
+
+======================================================================
+2. DTC DETAILS
+======================================================================
+
+
+----------------------------------------------------------------------
+DTC 0x010102 - PMS errata startup warning
+----------------------------------------------------------------------
+
+  DTC status:                    0x6D (TF | PDTC | CDTC | TFSLC | TNCTOC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:41.734 UTC
+  Vehicle time:                  2493161856517120 ns
+  UTC raw time:                  1788454301734963330 ns
+  MCU temperature:               43.30 deg C
+
+PMS Errata Monitoring:
+  PMS errata failure mask:       0x00000003
+    - TC007 VDDP3 OV
+    - TC007 VDD OV
+  PMS standby ignored mask:      0x00000000 (none)
+  TC007 samples / refresh timeouts: 4/0
+  SafetyKit reset:               type LBIST (15), trigger supply watchdog (25), reason 0x0000, standby wake=0
+  PMS errata status:             FAILED (2)
+  Firmware check status:         passed (2)
+  Checked EVRSTAT/MONSTAT1:      
+    EVRSTAT:                       0x30300081 (set: EVRC, UVSWD, SWDLVL, SDVOK, UVSB, UVDDM; EVRCMOD=0x0)
+    MONSTAT1:                      0x2C8FDCD8 (ADCCV=0xD8; ADC33V=0xDC; ADCSWDV=0x8F; ACTVCNT=0x2C)
+  Captured EVRSTAT/ADCSTAT/MONSTAT1: 
+    EVRSTAT:                       0x30300081 (set: EVRC, UVSWD, SWDLVL, SDVOK, UVSB, UVDDM; EVRCMOD=0x0)
+    ADCSTAT:                       0x206F9C6C (set: UVSWD; ADCCV=0x6C; ADC33V=0x9C; ADCSWDV=0x6F)
+    MONSTAT1:                      0x328FDCD9 (ADCCV=0xD9; ADC33V=0xDC; ADCSWDV=0x8F; ACTVCNT=0x32)
+  Raw PMS registers:             
+    EVRRSTCON:                     0x005C8358 (RSTCTRIM=0x58; RST33TRIM=0x83; RSTSWDTRIM=0x5C)
+    EVROVMON2:                     0x00EFEFFE (PREOVVAL=0xFE; VDDMOVVAL=0xEF; SBOVVAL=0xEF)
+    EVRUVMON2:                     0x2AC3C3C4 (PREUVVAL=0xC4; VDDMUVVAL=0xC3; SBUVVAL=0xC3; VDDMLVLSEL=0x2A)
+
+----------------------------------------------------------------------
+DTC 0x024000 - AiModel input invalid or stale
+----------------------------------------------------------------------
+
+  DTC status:                    0x2F (TF | TFTOC | PDTC | CDTC | TFSLC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:41.834 UTC
+  Vehicle time:                  2493161956495580 ns
+  UTC raw time:                  1788454301834941790 ns
+  MCU temperature:               43.17 deg C
+
+AI Model Status:
+  Input voltage / validity:      0.000 V, valid=0, windowReady=0
+  Inference valid / sequence:    0, sequence=0
+  Channel / predicted class:     1, predicted class=0
+  Measured/rated/predicted current: 0.000 A, rating=5.000 A, predicted=0.000 A
+  Fault probabilities:           0.000, 0.000, 0.000, 0.000
+  Limit flags:                   undervoltage=0, overvoltage=0, overcurrent=0
+  Timing:                        channel=0 us, total=0 us, processing=746 us
+
+----------------------------------------------------------------------
+DTC 0x022100 - ZGW_CAN_3 Bus-Off
+----------------------------------------------------------------------
+
+  DTC status:                    0x2F (TF | TFTOC | PDTC | CDTC | TFSLC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:41.942 UTC
+  Vehicle time:                  2493162064441170 ns
+  UTC raw time:                  1788454301942887380 ns
+  MCU temperature:               43.30 deg C
+
+Controller condition:
+  Controller:                    0
+  CAN state:                     BUS_OFF
+  Error state:                   BUS_OFF
+  Transmit Error Counter (TEC):  248
+  Receive Error Counter (REC):   0
+  CanSM state:                   BUS_OFF_RECOVERY_L1
+  ComM state:                    NO_COMMUNICATION
+  CanIf PDU mode:                OFFLINE
+  Bus-off occurrences:           381
+  Operational:                   No
+  Normal RX requested:           Yes
+  Normal TX requested:           Yes
+
+----------------------------------------------------------------------
+DTC 0x022105 - ZGW_CANFD_2 Error Passive
+----------------------------------------------------------------------
+
+  DTC status:                    0x2F (TF | TFTOC | PDTC | CDTC | TFSLC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:42.042 UTC
+  Vehicle time:                  2493162164478550 ns
+  UTC raw time:                  1788454302042924760 ns
+  MCU temperature:               43.30 deg C
+
+Controller condition:
+  Controller:                    1
+  CAN state:                     READY
+  Error state:                   ERROR_PASSIVE
+  Transmit Error Counter (TEC):  128
+  Receive Error Counter (REC):   0
+  CanSM state:                   FULL_COMMUNICATION
+  ComM state:                    FULL_COMMUNICATION
+  CanIf PDU mode:                ONLINE
+  Bus-off occurrences:           0
+  Operational:                   Yes
+  Normal RX requested:           Yes
+  Normal TX requested:           Yes
+
+----------------------------------------------------------------------
+DTC 0x022203 - LIN1 Wakeup Failure
+----------------------------------------------------------------------
+
+  DTC status:                    0x2C (PDTC | CDTC | TFSLC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:42.172 UTC
+  Vehicle time:                  2493162294413010 ns
+  UTC raw time:                  1788454302172859220 ns
+  MCU temperature:               43.17 deg C
+
+LIN channel condition:
+  Channel:                       0
+  Last PID:                      0x8B
+  LinSM state:                   FULL_COMMUNICATION
+  ComM state:                    FULL_COMMUNICATION
+  LIN state:                     IDLE
+  Error type:                    TIMEOUT
+  No-response events:            16
+  Schedule errors / diag timeouts: 202, diag timeouts=0
+  Slave response expected / channel unavailable: 1, diag schedule active=0, channel unavailable=1
+
+----------------------------------------------------------------------
+DTC 0x022204 - LIN1 Sleep Transition Failure
+----------------------------------------------------------------------
+
+  DTC status:                    0x2C (PDTC | CDTC | TFSLC)
+
+Occurrence:
+  UTC time:                      2026-09-03 16:51:42.272 UTC
+  Vehicle time:                  2493162394407210 ns
+  UTC raw time:                  1788454302272853420 ns
+  MCU temperature:               43.17 deg C
+
+LIN channel condition:
+  Channel:                       0
+  Last PID:                      0x8B
+  LinSM state:                   FULL_COMMUNICATION
+  ComM state:                    FULL_COMMUNICATION
+  LIN state:                     IDLE
+  Error type:                    TIMEOUT
+  No-response events:            21
+  Schedule errors / diag timeouts: 202, diag timeouts=0
+  Slave response expected / channel unavailable: 1, diag schedule active=0, channel unavailable=1
+
+======================================================================
+3. ECU / SOFTWARE INFORMATION
+======================================================================
+
+
+Current ECU Time
+----------------
+
+Read Current Date and Time calculated by ZGW: 2026-09-03T16:51:42.342Z; utcNs=1788454302342857360; vehicleNs=2493162464411150; source=1; syncStatus=0x00000012
+
+Software Versions
+-----------------
+
+Read SW Versions (FBL, APP):   APP 2.0.0; FBL 2.0.0
+Read SW Version (Coding):      Coding image version 0x0002 (2)
+
+======================================================================
+4. MCU STATUS
+======================================================================
+
+  Packet:
+    Magic: ZMCU (0x5A4D4355)
+    Version: 1
+    Message status: socket ready / transmitting (2)
+    Length: 64 bytes
+    Sequence: 420
+    Vehicle time: 2493162164552690 ns
+  Reset / Startup:
+    SafetyKit init done: Yes
+    Wakeup from standby: No
+    Reset type: LBIST (15)
+    Reset trigger: supply watchdog (25)
+    Reset reason: 0x0000
+  Power:
+    VEXT: 3.250 V
+    VDDP3: 3.278 V
+    Core voltage: 1.252 V
+    Core voltage highest: 1.257 V
+    Core voltage lowest: 1.243 V
+    Core undervoltage limit: 1.180 V
+  Temperature:
+    PMS: 43.57 deg C
+    CPU core: 43.31 deg C
+    Delta: 0.27 deg C
+    Highest: 43.71 deg C
+    Lowest: 42.91 deg C
+  CPU Load:
+    Core 0: 43.1 %
+    Core 1: 19.8 %
+    Core 2: 17.8 %
+  CRC:
+    Stored: 0xEE371555
+    Calculated: 0xEE371555
+    Valid: Yes
+  Reserved bytes 56..59: 00 00 00 00
+  Raw: 5A 4D 43 55 01 02 00 40 00 00 01 A4 00 08 DB 84 8D 2F 83 F2 01 00 00 0F 00 19 00 00 0C B2 0C CE 04 E4 04 E9 04 DB 04 9C 11 05 10 EB 00 1B 11 13 10 C3 01 AF 00 C6 00 B2 00 00 00 00 EE 37 15 55
+
+======================================================================
+5. ETHERNET STARTUP TIMING
+======================================================================
+
+Acquisition:                   Routine 0xF192 - SUCCESS (500.1 ms)
+  magic=0x45544854 version=2 byteOrder=big stmHz=100000000 referenceTicks=10081671492 flags=0x00 missedLocks=0
+  Measurement integrity: INVALID
+  Reason: Ethernet startup completed: event timestamp precedes reference timestamp
+  Reason: PHY link detected: event timestamp precedes reference timestamp
+  Reason: netif admin up: event timestamp precedes reference timestamp
+  Reason: netif link up: event timestamp precedes reference timestamp
+  Reason: Socket ready: event timestamp precedes reference timestamp
+  Reference raw ticks: 10081671492 (0x0000000258EA1944)
+  00 Timing reference: not captured
+  01 Ethernet startup entered: not captured
+  02 Ethernet startup completed: INVALID - event timestamp precedes reference timestamp, raw ticks=14165584, raw hex=0x0000000000D82650
+  03 GETH init entered: not captured
+  04 GETH init completed: not captured
+  05 GETH DMA init entered: not captured
+  06 GETH DMA init completed: not captured
+  07 GETH RX ready: not captured
+  08 GETH TX ready: not captured
+  09 RMII init entered: not captured
+  10 RMII init completed: not captured
+  11 MDIO init entered: not captured
+  12 MDIO init completed: not captured
+  13 PHY reset asserted: not captured
+  14 PHY reset released: not captured
+  15 PHY init entered: not captured
+  16 PHY init completed: not captured
+  17 PHY autoneg started: not captured
+  18 PHY autoneg wait entered: not captured
+  19 PHY autoneg wait exited: not captured
+  20 PHY autoneg completed: not captured
+  21 PHY link detected: INVALID - event timestamp precedes reference timestamp, raw ticks=295172247, raw hex=0x000000001197F897
+  22 lwIP init entered: not captured
+  23 lwIP init completed: not captured
+  24 tcpip thread ready: not captured
+  25 netif_add entered: not captured
+  26 netif_add completed: not captured
+  27 netif admin up: INVALID - event timestamp precedes reference timestamp, raw ticks=295172821, raw hex=0x000000001197FAD5
+  28 netif link up: INVALID - event timestamp precedes reference timestamp, raw ticks=295175845, raw hex=0x00000000119806A5
+  29 TcpIp ready: not captured
+  30 SoAd init completed: not captured
+  31 DoIP init completed: not captured
+  32 Socket open requested: not captured
+  33 Socket ready: INVALID - event timestamp precedes reference timestamp, raw ticks=14165187, raw hex=0x0000000000D824C3
+  34 First MAC RX interrupt: not captured
+  35 First GETH RX descriptor: INVALID - event timestamp precedes reference timestamp, raw ticks=311664462, raw hex=0x0000000012939F4E
+  36 First lwIP RX input: INVALID - event timestamp precedes reference timestamp, raw ticks=311665162, raw hex=0x000000001293A20A
+  37 First IP RX: INVALID - event timestamp precedes reference timestamp, raw ticks=311665525, raw hex=0x000000001293A375, metadata=other
+  38 First UDP RX: INVALID - event timestamp precedes reference timestamp, raw ticks=316210590, raw hex=0x0000000012D8FD9E, metadata=IPv4/UDP
+  39 First TCP RX: INVALID - event timestamp precedes reference timestamp, raw ticks=328168110, raw hex=0x00000000138F72AE, metadata=IPv4/TCP
+  40 First application RX: INVALID - event timestamp precedes reference timestamp, raw ticks=328168670, raw hex=0x00000000138F74DE, metadata=DoIP
+  41 First DoIP RX: INVALID - event timestamp precedes reference timestamp, raw ticks=328169008, raw hex=0x00000000138F7630, metadata=DoIP
+  42 First ARP request: INVALID - event timestamp precedes reference timestamp, raw ticks=295173214, raw hex=0x000000001197FC5E, metadata=ARP
+  43 First ARP RX: INVALID - event timestamp precedes reference timestamp, raw ticks=316664775, raw hex=0x0000000012DFEBC7, metadata=ARP
+  44 First ARP resolved: INVALID - event timestamp precedes reference timestamp, raw ticks=316665483, raw hex=0x0000000012DFEE8B, metadata=ARP
+  45 First application TX request: INVALID - event timestamp precedes reference timestamp, raw ticks=14167059, raw hex=0x0000000000D82C13
+  46 First lwIP TX: INVALID - event timestamp precedes reference timestamp, raw ticks=14167649, raw hex=0x0000000000D82E61
+  47 First netif linkoutput: INVALID - event timestamp precedes reference timestamp, raw ticks=295174186, raw hex=0x000000001198002A
+  48 First GETH TX request: INVALID - event timestamp precedes reference timestamp, raw ticks=295174530, raw hex=0x0000000011980182
+  49 First DMA TX submit: not captured
+  50 First DMA TX complete: not captured
+  51 First TX success: not captured
+
+======================================================================
+6. AUTOSAR NVM TIMING
+======================================================================
+
+Acquisition:                   Routine 0xF193 - SUCCESS (1304.8 ms)
+  STM frequency: 100.000 MHz (100000000 Hz)
+  Routine: 0xF193; block history depth: 8
+  Startup:
+  Last NvM_ReadAll:
+    Request: 51.692 ms
+    First NvM_MainFunction: 51.729 ms
+    First MemIf request: 51.730 ms
+    First Fee request: 51.740 ms
+    First Fls request: 51.786 ms
+    Last Fls complete: 85.288 ms
+    Last Fee complete: 85.459 ms
+    Completion: 85.628 ms
+    Total: 33.935 ms
+    Cycles: NvM=14 Fee=15 Fls=7
+    Blocks: planned=8 started=7 done=7 failed=0 skipped=1
+    Result: OK; MemIf=OK
+  Last NvM_WriteAll:
+    Request: NOT CAPTURED
+    First NvM_MainFunction: NOT CAPTURED
+    First MemIf request: NOT CAPTURED
+    First Fee request: NOT CAPTURED
+    First Fls request: NOT CAPTURED
+    Last Fls complete: NOT CAPTURED
+    Last Fee complete: NOT CAPTURED
+    Completion: NOT CAPTURED
+    Total: NOT CAPTURED
+    Cycles: NvM=0 Fee=0 Fls=0
+    Blocks: planned=0 started=0 done=0 failed=0 skipped=0
+    Result: OK; MemIf=OK
+  Recent NvM operations:
+    [0] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [1] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [2] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [3] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [4] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [5] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [6] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+    [7] NvM_SetRamBlockStatus block=7 total=NOT CAPTURED
+        Result: OK; MemIf=OK; cycles NvM=0 Fee=0 Fls=0
+
+======================================================================
+7. NVM LIFETIME STATISTICS
+======================================================================
+
+Acquisition:                   Routine 0xF195 - SUCCESS (1004.8 ms)
+  NvM Lifetime Statistics:
+    Routine: 0xF195; version=1; imageLength=508; blocks=8; counterWidth=64
+    Boot count: 264
+    ReadAll executions: 0
+    WriteAll executions: 263
+    WriteBlock requests/accepted/rejected: 74/74/0
+    Successful/failed logical writes: 1393/0
+    Read requests/success/failure: 263/526/0
+    Integrity/defaults/invalid reads: crc=0 defaults=0 invalid=0 feeIntegrity=0
+    Busy/uninit/invalid/protected rejections: 0/0/0/0
+    Invalidations request/success/failure: 0/0/0; erase API requests=0
+  Fee Statistics:
+    Logical writes request/success/failure: 1393/1393/0
+    Invalidations request/success: 0/0
+    GC count/sector switches/copied blocks: 131/131/1046
+    GC copied payload: 4627152 bytes (4.41 MiB); physical records: 4662720 bytes (4.45 MiB)
+    Max GC copied blocks/payload/physical: 8/35352 bytes (34.52 KiB)/35624 bytes (34.79 KiB)
+  DFLASH Physical Statistics:
+    Page programs: 1698570; programmed: 13588560 bytes (12.96 MiB)
+    Sector erases: 8384; erased: 34340864 bytes (32.75 MiB)
+    Fls failures write/erase/read/total: 0/0/0/0
+    DMU busy rejects/timeouts: 0/0
+  Fee Utilization:
+    Active append offset: 0x00019888; free=26488 bytes (25.87 KiB)
+    Max append offset: 0x00039C78; min free=25480 bytes (24.88 KiB)
+  Per-Block Successful NvM Writes:
+    Block 1 - DEM_PRIMARY: 263
+    Block 2 - APP_DATA: 0
+    Block 3 - TIMEBASE: 337
+    Block 4 - ETH_STARTUP_TIMING: 4
+    Block 5 - NVM_TIMING: 263
+    Block 6 - MCU_STATUS: 263
+    Block 7 - AIMODEL: 263
+    Block 8 - NVM_STATS:  excluded/self
+
+======================================================================
+8. CPU PERFORMANCE COUNTERS
+======================================================================
+
+Acquisition:                   Routine 0xF194 - SUCCESS (804.9 ms)
+  Routine: 0xF194; version=1; captured=25/30; counterMask=0x7FFFFFFF
+  13 OS QM BSW task C2 core=2 samples=85619 last/avg=553320 ns/2061140 ns
+  23 LinIf main C0 core=0 samples=85691 last/avg=3015960 ns/1506715 ns
+  28 Gateway Ethernet main C2 core=2 samples=85700 last/avg=1450 ns/984284 ns
+  18 AI model main C1 core=1 samples=85671 last/avg=960250 ns/960477 ns
+  27 Gateway main C0 core=0 samples=85113 last/avg=14810 ns/309069 ns
+  25 SoAd main C2 core=2 samples=85652 last/avg=73660 ns/273720 ns
+  08 Fls main step C0 core=0 samples=24 last/avg=947610 ns/103859 ns
+  01 OS ASIL NvM task C0 core=0 samples=84975 last/avg=54390 ns/55722 ns
+  19 CAN main C0 core=0 samples=85671 last/avg=21980 ns/45731 ns
+  26 TcpIp main C2 core=2 samples=85653 last/avg=980 ns/13120 ns
+  05 OS NvM NvM main C0 core=0 samples=85015 last/avg=9300 ns/9823 ns
+  04 OS NvM Fee main C0 core=0 samples=85015 last/avg=9150 ns/9760 ns
+  16 PduR DoIP core2 main C2 core=2 samples=85630 last/avg=720 ns/7991 ns
+  17 Dcm main C0 core=0 samples=85558 last/avg=4040 ns/3940 ns
+  29 CRC32 core=0 samples=43588 last/avg=1220 ns/3768 ns; bytes=402757
+  00 OS ASIL BSW task C0 core=0 samples=85583 last/avg=3570 ns/3749 ns
+  15 PduR DoIP core0 main C0 core=0 samples=85531 last/avg=8900 ns/2000 ns
+  22 CanTp main C0 core=0 samples=85691 last/avg=1560 ns/1606 ns
+  14 DoIP main C2 core=2 samples=85620 last/avg=720 ns/1301 ns
+  06 NvM main step C0 core=0 samples=85032 last/avg=470 ns/990 ns
+  07 Fee main step C0 core=0 samples=85026 last/avg=490 ns/854 ns
+  03 OS NvM Fls main C0 core=0 samples=84995 last/avg=600 ns/629 ns
+  02 OS NvM startup main C0 core=0 samples=84975 last/avg=550 ns/615 ns
+  11 Ethernet TX IRQ C2 core=2 samples=19538 last/avg=530 ns/536 ns
+  24 LinTp main C0 core=0 samples=488 last/avg=490 ns/483 ns
+
+======================================================================
+9. CODING INFORMATION
+======================================================================
+
+Acquisition:                   Routine 0x0203 - SUCCESS (309.9 ms)
+Coding Read-Out:               PARSED
+Acquisition:                   Routine 0x0201 - SUCCESS (194.9 ms)
+Check Coding Result:           PARSED
+
+======================================================================
+10. DIAGNOSTIC SESSION / PROGRAMMING STATE
+======================================================================
+
+Read Active Diagnostic Session: 0x03 (Extended)
+Read Active Software Block:    0x01 (ZGW_APP)
+
+======================================================================
+11. DATA AVAILABILITY / UNSUPPORTED MEASUREMENTS
+======================================================================
+
+Ethernet Startup Timing:       SUCCESS (500.1 ms)
+AUTOSAR NvM Timing:            SUCCESS (1304.8 ms)
+NvM Lifetime Statistics:       SUCCESS (1004.8 ms)
+CPU Performance Counters:      SUCCESS (804.9 ms)
+Coding Read-Out:               SUCCESS (309.9 ms)
+Check Coding Result:           SUCCESS (194.9 ms)

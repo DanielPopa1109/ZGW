@@ -6,12 +6,6 @@
 typedef uint16 PduIdType;
 typedef uint16 PduLengthType;
 
-typedef struct
-{
-        uint8* SduDataPtr;
-        PduLengthType SduLength;
-} PduInfoType;
-
 typedef enum
 {
     BUFREQ_OK=0u,

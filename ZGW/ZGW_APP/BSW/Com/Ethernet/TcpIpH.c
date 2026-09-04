@@ -8,6 +8,7 @@
 #include "FreeRTOS_core2.h"
 #include "semphr_core2.h"
 #include "task_core2.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #define TCPIP_MAX_SOCKETS 16u
 
@@ -212,7 +213,10 @@ void TcpIp_Init(void)
 
 void TcpIp_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint32 i;
+
+    CpuPerf_Start(CPUPERF_ID_TCPIP_MAIN_C2, &cpuPerfCtx);
 
     if (TcpIp_IsLinkUp() == 0u)
     {
@@ -234,6 +238,7 @@ void TcpIp_MainFunction(void)
     }
 
     TcpIp_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_TCPIP_MAIN_C2, &cpuPerfCtx);
 }
 
 static TcpIp_SocketType *TcpIp_Alloc(void)
@@ -490,26 +495,6 @@ TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *rem
 
     TcpIp_Unlock();
     return (TcpIp_SocketIdType)newSock;
-}
-
-sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port)
-{
-    struct sockaddr_in addr;
-    sint32 ret;
-
-    if (TcpIp_Lock() == 0u)
-    {
-        return -1;
-    }
-
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = htonl(ip);
-
-    ret = (sint32)lwip_connect(sock, (struct sockaddr *)&addr, sizeof(addr));
-    TcpIp_Unlock();
-
-    return ret;
 }
 
 sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len)

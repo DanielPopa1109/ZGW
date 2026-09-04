@@ -5,6 +5,8 @@
 #include "SysMgr.h"
 #include "FreeRTOS_core2.h"
 #include "semphr_core2.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include <string.h>
 #include <errno.h>
 
@@ -740,6 +742,7 @@ static void SoAd_DispatchTcpRx(SoAd_SoConRuntimeType *rt,
     SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxLength[id], len);
     SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemoteAddr[id], rt->remoteAddr.addr);
     SOAD_DEBUG_ASSIGN(SoAd_DebugLastRxRemotePort[id], rt->remoteAddr.port);
+    EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_TCP_RX, ETHSTARTUPTIMING_RX_IPV4_TCP);
     if ((rt->cfg->rxIndication != 0) &&
             ((rt->cfg->upperLayer == SOAD_UPPER_DOIP) ||
                     (ComM_IsRxAllowed(COMM_CH_ETH) != FALSE)))
@@ -751,6 +754,7 @@ static void SoAd_DispatchTcpRx(SoAd_SoConRuntimeType *rt,
 
 void SoAd_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint8 id;
     uint8 buffer[SOAD_RX_BUFFER_SIZE];
     sint32 len;
@@ -762,6 +766,8 @@ void SoAd_MainFunction(void)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_SOAD_MAIN_C2, &cpuPerfCtx);
 
     for (id = 0u; id < SOAD_MAX_CONNECTIONS; id++)
     {
@@ -916,6 +922,7 @@ void SoAd_MainFunction(void)
                     {
                         rt->remoteAddr = remote;
                     }
+                    EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_UDP_RX, ETHSTARTUPTIMING_RX_IPV4_UDP);
 
                     if (SoAd_HandlePcHeartbeat(rt, id, &remote, buffer, (uint16)len) != 0u)
                     {
@@ -946,6 +953,7 @@ void SoAd_MainFunction(void)
     }
 
     SoAd_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_SOAD_MAIN_C2, &cpuPerfCtx);
     SoAd_Unlock();
 }
 
@@ -988,11 +996,6 @@ Std_ReturnType SoAd_GetDiagSnapshot(SoAd_SoConIdType id, SoAd_DiagSnapshotType *
     snapshot->upperLayer = (uint8)cfg->upperLayer;
 
     return E_OK;
-}
-
-sint32 SoAd_Send(SoAd_SoConIdType id, const uint8 *data, uint16 len)
-{
-    return (GatewaySwc_RequestSoAdIfTransmit(id, 0, data, len) == SOAD_OK) ? (sint32)len : -1;
 }
 
 SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
@@ -1043,6 +1046,7 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
             return SOAD_NOT_OK;
         }
 
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_LWIP_TX);
         tcpIpResult = TcpIp_Send(rt->activeSock, data, len);
         soAdResult = (tcpIpResult == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
         SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, tcpIpResult);
@@ -1071,6 +1075,7 @@ SoAd_ReturnType SoAd_IfTransmit(SoAd_SoConIdType id,
 
     dst = (remoteAddr != 0) ? remoteAddr : &rt->remoteAddr;
 
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_LWIP_TX);
     tcpIpResult = TcpIp_SendTo(rt->listenSock, dst, data, len);
     soAdResult = (tcpIpResult == (sint32)len) ? SOAD_OK : SOAD_NOT_OK;
     SOAD_DEBUG_ASSIGN(SoAd_DebugLastTxTcpIpResult, tcpIpResult);

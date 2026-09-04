@@ -1,10 +1,13 @@
 #include "APP/AiModel/AiModel.h"
+#include <string.h>
 #include "Com.h"
 #include "Os.h"
 #include "IfxCpu.h"
 #include "Cpu/Std/IfxCpu_Intrinsics.h"
 #include "APP/TimeSync/TimeBase.h"
 #include "Dem.h"
+#include "NvM.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #define AIMODEL_INPUT_STALE_LIMIT_MS           (AIMODEL_PERIOD_MS * 3u)
 #define AIMODEL_MAILBOX_LOCK_TIMEOUT           100000u
@@ -41,6 +44,9 @@ static uint8 AiModel_InferenceDivider;
 static uint32 AiModel_LastInputCycle;
 static uint32 AiModel_InferenceSequence;
 static uint8 AiModel_Initialized;
+
+uint8 NvM_AiModel_Ram[AIMODEL_NVM_IMAGE_SIZE];
+const uint8 NvM_AiModel_Rom[AIMODEL_NVM_IMAGE_SIZE] = { 0u };
 
 static const float32 AiModel_ChannelRating_A[BCM_NUM_CHANNELS] =
 {
@@ -158,6 +164,12 @@ static void AiModel_PublishResult(const AiModel_ResultType *result)
     if (result == NULL_PTR)
     {
         return;
+    }
+
+    if (memcmp(NvM_AiModel_Ram, result, sizeof(AiModel_ResultType)) != 0)
+    {
+        memcpy(NvM_AiModel_Ram, result, sizeof(AiModel_ResultType));
+        (void)NvM_SetRamBlockStatus(NVM_BLOCK_ID_AIMODEL, TRUE);
     }
 
     if (AiModel_EnterMailboxCritical() == FALSE)
@@ -692,6 +704,7 @@ static void AiModel_RunInference(AiModel_ResultType *result)
 
 void AiModel_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     AiModel_Pdm1SnapshotType *snapshot = &AiModel_WorkSnapshot;
     AiModel_ResultType *result = &AiModel_WorkResult;
     uint32 processingStartUs;
@@ -700,6 +713,8 @@ void AiModel_MainFunction(void)
     {
         AiModel_Init();
     }
+
+    CpuPerf_Start(CPUPERF_ID_AI_MODEL_MAIN_C1, &cpuPerfCtx);
 
     processingStartUs = AiModel_NowUs();
     *result = AiModel_Mailbox[AiModel_MailboxIndex];
@@ -756,4 +771,5 @@ void AiModel_MainFunction(void)
     AiModel_PublishResult(result);
     AiModel_ReportDiagnostics(result);
     AiModel_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_AI_MODEL_MAIN_C1, &cpuPerfCtx);
 }

@@ -32,35 +32,3 @@ Std_ReturnType Lin_CheckPid(uint8 pid, uint8* idOut)
     *idOut = id;
     return E_OK;
 }
-
-uint8 Lin_CalcChecksum(uint8 pid, const uint8* data, uint8 len, Lin_ChecksumType type)
-{
-    uint16 sum;
-    uint8 i;
-
-    if ((data == NULL_PTR) || (len > 8u))
-    {
-        return 0x00u;
-    }
-
-    sum = 0u;
-
-    if ((type == LIN_CS_ENHANCED) &&
-        ((pid & 0x3Fu) != 0x3Cu) &&
-        ((pid & 0x3Fu) != 0x3Du))
-    {
-        sum += pid;
-    }
-
-    for (i = 0u; i < len; i++)
-    {
-        sum += data[i];
-
-        while (sum > 0xFFu)
-        {
-            sum = (uint16)((sum & 0xFFu) + (sum >> 8u));
-        }
-    }
-
-    return (uint8)(~sum);
-}

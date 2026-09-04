@@ -128,7 +128,6 @@ void safetyKitSswMcuStartup(void)
     /* Set crc_value to initial seed value */
     uint32 initialSeed = 0xFFFFFFFF;
     uint32 crcValue    = initialSeed;
-    uint8 diagIndex;
 
 //    McuSm_McuStartupComputedCrc = 0u;
 //    McuSm_McuStartupExpectedCrc = MCU_STARTUP_EXPECTED_CRC;

@@ -13,7 +13,6 @@
 static ComM_ModeType ComM_UserRequestedMode[COMM_NUM_USERS];
 static ComM_ModeType ComM_ChannelCurrentMode[COMM_NUM_CHANNELS];
 static uint8 ComM_ChannelRequestedMode[COMM_NUM_CHANNELS];
-static uint8 ComM_ChannelLimitedNoCom[COMM_NUM_CHANNELS];
 static uint8 ComM_NmRemoteRequest[COMM_NUM_CHANNELS];
 static uint8 ComM_Initialized;
 
@@ -95,11 +94,6 @@ static ComM_ModeType ComM_GetLocalUserAggregateForChannel(ComM_ChannelType chann
         }
     }
 
-    if (ComM_ChannelLimitedNoCom[channel] != FALSE)
-    {
-        highest = COMM_NO_COMMUNICATION;
-    }
-
     return highest;
 }
 
@@ -110,11 +104,6 @@ static ComM_ModeType ComM_GetUserAggregateForChannel(ComM_ChannelType channel)
     if (ComM_NmRemoteRequest[channel] != FALSE)
     {
         highest = COMM_FULL_COMMUNICATION;
-    }
-
-    if (ComM_ChannelLimitedNoCom[channel] != FALSE)
-    {
-        highest = COMM_NO_COMMUNICATION;
     }
 
     return highest;
@@ -301,7 +290,6 @@ void ComM_Init(void)
     {
         ComM_ChannelCurrentMode[channel] = COMM_NO_COMMUNICATION;
         ComM_ChannelRequestedMode[channel] = COMM_INVALID_REQUESTED_MODE;
-        ComM_ChannelLimitedNoCom[channel] = FALSE;
         ComM_NmRemoteRequest[channel] = FALSE;
     }
 
@@ -358,20 +346,6 @@ Std_ReturnType ComM_RequestComMode(ComM_UserHandleType user, ComM_ModeType mode)
     return E_OK;
 }
 
-Std_ReturnType ComM_GetRequestedComMode(ComM_UserHandleType user,
-                                        ComM_ModeType* mode)
-{
-    if ((ComM_Initialized == FALSE) ||
-        (ComM_IsValidUser(user) == FALSE) ||
-        (mode == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    *mode = ComM_UserRequestedMode[user];
-    return E_OK;
-}
-
 Std_ReturnType ComM_GetCurrentComMode(ComM_ChannelType channel,
                                       ComM_ModeType* mode)
 {
@@ -383,56 +357,6 @@ Std_ReturnType ComM_GetCurrentComMode(ComM_ChannelType channel,
     }
 
     *mode = ComM_ChannelCurrentMode[channel];
-    return E_OK;
-}
-
-Std_ReturnType ComM_GetMaxComMode(ComM_UserHandleType user, ComM_ModeType* mode)
-{
-    ComM_ChannelType channel;
-    uint8 channelMask;
-    uint8 mapped = FALSE;
-    uint8 limitedCount = 0u;
-    uint8 mappedCount = 0u;
-
-    if ((ComM_Initialized == FALSE) ||
-        (ComM_IsValidUser(user) == FALSE) ||
-        (mode == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    channelMask = ComM_UserChannelMap[user];
-
-    for (channel = 0u; channel < COMM_NUM_CHANNELS; channel++)
-    {
-        if ((channelMask & (uint8)(1u << channel)) != 0u)
-        {
-            mapped = TRUE;
-            mappedCount++;
-            if (ComM_ChannelLimitedNoCom[channel] != FALSE)
-            {
-                limitedCount++;
-            }
-        }
-    }
-
-    *mode = ((mapped == FALSE) || (limitedCount == mappedCount)) ?
-            COMM_NO_COMMUNICATION :
-            COMM_FULL_COMMUNICATION;
-    return E_OK;
-}
-
-Std_ReturnType ComM_LimitChannelToNoComMode(ComM_ChannelType channel,
-                                            uint8 status)
-{
-    if ((ComM_Initialized == FALSE) ||
-        (ComM_IsValidChannel(channel) == FALSE))
-    {
-        return E_NOT_OK;
-    }
-
-    ComM_ChannelLimitedNoCom[channel] = (status != FALSE) ? TRUE : FALSE;
-    ComM_EvaluateChannel(channel);
     return E_OK;
 }
 

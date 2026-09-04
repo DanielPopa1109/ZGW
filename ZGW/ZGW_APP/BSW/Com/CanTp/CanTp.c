@@ -2,6 +2,7 @@
 #include "Dcm_Cfg.h"
 #include "GatewaySwc.h"
 #include "PduR.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include <string.h>
 
 #define CANTP_TX_CF_BURST_BUDGET 16u
@@ -1436,6 +1437,7 @@ static void CanTp_HandleFlowControl(uint8 ch, const uint8* data, PduLengthType l
 
 void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType len)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint8 ch;
     uint8 pci;
     const CanTp_ChannelConfigType* cfg;
@@ -1445,10 +1447,13 @@ void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType
         return;
     }
 
+    CpuPerf_Start(CPUPERF_ID_CANTP_RX_INDICATION_C0, &cpuPerfCtx);
+
     ch = CanTp_FindRxChannel(CanIfRxPduId, data, len);
 
     if (ch >= CanTp_ConfigPtr->numChannels)
     {
+        CpuPerf_Stop(CPUPERF_ID_CANTP_RX_INDICATION_C0, &cpuPerfCtx);
         return;
     }
 
@@ -1477,6 +1482,8 @@ void CanTp_RxIndication(PduIdType CanIfRxPduId, const uint8* data, PduLengthType
     {
         CanTp_HandleFlowControl(ch, data, len);
     }
+
+    CpuPerf_Stop(CPUPERF_ID_CANTP_RX_INDICATION_C0, &cpuPerfCtx);
 }
 
 void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
@@ -1557,6 +1564,7 @@ void CanTp_TxConfirmation(PduIdType CanIfTxPduId)
 
 void CanTp_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint8 ch;
     uint8 cfBurstCount;
     const CanTp_ChannelConfigType* cfg;
@@ -1565,6 +1573,8 @@ void CanTp_MainFunction(void)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_CANTP_MAIN_C0, &cpuPerfCtx);
 
     for (ch = 0u; ch < CanTp_ConfigPtr->numChannels; ch++)
     {
@@ -1617,4 +1627,6 @@ void CanTp_MainFunction(void)
             }
         }
     }
+
+    CpuPerf_Stop(CPUPERF_ID_CANTP_MAIN_C0, &cpuPerfCtx);
 }

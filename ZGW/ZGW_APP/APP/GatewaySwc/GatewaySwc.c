@@ -11,11 +11,14 @@
 #include "Crc.h"
 #include "Nm.h"
 #include "SysMgr.h"
+#include "NvM.h"
 #include "IfxCpu.h"
 #include "APP/CodingApp/CodingApp.h"
 #include "APP/AiModel/AiModel.h"
 #include "APP/TimeSync/TimeBase.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 #include "BSW/Sys/Os/Os.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include "BSW/Sys/SmM/SafetyKit_Main.h"
 
 #define GATEWAYSWC_MAGIC0                             0x5Au
@@ -27,9 +30,11 @@
 #define GATEWAYSWC_FRAME_COMMAND_BLOCK                0x03u
 #define GATEWAYSWC_FRAME_DTC_TRANSITION               0x04u
 #define GATEWAYSWC_FRAME_AI_MODEL                     0x05u
+#define GATEWAYSWC_FRAME_CPU_PERF                     0x06u
 
 #define GATEWAYSWC_AI_MODEL_GLOBAL_LEN                56u
 #define GATEWAYSWC_AI_MODEL_CHANNEL_LEN               43u
+#define GATEWAYSWC_CPU_PERF_HEADER_LEN                8u
 #define GATEWAYSWC_HEADER_LEN                         12u
 #define GATEWAYSWC_ENTRY_LEN                          7u
 #define GATEWAYSWC_DTC_TRANSITION_LEN                 17u
@@ -47,6 +52,7 @@
 #define GATEWAYSWC_ETH_TX_KIND_DTC_TRANSITION         2u
 #define GATEWAYSWC_ETH_TX_KIND_MCU_STATUS             3u
 #define GATEWAYSWC_ETH_TX_KIND_AI_MODEL               4u
+#define GATEWAYSWC_ETH_TX_KIND_CPU_PERF               5u
 
 #define GATEWAYSWC_DIAG_PERIOD_MS                     1000u
 #define GATEWAYSWC_ETH_PERIOD_NS                      ((uint64)GATEWAYSWC_ETH_PERIOD_MS * TIMEBASE_NS_PER_MS)
@@ -96,6 +102,42 @@
 #define GATEWAYSWC_ROUTE_PHASE_SENT                   4u
 
 #define GATEWAYSWC_PDM_CMD_IDX_PDM1                   0u
+
+typedef struct
+{
+        uint32 mainCycles;
+        uint32 routedSignals;
+        uint32 generatedSignals;
+        uint32 sendSignalOk;
+        uint32 sendSignalFailed;
+        uint32 receiveSignalFailed;
+        uint32 ethFramesSent;
+        uint32 ethFramesFailed;
+        uint32 ethSignalsPublished;
+        uint8 ethLastOpenResult;
+        uint8 ethLastSoAdResult;
+        uint8 ethLastTransmitOk;
+        uint16 ethLastPayloadLength;
+        uint16 configuredRoutes;
+        uint16 rxDiagConfiguredMessages;
+        uint16 rxDiagConfiguredSignals;
+        uint16 rxDiagTimedOutMessages;
+        uint16 rxDiagInvalidSignals;
+        uint32 rxDiagTimeoutEvents;
+        uint32 rxDiagInvalidEvents;
+        uint16 rxDiagLastTimeoutPduId;
+        uint16 rxDiagLastInvalidSignalId;
+        uint32 rxDiagLastInvalidValue;
+} GatewaySwc_StatusType;
+
+typedef struct
+{
+        uint32 pdmCommandLoad[1u][GATEWAYSWC_PDM_LOADS_PER_PDM];
+        uint32 linHvDcdcEnable;
+        uint32 linHvDcdcTargetVoltage;
+        uint32 vehicleStatus;
+        uint32 nmPn1;
+} GatewaySwc_CommandType;
 
 typedef struct
 {
@@ -395,18 +437,20 @@ Std_ReturnType GatewaySwc_RequestLinIfTransmit(PduIdType txPduId, const uint8 *d
 }
 
 SoAd_ReturnType GatewaySwc_RequestSoAdIfTransmit(SoAd_SoConIdType soConId,
-                                                 const TcpIp_SockAddrType *remoteAddr,
-                                                 const uint8 *data,
-                                                 uint16 len)
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8 *data,
+        uint16 len)
 {
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_APP_TX_REQUEST);
     return SoAd_IfTransmit(soConId, remoteAddr, data, len);
 }
 
 sint32 GatewaySwc_RequestTcpIpSendTo(TcpIp_SocketIdType sock,
-                                     const TcpIp_SockAddrType *remoteAddr,
-                                     const uint8 *data,
-                                     uint16 len)
+        const TcpIp_SockAddrType *remoteAddr,
+        const uint8 *data,
+        uint16 len)
 {
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_APP_TX_REQUEST);
     return TcpIp_SendTo(sock, remoteAddr, data, len);
 }
 
@@ -546,18 +590,21 @@ static void GatewaySwc_GenerateCanFdOutputs(void);
 static void GatewaySwc_GenerateLinOutputs(void);
 static void GatewaySwc_PublishEthernetSummary(void);
 static void GatewaySwc_PublishAiModelResult(void);
+static void GatewaySwc_PublishCpuPerf(void);
 static void GatewaySwc_McuStatusInit(void);
 static void GatewaySwc_McuStatusMainFunction(uint64 nowNs);
 static void GatewaySwc_McuStatusOpenSocket(void);
 static void GatewaySwc_McuStatusCloseSocket(void);
 static void GatewaySwc_McuStatusBuildPacket(uint8 *packet);
+static void GatewaySwc_McuStatusStorePacketForWriteAll(const uint8 *packet);
 static void GatewaySwc_McuStatusSendPacket(void);
 static void GatewaySwc_McuStatusUpdateNextTxDeadline(uint64 nowNs);
 static uint16 GatewaySwc_McuStatusScaleMilliVolt(float32 voltage);
 static sint16 GatewaySwc_McuStatusScaleCentiDeg(float32 temperature);
-static void GatewaySwc_PublishRange(GatewaySwc_BusType bus,
+static uint8 GatewaySwc_PublishRange(GatewaySwc_BusType bus,
         Com_SignalIdType firstSignalId,
-        Com_SignalIdType lastSignalId);
+        Com_SignalIdType lastSignalId,
+        uint8 publishEmpty);
 static void GatewaySwc_ResetRxDiagnostics(void);
 static void GatewaySwc_UpdateRxDiagnostics(void);
 static void GatewaySwc_UpdateComModeFromBusActivity(void);
@@ -600,7 +647,7 @@ static sint32 GatewaySwc_Core2TransmitMcuStatus(const GatewaySwc_EthTxJobType *j
 static uint8 GatewaySwc_EnterCrossCoreCritical(void);
 static void GatewaySwc_ExitCrossCoreCritical(void);
 static void GatewaySwc_ResetEthFrame(uint16 *len, GatewaySwc_BusType bus);
-static void GatewaySwc_FlushEthFrame(uint16 *len);
+static uint8 GatewaySwc_FlushEthFrame(uint16 *len, uint8 allowEmpty);
 #if GATEWAYSWC_DEBUG_INSTRUMENTATION
 static void GatewaySwc_UpdateDtcDebugQueueState(void);
 #else
@@ -719,12 +766,15 @@ void GatewaySwc_Init(void)
 
 void GatewaySwc_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint64 nowNs;
 
     if (GatewaySwc_Initialized == 0u)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_GATEWAY_MAIN_C0, &cpuPerfCtx);
 
     GatewaySwc_ProcessCore0Async();
 
@@ -742,8 +792,11 @@ void GatewaySwc_MainFunction(void)
     {
         GatewaySwc_NextEthPublishTimeNs = 0ull;
     }
-    else if ((GatewaySwc_NextEthPublishTimeNs == 0ull) ||
-            (nowNs >= GatewaySwc_NextEthPublishTimeNs))
+    else if (GatewaySwc_NextEthPublishTimeNs == 0ull)
+    {
+        GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
+    }
+    else if (nowNs >= GatewaySwc_NextEthPublishTimeNs)
     {
         GatewaySwc_PublishEthernetSummary();
         GatewaySwc_NextEthPublishTimeNs = nowNs + GATEWAYSWC_ETH_PERIOD_NS;
@@ -780,134 +833,21 @@ void GatewaySwc_MainFunction(void)
     }
 
     GatewaySwc_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_GATEWAY_MAIN_C0, &cpuPerfCtx);
 }
 
 void GatewaySwc_EthernetMainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
     if (GatewaySwc_Initialized == 0u)
     {
         return;
     }
 
+    CpuPerf_Start(CPUPERF_ID_GATEWAY_ETH_MAIN_C2, &cpuPerfCtx);
     GatewaySwc_ProcessEthTxQueueCore2();
-}
-
-void GatewaySwc_SetCommands(const GatewaySwc_CommandType *cmd)
-{
-    if (cmd != NULL_PTR)
-    {
-        GatewaySwc_Command = *cmd;
-    }
-}
-
-void GatewaySwc_GetCommands(GatewaySwc_CommandType *cmd)
-{
-    if (cmd != NULL_PTR)
-    {
-        *cmd = GatewaySwc_Command;
-    }
-}
-
-void GatewaySwc_GetStatus(GatewaySwc_StatusType *status)
-{
-    if (status != NULL_PTR)
-    {
-        *status = GatewaySwc_Status;
-    }
-}
-
-uint8 GatewaySwc_GetMcuStatusStatus(void)
-{
-    return GatewaySwc_McuStatusStatus;
-}
-
-uint32 GatewaySwc_GetMcuStatusTxCounter(void)
-{
-    return GatewaySwc_McuStatusTxCounter;
-}
-
-uint16 GatewaySwc_GetRxMessageDiagCount(void)
-{
-    return (uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT;
-}
-
-uint16 GatewaySwc_GetRxSignalDiagCount(void)
-{
-    return (uint16)GATEWAYSWC_RX_SIGNAL_DIAG_COUNT;
-}
-
-Std_ReturnType GatewaySwc_GetRxMessageDiag(uint16 index, GatewaySwc_RxMessageDiagType *diag)
-{
-    PduIdType pduId;
-    GatewaySwc_BusType bus;
-    uint16 cycleTicks = 0u;
-    uint16 timeoutTicks = 0u;
-
-    if ((diag == NULL_PTR) ||
-            (GatewaySwc_GetPduDiagConfig(index, &pduId, &bus) != E_OK))
-    {
-        return E_NOT_OK;
-    }
-
-    diag->pduId = (uint16)pduId;
-    diag->bus = bus;
-    diag->status = GatewaySwc_RxMessageDiagStatus[index];
-    (void)Com_GetRxPduDiagConfig(pduId, &cycleTicks, &timeoutTicks);
-    diag->cycleTicks = cycleTicks;
-    diag->timeoutTicks = timeoutTicks;
-
-    return E_OK;
-}
-
-Std_ReturnType GatewaySwc_GetRxSignalDiag(uint16 index, GatewaySwc_RxSignalDiagType *diag)
-{
-    Com_SignalIdType signalId;
-    GatewaySwc_BusType bus;
-
-    if ((diag == NULL_PTR) ||
-            (GatewaySwc_GetSignalDiagConfig(index, &signalId, &bus) != E_OK))
-    {
-        return E_NOT_OK;
-    }
-
-    diag->signalId = (uint16)signalId;
-    diag->bus = bus;
-    diag->status = GatewaySwc_RxSignalDiagStatus[index];
-    diag->value = GatewaySwc_RxSignalDiagValue[index];
-    diag->invalidValue = GatewaySwc_RxSignalDiagInvalidValue[index];
-
-    return E_OK;
-}
-
-Std_ReturnType GatewaySwc_GetRxMessageDiagSnapshot(uint16 index, GatewaySwc_RxDiagSnapshotType *snapshot)
-{
-    PduIdType pduId;
-    GatewaySwc_BusType bus;
-    uint16 cycleTicks = 0u;
-    uint16 timeoutTicks = 0u;
-
-    if ((snapshot == NULL_PTR) ||
-            (GatewaySwc_GetPduDiagConfig(index, &pduId, &bus) != E_OK))
-    {
-        return E_NOT_OK;
-    }
-
-    (void)Com_GetRxPduDiagConfig(pduId, &cycleTicks, &timeoutTicks);
-
-    snapshot->kind = GATEWAYSWC_RX_DIAG_KIND_MESSAGE_TIMEOUT;
-    snapshot->diagIndex = index;
-    snapshot->objectId = (uint16)pduId;
-    snapshot->bus = bus;
-    snapshot->status = GatewaySwc_RxMessageDiagStatus[index];
-    snapshot->cycleTicks = cycleTicks;
-    snapshot->timeoutTicks = timeoutTicks;
-    snapshot->value = 0u;
-    snapshot->thresholdValue = (uint32)timeoutTicks;
-    snapshot->mainCycles = GatewaySwc_Status.mainCycles;
-    snapshot->activeCount = GatewaySwc_Status.rxDiagTimedOutMessages;
-    snapshot->eventCount = GatewaySwc_Status.rxDiagTimeoutEvents;
-
-    return E_OK;
+    CpuPerf_Stop(CPUPERF_ID_GATEWAY_ETH_MAIN_C2, &cpuPerfCtx);
 }
 
 Std_ReturnType GatewaySwc_CaptureRxDiagSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length)
@@ -933,6 +873,7 @@ void GatewaySwc_EthRxIndication(uint8 soConId,
         const uint8 *data,
         uint16 len)
 {
+    EthStartupTiming_CaptureFirstRx(ETHSTARTUPTIMING_RX_IPV4_UDP);
     (void)GatewaySwc_QueueEthRx(soConId, remoteAddr, data, len);
 }
 
@@ -1365,15 +1306,83 @@ static void GatewaySwc_GenerateLinOutputs(void)
 static void GatewaySwc_PublishEthernetSummary(void)
 {
     uint16 i;
+    uint8 emptyBusPublished[4u] = { 0u, 0u, 0u, 0u };
 
     for (i = 0u; i < (uint16)(sizeof(GatewaySwc_EthSignalRanges) / sizeof(GatewaySwc_EthSignalRanges[0])); i++)
     {
-        GatewaySwc_PublishRange(GatewaySwc_EthSignalRanges[i].bus,
+        GatewaySwc_BusType bus = GatewaySwc_EthSignalRanges[i].bus;
+        uint8 publishEmpty = 0u;
+
+        if ((uint8)bus < (uint8)(sizeof(emptyBusPublished) / sizeof(emptyBusPublished[0])))
+        {
+            publishEmpty = (emptyBusPublished[(uint8)bus] == 0u) ? 1u : 0u;
+        }
+
+        if (GatewaySwc_PublishRange(bus,
                 GatewaySwc_EthSignalRanges[i].firstSignalId,
-                GatewaySwc_EthSignalRanges[i].lastSignalId);
+                GatewaySwc_EthSignalRanges[i].lastSignalId,
+                publishEmpty) != 0u)
+        {
+            if ((uint8)bus < (uint8)(sizeof(emptyBusPublished) / sizeof(emptyBusPublished[0])))
+            {
+                emptyBusPublished[(uint8)bus] = 1u;
+            }
+        }
     }
 
     GatewaySwc_PublishAiModelResult();
+    GatewaySwc_PublishCpuPerf();
+}
+
+static void GatewaySwc_PublishCpuPerf(void)
+{
+    uint8 startId;
+    uint16 payloadLen;
+    uint8 maxEntries;
+
+    maxEntries = (uint8)((GATEWAYSWC_ETH_MAX_PAYLOAD - GATEWAYSWC_CPU_PERF_HEADER_LEN -
+            CPUPERF_RESPONSE_HEADER_LEN) / CPUPERF_RESPONSE_ENTRY_LEN);
+    if (maxEntries == 0u)
+    {
+        return;
+    }
+    if (maxEntries > CPUPERF_RESPONSE_MAX_ENTRIES)
+    {
+        maxEntries = CPUPERF_RESPONSE_MAX_ENTRIES;
+    }
+
+    for (startId = 0u; startId < (uint8)CPUPERF_ID_COUNT; startId = (uint8)(startId + maxEntries))
+    {
+        GatewaySwc_EthBuffer[0u] = GATEWAYSWC_MAGIC0;
+        GatewaySwc_EthBuffer[1u] = GATEWAYSWC_MAGIC1;
+        GatewaySwc_EthBuffer[2u] = GATEWAYSWC_MAGIC2;
+        GatewaySwc_EthBuffer[3u] = GATEWAYSWC_FRAME_CPU_PERF;
+        GatewaySwc_StoreU32(GatewaySwc_EthBuffer, 4u, GatewaySwc_Status.mainCycles);
+
+        if (CpuPerf_BuildSnapshotPayload(
+                startId,
+                maxEntries,
+                &GatewaySwc_EthBuffer[GATEWAYSWC_CPU_PERF_HEADER_LEN],
+                &payloadLen) != E_OK)
+        {
+            continue;
+        }
+
+        payloadLen = (uint16)(payloadLen + GATEWAYSWC_CPU_PERF_HEADER_LEN);
+        GatewaySwc_Status.ethLastPayloadLength = payloadLen;
+        if (GatewaySwc_QueueEthTx(GATEWAYSWC_ETH_TX_KIND_CPU_PERF,
+                (SoAd_SoConIdType)GATEWAYSWC_ETH_SOCON_ID,
+                NULL_PTR,
+                GatewaySwc_EthBuffer,
+                payloadLen) == FALSE)
+        {
+            GatewaySwc_Status.ethLastOpenResult = 0u;
+            GatewaySwc_Status.ethLastSoAdResult = SOAD_NOT_OK;
+            GatewaySwc_Status.ethLastTransmitOk = 0u;
+            GatewaySwc_Status.ethFramesFailed++;
+            break;
+        }
+    }
 }
 
 static void GatewaySwc_PublishAiModelResult(void)
@@ -1506,8 +1515,15 @@ static void GatewaySwc_McuStatusInit(void)
 static void GatewaySwc_McuStatusMainFunction(uint64 nowNs)
 {
 #if (GATEWAYSWC_MCU_STATUS_UDP_ENABLE == STD_ON)
-    if ((GatewaySwc_McuStatusNextTxTimeNs == 0ull) ||
-            (nowNs >= GatewaySwc_McuStatusNextTxTimeNs))
+    if (GatewaySwc_McuStatusNextTxTimeNs == 0ull)
+    {
+        if (GatewaySwc_McuStatusTxPending == 0u)
+        {
+            GatewaySwc_McuStatusSendPacket();
+        }
+        GatewaySwc_McuStatusUpdateNextTxDeadline(nowNs);
+    }
+    else if (nowNs >= GatewaySwc_McuStatusNextTxTimeNs)
     {
         if (GatewaySwc_McuStatusTxPending == 0u)
         {
@@ -1601,6 +1617,20 @@ static void GatewaySwc_McuStatusBuildPacket(uint8 *packet)
     GatewaySwc_StoreU32(packet, GATEWAYSWC_MCU_STATUS_CRC_OFFSET, crc);
 }
 
+static void GatewaySwc_McuStatusStorePacketForWriteAll(const uint8 *packet)
+{
+    if (packet == NULL_PTR)
+    {
+        return;
+    }
+
+    if (memcmp(NvM_McuStatus_Ram, packet, GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE) != 0)
+    {
+        memcpy(NvM_McuStatus_Ram, packet, GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE);
+        (void)NvM_SetRamBlockStatus(NVM_BLOCK_ID_MCU_STATUS, TRUE);
+    }
+}
+
 static void GatewaySwc_McuStatusSendPacket(void)
 {
 #if (GATEWAYSWC_MCU_STATUS_UDP_ENABLE == STD_ON)
@@ -1611,6 +1641,7 @@ static void GatewaySwc_McuStatusSendPacket(void)
     remoteAddr.port = GATEWAYSWC_MCU_STATUS_UDP_PORT;
 
     GatewaySwc_McuStatusBuildPacket(packet);
+    GatewaySwc_McuStatusStorePacketForWriteAll(packet);
     GatewaySwc_Status.ethLastPayloadLength = GATEWAYSWC_MCU_STATUS_PACKET_LENGTH;
     if (GatewaySwc_QueueEthTx(GATEWAYSWC_ETH_TX_KIND_MCU_STATUS,
             0u,
@@ -1627,6 +1658,29 @@ static void GatewaySwc_McuStatusSendPacket(void)
         GatewaySwc_Status.ethFramesFailed++;
     }
 #endif
+}
+
+Std_ReturnType GatewaySwc_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dataLen)
+{
+    if ((data == NULL_PTR) || (dataLen == NULL_PTR))
+    {
+        return E_NOT_OK;
+    }
+
+    if (did != DCM_DID_MCU_DATA_PACKET)
+    {
+        return E_NOT_OK;
+    }
+
+    if (*dataLen < GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE)
+    {
+        return E_NOT_OK;
+    }
+
+    memcpy(data, NvM_McuStatus_Ram, GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE);
+    *dataLen = GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE;
+
+    return E_OK;
 }
 
 static void GatewaySwc_McuStatusUpdateNextTxDeadline(uint64 nowNs)
@@ -1673,14 +1727,16 @@ static sint16 GatewaySwc_McuStatusScaleCentiDeg(float32 temperature)
     return (sint16)(centiDeg - 0.5f);
 }
 
-static void GatewaySwc_PublishRange(GatewaySwc_BusType bus,
+static uint8 GatewaySwc_PublishRange(GatewaySwc_BusType bus,
         Com_SignalIdType firstSignalId,
-        Com_SignalIdType lastSignalId)
+        Com_SignalIdType lastSignalId,
+        uint8 publishEmpty)
 {
     Com_SignalIdType signalId;
     uint16 len;
     uint32 value;
     Std_ReturnType receiveResult;
+    uint8 queued;
 
     GatewaySwc_ResetEthFrame(&len, bus);
     GATEWAYSWC_DEBUG_ASSIGN(GatewaySwc_DebugPublishBus, (uint8)bus);
@@ -1691,7 +1747,7 @@ static void GatewaySwc_PublishRange(GatewaySwc_BusType bus,
     if (firstSignalId > lastSignalId)
     {
         GATEWAYSWC_DEBUG_ASSIGN(GatewaySwc_DebugPublishInvalidRange, 1u);
-        return;
+        return 0u;
     }
 
     for (signalId = firstSignalId; signalId <= lastSignalId; signalId++)
@@ -1709,7 +1765,7 @@ static void GatewaySwc_PublishRange(GatewaySwc_BusType bus,
 
         if ((uint16)(len + GATEWAYSWC_ENTRY_LEN) > GATEWAYSWC_ETH_MAX_PAYLOAD)
         {
-            GatewaySwc_FlushEthFrame(&len);
+            (void)GatewaySwc_FlushEthFrame(&len, 0u);
             GatewaySwc_ResetEthFrame(&len, bus);
             GATEWAYSWC_DEBUG_ASSIGN(GatewaySwc_DebugPublishLen, len);
         }
@@ -1722,8 +1778,9 @@ static void GatewaySwc_PublishRange(GatewaySwc_BusType bus,
         GATEWAYSWC_DEBUG_ASSIGN(GatewaySwc_DebugPublishLen, len);
     }
 
-    GatewaySwc_FlushEthFrame(&len);
+    queued = GatewaySwc_FlushEthFrame(&len, publishEmpty);
     GATEWAYSWC_DEBUG_ASSIGN(GatewaySwc_DebugPublishLen, len);
+    return queued;
 }
 
 static void GatewaySwc_ResetRxDiagnostics(void)
@@ -2215,12 +2272,20 @@ static void GatewaySwc_ResetEthFrame(uint16 *len, GatewaySwc_BusType bus)
     GatewaySwc_AppendU8(len, 0u);
 }
 
-static void GatewaySwc_FlushEthFrame(uint16 *len)
+static uint8 GatewaySwc_FlushEthFrame(uint16 *len, uint8 allowEmpty)
 {
-    if (*len <= GATEWAYSWC_HEADER_LEN)
+    uint8 queued = 0u;
+
+    if (*len < GATEWAYSWC_HEADER_LEN)
     {
         *len = 0u;
-        return;
+        return 0u;
+    }
+
+    if ((*len == GATEWAYSWC_HEADER_LEN) && (allowEmpty == 0u))
+    {
+        *len = 0u;
+        return 0u;
     }
 
     GatewaySwc_Status.ethLastPayloadLength = *len;
@@ -2235,8 +2300,13 @@ static void GatewaySwc_FlushEthFrame(uint16 *len)
         GatewaySwc_Status.ethLastTransmitOk = 0u;
         GatewaySwc_Status.ethFramesFailed++;
     }
+    else
+    {
+        queued = 1u;
+    }
 
     *len = 0u;
+    return queued;
 }
 
 void GatewaySwc_ReportDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteType status)

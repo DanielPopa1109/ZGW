@@ -65,28 +65,18 @@
 /*********************************************************************************************************************/
 /*--------------------------------Enumerations-----------------------------------------------------------------------*/
 /*********************************************************************************************************************/
-typedef enum
+enum
 {
     SmuSR0       = 1u,
     SmuSR1       = 2u,
-    SmuSR0SR1    = 3u,
     SmuSR2       = 4u,
-    SmuSR0SR2    = 5u,
-    SmuSR1SR2    = 6u,
-    SmuSR0SR1SR2 = 7u,
-    SmuNAN       = 8u,
-} SmuSR;
+};
 typedef enum
 {
     NA     = -1,
     fail   = 0u,
     pass   = 1u,
 } SmuStatusType;
-typedef enum
-{
-    notPending = 0u,
-    pending    = 1u,
-} AlarmStatSMU;
 /*********************************************************************************************************************/
 /*-----------------------------Data Structures-----------------------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -95,24 +85,7 @@ typedef struct
 {
     IfxSmu_Alarm                alarm;
     IfxSmu_InternalAlarmAction  alarmReaction;
-    void                        (*functionToCallOnDetection)(void);
 } AlarmConfigStruct;
-/* Bind an IGCS reaction with its config */
-typedef struct {
-    IfxSmu_InternalAlarmAction  igcs_id;
-    SmuSR                      igcs_config;
-} IGCSisrBindingStruct;
-/* Store the state of an user configured alarm with its config (const) */
-typedef struct {
-    const AlarmConfigStruct*  alarmConfig;
-    AlarmStatSMU             alarmState;
-} RuntimeAlarmHandle;
-/* Hold records of all the alarm raised */
-typedef struct
-{
-    RuntimeAlarmHandle  *lastAlarmRaised[USER_ALARM_NUMBER];
-    uint16              alarmCounter;
-} SmuAlarmPendingType;
 /* Store function execution status */
 typedef struct
 {
@@ -140,7 +113,4 @@ typedef struct
 void safetyKitEnableAllSMUAlarms(void);
 void initSMUModule(void);
 SmuStatusType softwareCoreAlarmTriggerSMU(IfxSmu_Alarm alarm);
-uint16 detectAlarmSourcSMU(RuntimeAlarmHandle *alarm_array, uint16 nbr_alarms);
-SmuStatusType coreAlarmReactionClearSMU(RuntimeAlarmHandle *active_alarm);
-SmuStatusType resetAllAlarmsSMU(void);
 #endif /* SMU_H_ */

@@ -1,4 +1,5 @@
 #include "LinIf.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include "Lin_Cfg.h"
 #include "LinDiag.h"
 #include "LinTp.h"
@@ -79,8 +80,6 @@ typedef struct
     uint8 busy;
 
     uint8 diagReq[8];
-    uint8 diagResp[8];
-    uint8 diagRespValid;
     uint8 diagReqPending;
     LinIf_DiagStateType diagState;
 
@@ -232,23 +231,9 @@ Std_ReturnType LinIf_SetDiagRequest(const uint8 data[8])
     }
 
     memcpy(LinIf_State.diagReq, data, 8u);
-    LinIf_State.diagRespValid = FALSE;
     LinIf_State.diagReqPending = TRUE;
     LinIf_State.diagState = LINIF_DIAG_MRF_PENDING;
     LinIf_State.diagTimer = LINIF_DIAG_TIMEOUT_TICKS;
-
-    return E_OK;
-}
-
-Std_ReturnType LinIf_GetDiagResponse(uint8 data[8])
-{
-    if ((data == NULL_PTR) || (LinIf_State.diagRespValid == FALSE))
-    {
-        return E_NOT_OK;
-    }
-
-    memcpy(data, LinIf_State.diagResp, 8u);
-    LinIf_State.diagRespValid = FALSE;
 
     return E_OK;
 }
@@ -343,6 +328,7 @@ static Std_ReturnType LinIf_TransmitFrame(const LinIf_ScheduleEntryType* entry)
 
 void LinIf_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     const LinIf_ScheduleTableType* sched;
     const LinIf_ScheduleEntryType* entry;
     uint8 rx[8];
@@ -352,6 +338,8 @@ void LinIf_MainFunction(void)
     uint8 completedSchedule;
     uint8 completedIndex;
     Lin_ResultType res;
+
+    CpuPerf_Start(CPUPERF_ID_LINIF_MAIN_C0, &cpuPerfCtx);
 
     Lin_MainFunction();
 
@@ -370,6 +358,7 @@ void LinIf_MainFunction(void)
             LinIf_State.busy = FALSE;
             LinIf_State.channelState = LINIF_CHANNEL_ERROR;
             (void)LinIf_SwitchSchedule(LINIF_SCHED_NORMAL);
+            CpuPerf_Stop(CPUPERF_ID_LINIF_MAIN_C0, &cpuPerfCtx);
             return;
         }
     }
@@ -383,6 +372,7 @@ void LinIf_MainFunction(void)
     {
         if (Lin_GetState(LIN_CHANNEL_0) != LIN_IDLE)
         {
+            CpuPerf_Stop(CPUPERF_ID_LINIF_MAIN_C0, &cpuPerfCtx);
             return;
         }
 
@@ -400,9 +390,6 @@ void LinIf_MainFunction(void)
             }
             else if (entry->frame->frameClass == LIN_FRM_DIAGNOSTIC_SRF)
             {
-                memcpy(LinIf_State.diagResp, rx, 8u);
-                LinIf_State.diagRespValid = TRUE;
-
                 LinTp_RxSlaveResponse(rx);
                 LinIf_DiagFrameDone(TRUE);
                 SysMgr_NotifyBusActivity();
@@ -500,6 +487,7 @@ void LinIf_MainFunction(void)
 
     if (LinIf_State.timer > 0u)
     {
+        CpuPerf_Stop(CPUPERF_ID_LINIF_MAIN_C0, &cpuPerfCtx);
         return;
     }
 
@@ -522,6 +510,7 @@ void LinIf_MainFunction(void)
     }
 
     LinIf_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_LINIF_MAIN_C0, &cpuPerfCtx);
 }
 
 LinIf_ChannelStateType LinIf_GetChannelState(void)
@@ -546,7 +535,6 @@ uint32 LinIf_GetDiagTimeoutCounter(void)
 
 void LinIf_ResetDiagnostic(void)
 {
-    LinIf_State.diagRespValid = FALSE;
     LinIf_State.diagReqPending = FALSE;
     LinIf_State.diagState = LINIF_DIAG_IDLE;
     LinIf_State.diagTimer = 0u;

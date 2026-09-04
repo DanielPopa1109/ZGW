@@ -51,6 +51,7 @@ RM := rm -rf
 -include BSW/Sys/FreeRTOS_core1/subdir.mk
 -include BSW/Sys/FreeRTOS_core0/subdir.mk
 -include BSW/Sys/Crc/subdir.mk
+-include BSW/Sys/CpuPerf/subdir.mk
 -include BSW/Mem/Nvm/subdir.mk
 -include BSW/Mem/MemStack/subdir.mk
 -include BSW/Mem/MemIf/subdir.mk
@@ -141,7 +142,7 @@ all: main-build
 main-build: ZGW_APP.elf secondary-outputs
 
 dependents:
-	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) all
+	-cd "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)" && $(MAKE) clean all
 
 # Tool invocations
 ZGW_APP.elf: $(OBJS) "C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP/SCR Debug (SDCC)/SCR_AURIX_TC3x" makefile $(OPTIONAL_TOOL_DEPS) .ZGW_APP.elf.opt

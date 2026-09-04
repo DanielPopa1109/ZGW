@@ -97,6 +97,7 @@
 #include "lwip_geth_netif.h"
 #include "EthernetDiag.h"
 #include "lwip_geth_conf.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 #include <string.h>
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
 #include "lwip_geth_private_phy_dp83825i.h"
@@ -439,6 +440,7 @@ static void lwip_geth_SendSingleTransmitBuffer(IfxGeth_Eth *ethernetif, uint16 p
     firstDescr->TDES2.R.IOC = 1u;
     firstDescr->TDES2.R.B1L = packetLength;
     firstDescr->TDES3.R.OWN = 1u;
+    EthStartupTiming_CaptureFirstTxSubmit();
 
     lwip_geth_CacheWritebackInvalidateRange(firstDescr, (uint32)sizeof(IfxGeth_TxDescr));
     ethernetif->txChannel[IfxGeth_TxDmaChannel_0].txDescrPtr = firstDescr;
@@ -603,6 +605,7 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
         GethConfig = *(lwip_geth_handle->app_config->geth_lld_config);
 
         /* We get the ID of Ethernet Phy do determine the board version, also needed for SCR */
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_MDIO_INIT_ENTER);
         if (lwip_geth_handle->app_config->geth_lld_config->pins.rmiiPins != NULL_PTR)
         {
             IfxPort_setPinModeOutput(
@@ -644,6 +647,7 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
              * RMII pins/MDIO/MDC must be generated/configured externally.
              */
         }
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_MDIO_INIT_COMPLETE);
 
 #if (PHY_DEVICE_NAME != PHY_DP83825I)
         if (lwip_geth_MdioWaitReadyBounded() != 0u)
@@ -655,12 +659,16 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
 
         /* initialize the module */
         LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugLowLevelInitState, 2u);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_INIT_ENTER);
         if (lwip_geth_InitModuleWithResetCheck(ethernetif, &GethConfig) == 0u)
         {
             LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugLowLevelInitState, 0xE2u);
             return 0u;
         }
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_INIT_COMPLETE);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_DMA_INIT_ENTER);
         lwip_geth_PrepareDmaMemory(&GethConfig);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_DMA_INIT_COMPLETE);
 
         /* Normal operation: keep MAC destination filtering enabled. */
         IfxGeth_mac_setPromiscuousMode(ethernetif->gethSFR, FALSE);
@@ -669,11 +677,13 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
         Dp83825i_DebugScanMdio();
         /* initialize the PHY */
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_INIT_ENTER);
         if (lwip_geth_private_Phy_Dp83825i_init() == 0u)
         {
             LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugLowLevelInitState, 0xE3u);
             return 0u;
         }
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_INIT_COMPLETE);
 #endif
         Dp83825i_DebugScanMdio();
 
@@ -684,6 +694,8 @@ static uint8 lwip_geth_low_level_init(netif_t *netif)
         LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugLowLevelInitState, 3u);
         IfxGeth_Eth_startTransmitters(ethernetif, 1);
         IfxGeth_Eth_startReceivers(ethernetif, 1);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_TX_READY);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_GETH_RX_READY);
         LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugDmaCh0TxControlAfterStart, ethernetif->gethSFR->DMA_CH[IfxGeth_TxDmaChannel_0].TX_CONTROL.U);
         LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugDmaCh0RxControlAfterStart, ethernetif->gethSFR->DMA_CH[IfxGeth_RxDmaChannel_0].RX_CONTROL.U);
         LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugMacConfigurationAfterStart, ethernetif->gethSFR->MAC_CONFIGURATION.U);
@@ -752,6 +764,8 @@ static err_t lwip_geth_low_level_output(netif_t *netif, pbuf_t *p)
     u16_t l;
 
     LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugLowLevelOutputCount);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_NETIF_LINKOUTPUT);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_GETH_TX_REQUEST);
 #ifdef LWIP_DEBUG
     u16_t       length = p->tot_len;
 #endif
@@ -938,6 +952,7 @@ static pbuf_t *lwip_geth_low_level_input(netif_t *netif)
 
         lwip_geth_CacheInvalidateRange(src, (uint32)len);
         lwip_geth_LowLevelInputPacketCount++;
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_GETH_RX);
         /* We iterate over the pbuf chain until we have read the entire
          * packet into the pbuf. */
         for (q = p; q != NULL; q = q->next)
@@ -1018,14 +1033,11 @@ static uint8 lwip_geth_netif_input_once_with(netif_t *netif, netif_input_fn inpu
 
     ethhdr = (eth_hdr_t *)p->payload;
     LWIP_GETH_NETIF_DEBUG_ASSIGN(lwip_geth_DebugLastEthType, (uint32)htons(ethhdr->type));
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_LWIP_RX);
     switch (htons(ethhdr->type))
     {
         case ETHTYPE_IP:
-        case ETHTYPE_ARP:
-#if PPPOE_SUPPORT
-        case ETHTYPE_PPPOEDISC:
-        case ETHTYPE_PPPOE:
-#endif
+            EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_IP_RX, ETHSTARTUPTIMING_RX_OTHER);
             inputRet = inputFn(p, netif);
             if (inputRet != ERR_OK)
             {
@@ -1037,6 +1049,36 @@ static uint8 lwip_geth_netif_input_once_with(netif_t *netif, netif_input_fn inpu
                 LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputOkCount);
             }
             break;
+
+        case ETHTYPE_ARP:
+            EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_ARP_RX, ETHSTARTUPTIMING_RX_ARP);
+            inputRet = inputFn(p, netif);
+            if (inputRet != ERR_OK)
+            {
+                LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputFailCount);
+                pbuf_free(p);
+            }
+            else
+            {
+                LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputOkCount);
+            }
+            break;
+
+#if PPPOE_SUPPORT
+        case ETHTYPE_PPPOEDISC:
+        case ETHTYPE_PPPOE:
+            inputRet = inputFn(p, netif);
+            if (inputRet != ERR_OK)
+            {
+                LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputFailCount);
+                pbuf_free(p);
+            }
+            else
+            {
+                LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputOkCount);
+            }
+            break;
+#endif
 
         default:
             LWIP_GETH_NETIF_DEBUG_INC(lwip_geth_DebugNetifInputUnknownTypeCount);

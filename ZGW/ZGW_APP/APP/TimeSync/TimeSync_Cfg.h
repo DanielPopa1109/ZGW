@@ -16,7 +16,7 @@
 
 #define TIMESYNC_UDP_ENABLE                    STD_ON
 #define TIMESYNC_UDP_PORT                      35000u
-#define TIMESYNC_UDP_PERIOD_MS                 100u
+#define TIMESYNC_UDP_PERIOD_MS                 800u
 #define TIMESYNC_UDP_BROADCAST_ADDR            0xFFFFFFFFu
 
 #define TIMESYNC_DCM_ROUTINE_ENABLE            STD_ON

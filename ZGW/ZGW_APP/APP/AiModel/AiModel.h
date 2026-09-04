@@ -18,6 +18,7 @@
 #define AIMODEL_PERIOD_MS                      BCM_CYCLE_TIME_MS
 #define AIMODEL_INFERENCE_PERIOD_MS            BCM_INFERENCE_PERIOD_MS
 #define AIMODEL_WCET_BUDGET_US                 40000u
+#define AIMODEL_NVM_IMAGE_SIZE                 ((uint32)sizeof(AiModel_ResultType))
 
 typedef struct
 {
@@ -93,5 +94,8 @@ Std_ReturnType AiModel_GetLatestGlobalResult(AiModel_GlobalResultType *result);
 Std_ReturnType AiModel_GetLatestChannelResult(uint8 channel, AiModel_ChannelResultType *result);
 Std_ReturnType AiModel_GetPdm1Snapshot(AiModel_Pdm1SnapshotType *snapshot);
 Std_ReturnType AiModel_CaptureDiagSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
+
+extern uint8 NvM_AiModel_Ram[];
+extern const uint8 NvM_AiModel_Rom[];
 
 #endif

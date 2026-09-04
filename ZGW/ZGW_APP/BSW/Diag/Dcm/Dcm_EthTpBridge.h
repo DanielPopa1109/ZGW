@@ -5,12 +5,6 @@
 
 #define DCM_ETHTP_MAX_PAYLOAD_LEN 512u
 
-typedef enum
-{
-    DCM_ETH_TRANSPORT_NONE = 0,
-    DCM_ETH_TRANSPORT_DOIP
-} Dcm_EthTransportType;
-
 void Dcm_EthTp_Init(void);
 
 void Dcm_EthTp_RxIndication(uint16_t sourceAddress,

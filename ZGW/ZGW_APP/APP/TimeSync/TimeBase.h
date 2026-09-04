@@ -56,24 +56,10 @@ void TimeBase_Init(void);
 void TimeBase_MainFunction(void);
 
 uint64 TimeBase_GetVehicleTimeNs(void);
-uint64 TimeBase_GetVehicleTimeUs(void);
-uint32 TimeBase_GetVehicleTimeS(void);
 
-boolean TimeBase_IsUtcValid(void);
 boolean TimeBase_IsUtcRestoredFromNvM(void);
-uint64 TimeBase_GetUtcTimeNs(boolean *valid);
 void TimeBase_SetUtcTimeNs(uint64 utcNowNs);
 Std_ReturnType TimeBase_SetUtcTimeNsFromSource(uint64 utcNowNs, TimeBase_TimeSourceType source);
-
-void TimeBase_SetUtcTimeFromDateTime(
-        uint16 year,
-        uint8 month,
-        uint8 day,
-        uint8 hour,
-        uint8 minute,
-        uint8 second,
-        uint16 millisecond,
-        sint16 timezone_offset_min);
 
 Std_ReturnType TimeBase_ConvertDateTimeToUtcNs(
         uint16 year,

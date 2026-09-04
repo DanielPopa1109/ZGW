@@ -54,8 +54,6 @@ sint32 TcpIp_BindAddr(TcpIp_SocketIdType sock, uint32 ip, uint16 port);
 sint32 TcpIp_Listen(TcpIp_SocketIdType sock);
 TcpIp_SocketIdType TcpIp_Accept(TcpIp_SocketIdType sock, TcpIp_SockAddrType *remoteAddr);
 
-sint32 TcpIp_Connect(TcpIp_SocketIdType sock, uint32 ip, uint16 port);
-
 sint32 TcpIp_Send(TcpIp_SocketIdType sock, const uint8 *data, uint16 len);
 sint32 TcpIp_SendTo(TcpIp_SocketIdType sock,
                     const TcpIp_SockAddrType *remoteAddr,

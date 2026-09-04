@@ -8,6 +8,16 @@
 #define SOMEIPSD_OFFER_TX_FAIL_THRESHOLD        3u
 #define SOMEIPSD_MANDATORY_EVENTGROUP_ID        0x0001u
 
+typedef struct
+{
+    uint8 active;
+    TcpIp_SockAddrType remoteAddr;
+    uint16 serviceId;
+    uint16 instanceId;
+    uint16 eventgroupId;
+    uint32 ttlMs;
+} SomeIpSd_SubscriptionType;
+
 static const SomeIpSd_ConfigType *SomeIpSd_Cfg;
 static uint64 SomeIpSd_NextOfferTimeNs;
 static uint64 SomeIpSd_LastMainTimeNs;
@@ -711,9 +721,4 @@ void SomeIpSd_SoAdRxIndication(SoAd_SoConIdType soConId,
     {
         SomeIpSd_ProcessEntry(remoteAddr, &data[entriesPos + i]);
     }
-}
-
-const SomeIpSd_SubscriptionType *SomeIpSd_GetSubscriptions(void)
-{
-    return SomeIpSd_Subscriptions;
 }

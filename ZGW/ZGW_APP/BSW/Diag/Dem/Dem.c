@@ -2,6 +2,7 @@
 #include "Dem_Int.h"
 #include "Dem_NvM.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "APP/TimeSync/TimeBase.h"
 #include "SysMgr.h"
 #include "IfxCpu.h"
 #include <string.h>
@@ -15,12 +16,20 @@ typedef enum
     DEM_NVM_STATE_READ_PENDING
 } Dem_InternalNvMStateType;
 
+typedef struct
+{
+    boolean valid;
+    Dem_EventIdType eventId;
+    Dem_EventStatusType status;
+} Dem_PendingEventStatusType;
+
 static const Dem_ConfigType *Dem_ConfigPtr = NULL_PTR;
 
 static Dem_InitStateType Dem_InitState = DEM_UNINIT;
 static Dem_InternalNvMStateType Dem_NvMState = DEM_NVM_STATE_IDLE;
 
 static Dem_RuntimeEventType Dem_RuntimeEvents[DEM_MAX_EVENTS];
+static Dem_PendingEventStatusType Dem_PendingEventStatus[DEM_MAX_EVENTS];
 Dem_NvImageType Dem_NvImage;
 #define Dem_PrimaryMemory (Dem_NvImage.primaryEntries)
 static Dem_FilterType Dem_Filter;
@@ -58,6 +67,78 @@ long long Dem_MainFunction_Counter = 0;
 static Dem_UdsStatusByteType Dem_GetPersistentStatus(Dem_UdsStatusByteType status)
 {
     return (Dem_UdsStatusByteType)(status & DEM_UDS_STATUS_PERSISTENT_MASK);
+}
+
+static boolean Dem_IsDtcEntryStatus(Dem_EventStatusType status)
+{
+    return ((status == DEM_EVENT_STATUS_FAILED) ||
+            (status == DEM_EVENT_STATUS_PREFAILED)) ? TRUE : FALSE;
+}
+
+static void Dem_QueuePendingEventStatus(Dem_EventIdType eventId, Dem_EventStatusType status)
+{
+    uint16 i;
+    uint16 freeIndex = DEM_MAX_EVENTS;
+
+    if (Dem_IsDtcEntryStatus(status) == FALSE)
+    {
+        return;
+    }
+
+    for (i = 0u; i < DEM_MAX_EVENTS; i++)
+    {
+        if (Dem_PendingEventStatus[i].valid != FALSE)
+        {
+            if (Dem_PendingEventStatus[i].eventId == eventId)
+            {
+                if ((status == DEM_EVENT_STATUS_FAILED) ||
+                        (Dem_PendingEventStatus[i].status != DEM_EVENT_STATUS_FAILED))
+                {
+                    Dem_PendingEventStatus[i].status = status;
+                }
+                return;
+            }
+        }
+        else if (freeIndex >= DEM_MAX_EVENTS)
+        {
+            freeIndex = i;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+    }
+
+    if (freeIndex < DEM_MAX_EVENTS)
+    {
+        Dem_PendingEventStatus[freeIndex].valid = TRUE;
+        Dem_PendingEventStatus[freeIndex].eventId = eventId;
+        Dem_PendingEventStatus[freeIndex].status = status;
+    }
+}
+
+static void Dem_ReplayPendingEventStatus(void)
+{
+    uint16 i;
+
+    if ((Dem_InitState != DEM_INITIALIZED) ||
+            (Dem_DtcSettingEnabled == FALSE) ||
+            (TimeBase_IsUtcRestoredFromNvM() == FALSE))
+    {
+        return;
+    }
+
+    for (i = 0u; i < DEM_MAX_EVENTS; i++)
+    {
+        if (Dem_PendingEventStatus[i].valid != FALSE)
+        {
+            Dem_EventIdType eventId = Dem_PendingEventStatus[i].eventId;
+            Dem_EventStatusType status = Dem_PendingEventStatus[i].status;
+
+            Dem_PendingEventStatus[i].valid = FALSE;
+            (void)Dem_SetEventStatus(eventId, status);
+        }
+    }
 }
 
 void Dem_EnterCritical(void)
@@ -366,6 +447,41 @@ static uint16 Dem_FindEventIndexByDTC(Dem_DTCType dtc)
     }
 
     return DEM_MAX_EVENTS;
+}
+
+static void Dem_ClearPendingEventStatus(Dem_DTCType dtc)
+{
+    uint16 i;
+
+    if ((dtc & 0x00FFFFFFu) == DEM_DTC_GROUP_ALL_DTCS)
+    {
+        for (i = 0u; i < DEM_MAX_EVENTS; i++)
+        {
+            Dem_PendingEventStatus[i].valid = FALSE;
+        }
+        return;
+    }
+
+    if (Dem_ConfigPtr == NULL_PTR)
+    {
+        return;
+    }
+
+    for (i = 0u; i < DEM_MAX_EVENTS; i++)
+    {
+        if (Dem_PendingEventStatus[i].valid != FALSE)
+        {
+            uint16 eventIndex = Dem_FindEventIndex(Dem_PendingEventStatus[i].eventId);
+            Dem_EventConfigType eventConfig;
+
+            if ((eventIndex < DEM_MAX_EVENTS) &&
+                    (Dem_GetEventConfig(eventIndex, &eventConfig) == E_OK) &&
+                    ((eventConfig.DTC & 0x00FFFFFFu) == (dtc & 0x00FFFFFFu)))
+            {
+                Dem_PendingEventStatus[i].valid = FALSE;
+            }
+        }
+    }
 }
 
 static uint16 Dem_FindPrimaryEntryByEvent(Dem_EventIdType eventId)
@@ -1301,11 +1417,15 @@ void Dem_MainFunction(void)
         return;
     }
 
+    Dem_ReplayPendingEventStatus();
+
     if ((Dem_NvMState == DEM_NVM_STATE_IDLE) && (Dem_Dirty != FALSE))
     {
         (void)Dem_UpdateNvMRamImageIfIdle();
     }
 #else
+    Dem_ReplayPendingEventStatus();
+
     if (Dem_ClearStatus == DEM_CLEAR_PENDING)
     {
         Dem_ClearStatus = DEM_CLEAR_OK;
@@ -1322,6 +1442,7 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
 
     if (Dem_InitState != DEM_INITIALIZED)
     {
+        Dem_QueuePendingEventStatus(EventId, EventStatus);
         return E_NOT_OK;
     }
 
@@ -1339,6 +1460,14 @@ Std_ReturnType Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType E
 
     if (Dem_DtcSettingEnabled == FALSE)
     {
+        return E_OK;
+    }
+
+    if (((EventStatus == DEM_EVENT_STATUS_FAILED) ||
+            (EventStatus == DEM_EVENT_STATUS_PREFAILED)) &&
+            (TimeBase_IsUtcRestoredFromNvM() == FALSE))
+    {
+        Dem_QueuePendingEventStatus(EventId, EventStatus);
         return E_OK;
     }
 
@@ -1741,6 +1870,8 @@ Std_ReturnType Dem_ClearDTC(
 
     if ((DTC & 0x00FFFFFFu) == DEM_DTC_GROUP_ALL_DTCS)
     {
+        Dem_ClearPendingEventStatus(DTC);
+
         for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
         {
             Dem_ClearRuntimeEvent(i);
@@ -1750,6 +1881,8 @@ Std_ReturnType Dem_ClearDTC(
     }
     else
     {
+        Dem_ClearPendingEventStatus(DTC);
+
         for (i = 0u; i < Dem_ConfigPtr->EventCount; i++)
         {
             Dem_EventConfigType eventConfig;

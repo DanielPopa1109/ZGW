@@ -11,6 +11,10 @@
 #include "NvM.h"
 #include "SysMgr.h"
 #include "BSW/Diag/Dcm/Dcm_TimeRoutine.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
+#include "BSW/Mem/Nvm/NvMTiming.h"
+#include "BSW/Mem/Nvm/NvMStats.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 
 /* ===================== Internal types ===================== */
@@ -763,12 +767,15 @@ void Dcm_ResetDoIPSession(void)
 
 void Dcm_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint8 i;
 
     if (Dcm_ConfigPtr == NULL_PTR)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_DCM_MAIN_C0, &cpuPerfCtx);
 
     for (i = 0u; (i < Dcm_ConfigPtr->numConnections) && (i < DCM_MAX_CONNECTIONS); i++)
     {
@@ -827,6 +834,7 @@ void Dcm_MainFunction(void)
     }
 
     Dcm_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_DCM_MAIN_C0, &cpuPerfCtx);
 }
 
 Std_ReturnType Dcm_RxIndication(PduIdType rxPduId, const uint8* data, PduLengthType len)
@@ -2486,6 +2494,50 @@ static Dcm_ReturnType Dcm_Service_0x31(
     if (Dcm_TimeRoutine_IsRoutineId(routineId) != FALSE)
     {
         ret = Dcm_TimeRoutine_HandleRoutineControl(
+                opStatus,
+                routineControlType,
+                routineId,
+                &req[3],
+                (Dcm_PduLengthType)(len - 3u),
+                &resp[3],
+                respLen);
+    }
+    else if (EthStartupTiming_IsRoutineId(routineId) != FALSE)
+    {
+        ret = EthStartupTiming_HandleRoutineControl(
+                opStatus,
+                routineControlType,
+                routineId,
+                &req[3],
+                (Dcm_PduLengthType)(len - 3u),
+                &resp[3],
+                respLen);
+    }
+    else if (NvMTiming_IsRoutineId(routineId) != FALSE)
+    {
+        ret = NvMTiming_HandleRoutineControl(
+                opStatus,
+                routineControlType,
+                routineId,
+                &req[3],
+                (Dcm_PduLengthType)(len - 3u),
+                &resp[3],
+                respLen);
+    }
+    else if (NvMStats_IsRoutineId(routineId) != FALSE)
+    {
+        ret = NvMStats_HandleRoutineControl(
+                opStatus,
+                routineControlType,
+                routineId,
+                &req[3],
+                (Dcm_PduLengthType)(len - 3u),
+                &resp[3],
+                respLen);
+    }
+    else if (CpuPerf_IsRoutineId(routineId) != FALSE)
+    {
+        ret = CpuPerf_HandleRoutineControl(
                 opStatus,
                 routineControlType,
                 routineId,

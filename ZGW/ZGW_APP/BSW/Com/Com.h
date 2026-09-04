@@ -34,16 +34,11 @@ void Com_MainFunctionTx(void);
 void Com_MainFunctionRx(void);
 
 Std_ReturnType Com_IpduGroupStart(Com_IpduGroupIdType groupId);
-Std_ReturnType Com_IpduGroupStop(Com_IpduGroupIdType groupId);
 void Com_TriggerFullComRestartBurst(uint8 channel);
 
 Std_ReturnType Com_SendSignal(Com_SignalIdType SignalId, const void* SignalDataPtr);
 Std_ReturnType Com_ReceiveSignal(Com_SignalIdType SignalId, void* SignalDataPtr);
-Std_ReturnType Com_InvalidateSignal(Com_SignalIdType SignalId);
 Std_ReturnType Com_GetRxPduDiagStatus(PduIdType RxPduId, uint8* StatusPtr);
-Std_ReturnType Com_GetRxPduDiagConfig(PduIdType RxPduId,
-        uint16* CycleTicksPtr,
-        uint16* TimeoutTicksPtr);
 Std_ReturnType Com_GetRxSignalDiagStatus(Com_SignalIdType SignalId,
         uint32* ValuePtr,
         uint32* InvalidValuePtr,

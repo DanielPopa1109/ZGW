@@ -3,6 +3,7 @@
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
 
 #include "lwip_geth_private_phy_dp83825i.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 
 #define DP83825I_PHY_ADDR              0u
 
@@ -188,6 +189,7 @@ void lwip_geth_private_Phy_Dp83825i_reset(void)
         DP83825I_PHY_ADDR,
         DP83825I_REG_BMCR,
         DP83825I_BMCR_RESET);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_RESET_ASSERT);
 }
 
 uint32 lwip_geth_private_Phy_Dp83825i_init(void)
@@ -210,6 +212,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
     Dp83825i_Status.linkDownCnt = 0u;
     Dp83825i_Status.linkUpCnt = 0u;
 
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_INIT_ENTER);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_RESET_ASSERT);
     if (lwip_geth_private_Phy_Dp83825i_write_mdio_reg(
             DP83825I_PHY_ADDR,
             DP83825I_REG_BMCR,
@@ -219,6 +223,7 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
         DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_RESET_RELEASE);
 
     timeout = DP83825I_RESET_SYNC_POLLS;
 
@@ -264,6 +269,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
         DP83825I_DEBUG_INC(Dp83825i_DebugInitFailCount);
         return 0u;
     }
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_START);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_WAIT_ENTER);
 
     Dp83825i_Status.initDone = 1u;
     Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_DOWN;
@@ -281,8 +288,12 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
         Dp83825i_Status.fullDuplex = ((physts & DP83825I_PHYSTS_FULL_DUPLEX) != 0u) ? 1u : 0u;
         Dp83825i_Status.linkUpCnt++;
         Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_UP;
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_WAIT_EXIT);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_COMPLETE);
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_LINK_DETECTED);
     }
 
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_INIT_COMPLETE);
     return 1u;
 }
 
@@ -311,6 +322,7 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
 
             if ((bmcr & DP83825I_BMCR_RESET) == 0u)
             {
+                EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_RESET_RELEASE);
                 Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_CONFIGURE;
             }
             else
@@ -340,6 +352,8 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
 
             Dp83825i_Status.autonegTimeoutCnt = 0u;
             Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_WAIT_AUTONEG;
+            EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_START);
+            EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_WAIT_ENTER);
             break;
         }
 
@@ -363,6 +377,8 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 Dp83825i_Status.autonegDone = 1u;
                 Dp83825i_Status.initDone = 1u;
                 Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_DOWN;
+                EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_WAIT_EXIT);
+                EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_AUTONEG_COMPLETE);
             }
             else
             {
@@ -410,6 +426,7 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 Dp83825i_Status.fullDuplex = ((physts & DP83825I_PHYSTS_FULL_DUPLEX) != 0u) ? 1u : 0u;
                 Dp83825i_Status.linkUpCnt++;
                 Dp83825i_Status.state = LWIP_GETH_PHY_DP83825I_STATE_LINK_UP;
+                EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_LINK_DETECTED);
             }
             else
             {

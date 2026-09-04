@@ -160,10 +160,11 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define UDS_DID_ACTIVE_SESSION           0xF186u
 #define FBL_ACTIVE_SOFTWARE_BLOCK_APP    0x01u
 #define FBL_ACTIVE_SOFTWARE_BLOCK_FBL    0x02u
-#define APP_SW_VERSION_MAJOR             1u
+#define FBL_ACTIVE_SOFTWARE_BLOCK_FBL_UPDATER 0x03u
+#define APP_SW_VERSION_MAJOR             2u
 #define APP_SW_VERSION_MINOR             0u
 #define APP_SW_VERSION_PATCH             0u
-#define FBL_SW_VERSION_MAJOR             1u
+#define FBL_SW_VERSION_MAJOR             2u
 #define FBL_SW_VERSION_MINOR             0u
 #define FBL_SW_VERSION_PATCH             0u
 
@@ -832,6 +833,12 @@ static uint8 Fbl_BluActiveSoftwareBlock(void)
 {
     if(g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER)
     {
+        if((g_blu.state >= FBL_BLU_STATE_ENTER_REQUESTED) &&
+           (g_blu.state != FBL_BLU_STATE_FBL_STARTED))
+        {
+            return FBL_ACTIVE_SOFTWARE_BLOCK_FBL_UPDATER;
+        }
+
         return FBL_ACTIVE_SOFTWARE_BLOCK_FBL;
     }
 

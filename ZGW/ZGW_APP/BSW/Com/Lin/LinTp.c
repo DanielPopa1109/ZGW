@@ -1,6 +1,7 @@
 #include "LinTp.h"
 #include "LinIf.h"
 #include "PduR.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include <string.h>
 
 #define LINTP_TIMER_N_CR 200u
@@ -43,10 +44,7 @@ typedef struct
 
 typedef struct
 {
-    uint8 initialNad;
     uint8 currentNad;
-    uint16 supplierId;
-    uint16 functionId;
 } LinTp_NodeType;
 
 static LinTp_StateType LinTp_State;
@@ -65,15 +63,9 @@ static void LinTp_InitConfiguredNodes(uint8 configuredNad)
         configuredNad = LINTP_NAD_ZGW_DEFAULT;
     }
 
-    LinTp_ConfiguredNodes[0u].initialNad = configuredNad;
     LinTp_ConfiguredNodes[0u].currentNad = configuredNad;
-    LinTp_ConfiguredNodes[0u].supplierId = LINTP_SUPPLIER_ID;
-    LinTp_ConfiguredNodes[0u].functionId = LINTP_FUNCTION_ID;
 
-    LinTp_ConfiguredNodes[1u].initialNad = LINIF_NAD_HVDCDC;
     LinTp_ConfiguredNodes[1u].currentNad = LINIF_NAD_HVDCDC;
-    LinTp_ConfiguredNodes[1u].supplierId = LINTP_SUPPLIER_ID;
-    LinTp_ConfiguredNodes[1u].functionId = LINTP_FUNCTION_ID;
 }
 
 static sint16 LinTp_FindConfiguredNad(uint8 nad)
@@ -103,64 +95,6 @@ void LinTp_Init(uint8 configuredNad)
     LinTp_State.activeTargetNad = LinTp_ConfiguredNodes[0u].currentNad;
     LinTp_State.txNad = LinTp_State.activeTargetNad;
     LinTp_State.state = LINTP_IDLE;
-}
-
-uint8 LinTp_GetNad(void)
-{
-    return LinTp_State.activeTargetNad;
-}
-
-uint8 LinTp_GetTargetNad(void)
-{
-    return LinTp_State.activeTargetNad;
-}
-
-Std_ReturnType LinTp_SetTargetNad(uint8 targetNad)
-{
-    if ((LinTp_State.state != LINTP_IDLE) || (LinTp_IsConfiguredNad(targetNad) == FALSE))
-    {
-        return E_NOT_OK;
-    }
-
-    LinTp_State.activeTargetNad = targetNad;
-    return E_OK;
-}
-
-Std_ReturnType LinTp_AssignNad(uint8 initialNad, uint16 supplierId, uint16 functionId, uint8 newNad)
-{
-    uint8 idx;
-    uint8 conflictIdx;
-
-    if ((newNad == 0u) || (newNad >= LINTP_NAD_FUNCTIONAL))
-    {
-        return E_NOT_OK;
-    }
-
-    for (idx = 0u; idx < LINTP_CONFIGURED_NODE_COUNT; idx++)
-    {
-        if ((LinTp_ConfiguredNodes[idx].initialNad == initialNad) &&
-            (LinTp_ConfiguredNodes[idx].supplierId == supplierId) &&
-            (LinTp_ConfiguredNodes[idx].functionId == functionId))
-        {
-            for (conflictIdx = 0u; conflictIdx < LINTP_CONFIGURED_NODE_COUNT; conflictIdx++)
-            {
-                if ((conflictIdx != idx) && (LinTp_ConfiguredNodes[conflictIdx].currentNad == newNad))
-                {
-                    return E_NOT_OK;
-                }
-            }
-
-            if (LinTp_State.activeTargetNad == LinTp_ConfiguredNodes[idx].currentNad)
-            {
-                LinTp_State.activeTargetNad = newNad;
-            }
-
-            LinTp_ConfiguredNodes[idx].currentNad = newNad;
-            return E_OK;
-        }
-    }
-
-    return E_NOT_OK;
 }
 
 static Std_ReturnType LinTp_QueueFrame(const uint8 frame[8])
@@ -199,16 +133,6 @@ static uint8 LinTp_CanStartTransmitNow(void)
     }
 
     return TRUE;
-}
-
-uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad)
-{
-    if (LinTp_IsConfiguredNad(targetNad) == FALSE)
-    {
-        return FALSE;
-    }
-
-    return LinTp_CanStartTransmitNow();
 }
 
 uint8 LinTp_CanStartTransmitToNadNow(uint8 targetNad)
@@ -353,6 +277,8 @@ void LinTp_TxFrameConfirmation(uint8 success)
 
 void LinTp_MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
     if (LinTp_State.startDelay > 0u)
     {
         LinTp_State.startDelay--;
@@ -363,9 +289,12 @@ void LinTp_MainFunction(void)
         return;
     }
 
+    CpuPerf_Start(CPUPERF_ID_LINTP_MAIN_C0, &cpuPerfCtx);
+
     if (LinTp_State.timer > 0u)
     {
         LinTp_State.timer--;
+        CpuPerf_Stop(CPUPERF_ID_LINTP_MAIN_C0, &cpuPerfCtx);
         return;
     }
 
@@ -381,6 +310,7 @@ void LinTp_MainFunction(void)
     }
 
     LinTp_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_LINTP_MAIN_C0, &cpuPerfCtx);
 }
 
 static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
@@ -512,11 +442,6 @@ static void LinTp_HandleRxFrame(const uint8 frame[8], PduIdType pduRId)
             LinTp_State.state = LINTP_IDLE;
         }
     }
-}
-
-void LinTp_RxMasterRequest(const uint8 frame[8])
-{
-    LinTp_HandleRxFrame(frame, LINTP_PDUR_MASTER_REQ_ID);
 }
 
 void LinTp_RxSlaveResponse(const uint8 frame[8])

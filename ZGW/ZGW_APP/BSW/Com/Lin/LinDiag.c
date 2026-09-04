@@ -276,16 +276,6 @@ void LinDiag_ReportFrameResult(uint8 channel,
     LinDiag_Report(channel, LINDIAG_FAULT_CONTROLLER_FAULT, DEM_EVENT_STATUS_PREFAILED);
 }
 
-void LinDiag_ReportControllerFault(uint8 channel)
-{
-    if (channel < LINDIAG_CHANNEL_COUNT)
-    {
-        LinDiag_Runtime[channel].controllerFaultCount++;
-        LinDiag_Runtime[channel].channelUnavailable = TRUE;
-        LinDiag_Report(channel, LINDIAG_FAULT_CONTROLLER_FAULT, DEM_EVENT_STATUS_FAILED);
-    }
-}
-
 void LinDiag_ReportWakeupFailure(uint8 channel)
 {
     if (channel < LINDIAG_CHANNEL_COUNT)

@@ -32,10 +32,7 @@ void ComM_Init(void);
 void ComM_MainFunction(void);
 
 Std_ReturnType ComM_RequestComMode(ComM_UserHandleType user, ComM_ModeType mode);
-Std_ReturnType ComM_GetRequestedComMode(ComM_UserHandleType user, ComM_ModeType* mode);
 Std_ReturnType ComM_GetCurrentComMode(ComM_ChannelType channel, ComM_ModeType* mode);
-Std_ReturnType ComM_GetMaxComMode(ComM_UserHandleType user, ComM_ModeType* mode);
-Std_ReturnType ComM_LimitChannelToNoComMode(ComM_ChannelType channel, uint8 status);
 
 uint8 ComM_IsTxAllowed(ComM_ChannelType channel);
 uint8 ComM_IsRxAllowed(ComM_ChannelType channel);

@@ -7,6 +7,7 @@
 #include "Fls.h"
 #include "NvM.h"
 #include "NvM_Cfg.h"
+#include "APP/GatewaySwc/GatewaySwc.h"
 
 #define CODINGAPP_UNUSED(x)                  ((void)(x))
 
@@ -20,6 +21,22 @@ typedef enum
     CODINGAPP_NVM_JOB_WRITE_ALL,
     CODINGAPP_NVM_JOB_READ_BLOCK
 } CodingApp_NvMJobType;
+
+typedef struct
+{
+    uint8 initialized;
+    uint8 state;
+    uint8 validationStatus;
+    uint8 dirty;
+    uint16 rxMessageCount;
+    uint16 rxMessageExpectedCount;
+    uint16 nvImageLength;
+    uint32 generation;
+    uint32 validationCounter;
+    uint32 invalidCodingCounter;
+    uint32 writeAllCounter;
+    uint8 lastNvMResult;
+} CodingApp_StatusType;
 
 static CodingApp_NvImageType CodingApp_ActiveImage;
 static CodingApp_StatusType CodingApp_Status;
@@ -224,17 +241,6 @@ boolean CodingApp_IsTxPduEnabled(PduIdType txPduId)
     }
 
     return CodingApp_GetTxPduEnabledBit(&CodingApp_ActiveImage, txPduId);
-}
-
-Std_ReturnType CodingApp_GetStatus(CodingApp_StatusType *status)
-{
-    if (status == NULL_PTR)
-    {
-        return E_NOT_OK;
-    }
-
-    *status = CodingApp_Status;
-    return E_OK;
 }
 
 Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dataLen)
@@ -623,6 +629,11 @@ Dcm_ReturnType DcmAppl_ReadDataByIdentifier(
 {
     CODINGAPP_UNUSED(connIdx);
     CODINGAPP_UNUSED(opStatus);
+
+    if (GatewaySwc_ReadDid(did, data, dataLen) == E_OK)
+    {
+        return DCM_E_OK;
+    }
 
     if (CodingApp_ReadDid(did, data, dataLen) == E_OK)
     {

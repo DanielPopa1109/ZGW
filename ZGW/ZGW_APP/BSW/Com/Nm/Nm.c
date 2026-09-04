@@ -6,8 +6,6 @@
 #include "../ComM/ComM.h"
 #include "../UdpNm/UdpNm.h"
 
-#include <string.h>
-
 typedef struct
 {
     uint8 localRequested;
@@ -15,8 +13,6 @@ typedef struct
     Nm_ModeType mode;
     uint16 readySleepTimer;
     uint16 prepareSleepTimer;
-    uint8 userData[NM_MAX_USER_DATA_LEN];
-    uint8 userDataLen;
 } Nm_LinStateType;
 
 static Nm_LinStateType Nm_LinState;
@@ -25,13 +21,6 @@ static uint8 Nm_Initialized;
 static void Nm_LinWriteNm3Signal(uint8 value)
 {
     (void)value;
-}
-
-static uint8 Nm_LinGetNm3SignalValue(void)
-{
-    return (Nm_LinState.userDataLen > 0u) ?
-           Nm_LinState.userData[0u] :
-           0xFFu;
 }
 
 static void Nm_LinSetState(Nm_StateType state, Nm_ModeType mode)
@@ -68,7 +57,7 @@ static Std_ReturnType Nm_LinNetworkRequest(void)
     Nm_LinState.readySleepTimer = 0u;
     Nm_LinState.prepareSleepTimer = 0u;
     Nm_LinSetState(NM_STATE_NORMAL_OPERATION, NM_MODE_NETWORK);
-    Nm_LinWriteNm3Signal(Nm_LinGetNm3SignalValue());
+    Nm_LinWriteNm3Signal(0xFFu);
     return E_OK;
 }
 
@@ -131,8 +120,6 @@ void Nm_Init(void)
     Nm_LinState.mode = NM_MODE_BUS_SLEEP;
     Nm_LinState.readySleepTimer = 0u;
     Nm_LinState.prepareSleepTimer = 0u;
-    Nm_LinState.userDataLen = 0u;
-    (void)memset(Nm_LinState.userData, 0, sizeof(Nm_LinState.userData));
 
     CanNm_Init();
     UdpNm_Init();
@@ -218,106 +205,6 @@ Std_ReturnType Nm_GetState(uint8 channel, Nm_StateType* state, Nm_ModeType* mode
 
         case COMM_CH_ETH:
             return UdpNm_GetState(channel, state, mode);
-
-        default:
-            return E_NOT_OK;
-    }
-}
-
-Std_ReturnType Nm_PassiveStartUp(uint8 channel)
-{
-    if (Nm_Initialized == FALSE)
-    {
-        return E_NOT_OK;
-    }
-
-    switch (channel)
-    {
-        case COMM_CH_CAN:
-        case COMM_CH_CANFD:
-            return CanNm_PassiveStartUp(channel);
-
-        case COMM_CH_LIN:
-            ComM_Nm_NetworkStartIndication(COMM_CH_LIN);
-            return Nm_LinNetworkRequest();
-
-        case COMM_CH_ETH:
-            return UdpNm_PassiveStartUp(channel);
-
-        default:
-            return E_NOT_OK;
-    }
-}
-
-Std_ReturnType Nm_SetUserData(uint8 channel, const uint8* data, uint8 len)
-{
-    if ((Nm_Initialized == FALSE) ||
-        ((data == NULL_PTR) && (len != 0u)) ||
-        (len > NM_MAX_USER_DATA_LEN))
-    {
-        return E_NOT_OK;
-    }
-
-    switch (channel)
-    {
-        case COMM_CH_CAN:
-        case COMM_CH_CANFD:
-            return CanNm_SetUserData(channel, data, len);
-
-        case COMM_CH_LIN:
-            if (len > 1u)
-            {
-                return E_NOT_OK;
-            }
-            if (len != 0u)
-            {
-                (void)memcpy(Nm_LinState.userData, data, len);
-            }
-            Nm_LinState.userDataLen = len;
-            if (Nm_LinState.localRequested != FALSE)
-            {
-                Nm_LinWriteNm3Signal(Nm_LinGetNm3SignalValue());
-            }
-            return E_OK;
-
-        case COMM_CH_ETH:
-            return UdpNm_SetUserData(channel, data, len);
-
-        default:
-            return E_NOT_OK;
-    }
-}
-
-Std_ReturnType Nm_GetUserData(uint8 channel, uint8* data, uint8* len)
-{
-    uint8 copyLen;
-
-    if ((Nm_Initialized == FALSE) || (data == NULL_PTR) || (len == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    switch (channel)
-    {
-        case COMM_CH_CAN:
-        case COMM_CH_CANFD:
-            return CanNm_GetUserData(channel, data, len);
-
-        case COMM_CH_LIN:
-            if (*len < Nm_LinState.userDataLen)
-            {
-                return E_NOT_OK;
-            }
-            copyLen = Nm_LinState.userDataLen;
-            if (copyLen != 0u)
-            {
-                (void)memcpy(data, Nm_LinState.userData, copyLen);
-            }
-            *len = copyLen;
-            return E_OK;
-
-        case COMM_CH_ETH:
-            return UdpNm_GetUserData(channel, data, len);
 
         default:
             return E_NOT_OK;

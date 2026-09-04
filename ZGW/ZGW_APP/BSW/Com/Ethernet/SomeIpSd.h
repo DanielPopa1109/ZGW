@@ -35,16 +35,6 @@ typedef struct
     uint32 offerPeriodMs;
 } SomeIpSd_ConfigType;
 
-typedef struct
-{
-    uint8 active;
-    TcpIp_SockAddrType remoteAddr;
-    uint16 serviceId;
-    uint16 instanceId;
-    uint16 eventgroupId;
-    uint32 ttlMs;
-} SomeIpSd_SubscriptionType;
-
 void SomeIpSd_Init(const SomeIpSd_ConfigType *config);
 void SomeIpSd_MainFunction(uint32 elapsedMs);
 
@@ -52,7 +42,5 @@ void SomeIpSd_SoAdRxIndication(SoAd_SoConIdType soConId,
                                const TcpIp_SockAddrType *remoteAddr,
                                const uint8 *data,
                                uint16 len);
-
-const SomeIpSd_SubscriptionType *SomeIpSd_GetSubscriptions(void);
 
 #endif

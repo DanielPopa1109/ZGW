@@ -10,7 +10,5 @@
 
 void EthTimeSync_Init(void);
 void EthTimeSync_MainFunction(uint32 elapsedMs);
-uint8 EthTimeSync_GetStatus(void);
-uint32 EthTimeSync_GetTxCounter(void);
 
 #endif /* ETHTIMESYNC_H */

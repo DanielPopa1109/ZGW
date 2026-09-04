@@ -4,6 +4,9 @@
 #include "Fls.h"
 #include "Crc.h"
 #include "MemStack_Error.h"
+#include "BSW/Mem/Nvm/NvMTiming.h"
+#include "BSW/Mem/Nvm/NvMStats.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #define FEE_API_INIT                    (0x00u)
 #define FEE_API_SET_MODE                (0x01u)
@@ -202,7 +205,12 @@ static uint8 Fee_MarkerBuffer[sizeof(Fee_RecordHeaderType) + sizeof(Fee_RecordTr
 #define FEE_ALL_LIVE_RECORD_STORAGE_SIZE \
     (FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_DEM_PRIMARY_SIZE) + \
      FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_APP_DATA_SIZE) + \
-     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_TIMEBASE_SIZE))
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_TIMEBASE_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_ETH_STARTUP_TIMING_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_NVM_TIMING_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_MCU_STATUS_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_AIMODEL_SIZE) + \
+     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_BLOCK_NVM_STATS_SIZE))
 #define FEE_MAX_PENDING_WRITE_STORAGE_SIZE \
     FEE_REDUNDANT_RECORD_STORAGE_SIZE(FEE_MAX_BLOCK_SIZE)
 
@@ -709,6 +717,7 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
     }
     if (Fee_IsSectorHeaderValid(&sectorHeader) == FALSE)
     {
+        NvMStats_RecordFeeIntegrityFailure();
         return;
     }
 
@@ -752,6 +761,7 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
         recordState = Fee_ClassifyRecordAt(cursor, end, &header);
         if (recordState == FEE_RECORD_TORN_TAIL)
         {
+            NvMStats_RecordFeeScanRecovery();
             /* Interrupted append at the log tail. Keep every committed record
              * already applied and keep this sector usable. Park the append cursor
              * past the end of the sector so the next write/invalidate garbage-
@@ -769,6 +779,10 @@ static void Fee_ScanSector(uint8 sector, Fee_ScanResultType *result)
         if (recordState == FEE_RECORD_VALID)
         {
             Fee_ApplyRecord(result->block, cursor, &header);
+        }
+        else
+        {
+            NvMStats_RecordFeeIntegrityFailure();
         }
         /* FEE_RECORD_SKIP: header (hence length) is trusted, so advance to the
          * next record boundary without applying the corrupt copy and keep
@@ -891,6 +905,7 @@ static void Fee_RestorePendingWriteData(void)
 static void Fee_SetIdle(MemIf_JobResultType result)
 {
     Fee_State.result = result;
+    NvMTiming_FeeComplete((uint8)result);
     Fee_State.status = MEMIF_IDLE;
     Fee_State.state = FEE_STATE_IDLE;
     Fee_State.userJob = FEE_USER_JOB_NONE;
@@ -902,6 +917,11 @@ static void Fee_SetIdle(MemIf_JobResultType result)
 static void Fee_SetFailed(uint8 error, uint32 detail)
 {
     MemStack_ReportError(MEMSTACK_MODULE_ID_FEE, FEE_API_MAIN, error, detail);
+    NvMStats_RecordFeeError(error, detail);
+    if ((Fee_State.status == MEMIF_BUSY) && (Fee_State.userJob == FEE_USER_JOB_WRITE))
+    {
+        NvMStats_RecordFeeWriteFailure();
+    }
     Fee_SetIdle(MEMIF_JOB_FAILED);
 }
 
@@ -920,6 +940,7 @@ static void Fee_StartFormat(void)
 static Std_ReturnType Fee_StartErase(uint32 address, uint32 length)
 {
     Fee_RecordFlashAccess(FEE_DEBUG_FLASH_ACCESS_ERASE, address, length);
+    NvMTiming_FlsRequest(NVMTIMING_OP_WRITE_BLOCK, address, length);
     return Fls_Erase(address, (Fls_LengthType)length);
 }
 
@@ -928,6 +949,7 @@ static Std_ReturnType Fee_StartRawWrite(uint32 address, const uint8 *data, uint3
     Fee_NextWriteDFlashAddress = Fls_GetPhysicalAddress(address);
     Fee_DebugLastFlashPhysicalAddress = Fee_NextWriteDFlashAddress;
     Fee_RecordFlashAccess(FEE_DEBUG_FLASH_ACCESS_FLS_WRITE, address, length);
+    NvMTiming_FlsRequest(NVMTIMING_OP_WRITE_BLOCK, address, length);
     return Fls_Write(address, data, (Fls_LengthType)length);
 }
 
@@ -1013,6 +1035,7 @@ static boolean Fee_SelectReadCopy(uint16 blockIndex, uint8 attempt, uint32 *addr
 static void Fee_StartGc(void)
 {
     Fee_SavePendingWriteData();
+    NvMStats_RecordFeeGcStart();
 
     Fee_State.pendingAfterGc = TRUE;
     Fee_State.pendingJob = Fee_State.userJob;
@@ -1072,6 +1095,7 @@ void Fee_Init(const Fee_ConfigType *ConfigPtr)
         Fee_State.state = FEE_STATE_IDLE;
         Fee_NextSequence = 1u;
         Fee_DeferredFormatPending = TRUE;
+        NvMStats_RecordFeeDeferredFormat();
     }
 }
 
@@ -1151,6 +1175,7 @@ Std_ReturnType Fee_Write(uint16 BlockNumber, const uint8 *DataBufferPtr)
     }
 
     memcpy(Fee_JobData, DataBufferPtr, Fee_BlockConfig[(uint16)idx].blockSize);
+    NvMStats_RecordFeeWriteRequest(BlockNumber);
     Fee_State.status = MEMIF_BUSY;
     Fee_State.result = MEMIF_JOB_PENDING;
     Fee_State.userJob = FEE_USER_JOB_WRITE;
@@ -1192,6 +1217,7 @@ Std_ReturnType Fee_InvalidateBlock(uint16 BlockNumber)
         return E_NOT_OK;
     }
 
+    NvMStats_RecordFeeInvalidationRequest();
     Fee_State.status = MEMIF_BUSY;
     Fee_State.result = MEMIF_JOB_PENDING;
     Fee_State.userJob = FEE_USER_JOB_INVALIDATE;
@@ -1417,8 +1443,15 @@ static void Fee_ProcessWriteStates(Fee_InternalStateType prepareState,
         {
             Fee_UpdateRuntimeAfterCurrentRecord();
         }
+        if ((Fee_State.status == MEMIF_BUSY_INTERNAL) &&
+                (dataFromFlash != FALSE) &&
+                ((uint8)(Fee_State.currentCopy + 1u) >= Fee_State.copiesToWrite))
+        {
+            NvMStats_RecordFeeGcCopiedRecord(Fee_RecordHeader.length, Fee_RecordTotalLength * Fee_State.copiesToWrite);
+        }
         Fee_State.activeAppend += Fee_RecordTotalLength;
         Fee_UpdateNextWriteDFlashAddress();
+        NvMStats_RecordFeeUtilization(Fee_State.activeAppend, Fee_FreeBytesInActiveSector());
         Fee_State.currentCopy++;
 
         if (Fee_State.currentCopy < Fee_State.copiesToWrite)
@@ -1433,6 +1466,15 @@ static void Fee_ProcessWriteStates(Fee_InternalStateType prepareState,
             }
             else
             {
+                if (Fee_State.userJob == FEE_USER_JOB_WRITE)
+                {
+                    NvMStats_RecordFeeWriteSuccess(Fee_State.jobBlockNumber);
+                }
+                else if ((Fee_State.userJob == FEE_USER_JOB_INVALIDATE) ||
+                        (Fee_State.userJob == FEE_USER_JOB_ERASE_IMMEDIATE))
+                {
+                    NvMStats_RecordFeeInvalidationSuccess();
+                }
                 Fee_SetIdle(MEMIF_JOB_OK);
             }
         }
@@ -1483,10 +1525,13 @@ long long Fee_MainFunction_Counter =0;
 
 static void Fee_MainFunctionStep(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint32 address;
     uint32 crc;
     uint32 length;
     sint16 idx;
+
+    CpuPerf_Start(CPUPERF_ID_FEE_MAIN_STEP_C0, &cpuPerfCtx);
 
     switch (Fee_State.state)
     {
@@ -1603,6 +1648,7 @@ static void Fee_MainFunctionStep(void)
         case FEE_STATE_READ_START:
             if (Fee_SelectReadCopy(Fee_State.jobBlockIndex, Fee_State.currentCopy, &address, &crc, &length) == FALSE)
             {
+                NvMStats_RecordFeeInvalidMissingBlockRead();
                 Fee_SetIdle(MEMIF_BLOCK_INVALID);
             }
             else if ((((uint32)Fee_State.jobOffset + (uint32)Fee_State.jobLength) > length) ||
@@ -1647,14 +1693,16 @@ static void Fee_MainFunctionStep(void)
                     else
                     {
                         Fee_State.currentCopy++;
-                        if (Fee_State.currentCopy < 2u)
-                        {
-                            Fee_State.state = FEE_STATE_READ_START;
-                        }
-                        else
-                        {
-                            Fee_SetIdle(MEMIF_BLOCK_INCONSISTENT);
-                        }
+            if (Fee_State.currentCopy < 2u)
+            {
+                NvMStats_RecordFeeIntegrityFailure();
+                Fee_State.state = FEE_STATE_READ_START;
+            }
+            else
+            {
+                NvMStats_RecordFeeIntegrityFailure();
+                Fee_SetIdle(MEMIF_BLOCK_INCONSISTENT);
+            }
                     }
                 }
             }
@@ -1804,6 +1852,10 @@ static void Fee_MainFunctionStep(void)
             /* Once the seal commits the destination is a complete, scannable
              * sector; now retire the old one. */
             Fee_ProcessMarkerWait(FEE_STATE_GC_MARKER_WAIT, FEE_STATE_GC_ERASE_OLD_START);
+            if (Fee_State.state == FEE_STATE_GC_ERASE_OLD_START)
+            {
+                NvMStats_RecordFeeSectorSwitch();
+            }
             break;
 
         case FEE_STATE_GC_ERASE_OLD_START:
@@ -1840,6 +1892,7 @@ static void Fee_MainFunctionStep(void)
             break;
     }
 
+    CpuPerf_Stop(CPUPERF_ID_FEE_MAIN_STEP_C0, &cpuPerfCtx);
 }
 
 void Fee_MainFunction(void)
@@ -1879,4 +1932,5 @@ void Fee_MainFunction(void)
     } while (stepBudget > 0u);
 
     Fee_MainFunction_Counter++;
+    NvMTiming_FeeMainCycle();
 }

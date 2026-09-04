@@ -302,65 +302,6 @@ Std_ReturnType UdpNm_GetState(uint8 channel,
     return E_OK;
 }
 
-Std_ReturnType UdpNm_PassiveStartUp(uint8 channel)
-{
-    if ((UdpNm_Initialized == FALSE) || (channel != COMM_CH_ETH))
-    {
-        return E_NOT_OK;
-    }
-
-    ComM_Nm_NetworkStartIndication(COMM_CH_ETH);
-    UdpNm_EnterNetwork(TRUE);
-    return E_OK;
-}
-
-Std_ReturnType UdpNm_SetUserData(uint8 channel, const uint8* data, uint8 len)
-{
-    if ((UdpNm_Initialized == FALSE) ||
-        (channel != COMM_CH_ETH) ||
-        ((data == NULL_PTR) && (len != 0u)) ||
-        (len > UDPNM_USER_DATA_LEN))
-    {
-        return E_NOT_OK;
-    }
-
-    if (len != 0u)
-    {
-        (void)memcpy(UdpNm_ChannelState.userData, data, len);
-    }
-
-    UdpNm_ChannelState.userDataLen = len;
-    return E_OK;
-}
-
-Std_ReturnType UdpNm_GetUserData(uint8 channel, uint8* data, uint8* len)
-{
-    uint8 copyLen;
-
-    if ((UdpNm_Initialized == FALSE) ||
-        (channel != COMM_CH_ETH) ||
-        (data == NULL_PTR) ||
-        (len == NULL_PTR))
-    {
-        return E_NOT_OK;
-    }
-
-    copyLen = UdpNm_ChannelState.userDataLen;
-
-    if (*len < copyLen)
-    {
-        return E_NOT_OK;
-    }
-
-    if (copyLen != 0u)
-    {
-        (void)memcpy(data, UdpNm_ChannelState.userData, copyLen);
-    }
-
-    *len = copyLen;
-    return E_OK;
-}
-
 uint8 UdpNm_SoAdRxIndication(SoAd_SoConIdType soConId,
                              const TcpIp_SockAddrType* remoteAddr,
                              const uint8* data,

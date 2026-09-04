@@ -14,6 +14,7 @@
 #include "McuSm.h"
 #include "SoAd.h"
 #include "../UdpNm/UdpNm.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 #include <string.h>
 
@@ -343,7 +344,6 @@ volatile uint32 PduR_DoIPRoutedRelayDroppedCounter;
 volatile uint32 PduR_DoIPRoutedForwardDroppedCounter;
 
 volatile uint32 PduR_DoIPRxMailboxFullCounter;
-volatile uint32 PduR_DoIPRxDroppedBusyCounter;
 volatile uint32 PduR_DoIPTxMailboxFullCounter;
 volatile uint32 PduR_DoIPTxConfirmFullCounter;
 volatile uint32 PduR_DoIPTxSentCounter;
@@ -1182,11 +1182,6 @@ void PduR_Init(void)
     PDUR_DEBUG_ASSIGN(PduR_DebugInitialized, TRUE);
 }
 
-uint8 PduR_IsInitialized(void)
-{
-    return PduR_Initialized;
-}
-
 void PduR_DoIPResetSession(void)
 {
     /* Called from the DoIP TCP connect/disconnect callbacks, which run on core2.
@@ -1814,6 +1809,7 @@ Std_ReturnType PduR_DoIPRxIndication(uint16 sourceAddress,
 
 void PduR_DoIPCore0MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     const PduR_TpRxRouteType* route;
     PduIdType txPduId;
     Std_ReturnType txResult;
@@ -1833,6 +1829,8 @@ void PduR_DoIPCore0MainFunction(void)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_PDUR_DOIP_CORE0_MAIN_C0, &cpuPerfCtx);
 
     if (PduR_DoIPTxConfirmationMailbox.valid != FALSE)
     {
@@ -1867,6 +1865,7 @@ void PduR_DoIPCore0MainFunction(void)
 
         if (PduR_DoIPCtx.valid != FALSE)
         {
+            CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE0_MAIN_C0, &cpuPerfCtx);
             return;
         }
 
@@ -1899,6 +1898,7 @@ void PduR_DoIPCore0MainFunction(void)
             }
             else if (PduR_DoIPRxMailbox.valid == FALSE)
             {
+                CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE0_MAIN_C0, &cpuPerfCtx);
                 return;
             }
             else
@@ -2015,16 +2015,21 @@ void PduR_DoIPCore0MainFunction(void)
         }
         __dsync();
     }
+
+    CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE0_MAIN_C0, &cpuPerfCtx);
 }
 
 void PduR_DoIPCore2MainFunction(void)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     DoIP_ReturnType doipRet;
 
     if (PduR_Initialized == FALSE)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
 
     PduR_DoIPMonitorSessionReset();
 
@@ -2054,6 +2059,7 @@ void PduR_DoIPCore2MainFunction(void)
                 PduR_DoIPTxRetryCounter++;
                 PduR_DoIPTxLastRetries = PduR_DoIPTxMailbox.txRetries;
                 __dsync();
+                CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
                 return;
             }
 
@@ -2064,6 +2070,7 @@ void PduR_DoIPCore2MainFunction(void)
         {
             PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
             __dsync();
+            CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
             return;
         }
 
@@ -2075,12 +2082,14 @@ void PduR_DoIPCore2MainFunction(void)
     if (PduR_DoIPTxMailbox.state != PDUR_DOIP_TX_STATE_CONFIRM)
     {
         PduR_DoIPTxLastMailboxState = PduR_DoIPTxMailbox.state;
+        CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
         return;
     }
 
     if (PduR_DoIPTxConfirmationMailbox.valid != FALSE)
     {
         PduR_DoIPTxConfirmFullCounter++;
+        CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
         return;
     }
 
@@ -2092,4 +2101,5 @@ void PduR_DoIPCore2MainFunction(void)
     __dsync();
     PduR_DoIPTxMailbox.state = PDUR_DOIP_TX_STATE_EMPTY;
     __dsync();
+    CpuPerf_Stop(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
 }

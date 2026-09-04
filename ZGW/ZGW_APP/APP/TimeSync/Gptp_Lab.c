@@ -13,11 +13,19 @@
 #define GPTP_LAB_SYNC_FRAME_LENGTH             58u
 #define GPTP_LAB_FOLLOW_UP_FRAME_LENGTH        58u
 #define GPTP_LAB_ANNOUNCE_FRAME_LENGTH         78u
-#define GPTP_LAB_DELAY_REQ_FRAME_LENGTH        58u
-#define GPTP_LAB_DELAY_RESP_FRAME_LENGTH       68u
 #define GPTP_LAB_CONTROL_SYNC                  0x00u
 #define GPTP_LAB_CONTROL_FOLLOW_UP             0x02u
 #define GPTP_LAB_CONTROL_OTHER                 0x05u
+
+typedef struct
+{
+    uint8 priority1;
+    uint8 clockClass;
+    uint8 clockAccuracy;
+    uint16 offsetScaledLogVariance;
+    uint8 priority2;
+    uint8 clockIdentity[GPTP_LAB_CLOCK_IDENTITY_LENGTH];
+} Gptp_Lab_DatasetType;
 
 static const uint8 Gptp_Lab_DestinationMac[6] = { 0x01u, 0x80u, 0xC2u, 0x00u, 0x00u, 0x0Eu };
 static const uint8 Gptp_Lab_SourceMac[6] = { 0x02u, 0x54u, 0x43u, 0x33u, 0x37u, 0x35u };
@@ -35,7 +43,6 @@ static void Gptp_Lab_PutU16(uint8 *data, uint16 value);
 static void Gptp_Lab_PutU32(uint8 *data, uint32 value);
 static void Gptp_Lab_PutU48(uint8 *data, uint64 value);
 static void Gptp_Lab_PutU64(uint8 *data, uint64 value);
-static uint16 Gptp_Lab_GetU16(const uint8 *data);
 static uint64 Gptp_Lab_SecondsFromNs(uint64 timestampNs);
 static uint32 Gptp_Lab_NanosecondsRemainder(uint64 timestampNs);
 static void Gptp_Lab_WriteTimestamp(uint8 *data, uint64 timestampNs);
@@ -91,11 +98,6 @@ static void Gptp_Lab_PutU64(uint8 *data, uint64 value)
     data[5u] = (uint8)(value >> 16u);
     data[6u] = (uint8)(value >> 8u);
     data[7u] = (uint8)value;
-}
-
-static uint16 Gptp_Lab_GetU16(const uint8 *data)
-{
-    return (uint16)(((uint16)data[0u] << 8u) | (uint16)data[1u]);
 }
 
 static uint64 Gptp_Lab_SecondsFromNs(uint64 timestampNs)
@@ -174,42 +176,6 @@ void Gptp_Lab_Init(void)
 #endif
 }
 
-sint32 Gptp_Lab_CompareDatasets(const Gptp_Lab_DatasetType *left, const Gptp_Lab_DatasetType *right)
-{
-    uint8 i;
-
-    if ((left == NULL_PTR) || (right == NULL_PTR))
-    {
-        return 0;
-    }
-
-#define GPTP_LAB_COMPARE_FIELD(field) \
-    if (left->field < right->field) { return -1; } \
-    if (left->field > right->field) { return 1; }
-
-    GPTP_LAB_COMPARE_FIELD(priority1)
-    GPTP_LAB_COMPARE_FIELD(clockClass)
-    GPTP_LAB_COMPARE_FIELD(clockAccuracy)
-    GPTP_LAB_COMPARE_FIELD(offsetScaledLogVariance)
-    GPTP_LAB_COMPARE_FIELD(priority2)
-
-#undef GPTP_LAB_COMPARE_FIELD
-
-    for (i = 0u; i < GPTP_LAB_CLOCK_IDENTITY_LENGTH; i++)
-    {
-        if (left->clockIdentity[i] < right->clockIdentity[i])
-        {
-            return -1;
-        }
-        if (left->clockIdentity[i] > right->clockIdentity[i])
-        {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
 Std_ReturnType Gptp_Lab_BuildSync(uint8 *frame, uint16 frameLen, uint16 *outLen, uint16 sequenceId, uint64 originTimestampNs)
 {
     if ((frame == NULL_PTR) || (outLen == NULL_PTR) || (frameLen < GPTP_LAB_SYNC_FRAME_LENGTH))
@@ -268,75 +234,6 @@ Std_ReturnType Gptp_Lab_BuildAnnounce(uint8 *frame, uint16 frameLen, uint16 *out
     Gptp_Lab_PutU16(&payload[27u], 0u);
     payload[29u] = 0xA0u;
     *outLen = GPTP_LAB_ANNOUNCE_FRAME_LENGTH;
-
-    return E_OK;
-}
-
-Std_ReturnType Gptp_Lab_BuildDelayReq(uint8 *frame, uint16 frameLen, uint16 *outLen, uint16 sequenceId, uint64 originTimestampNs)
-{
-    if ((frame == NULL_PTR) || (outLen == NULL_PTR) || (frameLen < GPTP_LAB_DELAY_REQ_FRAME_LENGTH))
-    {
-        return E_NOT_OK;
-    }
-
-    memset(frame, 0, GPTP_LAB_DELAY_REQ_FRAME_LENGTH);
-    Gptp_Lab_WriteEthernetHeader(frame);
-    Gptp_Lab_WritePtpHeader(frame, GPTP_LAB_MESSAGE_DELAY_REQ, GPTP_LAB_DELAY_REQ_FRAME_LENGTH - GPTP_LAB_ETH_HEADER_LENGTH, sequenceId, GPTP_LAB_CONTROL_OTHER, 0);
-    Gptp_Lab_WriteTimestamp(&frame[GPTP_LAB_PTP_PAYLOAD_OFFSET], originTimestampNs);
-    *outLen = GPTP_LAB_DELAY_REQ_FRAME_LENGTH;
-
-    return E_OK;
-}
-
-Std_ReturnType Gptp_Lab_BuildDelayResp(uint8 *frame, uint16 frameLen, uint16 *outLen, uint16 sequenceId, uint64 receiveTimestampNs)
-{
-    uint8 *payload;
-
-    if ((frame == NULL_PTR) || (outLen == NULL_PTR) || (frameLen < GPTP_LAB_DELAY_RESP_FRAME_LENGTH))
-    {
-        return E_NOT_OK;
-    }
-
-    memset(frame, 0, GPTP_LAB_DELAY_RESP_FRAME_LENGTH);
-    Gptp_Lab_WriteEthernetHeader(frame);
-    Gptp_Lab_WritePtpHeader(frame, GPTP_LAB_MESSAGE_DELAY_RESP, GPTP_LAB_DELAY_RESP_FRAME_LENGTH - GPTP_LAB_ETH_HEADER_LENGTH, sequenceId, GPTP_LAB_CONTROL_OTHER, 0);
-    payload = &frame[GPTP_LAB_PTP_PAYLOAD_OFFSET];
-    Gptp_Lab_WriteTimestamp(&payload[0u], receiveTimestampNs);
-    memcpy(&payload[10u], Gptp_Lab_ClockIdentity, GPTP_LAB_CLOCK_IDENTITY_LENGTH);
-    Gptp_Lab_PutU16(&payload[18u], 1u);
-    *outLen = GPTP_LAB_DELAY_RESP_FRAME_LENGTH;
-
-    return E_OK;
-}
-
-Std_ReturnType Gptp_Lab_ParseAnnounce(const uint8 *frame, uint16 frameLen, Gptp_Lab_DatasetType *dataset)
-{
-    const uint8 *ptp;
-    const uint8 *payload;
-
-    if ((frame == NULL_PTR) || (dataset == NULL_PTR) || (frameLen < GPTP_LAB_ANNOUNCE_FRAME_LENGTH))
-    {
-        return E_NOT_OK;
-    }
-
-    if (Gptp_Lab_GetU16(&frame[12u]) != GPTP_LAB_ETHERTYPE_PTP)
-    {
-        return E_NOT_OK;
-    }
-
-    ptp = &frame[GPTP_LAB_ETH_HEADER_LENGTH];
-    if ((ptp[0u] & 0x0Fu) != GPTP_LAB_MESSAGE_ANNOUNCE)
-    {
-        return E_NOT_OK;
-    }
-
-    payload = &frame[GPTP_LAB_PTP_PAYLOAD_OFFSET];
-    dataset->priority1 = payload[13u];
-    dataset->clockClass = payload[14u];
-    dataset->clockAccuracy = payload[15u];
-    dataset->offsetScaledLogVariance = Gptp_Lab_GetU16(&payload[16u]);
-    dataset->priority2 = payload[18u];
-    memcpy(dataset->clockIdentity, &payload[19u], GPTP_LAB_CLOCK_IDENTITY_LENGTH);
 
     return E_OK;
 }
@@ -449,43 +346,6 @@ void Gptp_Lab_MainFunction(uint32 elapsedMs)
 #endif
 }
 
-void Gptp_Lab_RxIndication(const uint8 *frame, uint16 frameLen, uint64 rxTimestampNs)
-{
-#if (TIMESYNC_GPTP_ENABLE == STD_ON)
-    Gptp_Lab_DatasetType remoteDataset;
-    sint32 compareResult;
-
-    (void)rxTimestampNs;
-
-    if (Gptp_Lab_ParseAnnounce(frame, frameLen, &remoteDataset) != E_OK)
-    {
-        return;
-    }
-
-    Gptp_Lab_Status.rxAnnounceCounter++;
-
-    if (Gptp_Lab_Status.forceMaster != 0u)
-    {
-        Gptp_Lab_Status.state = GPTP_LAB_STATE_MASTER;
-        return;
-    }
-
-    compareResult = Gptp_Lab_CompareDatasets(&remoteDataset, &Gptp_Lab_LocalDataset);
-    if (compareResult < 0)
-    {
-        Gptp_Lab_Status.state = GPTP_LAB_STATE_SLAVE;
-    }
-    else
-    {
-        Gptp_Lab_Status.state = GPTP_LAB_STATE_MASTER;
-    }
-#else
-    (void)frame;
-    (void)frameLen;
-    (void)rxTimestampNs;
-#endif
-}
-
 void Gptp_Lab_GetStatus(Gptp_Lab_StatusType *status)
 {
     if (status == NULL_PTR)
@@ -508,12 +368,6 @@ __attribute__((weak)) Std_ReturnType Gptp_Lab_PlatformTransmitFrame(const uint8 
 }
 
 __attribute__((weak)) Std_ReturnType Gptp_Lab_PlatformGetTxTimestamp(uint64 *timestampNs)
-{
-    (void)timestampNs;
-    return E_NOT_OK;
-}
-
-__attribute__((weak)) Std_ReturnType Gptp_Lab_PlatformGetRxTimestamp(uint64 *timestampNs)
 {
     (void)timestampNs;
     return E_NOT_OK;

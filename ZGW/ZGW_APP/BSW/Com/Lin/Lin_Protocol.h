@@ -47,6 +47,5 @@ typedef struct
 
 uint8 Lin_MakePid(uint8 id);
 Std_ReturnType Lin_CheckPid(uint8 pid, uint8* idOut);
-uint8 Lin_CalcChecksum(uint8 pid, const uint8* data, uint8 len, Lin_ChecksumType type);
 
 #endif

@@ -196,7 +196,8 @@ void EthTimeSync_MainFunction(uint32 elapsedMs)
 
     if (EthTimeSync_NextTxTimeNs == 0ull)
     {
-        EthTimeSync_NextTxTimeNs = nowNs + ETHTIMESYNC_TX_PERIOD_NS;
+        EthTimeSync_SendPacket();
+        EthTimeSync_UpdateNextTxDeadline(nowNs);
     }
     else if (nowNs >= EthTimeSync_NextTxTimeNs)
     {
@@ -205,14 +206,4 @@ void EthTimeSync_MainFunction(uint32 elapsedMs)
     }
 #endif
 
-}
-
-uint8 EthTimeSync_GetStatus(void)
-{
-    return EthTimeSync_Status;
-}
-
-uint32 EthTimeSync_GetTxCounter(void)
-{
-    return EthTimeSync_TxCounter;
 }

@@ -1,6 +1,8 @@
 #include "DoIP.h"
 #include "GatewaySwc.h"
 #include "EthernetDiag.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include <string.h>
 
 #if DOIP_DEBUG_INSTRUMENTATION
@@ -586,6 +588,10 @@ void DoIP_Init(const DoIP_ConfigType *config)
 
 void DoIP_MainFunction(uint32 elapsedMs)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_DOIP_MAIN_C2, &cpuPerfCtx);
+
     if ((DoIP_Rt.cfg != 0) && (DoIP_Rt.vehicleAnnouncementRemaining > 0u))
     {
         DoIP_Rt.vehicleAnnouncementTimerMs += elapsedMs;
@@ -604,6 +610,7 @@ void DoIP_MainFunction(uint32 elapsedMs)
         DOIP_DEBUG_ASSIGN(DoIP_DebugAliveTimerMs, DoIP_Rt.aliveTimerMs);
         DOIP_DEBUG_ASSIGN(DoIP_DebugInactivityTimerMs, DoIP_Rt.inactivityTimerMs);
         DoIP_MainFunction_Counter++;
+        CpuPerf_Stop(CPUPERF_ID_DOIP_MAIN_C2, &cpuPerfCtx);
         return;
     }
 
@@ -667,6 +674,7 @@ void DoIP_MainFunction(uint32 elapsedMs)
     DOIP_DEBUG_ASSIGN(DoIP_DebugAliveTimerMs, DoIP_Rt.aliveTimerMs);
     DOIP_DEBUG_ASSIGN(DoIP_DebugInactivityTimerMs, DoIP_Rt.inactivityTimerMs);
     DoIP_MainFunction_Counter++;
+    CpuPerf_Stop(CPUPERF_ID_DOIP_MAIN_C2, &cpuPerfCtx);
 }
 void DoIP_SetDcmRxIndication(DoIP_DcmRxIndicationFct cb)
 {
@@ -689,6 +697,8 @@ void DoIP_SoAdUdpRxIndication(SoAd_SoConIdType soConId,
     (void)soConId;
 
     DOIP_DEBUG_INC(DoIP_DebugUdpRxCounter);
+    EthStartupTiming_CaptureFirstRx(ETHSTARTUPTIMING_RX_DOIP);
+    EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_DOIP_RX, ETHSTARTUPTIMING_RX_DOIP);
     if ((DoIP_Rt.cfg == 0) || (remoteAddr == 0) || (data == 0))
     {
         return;
@@ -730,6 +740,8 @@ void DoIP_SoAdTcpRxIndication(SoAd_SoConIdType soConId,
     (void)soConId;
     (void)remoteAddr;
 
+    EthStartupTiming_CaptureFirstRx(ETHSTARTUPTIMING_RX_DOIP);
+    EthStartupTiming_CaptureWithMeta(ETHSTARTUPTIMING_EVENT_FIRST_DOIP_RX, ETHSTARTUPTIMING_RX_DOIP);
     if ((DoIP_Rt.cfg == 0) || (data == 0) || (len == 0u))
     {
         return;

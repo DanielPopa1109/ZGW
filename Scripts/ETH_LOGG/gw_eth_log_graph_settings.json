@@ -1,14 +1,12 @@
 {
   "selected_keys": [
     "ETH:TimeSync:TimeSync:UtcTimeSeconds",
-    "ETH:AiModel:Channel065:InferenceValid",
-    "ETH:AiModel:Global:InputTimestamp"
+    "ETH:MCUData:MCUData:TempPms"
   ],
   "signals": {
-    "ETH:AiModel:Channel065:InferenceValid": "ETH | AiModel | Channel065 | InferenceValid",
-    "ETH:AiModel:Global:InputTimestamp": "ETH | AiModel | Global | InputTimestamp",
+    "ETH:MCUData:MCUData:TempPms": "ETH | MCUData | MCUData | TempPms",
     "ETH:TimeSync:TimeSync:UtcTimeSeconds": "ETH | TimeSync | TimeSync | UtcTimeSeconds"
   },
   "view_mode": "Stacked",
-  "window_s": 12.8
+  "window_s": 32.0
 }

@@ -10,8 +10,6 @@
 #include <string.h>
 
 #define PARALLELFLASHSWC_ERROR_NONE                 0u
-#define PARALLELFLASHSWC_ERROR_BAD_BUNDLE           1u
-#define PARALLELFLASHSWC_ERROR_BUSY                 2u
 #define PARALLELFLASHSWC_ERROR_TRANSPORT            3u
 #define PARALLELFLASHSWC_ERROR_ZGW_PREREQ_FAILED    4u
 #define PARALLELFLASHSWC_FORWARD_MAX_REQUEST        DCM_CLASSIC_ISOTP_MAX_LEN
@@ -21,6 +19,98 @@
 #define PARALLELFLASHSWC_FORWARD_ACK_MAX_LEN         8u
 /* FCD dry-run forwarding must drain even when simulated targets do not send FC. */
 #define PARALLELFLASHSWC_FORWARD_ASSUME_CAN_FC      TRUE
+
+typedef enum
+{
+    PARALLELFLASHSWC_JOB_IDLE = 0u,
+    PARALLELFLASHSWC_JOB_ACCEPTED,
+    PARALLELFLASHSWC_JOB_BUNDLE_VALIDATED,
+    PARALLELFLASHSWC_JOB_NODE_ROUTING_RESOLVED,
+    PARALLELFLASHSWC_JOB_SESSION_PREPARED,
+    PARALLELFLASHSWC_JOB_FLASH_ERASE,
+    PARALLELFLASHSWC_JOB_FLASH_DOWNLOAD,
+    PARALLELFLASHSWC_JOB_FLASH_TRANSFER,
+    PARALLELFLASHSWC_JOB_FLASH_TRANSFER_EXIT,
+    PARALLELFLASHSWC_JOB_FLASH_VERIFY,
+    PARALLELFLASHSWC_JOB_RESET_VALIDATE,
+    PARALLELFLASHSWC_JOB_CODING_PREPARE,
+    PARALLELFLASHSWC_JOB_CODING_WRITE,
+    PARALLELFLASHSWC_JOB_CODING_VALIDATE,
+    PARALLELFLASHSWC_JOB_COMPLETED,
+    PARALLELFLASHSWC_JOB_FAILED,
+    PARALLELFLASHSWC_JOB_SKIPPED
+} ParallelFlashSwc_JobStateType;
+
+typedef enum
+{
+    PARALLELFLASHSWC_PHASE_FLASH = 0u,
+    PARALLELFLASHSWC_PHASE_CODING = 1u
+} ParallelFlashSwc_PhaseType;
+
+typedef struct
+{
+    uint32 address;
+    uint32 size;
+    uint32 crc32;
+    uint16 payloadRef;
+} ParallelFlashSwc_FlashBlockType;
+
+typedef struct
+{
+    uint16 descriptorId;
+    uint16 payloadRef;
+    uint16 payloadLength;
+} ParallelFlashSwc_CodingDescriptorType;
+
+typedef struct
+{
+    uint8 nodeName[PARALLELFLASHSWC_NODE_NAME_LEN];
+    GatewaySwc_BusType busType;
+    boolean simulationEnabled;
+    uint8 extendedDiagAddress[PARALLELFLASHSWC_EXT_ADDR_LEN];
+    uint8 extendedDiagAddressLength;
+    boolean isZgw;
+    uint8 flashBlockCount;
+    ParallelFlashSwc_FlashBlockType flashBlocks[PARALLELFLASHSWC_MAX_BLOCKS_PER_TARGET];
+    ParallelFlashSwc_CodingDescriptorType coding;
+} ParallelFlashSwc_TargetConfigType;
+
+typedef struct
+{
+    uint8 targetIndex;
+    ParallelFlashSwc_PhaseType phase;
+    ParallelFlashSwc_JobStateType state;
+    uint8 retryCount;
+    uint8 active;
+    uint16 activeBlock;
+    uint32 progressBytes;
+    uint32 resultCode;
+    uint32 lastActivityTicks;
+    uint32 testerPresentTicks;
+} ParallelFlashSwc_TargetContextType;
+
+typedef struct
+{
+    uint8 targetCount;
+    ParallelFlashSwc_TargetConfigType targets[PARALLELFLASHSWC_MAX_TARGETS];
+} ParallelFlashSwc_JobBundleType;
+
+typedef struct
+{
+    uint8 initialized;
+    uint8 acceptedJobs;
+    uint8 activeJobs;
+    uint8 completedJobs;
+    uint8 failedJobs;
+    uint8 skippedJobs;
+    uint8 cancelled;
+    uint8 currentPhase;
+    uint8 activeCan;
+    uint8 activeCanFd;
+    uint8 activeLin;
+    uint32 mainCycles;
+    uint32 lastError;
+} ParallelFlashSwc_StatusType;
 
 typedef struct
 {
@@ -133,7 +223,6 @@ volatile uint32 ParallelFlashSwc_DebugForwardLinFastFail = 0u;
 #define PARALLELFLASHSWC_DEBUG_INC(lhs) do { } while (0)
 #endif
 
-static Std_ReturnType ParallelFlashSwc_ValidateBundle(const ParallelFlashSwc_JobBundleType *bundle);
 static void ParallelFlashSwc_ResetRuntime(void);
 static void ParallelFlashSwc_ResetForwardQueue(void);
 static void ParallelFlashSwc_UpdateDebug(void);
@@ -245,86 +334,6 @@ void ParallelFlashSwc_MainFunction(void)
     ParallelFlashSwc_UpdateDebug();
 }
 
-Std_ReturnType ParallelFlashSwc_SubmitJob(const ParallelFlashSwc_JobBundleType *bundle)
-{
-    uint8 i;
-
-    if (bundle == NULL_PTR)
-    {
-        ParallelFlashSwc_Runtime.status.lastError = PARALLELFLASHSWC_ERROR_BAD_BUNDLE;
-        ParallelFlashSwc_UpdateDebug();
-        return E_NOT_OK;
-    }
-
-    if (ParallelFlashSwc_Runtime.status.activeJobs != 0u)
-    {
-        ParallelFlashSwc_Runtime.status.lastError = PARALLELFLASHSWC_ERROR_BUSY;
-        ParallelFlashSwc_UpdateDebug();
-        return E_NOT_OK;
-    }
-
-    if (ParallelFlashSwc_ValidateBundle(bundle) != E_OK)
-    {
-        ParallelFlashSwc_Runtime.status.lastError = PARALLELFLASHSWC_ERROR_BAD_BUNDLE;
-        ParallelFlashSwc_UpdateDebug();
-        return E_NOT_OK;
-    }
-
-    ParallelFlashSwc_ResetRuntime();
-    ParallelFlashSwc_ResetForwardQueue();
-    ParallelFlashSwc_Runtime.status.initialized = TRUE;
-    (void)memcpy(&ParallelFlashSwc_Runtime.bundle, bundle, sizeof(ParallelFlashSwc_JobBundleType));
-    ParallelFlashSwc_Runtime.status.acceptedJobs = bundle->targetCount;
-    ParallelFlashSwc_Runtime.phase = PARALLELFLASHSWC_PHASE_FLASH;
-
-    for (i = 0u; i < bundle->targetCount; i++)
-    {
-        ParallelFlashSwc_Runtime.contexts[i].targetIndex = i;
-        ParallelFlashSwc_Runtime.contexts[i].phase = PARALLELFLASHSWC_PHASE_FLASH;
-        ParallelFlashSwc_Runtime.contexts[i].state = PARALLELFLASHSWC_JOB_ACCEPTED;
-    }
-
-    ParallelFlashSwc_UpdateDebug();
-    return E_OK;
-}
-
-void ParallelFlashSwc_Cancel(void)
-{
-    uint8 i;
-
-    ParallelFlashSwc_Runtime.status.cancelled = TRUE;
-    ParallelFlashSwc_ResetForwardQueue();
-    for (i = 0u; i < ParallelFlashSwc_Runtime.bundle.targetCount; i++)
-    {
-        if (ParallelFlashSwc_Runtime.contexts[i].active != FALSE)
-        {
-            ParallelFlashSwc_Runtime.contexts[i].active = FALSE;
-            ParallelFlashSwc_Runtime.contexts[i].state = PARALLELFLASHSWC_JOB_CANCELLED;
-        }
-    }
-    ParallelFlashSwc_UpdateDebug();
-}
-
-Std_ReturnType ParallelFlashSwc_GetStatus(ParallelFlashSwc_StatusType *status)
-{
-    if (status == NULL_PTR)
-    {
-        return E_NOT_OK;
-    }
-    *status = ParallelFlashSwc_Runtime.status;
-    return E_OK;
-}
-
-Std_ReturnType ParallelFlashSwc_GetTargetContext(uint8 index, ParallelFlashSwc_TargetContextType *context)
-{
-    if ((context == NULL_PTR) || (index >= ParallelFlashSwc_Runtime.bundle.targetCount))
-    {
-        return E_NOT_OK;
-    }
-    *context = ParallelFlashSwc_Runtime.contexts[index];
-    return E_OK;
-}
-
 uint8 ParallelFlashSwc_CanAcceptRoutedRequest(uint8 extendedAddress)
 {
     GatewaySwc_BusType busType;
@@ -431,30 +440,6 @@ void ParallelFlashSwc_BroadcastTesterPresent(void)
                                                      response,
                                                      &responseLength);
     }
-}
-
-static Std_ReturnType ParallelFlashSwc_ValidateBundle(const ParallelFlashSwc_JobBundleType *bundle)
-{
-    uint8 i;
-
-    if ((bundle->targetCount == 0u) || (bundle->targetCount > PARALLELFLASHSWC_MAX_TARGETS))
-    {
-        return E_NOT_OK;
-    }
-
-    for (i = 0u; i < bundle->targetCount; i++)
-    {
-        if (bundle->targets[i].busType == 0u)
-        {
-            return E_NOT_OK;
-        }
-        if (bundle->targets[i].flashBlockCount > PARALLELFLASHSWC_MAX_BLOCKS_PER_TARGET)
-        {
-            return E_NOT_OK;
-        }
-    }
-
-    return E_OK;
 }
 
 static void ParallelFlashSwc_ResetRuntime(void)
@@ -614,7 +599,6 @@ static void ParallelFlashSwc_RunContext(ParallelFlashSwc_TargetContextType *cont
 
     if ((context->state == PARALLELFLASHSWC_JOB_COMPLETED) ||
         (context->state == PARALLELFLASHSWC_JOB_FAILED) ||
-        (context->state == PARALLELFLASHSWC_JOB_CANCELLED) ||
         (context->state == PARALLELFLASHSWC_JOB_SKIPPED))
     {
         if (context->active != FALSE)

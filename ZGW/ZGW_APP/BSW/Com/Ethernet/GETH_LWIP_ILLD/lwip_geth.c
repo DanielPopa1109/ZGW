@@ -44,6 +44,7 @@
 #if LWIP_GETH_RTOS_ENABLED
 #include "lwip/tcpip.h"
 #endif
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 
 /**********************************************************************************************************************
  * API IMPLEMENTATION
@@ -70,6 +71,7 @@ LWIP_GETH_STATUS_t LWIP_GETH_Init(LWIP_GETH_t *handle)
         IfxGeth_enableModule(handle->app_config->geth_lld_config->gethSFR);
 #if LWIP_GETH_RTOS_ENABLED
         LWIP_GETH_TcpipInitCallCounter++;
+        EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_LWIP_INIT_ENTER);
         tcpip_init(lwip_geth_Lwip_init, NULL_PTR);
 #else
         lwip_geth_Lwip_init(NULL_PTR);

@@ -1,6 +1,7 @@
 #include "MemIf.h"
 #include "Fee.h"
 #include "MemStack_Error.h"
+#include "BSW/Mem/Nvm/NvMTiming.h"
 
 #define MEMIF_API_SET_MODE              (0x01u)
 #define MEMIF_API_READ                  (0x02u)
@@ -29,6 +30,7 @@ Std_ReturnType MemIf_Read(uint8 DeviceIndex, uint16 BlockNumber, uint16 BlockOff
         MemStack_ReportError(MEMSTACK_MODULE_ID_MEMIF, MEMIF_API_READ, MEMIF_E_PARAM_DEVICE, DeviceIndex);
         return E_NOT_OK;
     }
+    NvMTiming_FeeRequest(NVMTIMING_OP_READ_BLOCK, BlockNumber);
     return Fee_Read(BlockNumber, BlockOffset, DataBufferPtr, Length);
 }
 
@@ -39,6 +41,7 @@ Std_ReturnType MemIf_Write(uint8 DeviceIndex, uint16 BlockNumber, const uint8 *D
         MemStack_ReportError(MEMSTACK_MODULE_ID_MEMIF, MEMIF_API_WRITE, MEMIF_E_PARAM_DEVICE, DeviceIndex);
         return E_NOT_OK;
     }
+    NvMTiming_FeeRequest(NVMTIMING_OP_WRITE_BLOCK, BlockNumber);
     return Fee_Write(BlockNumber, DataBufferPtr);
 }
 
@@ -49,6 +52,7 @@ Std_ReturnType MemIf_InvalidateBlock(uint8 DeviceIndex, uint16 BlockNumber)
         MemStack_ReportError(MEMSTACK_MODULE_ID_MEMIF, MEMIF_API_INVALIDATE, MEMIF_E_PARAM_DEVICE, DeviceIndex);
         return E_NOT_OK;
     }
+    NvMTiming_FeeRequest(NVMTIMING_OP_INVALIDATE_BLOCK, BlockNumber);
     return Fee_InvalidateBlock(BlockNumber);
 }
 

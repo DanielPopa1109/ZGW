@@ -92,8 +92,6 @@ void McuSm_TRAP3(IfxCpu_Trap trapInfo);
 void McuSm_TRAP4(IfxCpu_Trap trapInfo);
 void McuSm_TRAP7(IfxCpu_Trap trapInfo);
 
-volatile uint8 debugvar = 0;
-
 #define MCUSM_ENDINIT_WAIT_LIMIT 100000u
 #define MCUSM_TRAP4_REACTION_NONE 0u
 #define MCUSM_TRAP4_REACTION_XRAM 1u

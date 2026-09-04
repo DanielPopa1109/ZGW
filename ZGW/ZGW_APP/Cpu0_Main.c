@@ -38,7 +38,9 @@
 #include "APP/GatewaySwc/GatewaySwc.h"
 #include "APP/ParallelFlashSwc/ParallelFlashSwc.h"
 #include "APP/TimeSync/TimeBase.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 #include "BSW/Io/GtmTom/GtmTom.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 AURIX_SHARED_NC volatile uint8 OsInit_C0;
 
@@ -164,6 +166,8 @@ void Core0_DemNvMInit(void)
      * ASIL_NVM OS task. */
     NvM_Init(NULL_PTR);
 
+    EthStartupTiming_EnableNvMStatus();
+
     CodingApp_Init();
 
     ParallelFlashSwc_Init();
@@ -173,6 +177,8 @@ void Core0_DemNvMInit(void)
 
 void Core0_InitSequence(void)
 {
+    EthStartupTiming_Init();
+
     Core0_InitWatchdog();
 
     Core0_HandleScrStartup();
@@ -210,6 +216,8 @@ void core0_main(void)
 {
     //while(0x40000000u == SCU_RSTSTAT.U){__debug();};
   
+    CpuPerf_InitCore();
+
     Core0_InitSequence();
 
     vTaskStartScheduler_core0();

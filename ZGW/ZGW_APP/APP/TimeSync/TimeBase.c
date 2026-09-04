@@ -1023,27 +1023,6 @@ uint64 TimeBase_GetVehicleTimeNs(void)
     return vehicleTimeNs;
 }
 
-uint64 TimeBase_GetVehicleTimeUs(void)
-{
-    return TimeBase_GetVehicleTimeNs() / TIMEBASE_NS_PER_US;
-}
-
-uint32 TimeBase_GetVehicleTimeS(void)
-{
-    return (uint32)(TimeBase_GetVehicleTimeNs() / TIMEBASE_NS_PER_S);
-}
-
-boolean TimeBase_IsUtcValid(void)
-{
-    boolean valid;
-
-    TimeBase_EnterCritical();
-    valid = TimeBase_UtcMapping.utc_valid;
-    TimeBase_ExitCritical();
-
-    return valid;
-}
-
 boolean TimeBase_IsUtcRestoredFromNvM(void)
 {
     boolean restored;
@@ -1054,30 +1033,6 @@ boolean TimeBase_IsUtcRestoredFromNvM(void)
     TimeBase_ExitCritical();
 
     return restored;
-}
-
-uint64 TimeBase_GetUtcTimeNs(boolean *valid)
-{
-    uint64 vehicleTimeNs;
-    uint64 utcTimeNs;
-    boolean utcValid;
-
-    TimeBase_EnterCritical();
-    if (TimeBase_Initialized != FALSE)
-    {
-        TimeBase_UpdateVehicleTimeLocked();
-    }
-    vehicleTimeNs = TimeBase_VehicleTimeNs;
-    utcValid = TimeBase_UtcMapping.utc_valid;
-    utcTimeNs = TimeBase_GetMappedUtcLocked(vehicleTimeNs);
-    TimeBase_ExitCritical();
-
-    if (valid != NULL_PTR)
-    {
-        *valid = utcValid;
-    }
-
-    return utcTimeNs;
 }
 
 void TimeBase_SetUtcTimeNs(uint64 utcNowNs)
@@ -1121,33 +1076,6 @@ Std_ReturnType TimeBase_SetUtcTimeNsFromSource(uint64 utcNowNs, TimeBase_TimeSou
 #endif
 
     return E_OK;
-}
-
-void TimeBase_SetUtcTimeFromDateTime(
-        uint16 year,
-        uint8 month,
-        uint8 day,
-        uint8 hour,
-        uint8 minute,
-        uint8 second,
-        uint16 millisecond,
-        sint16 timezone_offset_min)
-{
-    uint64 utcTimeNs;
-
-    if (TimeBase_ConvertDateTimeToUtcNs(
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second,
-            millisecond,
-            timezone_offset_min,
-            &utcTimeNs) == E_OK)
-    {
-        TimeBase_SetUtcTimeNs(utcTimeNs);
-    }
 }
 
 Std_ReturnType TimeBase_LoadUtcFromNvM(void)

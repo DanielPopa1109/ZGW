@@ -8,6 +8,7 @@
 #include "SafetyKit_InternalWatchdogs.h"
 #include "McuSm.h"
 #include "IfxCpu_Intrinsics.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 extern volatile uint8 OsInit_C0;
 AURIX_SHARED_NC volatile uint8 OsInit_C1;
@@ -41,6 +42,7 @@ void core1_main(void)
     Core1_MainEnteredCounter++;
 
     initCpuWatchdog(1u);
+    CpuPerf_InitCore();
     Core1_EnableCpuSysconSafetyProtection();
     while(OsInit_C0 == 0u)
     {

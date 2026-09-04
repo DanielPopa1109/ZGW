@@ -67,22 +67,6 @@ typedef struct
 
 #define CODINGAPP_NVM_IMAGE_SIZE                ((uint32)sizeof(CodingApp_NvImageType))
 
-typedef struct
-{
-    uint8 initialized;
-    uint8 state;
-    uint8 validationStatus;
-    uint8 dirty;
-    uint16 rxMessageCount;
-    uint16 rxMessageExpectedCount;
-    uint16 nvImageLength;
-    uint32 generation;
-    uint32 validationCounter;
-    uint32 invalidCodingCounter;
-    uint32 writeAllCounter;
-    uint8 lastNvMResult;
-} CodingApp_StatusType;
-
 void CodingApp_Init(void);
 void CodingApp_MainFunction(void);
 void CodingApp_OnNvMReadAllComplete(void);
@@ -92,7 +76,6 @@ boolean CodingApp_IsCoded(void);
 boolean CodingApp_IsRxMessageExpected(uint16 diagIndex);
 boolean CodingApp_IsTxPduEnabled(PduIdType txPduId);
 
-Std_ReturnType CodingApp_GetStatus(CodingApp_StatusType *status);
 Std_ReturnType CodingApp_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dataLen);
 Dcm_ReturnType CodingApp_WriteDid(uint16 did, const uint8 *data, Dcm_PduLengthType dataLen);
 Dcm_ReturnType CodingApp_RoutineControl(

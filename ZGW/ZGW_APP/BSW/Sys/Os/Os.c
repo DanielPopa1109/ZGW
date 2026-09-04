@@ -52,7 +52,9 @@
 #include "BSW/Com/Ethernet/EthTimeSync.h"
 #include "APP/TimeSync/Gptp_Lab.h"
 #include "APP/AiModel/AiModel.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
 #include "BSW/Io/GtmTom/GtmTom.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 
 void Os_Init_C0(void);
 void Os_Init_C1(void);
@@ -142,7 +144,7 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_INIT_FAIL_C0_QM_LIN_START   29u
 #define OS_INIT_FAIL_C0_ASIL_NVM_START 30u
 
-typedef enum
+enum
 {
         OS_NVM_STARTUP_INIT_WAIT = 0,
         OS_NVM_STARTUP_READALL_START,
@@ -158,20 +160,16 @@ typedef enum
         OS_NVM_STARTUP_DEFERRED_FORMAT_START,
         OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT,
         OS_NVM_STARTUP_DONE
-} Os_NvMStartupStateType;
+};
 
 typedef struct
 {
         uint8 initialized;
-        uint8 valid;
         uint32 sampleTicks;
         uint32 lastRuntime;
         uint32 lastIdleRuntime;
         uint32 idleRuntime;
         uint32 idleTaskStartRuntime;
-        uint32 runtimeDelta;
-        uint32 idleRuntimeDelta;
-        uint16 loadPermille;
         uint8 currentTaskIsIdle;
 } Os_CpuLoadRuntimeType;
 
@@ -709,10 +707,6 @@ static void Os_CpuLoad_RecordTick(uint8 CoreId)
 
     if (runtimeDelta == 0u)
     {
-        runtime->valid = 0u;
-        runtime->loadPermille = OS_CPU_LOAD_INVALID_PERMILLE;
-        runtime->runtimeDelta = 0u;
-        runtime->idleRuntimeDelta = 0u;
         Os_CpuLoad_StorePublic(CoreId, OS_CPU_LOAD_INVALID_PERMILLE, 0u);
         return;
     }
@@ -731,29 +725,7 @@ static void Os_CpuLoad_RecordTick(uint8 CoreId)
         loadPermille = OS_CPU_LOAD_MAX_PERMILLE;
     }
 
-    runtime->runtimeDelta = runtimeDelta;
-    runtime->idleRuntimeDelta = idleRuntimeDelta;
-    runtime->loadPermille = (uint16)loadPermille;
-    runtime->valid = 1u;
-    Os_CpuLoad_StorePublic(CoreId, runtime->loadPermille, runtime->valid);
-}
-
-uint8 Os_GetCpuLoadPercent(uint8 CoreId)
-{
-    switch(CoreId)
-    {
-        case OS_CPU_CORE_0:
-            return Os_CpuLoadPercent_core0;
-
-        case OS_CPU_CORE_1:
-            return Os_CpuLoadPercent_core1;
-
-        case OS_CPU_CORE_2:
-            return Os_CpuLoadPercent_core2;
-
-        default:
-            return OS_CPU_LOAD_INVALID_PERCENT;
-    }
+    Os_CpuLoad_StorePublic(CoreId, (uint16)loadPermille, 1u);
 }
 
 uint16 Os_GetCpuLoadPermille(uint8 CoreId)
@@ -772,39 +744,6 @@ uint16 Os_GetCpuLoadPermille(uint8 CoreId)
         default:
             return OS_CPU_LOAD_INVALID_PERMILLE;
     }
-}
-
-void Os_GetCpuLoadSnapshot(uint8 CoreId, Os_CpuLoadType *CpuLoad)
-{
-    Os_CpuLoadRuntimeType *runtime;
-
-    if (CpuLoad == 0)
-    {
-        return;
-    }
-
-    CpuLoad->valid = 0u;
-    CpuLoad->percent = OS_CPU_LOAD_INVALID_PERCENT;
-    CpuLoad->permille = OS_CPU_LOAD_INVALID_PERMILLE;
-    CpuLoad->runtimeDelta = 0u;
-    CpuLoad->idleRuntimeDelta = 0u;
-
-    if (CoreId >= OS_CPU_LOAD_CORE_COUNT)
-    {
-        return;
-    }
-
-    runtime = &Os_CpuLoadRuntime[CoreId];
-    if (runtime->valid == 0u)
-    {
-        return;
-    }
-
-    CpuLoad->valid = 1u;
-    CpuLoad->permille = runtime->loadPermille;
-    CpuLoad->percent = Os_CpuLoad_PermilleToPercent(runtime->loadPermille);
-    CpuLoad->runtimeDelta = runtime->runtimeDelta;
-    CpuLoad->idleRuntimeDelta = runtime->idleRuntimeDelta;
 }
 
 static boolean Os_NvMStackHasPendingJobs(void)
@@ -845,7 +784,7 @@ static void Os_NvMStartup_MainFunction(void)
 {
     Os_NvMStartupMainCounter++;
 
-    switch ((Os_NvMStartupStateType)Os_NvMStartupState)
+    switch (Os_NvMStartupState)
     {
         case OS_NVM_STARTUP_INIT_WAIT:
             if (NvM_GetStatus() == NVM_IDLE)
@@ -982,10 +921,13 @@ void ASIL_BSW_Task_C0(void *pvParameters)
     {
         if(1u == Alarm5ms_Flag_ASIL_BSW_Task_C0)
         {
+            CpuPerf_ContextType cpuPerfCtx;
             Alarm5ms_Flag_ASIL_BSW_Task_C0 = 0u;
+            CpuPerf_Start(CPUPERF_ID_OS_ASIL_BSW_TASK_C0, &cpuPerfCtx);
             SysMgr_MainFunction();
             serviceCpuWatchdog();
             serviceSafetyWatchdog();
+            CpuPerf_Stop(CPUPERF_ID_OS_ASIL_BSW_TASK_C0, &cpuPerfCtx);
             ASIL_BSW_Task_C0_Counter ++;
 
         }
@@ -1006,14 +948,25 @@ void ASIL_NVM_Task_C0(void *pvParameters)
     {
         if(1u == Alarm5ms_Flag_ASIL_NVM_Task_C0)
         {
+            CpuPerf_ContextType activationPerfCtx;
+            CpuPerf_ContextType segmentPerfCtx;
             Alarm5ms_Flag_ASIL_NVM_Task_C0 = 0u;
+            CpuPerf_Start(CPUPERF_ID_OS_ASIL_NVM_TASK_C0, &activationPerfCtx);
+            CpuPerf_Start(CPUPERF_ID_OS_NVM_STARTUP_MAIN_C0, &segmentPerfCtx);
             Os_NvMStartup_MainFunction();
+            CpuPerf_Stop(CPUPERF_ID_OS_NVM_STARTUP_MAIN_C0, &segmentPerfCtx);
             nvmCycleBudget = OS_NVM_MAIN_CYCLES_PER_ACTIVATION;
             do
             {
+                CpuPerf_Start(CPUPERF_ID_OS_NVM_FLS_MAIN_C0, &segmentPerfCtx);
                 Fls_MainFunction();
+                CpuPerf_Stop(CPUPERF_ID_OS_NVM_FLS_MAIN_C0, &segmentPerfCtx);
+                CpuPerf_Start(CPUPERF_ID_OS_NVM_FEE_MAIN_C0, &segmentPerfCtx);
                 Fee_MainFunction();
+                CpuPerf_Stop(CPUPERF_ID_OS_NVM_FEE_MAIN_C0, &segmentPerfCtx);
+                CpuPerf_Start(CPUPERF_ID_OS_NVM_NVM_MAIN_C0, &segmentPerfCtx);
                 NvM_MainFunction();
+                CpuPerf_Stop(CPUPERF_ID_OS_NVM_NVM_MAIN_C0, &segmentPerfCtx);
 
                 ASIL_NVM_Task_C0_Counter ++;
                 if (nvmCycleBudget > 0u)
@@ -1028,6 +981,7 @@ void ASIL_NVM_Task_C0(void *pvParameters)
                 Os_NvMBudgetHitCounter++;
             }
 
+            CpuPerf_Stop(CPUPERF_ID_OS_ASIL_NVM_TASK_C0, &activationPerfCtx);
         }
         else
         {
@@ -1201,7 +1155,9 @@ void ASIL_APPL_Task_C2(void *pvParameters)
 
     while(1)
     {
+        CpuPerf_ContextType cpuPerfCtx;
         vTaskDelayUntil_core2(&lastWakeTime, OS_CORE2_MAIN_PERIOD_TICKS);
+        CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
 
         Os_Core2AsilApplStackHighWater =
                 (uint32)uxTaskGetStackHighWaterMark_core2(ASIL_APPL_Task_C2_THandle);
@@ -1224,6 +1180,7 @@ static uint8 Os_TryInitEthStackCore2(void)
 
     Os_EthNetifReadyBeforeStackInit = 1u;
 
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_ETH_STARTUP_ENTER);
     EthStack_Init();
     EthTimeSync_Init();
     Gptp_Lab_Init();
@@ -1246,6 +1203,7 @@ void QM_BSW_Task_C2(void *pvParameters)
      * netif is initialized inside tcpip_thread, not synchronously in core2_main().
      */
 
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_ETH_STARTUP_ENTER);
     (void)LWIP_GETH_Init(lwip_geth_handle);
 
     Os_EthNetifWaitLoops = 0u;
@@ -1282,7 +1240,10 @@ void QM_BSW_Task_C2(void *pvParameters)
 
     while(1)
     {
+        CpuPerf_ContextType cpuPerfCtx;
+
         vTaskDelayUntil_core2(&lastWakeTime, OS_CORE2_MAIN_PERIOD_TICKS);
+        CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
 
         if (Os_EthStackInitialized == 0u)
         {
@@ -1312,6 +1273,7 @@ void QM_BSW_Task_C2(void *pvParameters)
         }
 
         Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
+        CpuPerf_Stop(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
         QM_BSW_Task_C2_Counter++;
     }
 }

@@ -2,6 +2,7 @@
 #include "CanTp.h"
 #include "CanSM.h"
 #include "PduR.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #include <string.h>
 
 static uint8 CanIf_BusOffState[CAN_NUM_CONTROLLERS];
@@ -265,6 +266,7 @@ Std_ReturnType CanIf_Transmit(PduIdType CanIfTxSduId, const uint8* data, PduLeng
 
 void CanIf_RxIndication(const Can_FrameType* frame)
 {
+    CpuPerf_ContextType cpuPerfCtx;
     uint8 i;
 
     if ((CanIf_ConfigPtr == NULL_PTR) || (frame == NULL_PTR))
@@ -281,6 +283,8 @@ void CanIf_RxIndication(const Can_FrameType* frame)
     {
         return;
     }
+
+    CpuPerf_Start(CPUPERF_ID_CANIF_RX_INDICATION_C0, &cpuPerfCtx);
 
     for (i = 0u; i < CanIf_ConfigPtr->numRxPdus; i++)
     {
@@ -303,6 +307,8 @@ void CanIf_RxIndication(const Can_FrameType* frame)
             }
         }
     }
+
+    CpuPerf_Stop(CPUPERF_ID_CANIF_RX_INDICATION_C0, &cpuPerfCtx);
 }
 
 void CanIf_TxConfirmation(PduIdType CanIfTxSduId)

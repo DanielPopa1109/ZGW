@@ -26,23 +26,43 @@ typedef struct
     boolean immediateData;
 } NvM_BlockDescriptorType;
 
-#define NVM_TOTAL_BLOCKS                    (3u)
+#define NVM_TOTAL_BLOCKS                    (8u)
 
 #define NVM_BLOCK_ID_DEM_PRIMARY            (1u)
 #define NVM_BLOCK_ID_APP_DATA               (2u)
 #define NVM_BLOCK_ID_TIMEBASE               (3u)
+#define NVM_BLOCK_ID_ETH_STARTUP_TIMING     (4u)
+#define NVM_BLOCK_ID_NVM_TIMING             (5u)
+#define NVM_BLOCK_ID_MCU_STATUS             (6u)
+#define NVM_BLOCK_ID_AIMODEL                (7u)
+#define NVM_BLOCK_ID_NVM_STATS              (8u)
 
 #define NVM_BLOCK_DEM_PRIMARY_LENGTH        FEE_BLOCK_DEM_PRIMARY_SIZE
 #define NVM_BLOCK_APP_DATA_LENGTH           FEE_BLOCK_APP_DATA_SIZE
 #define NVM_BLOCK_TIMEBASE_LENGTH           FEE_BLOCK_TIMEBASE_SIZE
+#define NVM_BLOCK_ETH_STARTUP_TIMING_LENGTH FEE_BLOCK_ETH_STARTUP_TIMING_SIZE
+#define NVM_BLOCK_NVM_TIMING_LENGTH         FEE_BLOCK_NVM_TIMING_SIZE
+#define NVM_BLOCK_MCU_STATUS_LENGTH         FEE_BLOCK_MCU_STATUS_SIZE
+#define NVM_BLOCK_AIMODEL_LENGTH            FEE_BLOCK_AIMODEL_SIZE
+#define NVM_BLOCK_NVM_STATS_LENGTH          FEE_BLOCK_NVM_STATS_SIZE
 
 #define NVM_MAX_BLOCK_LENGTH                FEE_MAX_BLOCK_SIZE
 
 extern uint8 NvM_AppData_Ram[NVM_BLOCK_APP_DATA_LENGTH];
 extern uint8 NvM_TimeBase_Ram[NVM_BLOCK_TIMEBASE_LENGTH];
+extern uint8 NvM_EthStartupTiming_Ram[NVM_BLOCK_ETH_STARTUP_TIMING_LENGTH];
+extern uint8 NvM_NvMTiming_Ram[NVM_BLOCK_NVM_TIMING_LENGTH];
+extern uint8 NvM_McuStatus_Ram[NVM_BLOCK_MCU_STATUS_LENGTH];
+extern uint8 NvM_AiModel_Ram[NVM_BLOCK_AIMODEL_LENGTH];
+extern uint8 NvMStats_Ram[NVM_BLOCK_NVM_STATS_LENGTH];
 
 extern const uint8 NvM_AppData_Rom[NVM_BLOCK_APP_DATA_LENGTH];
 extern const uint8 NvM_TimeBase_Rom[NVM_BLOCK_TIMEBASE_LENGTH];
+extern const uint8 NvM_EthStartupTiming_Rom[NVM_BLOCK_ETH_STARTUP_TIMING_LENGTH];
+extern const uint8 NvM_NvMTiming_Rom[NVM_BLOCK_NVM_TIMING_LENGTH];
+extern const uint8 NvM_McuStatus_Rom[NVM_BLOCK_MCU_STATUS_LENGTH];
+extern const uint8 NvM_AiModel_Rom[NVM_BLOCK_AIMODEL_LENGTH];
+extern const uint8 NvMStats_Rom[NVM_BLOCK_NVM_STATS_LENGTH];
 
 extern const NvM_BlockDescriptorType NvM_BlockDescriptor[NVM_TOTAL_BLOCKS];
 

@@ -67,7 +67,6 @@ typedef struct
         boolean                             unlockConfig;
         SmuStatusType                       regMonitorTestAllFB;
         SmuExecutionStatusType              smuStatus;
-        SmuAlarmPendingType                 smuAlarmPending;
         SafetyKitRunTaskType                safetyKitRunTask;
         DieTempStatusType                   dieTempStatus;
         VoltStatusType                      voltStatus;

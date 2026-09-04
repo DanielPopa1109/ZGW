@@ -17,30 +17,16 @@
 
 #define LINTP_NAD_ZGW_DEFAULT     1u
 
-#ifndef LINTP_SUPPLIER_ID
-#define LINTP_SUPPLIER_ID         0xFFFFu
-#endif
-
-#ifndef LINTP_FUNCTION_ID
-#define LINTP_FUNCTION_ID         0xFFFFu
-#endif
-
 void LinTp_Init(uint8 configuredNad);
 void LinTp_MainFunction(void);
 
 Std_ReturnType LinTp_Transmit(PduIdType TxPduId, const uint8* data, PduLengthType len);
 Std_ReturnType LinTp_TransmitToNad(PduIdType TxPduId, uint8 targetNad, const uint8* data, PduLengthType len);
-uint8 LinTp_CanAcceptTransmitToNad(uint8 targetNad);
 uint8 LinTp_CanStartTransmitToNadNow(uint8 targetNad);
 void LinTp_TxFrameConfirmation(uint8 success);
 
-void LinTp_RxMasterRequest(const uint8 frame[8]);
 void LinTp_RxSlaveResponse(const uint8 frame[8]);
 
-Std_ReturnType LinTp_AssignNad(uint8 initialNad, uint16 supplierId, uint16 functionId, uint8 newNad);
-Std_ReturnType LinTp_SetTargetNad(uint8 targetNad);
 uint8 LinTp_IsConfiguredNad(uint8 nad);
-uint8 LinTp_GetTargetNad(void);
-uint8 LinTp_GetNad(void);
 
 #endif

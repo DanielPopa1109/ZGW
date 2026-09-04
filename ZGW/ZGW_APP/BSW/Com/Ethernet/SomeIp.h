@@ -78,14 +78,4 @@ uint8 SomeIp_SendResponse(SoAd_SoConIdType soConId,
                           uint32 payloadLen,
                           uint8 returnCode);
 
-uint8 SomeIp_SendNotification(SoAd_SoConIdType soConId,
-                              const TcpIp_SockAddrType *remoteAddr,
-                              uint16 serviceId,
-                              uint16 eventId,
-                              uint16 clientId,
-                              uint16 sessionId,
-                              uint8 interfaceVersion,
-                              const uint8 *payload,
-                              uint32 payloadLen);
-
 #endif

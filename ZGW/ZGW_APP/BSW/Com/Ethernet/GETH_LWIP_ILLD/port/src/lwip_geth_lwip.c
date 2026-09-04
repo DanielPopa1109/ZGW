@@ -51,6 +51,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include "lwip_geth_conf.h"
+#include "BSW/Com/Ethernet/EthStartupTiming.h"
+#include "BSW/Sys/CpuPerf/CpuPerf.h"
 #if (PHY_DEVICE_NAME == PHY_DP83825I)
 #include "lwip_geth_private_phy_dp83825i.h"
 #endif
@@ -666,9 +668,13 @@ void lwip_geth_Lwip_forceNetifUp(void)
      */
     lwip_geth_Lwip_configureForcedMacMode((IfxGeth_Eth *)g_Lwip.netif.state);
     g_Lwip.netif.flags |= (NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADMIN_UP);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP);
 #else
     netif_set_up(&g_Lwip.netif);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADMIN_UP);
     netif_set_link_up(&g_Lwip.netif);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP);
 #endif
 
     g_LwipNetifFlagsAfterSet = g_Lwip.netif.flags;
@@ -742,6 +748,7 @@ void lwip_geth_Lwip_init(void *arg)
 #endif
 
     LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init start!\n"));
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_TCPIP_THREAD_READY);
 
     /** - initialise LWIP (lwip_init()) */
 #if !LWIP_GETH_RTOS_ENABLED
@@ -753,12 +760,14 @@ void lwip_geth_Lwip_init(void *arg)
                  sizeof(g_Lwip.eth_addr));
 
 #if LWIP_GETH_RTOS_ENABLED
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADD_ENTER);
     if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
             (void *)0, lwip_geth_netif_init, tcpip_input) == NULL_PTR)
     {
         LWIP_ASSERT("netif_add failed", 0);
         return;
     }
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADD_COMPLETE);
 #if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
     /* In forced-link bring-up mode the netif is kept up and the MAC is forced
      * to RMII 100M/full-duplex. Do not create the 100 ms link task: it posts a
@@ -779,12 +788,14 @@ void lwip_geth_Lwip_init(void *arg)
     g_LwipRxTaskCreateResult = 0u;
 #endif
 #else
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADD_ENTER);
     if (netif_add(&g_Lwip.netif, &default_ipaddr, &default_netmask, &default_gw,
             (void *)0, lwip_geth_netif_init, ethernet_input) == NULL_PTR)
     {
         LWIP_ASSERT("netif_add failed", 0);
         return;
     }
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_NETIF_ADD_COMPLETE);
 #endif
 
     netif_set_default(&g_Lwip.netif);
@@ -815,6 +826,7 @@ void lwip_geth_Lwip_init(void *arg)
 #endif
     LWIP_DEBUGF(LWIP_GETH_DEBUG, ("Lwip_geth_lwip_init end!\n"));
     g_LwipInitDone = 1u;
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_LWIP_INIT_COMPLETE);
     g_LwipTcpipInitDoneCounter++;
 }
 
@@ -835,13 +847,22 @@ void lwip_geth_UpdateTickCount(void)
 /** This interrupt is raised by the ethernet tx. The initialization is done by IfxGeth_Eth_init(). */
 IFX_INTERRUPT(ISR_Geth_Tx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_TX)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_ETH_IRQ_TX_C2, &cpuPerfCtx);
     isrTxCount++;
+    EthStartupTiming_CaptureFirstTxComplete();
+    CpuPerf_Stop(CPUPERF_ID_ETH_IRQ_TX_C2, &cpuPerfCtx);
 }
 
 /** This interrupt is raised by the ethernet rx. The initialization is done by IfxGeth_Eth_init(). */
 #if LWIP_GETH_IS_ISR
 IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
 {
+    CpuPerf_ContextType cpuPerfCtx;
+
+    CpuPerf_Start(CPUPERF_ID_ETH_IRQ_RX_C2, &cpuPerfCtx);
+    EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_MAC_RX);
 #if !LWIP_GETH_RTOS_ENABLED
     lwip_geth_netif_input(&g_Lwip.netif);
 #else
@@ -863,6 +884,7 @@ IFX_INTERRUPT(ISR_Geth_Rx, CPU_WHICH_SERVICE_ETHERNET, ISR_PRIORITY_GETH_RX)
     }
 #endif
     isrRxCount++;
+    CpuPerf_Stop(CPUPERF_ID_ETH_IRQ_RX_C2, &cpuPerfCtx);
 }
 #endif
 

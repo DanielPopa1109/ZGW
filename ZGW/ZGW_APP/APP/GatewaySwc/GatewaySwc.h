@@ -25,9 +25,10 @@
 
 #define GATEWAYSWC_MCU_STATUS_UDP_ENABLE          STD_ON
 #define GATEWAYSWC_MCU_STATUS_UDP_PORT            35001u
-#define GATEWAYSWC_MCU_STATUS_UDP_PERIOD_MS       100u
+#define GATEWAYSWC_MCU_STATUS_UDP_PERIOD_MS       1000u
 #define GATEWAYSWC_MCU_STATUS_UDP_BROADCAST_ADDR  0xFFFFFFFFu
 #define GATEWAYSWC_MCU_STATUS_PACKET_LENGTH       64u
+#define GATEWAYSWC_MCU_STATUS_NVM_IMAGE_SIZE      GATEWAYSWC_MCU_STATUS_PACKET_LENGTH
 
 #define GATEWAYSWC_MCU_STATUS_DISABLED            0u
 #define GATEWAYSWC_MCU_STATUS_WAIT_LINK           1u
@@ -39,8 +40,6 @@
 #define GATEWAYSWC_RX_DIAG_STATUS_OK       0x00u
 #define GATEWAYSWC_RX_DIAG_STATUS_TIMEOUT  0x01u
 #define GATEWAYSWC_RX_DIAG_STATUS_INVALID  0x02u
-
-#define GATEWAYSWC_RX_DIAG_KIND_MESSAGE_TIMEOUT  0x01u
 
 #define GATEWAYSWC_CAN_RX_FIRST_0          COM_SIG_RX_CENTRALLOCKDATA_VIBRATIONSENSORSTATUS
 #define GATEWAYSWC_CAN_RX_LAST_0           COM_SIG_RX_DMUSTATUS_DISPLAYCAMERASTATUS
@@ -91,78 +90,6 @@ typedef enum
     GATEWAYSWC_BUS_CANFD  = 2u,
     GATEWAYSWC_BUS_LIN    = 3u
 } GatewaySwc_BusType;
-
-typedef struct
-{
-    uint32 mainCycles;
-    uint32 routedSignals;
-    uint32 generatedSignals;
-    uint32 sendSignalOk;
-    uint32 sendSignalFailed;
-    uint32 receiveSignalFailed;
-    uint32 ethFramesSent;
-    uint32 ethFramesFailed;
-    uint32 ethSignalsPublished;
-    uint8 ethLastOpenResult;
-    uint8 ethLastSoAdResult;
-    uint8 ethLastTransmitOk;
-    uint16 ethLastPayloadLength;
-    uint16 configuredRoutes;
-    uint16 rxDiagConfiguredMessages;
-    uint16 rxDiagConfiguredSignals;
-    uint16 rxDiagTimedOutMessages;
-    uint16 rxDiagInvalidSignals;
-    uint32 rxDiagTimeoutEvents;
-    uint32 rxDiagInvalidEvents;
-    uint16 rxDiagLastTimeoutPduId;
-    uint16 rxDiagLastInvalidSignalId;
-    uint32 rxDiagLastInvalidValue;
-} GatewaySwc_StatusType;
-
-typedef struct
-{
-    uint16 pduId;
-    GatewaySwc_BusType bus;
-    uint8 status;
-    uint16 cycleTicks;
-    uint16 timeoutTicks;
-} GatewaySwc_RxMessageDiagType;
-
-typedef struct
-{
-    uint16 signalId;
-    GatewaySwc_BusType bus;
-    uint8 status;
-    uint32 value;
-    uint32 invalidValue;
-} GatewaySwc_RxSignalDiagType;
-
-typedef struct
-{
-    uint8 kind;
-    uint16 diagIndex;
-    uint16 objectId;
-    GatewaySwc_BusType bus;
-    uint8 status;
-    uint16 cycleTicks;
-    uint16 timeoutTicks;
-    uint32 value;
-    uint32 thresholdValue;
-    uint32 mainCycles;
-    uint16 activeCount;
-    uint32 eventCount;
-} GatewaySwc_RxDiagSnapshotType;
-
-typedef struct
-{
-    uint32 pdmCommandLoad[1u][GATEWAYSWC_PDM_LOADS_PER_PDM];
-
-    uint32 linHvDcdcEnable;
-    uint32 linHvDcdcTargetVoltage;
-
-    uint32 vehicleStatus;
-    uint32 nmPn1;
-} GatewaySwc_CommandType;
 
 extern volatile uint32 GatewaySwc_RxMessageTimeoutCounter[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
 extern volatile uint32 GatewaySwc_RxMessageTimeoutActiveSamples[GATEWAYSWC_RX_MESSAGE_DIAG_COUNT];
@@ -231,19 +158,10 @@ sint32 GatewaySwc_RequestTcpIpSendTo(TcpIp_SocketIdType sock,
                                      uint16 len);
 void GatewaySwc_RequestLinIfMainFunction(void);
 
-void GatewaySwc_SetCommands(const GatewaySwc_CommandType *cmd);
-void GatewaySwc_GetCommands(GatewaySwc_CommandType *cmd);
-void GatewaySwc_GetStatus(GatewaySwc_StatusType *status);
-uint8 GatewaySwc_GetMcuStatusStatus(void);
-uint32 GatewaySwc_GetMcuStatusTxCounter(void);
-uint16 GatewaySwc_GetRxMessageDiagCount(void);
-uint16 GatewaySwc_GetRxSignalDiagCount(void);
-Std_ReturnType GatewaySwc_GetRxMessageDiag(uint16 index, GatewaySwc_RxMessageDiagType *diag);
-Std_ReturnType GatewaySwc_GetRxSignalDiag(uint16 index, GatewaySwc_RxSignalDiagType *diag);
-Std_ReturnType GatewaySwc_GetRxMessageDiagSnapshot(uint16 index, GatewaySwc_RxDiagSnapshotType *snapshot);
 Std_ReturnType GatewaySwc_CaptureRxDiagSnapshotData(Dem_EventIdType eventId, uint8 *buffer, uint16 *length);
 void GatewaySwc_ReportDtcTransition(Dem_DTCType dtc, Dem_UdsStatusByteType status);
 void GatewaySwc_OnDemEventCleared(Dem_EventIdType eventId);
+Std_ReturnType GatewaySwc_ReadDid(uint16 did, uint8 *data, Dcm_PduLengthType *dataLen);
 
 void GatewaySwc_EthRxIndication(uint8 soConId,
                                 const TcpIp_SockAddrType *remoteAddr,

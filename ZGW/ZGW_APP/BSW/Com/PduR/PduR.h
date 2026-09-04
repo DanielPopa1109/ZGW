@@ -18,7 +18,6 @@
 #endif
 
 void PduR_Init(void);
-uint8 PduR_IsInitialized(void);
 
 /* Upper IF API: COM -> PduR -> CanIf/LinIf/SoAd */
 Std_ReturnType PduR_ComTransmit(PduIdType TxPduId,

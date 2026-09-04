@@ -12,7 +12,6 @@
 #include "lwip/pbuf.h"
 #include "lwip/ip_addr.h"
 #include "lwip/netif.h"
-#include "lwip/priv/raw_priv.h"
 #include "netif/ethernet.h"
 #include "IfxStm_reg.h"
 
@@ -98,7 +97,6 @@ volatile uint32 g_FblEthTcpRecvCbInvalidPbufAccum;
 volatile uint32 g_FblEthTcpReceiveCallCount;
 volatile uint32 g_FblEthTcpReceiveReturnCount;
 volatile uint32 g_FblEthTcpReceiveNullArgCounter;
-volatile uint32 g_FblEthTcpReceiveEmptyCounter;
 volatile uint32 g_FblEthTcpReceiveInvalidLenCounter;
 volatile uint32 g_FblEthTcpReceiveLastStreamLen;
 volatile uint32 g_FblEthTcpReceiveLastOutLen;
@@ -136,32 +134,6 @@ void FblEth_SetDoIpCallbacks(FblEth_TcpEventCb connectedCb,
     g_tcpConnectedCb = connectedCb;
     g_tcpDisconnectedCb = disconnectedCb;
     g_tcpRxOverflowCb = rxOverflowCb;
-}
-
-void FblEth_ForceReinit(void)
-{
-    FblEth_ResetTcpStream();
-    FblEth_SetBytes((uint8 *)g_udpQ, 0u, (uint16)sizeof(g_udpQ));
-    FblEth_SetBytes((uint8 *)&g_udpRemoteIp, 0u, (uint16)sizeof(g_udpRemoteIp));
-    FblEth_SetBytes((uint8 *)&g_Lwip, 0u, (uint16)sizeof(g_Lwip));
-    netif_default = NULL;
-#if !LWIP_SINGLE_NETIF
-    netif_list = NULL;
-#endif
-
-    g_udpWr = 0u;
-    g_udpRd = 0u;
-    g_udpCnt = 0u;
-    g_udpRemotePort = 0u;
-    g_udpRemoteValid = 0u;
-    g_tcpListenPcb = NULL;
-    g_tcpActivePcb = NULL;
-    g_udpPcb = NULL;
-    g_tcpSessionCookie = 0u;
-    g_ethInitDone = 0u;
-    g_LwipNetifAddFailed = 0u;
-    LWIP_GETH_0.app_is_initialized = FALSE;
-    FblEth_UpdateTcpDebugState();
 }
 
 static uint8 FblEth_IsTcpPbufChainValid(const struct pbuf *p, uint16 *sumLen)
@@ -777,16 +749,6 @@ void FblEth_PollReceiveOnly(void)
     g_FblEthRxStage = 0u;
 }
 
-void FblEth_WatchRxProgress(void)
-{
-    if(g_ethInitDone == 0u)
-    {
-        return;
-    }
-
-    lwip_geth_Lwip_watchRxProgress();
-}
-
 void FblEth_PollTimerOnly(void)
 {
     if(g_ethInitDone == 0u)
@@ -1306,7 +1268,6 @@ uint8 FblEth_RuntimeClosureOk(void)
     FBL_ETH_CLOSURE_CHECK(46u, FblRam_Memmove);
     FBL_ETH_CLOSURE_CHECK(47u, FblRam_Memcmp);
     FBL_ETH_CLOSURE_CHECK(48u, FblRam_Strlen);
-    FBL_ETH_CLOSURE_CHECK(49u, raw_input);
     FBL_ETH_CLOSURE_CHECK(50u, ethernet_input);
     FBL_ETH_CLOSURE_CHECK(51u, FblEth_RecordLocalAbort);
     FBL_ETH_CLOSURE_CHECK(52u, lwip_geth_Lwip_watchRxProgress);

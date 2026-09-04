@@ -64,6 +64,7 @@ BSW/Mem/Fls \
 BSW/Mem/MemIf \
 BSW/Mem/MemStack \
 BSW/Mem/Nvm \
+BSW/Sys/CpuPerf \
 BSW/Sys/Crc \
 BSW/Sys/FreeRTOS_core0 \
 BSW/Sys/FreeRTOS_core1 \
