@@ -164,6 +164,9 @@ void NvMTiming_FeeMainCycle(void);
 void NvMTiming_FlsMainCycle(void);
 boolean NvMTiming_IsDirty(void);
 void NvMTiming_ClearDirty(void);
+void NvMTiming_LoadPersistedWriteAll(void);
+void NvMTiming_PreparePersistedImage(void);
+void NvMTiming_PersistFailed(void);
 boolean NvMTiming_IsRoutineId(uint16 routineId);
 Dcm_ReturnType NvMTiming_HandleRoutineControl(
         Dcm_OpStatusType opStatus,

@@ -22,6 +22,9 @@ void EthStack_Init(void)
 {
     if (EthStack_Initialized != 0u)
     {
+        /* A caller attempting to initialize an already-running stack marks a
+         * runtime reinitialization boundary for the boot timing recorder. */
+        EthStartupTiming_NotifyReinitialization();
         return;
     }
 

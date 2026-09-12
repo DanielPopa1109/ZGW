@@ -1,28 +1,28 @@
-28   INFO  [main] Log5J : ***  37.676  ***  **********************************************************
-28   INFO  [main] Log5J : ***  38.154701  ***  Logger configuration successful. Configuration file used: 
-28   INFO  [main] Log5J : ***  38.265701  ***  C:\Infineon\AURIX-Studio-1.10.36\configuration\org.eclipse.osgi\400\0\.cp\lib\log4j.properties
-28   INFO  [main] Log5J : ***  38.3537  ***  **********************************************************
-86   INFO  [main] ISysProductFactory : ***  95.744  ***  Eclipse product full name: 'AURIX Development Studio'
-86   INFO  [main] ISysProductFactory : ***  96.1312  ***  Found product: Name: 'com.infineon.aurix.buildsystem.aurixide', winIDEA package: 'winIDEA_IFX_ADS'
-89   INFO  [main] CmdRunner : Running: 'C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe init --afr-path="C:\Infineon\AURIX-Studio-1.10.36\local_AFR" --owner="C:\Infineon\AURIX-Studio-1.10.36\AURIX-studio.exe"'
-632  INFO  [main] CmdRunner : Operation finished in 543ms Return code: 0
-632  INFO  [main] CmdRunner : Output: >>><<<
-632  INFO  [main] CmdRunner : Running: 'C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe --version'
-676  INFO  [main] CmdRunner : Operation finished in 43ms Return code: 0
-676  INFO  [main] CmdRunner : Output: >>>9.21.345<<<
-678  INFO  [main] WinIdeaUpdateManager : Package manager version 9.21.345
-678  INFO  [main] WinIdeaUpdateManager : WinIdeaUpdateManager: initialization:
-678  INFO  [main] WinIdeaUpdateManager :  - Product folder: C:\Infineon\AURIX-Studio-1.10.36
-678  INFO  [main] WinIdeaUpdateManager :  - Product exe (owner): C:\Infineon\AURIX-Studio-1.10.36\AURIX-studio.exe
-678  INFO  [main] WinIdeaUpdateManager :  - Package manager: C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe
-679  INFO  [main] WinIdeaUpdateManager :  - Local AFR: C:\Infineon\AURIX-Studio-1.10.36\local_AFR
-679  INFO  [main] WinIdeaUpdateManager :  - Update channel: Production
-692  INFO  [main] ISystemPreferences : ***  702.0197  ***  Preferences loaded: Install type: Custom, Custom path: '\winIDEA'
-693  INFO  [main] ISysDebugPlugin : ***  703.485601  ***  Starting Plugin si.isystem.eclipse.debug version 921.38900.245076.
-696  INFO  [main] ISysDebugPlugin : ***  706.440801  ***  Plugin si.isystem.eclipse.debug started.
-2553 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 1 site 'https://m1.247365bb.com/ftp/afrs' available: true
-2553 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 2 site 'https://m2.247365bb.com/ftp/afrs' available: true
-3733 INFO  [main] IConDebuggerPage : ***  3742.984301  ***  
+33   INFO  [main] Log5J : ***  52.3546  ***  **********************************************************
+34   INFO  [main] Log5J : ***  53.0027  ***  Logger configuration successful. Configuration file used: 
+34   INFO  [main] Log5J : ***  53.1106  ***  C:\Infineon\AURIX-Studio-1.10.36\configuration\org.eclipse.osgi\400\0\.cp\lib\log4j.properties
+34   INFO  [main] Log5J : ***  53.1818  ***  **********************************************************
+204  INFO  [main] ISysProductFactory : ***  223.76  ***  Eclipse product full name: 'AURIX Development Studio'
+205  INFO  [main] ISysProductFactory : ***  224.2219  ***  Found product: Name: 'com.infineon.aurix.buildsystem.aurixide', winIDEA package: 'winIDEA_IFX_ADS'
+209  INFO  [main] CmdRunner : Running: 'C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe init --afr-path="C:\Infineon\AURIX-Studio-1.10.36\local_AFR" --owner="C:\Infineon\AURIX-Studio-1.10.36\AURIX-studio.exe"'
+604  INFO  [main] CmdRunner : Operation finished in 393ms Return code: 0
+604  INFO  [main] CmdRunner : Output: >>><<<
+604  INFO  [main] CmdRunner : Running: 'C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe --version'
+644  INFO  [main] CmdRunner : Operation finished in 40ms Return code: 0
+645  INFO  [main] CmdRunner : Output: >>>9.21.345<<<
+645  INFO  [main] WinIdeaUpdateManager : Package manager version 9.21.345
+645  INFO  [main] WinIdeaUpdateManager : WinIdeaUpdateManager: initialization:
+645  INFO  [main] WinIdeaUpdateManager :  - Product folder: C:\Infineon\AURIX-Studio-1.10.36
+645  INFO  [main] WinIdeaUpdateManager :  - Product exe (owner): C:\Infineon\AURIX-Studio-1.10.36\AURIX-studio.exe
+645  INFO  [main] WinIdeaUpdateManager :  - Package manager: C:\Users\Daniel\AppData\Local\iSYSTEM\b18\PackageManager.exe
+645  INFO  [main] WinIdeaUpdateManager :  - Local AFR: C:\Infineon\AURIX-Studio-1.10.36\local_AFR
+645  INFO  [main] WinIdeaUpdateManager :  - Update channel: Production
+658  INFO  [main] ISystemPreferences : ***  677.8446  ***  Preferences loaded: Install type: Custom, Custom path: '\winIDEA'
+661  INFO  [main] ISysDebugPlugin : ***  679.5508  ***  Starting Plugin si.isystem.eclipse.debug version 921.38900.245076.
+662  INFO  [main] ISysDebugPlugin : ***  681.1182  ***  Plugin si.isystem.eclipse.debug started.
+2627 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 1 site 'https://m1.247365bb.com/ftp/afrs' available: true
+2627 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 2 site 'https://m2.247365bb.com/ftp/afrs' available: true
+3714 INFO  [main] IConDebuggerPage : ***  3733.5986  ***  
 Opening winIDEA using launch configuration paramenters: 
  - Launch name = 'ZGW_APP TriCore Debug (TASKING)'
  - Project name = 'ZGW_APP'
@@ -46,9 +46,43 @@ Opening winIDEA using launch configuration paramenters:
  - After download action = 'Address'
  - After download symbol = '0x80000000'
 
-3737 INFO  [main] ISysSessionManager : ***  3747.379001  ***  Setting winIDEA workspace path to 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf'
-3740 INFO  [main] ISysSessionManager : ***  3750.2236  ***  Connecting to winIDEA 'C:\Infineon\AURIX-Studio-1.10.36\winIDEA\' with workspace 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf', winIDEA-ID: 'com.tasking.winIDEA.instance.id-ZGW_APP TriCore Debug (TASKING)', visible: true, CLI args: '/HideCrashDumpMessage'
-9201 INFO  [main] ISysSessionManager : ***  9211.47  ***  Connected to winIDEA and setup workspace.
-9202 INFO  [main] ISysSessionManager : ***  9212.759201  ***  Version of isystem.connect for Java: 9.21.389.0
-9203 INFO  [main] ISysSessionManager : ***  9213.3395  ***  Version of isystem.connect DLL: 9.21.389.0.0
-9211 INFO  [main] ISysSessionManager : ***  9220.584601  ***  Version of winIDEA: 9.21.415.0.263573
+3723 INFO  [main] ISysSessionManager : ***  3742.2927  ***  Setting winIDEA workspace path to 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf'
+3730 INFO  [main] ISysSessionManager : ***  3748.9349  ***  Connecting to winIDEA 'C:\Infineon\AURIX-Studio-1.10.36\winIDEA\' with workspace 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf', winIDEA-ID: 'com.tasking.winIDEA.instance.id-ZGW_APP TriCore Debug (TASKING)', visible: true, CLI args: '/HideCrashDumpMessage'
+9541 INFO  [main] ISysSessionManager : ***  9560.8225  ***  Connected to winIDEA and setup workspace.
+9544 INFO  [main] ISysSessionManager : ***  9563.037  ***  Version of isystem.connect for Java: 9.21.389.0
+9544 INFO  [main] ISysSessionManager : ***  9563.5327  ***  Version of isystem.connect DLL: 9.21.389.0.0
+9545 INFO  [main] ISysSessionManager : ***  9564.5417  ***  Version of winIDEA: 9.21.415.0.263573
+63072600 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 1 site 'https://m1.247365bb.com/ftp/afrs' available: true
+63072600 INFO  [main] ISysArtifactoryRepository : Is repository on mirror 2 site 'https://m2.247365bb.com/ftp/afrs' available: true
+63073916 INFO  [main] IConDebuggerPage : ***  6.30739356909E7  ***  
+Opening winIDEA using launch configuration paramenters: 
+ - Launch name = 'ZGW_APP TriCore Debug (TASKING)'
+ - Project name = 'ZGW_APP'
+ - Project path = 'C:/Users/Daniel/Desktop/ZGW_Repo/ZGW/ZGW_APP'
+ - Output file = 'TriCore Debug (TASKING)/ZGW_APP.elf'
+ - Stop on startup = 'true'
+ - Stop on startup location = 'core0_main'
+ - Verbose mode = true' - winIDEA visible = 'true'
+ - Bring winIDEA to top = 'true'
+ - Verify download = 'false'
+ - Analyze source files = 'false'
+ - Shutdown winIDEA at terminate session = 'false'
+ - winIDEA workspace path = '.ads/winIDEAWorkspaces/TriCore-Debug-(TASKING)/ADS.xjrf'
+ - full winIDEA workspace path = 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf'
+ - Device = 'TC375TP'
+ - Hardware = 'IFX_DAS'
+ - Communication = 'USB'
+ - Hardware debugger = ''
+ - Image check = 'Default'
+ - Create SMP = 'true'
+ - After download action = 'Address'
+ - After download symbol = '0x80000000'
+
+63073917 INFO  [main] ISysSessionManager : ***  6.30739360976E7  ***  Setting winIDEA workspace path to 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf'
+63073917 INFO  [main] ISysSessionManager : ***  6.30739363556E7  ***  Connecting to winIDEA 'C:\Infineon\AURIX-Studio-1.10.36\winIDEA\' with workspace 'C:\Users\Daniel\Desktop\ZGW_Repo\ZGW\ZGW_APP\.ads\winIDEAWorkspaces\TriCore-Debug-(TASKING)\ADS.xjrf', winIDEA-ID: 'com.tasking.winIDEA.instance.id-ZGW_APP TriCore Debug (TASKING)', visible: true, CLI args: '/HideCrashDumpMessage'
+63079660 INFO  [main] ISysSessionManager : ***  6.30796788618E7  ***  Connected to winIDEA and setup workspace.
+63079660 INFO  [main] ISysSessionManager : ***  6.30796791286E7  ***  Version of isystem.connect for Java: 9.21.389.0
+63079660 INFO  [main] ISysSessionManager : ***  6.30796793183E7  ***  Version of isystem.connect DLL: 9.21.389.0.0
+63079668 INFO  [main] ISysSessionManager : ***  6.30796869507E7  ***  Version of winIDEA: 9.21.415.0.263573
+64945794 INFO  [Framework stop - Equinox Container: 2f5c0b69-d0ed-49c5-a898-ef6d159ac64d] ISysDebugPlugin : ***  6.49458136815E7  ***  Stopping Plugin si.isystem.eclipse.debug
+64945805 INFO  [Framework stop - Equinox Container: 2f5c0b69-d0ed-49c5-a898-ef6d159ac64d] ISysDebugPlugin : ***  6.49458252226E7  ***  Plugin si.isystem.eclipse.debug stopped.

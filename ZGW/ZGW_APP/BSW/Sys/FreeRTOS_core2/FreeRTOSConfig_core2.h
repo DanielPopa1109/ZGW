@@ -83,8 +83,14 @@
 
 extern void Os_CpuLoad_TaskSwitchedIn(unsigned char CoreId, unsigned char IsIdleTask);
 extern void Os_CpuLoad_TaskSwitchedOut(unsigned char CoreId);
-#define traceTASK_SWITCHED_IN_core2() \
-    Os_CpuLoad_TaskSwitchedIn(2u, (unsigned char)(pxCurrentTCB_core2 == xIdleTaskHandle_core2))
-#define traceTASK_SWITCHED_OUT_core2() \
-    Os_CpuLoad_TaskSwitchedOut(2u)
+extern void CpuPerf_TraceTaskSwitchedIn(unsigned char coreId, const void *taskHandle);
+extern void CpuPerf_TraceTaskSwitchedOut(unsigned char coreId, const void *taskHandle);
+#define traceTASK_SWITCHED_IN_core2() do { \
+    Os_CpuLoad_TaskSwitchedIn(2u, (unsigned char)(pxCurrentTCB_core2 == xIdleTaskHandle_core2)); \
+    CpuPerf_TraceTaskSwitchedIn(2u, (const void *)pxCurrentTCB_core2); \
+} while (0)
+#define traceTASK_SWITCHED_OUT_core2() do { \
+    CpuPerf_TraceTaskSwitchedOut(2u, (const void *)pxCurrentTCB_core2); \
+    Os_CpuLoad_TaskSwitchedOut(2u); \
+} while (0)
 #endif /* FREERTOS_CONFIG_H */

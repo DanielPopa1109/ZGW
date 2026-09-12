@@ -13,6 +13,8 @@
 #define ETHSTARTUPTIMING_FLAG_TX_COMPLETE_VALID  (0x00000004u)
 #define ETH_TIMING_FLAG_TIMESTAMP_INVALID        (0x00000008u)
 #define ETHSTARTUPTIMING_FLAG_EARLY_CAPTURE      (0x00000010u)
+#define ETHSTARTUPTIMING_FLAG_CAPTURE_CLOSED     (0x00000020u)
+#define ETHSTARTUPTIMING_FLAG_REINIT_OBSERVED    (0x00000040u)
 
 #define ETHSTARTUPTIMING_RX_NONE                 (0u)
 #define ETHSTARTUPTIMING_RX_ARP                  (1u)
@@ -81,6 +83,8 @@ typedef enum
 uint64 EthTiming_ReadStmTicks(void);
 void EthStartupTiming_Init(void);
 void EthStartupTiming_EnableNvMStatus(void);
+void EthStartupTiming_OnNvMReadAllComplete(void);
+void EthStartupTiming_NotifyReinitialization(void);
 void EthStartupTiming_Capture(EthStartupTiming_EventIdType eventId);
 void EthStartupTiming_CaptureWithMeta(EthStartupTiming_EventIdType eventId, uint32 metadata);
 void EthStartupTiming_CaptureFirstRx(uint32 rxClass);

@@ -89,6 +89,7 @@ typedef struct
 
 void AiModel_Init(void);
 void AiModel_MainFunction(void);
+void AiModel_NotifyDtcClear(void);
 Std_ReturnType AiModel_GetLatestResult(AiModel_ResultType *result);
 Std_ReturnType AiModel_GetLatestGlobalResult(AiModel_GlobalResultType *result);
 Std_ReturnType AiModel_GetLatestChannelResult(uint8 channel, AiModel_ChannelResultType *result);

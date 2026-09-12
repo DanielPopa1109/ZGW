@@ -322,6 +322,8 @@ void CanIf_TxConfirmation(PduIdType CanIfTxSduId)
         return;
     }
 
+    CanIf_AppTxConfirmation(cfg->controllerId);
+
     if (cfg->target == CANIF_TX_TARGET_CANTP)
     {
         CanTp_TxConfirmation(CanIfTxSduId);
@@ -398,6 +400,11 @@ __attribute__((weak)) void CanIf_AppBusOff(uint8 ControllerId)
 }
 
 __attribute__((weak)) void CanIf_AppControllerRecovered(uint8 ControllerId)
+{
+    (void)ControllerId;
+}
+
+__attribute__((weak)) void CanIf_AppTxConfirmation(uint8 ControllerId)
 {
     (void)ControllerId;
 }

@@ -32,6 +32,8 @@ typedef struct
     uint32 mdioErrorCnt;
     uint32 linkDownCnt;
     uint32 linkUpCnt;
+    uint16 lastBmsr;
+    uint16 lastPhysts;
 } lwip_geth_PhyDp83825i_StatusType;
 
 IFX_EXTERN void lwip_geth_private_Phy_Dp83825i_reset(void);

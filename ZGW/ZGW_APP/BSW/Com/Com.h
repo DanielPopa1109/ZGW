@@ -427,9 +427,21 @@ extern volatile uint32 Com_DebugReceiveSignalLastValue;
 
 /* DBC/LDF generated LIN COM I-PDU IDs and Signal IDs. */
 #define COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                  202u
+#define COM_TX_PDU_LIN_ZGW_SDAT                            203u
 #define COM_RX_PDU_LIN_HVDCDC_STATUS                       201u
 #define COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_ENABLE_HVDCDC                                  2205u
 #define COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_TARGETVOLTAGE_HVDCDC                           2206u
+#define COM_SIG_TX_LIN_ZGW_SDAT_MINUTE                                                  2220u
+#define COM_SIG_TX_LIN_ZGW_SDAT_TIMESOURCE                                              2221u
+#define COM_SIG_TX_LIN_ZGW_SDAT_SECOND                                                  2222u
+#define COM_SIG_TX_LIN_ZGW_SDAT_UTCVALID                                                2223u
+#define COM_SIG_TX_LIN_ZGW_SDAT_DEFAULTTIME                                             2224u
+#define COM_SIG_TX_LIN_ZGW_SDAT_YEAR                                                    2225u
+#define COM_SIG_TX_LIN_ZGW_SDAT_NVMRESTORED                                             2226u
+#define COM_SIG_TX_LIN_ZGW_SDAT_DAY                                                     2227u
+#define COM_SIG_TX_LIN_ZGW_SDAT_HOUR                                                    2228u
+#define COM_SIG_TX_LIN_ZGW_SDAT_MONTH                                                   2229u
+#define COM_SIG_TX_LIN_ZGW_SDAT_MILLISECOND                                             2230u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_RESPONSEERROR                               2215u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_VOLTAGE                                  2216u
 #define COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_CURRENT                                  2217u

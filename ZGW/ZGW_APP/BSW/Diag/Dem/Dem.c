@@ -2,6 +2,7 @@
 #include "Dem_Int.h"
 #include "Dem_NvM.h"
 #include "APP/CodingApp/CodingApp.h"
+#include "APP/AiModel/AiModel.h"
 #include "APP/TimeSync/TimeBase.h"
 #include "SysMgr.h"
 #include "IfxCpu.h"
@@ -938,7 +939,6 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
         Dem_PrimaryMemory[entryIndex].dtc = eventConfig.DTC & 0x00FFFFFFu;
         Dem_PrimaryMemory[entryIndex].firstFailedCycle = Dem_OperationCycleCounter;
 
-        Dem_CaptureSnapshot(eventIndex, entryIndex);
     }
 
     Dem_PrimaryMemory[entryIndex].udsStatus =
@@ -948,6 +948,10 @@ static void Dem_StoreOrUpdatePrimaryEntry(uint16 eventIndex)
     Dem_PrimaryMemory[entryIndex].lastFailedCycle = Dem_OperationCycleCounter;
     Dem_PrimaryMemory[entryIndex].lastChangedCounter = ++Dem_ChangeCounter;
 
+    /* Capture once, after the entry metadata has been updated.  Capturing in
+     * both the new-entry branch and here consumed latched occurrence data and
+     * then immediately overwrote it with the current (possibly recovered)
+     * state. */
     Dem_CaptureSnapshot(eventIndex, entryIndex);
 }
 
@@ -1866,6 +1870,17 @@ Std_ReturnType Dem_ClearDTC(
     if (Dem_ClearStatus == DEM_CLEAR_PENDING)
     {
         return E_NOT_OK;
+    }
+
+    /* Invalidate the producer before clearing its DEM records. Any AI task
+     * already in progress will then suppress the old inference, while reports
+     * made before this notification are removed by the clear below. */
+    if (((DTC & 0x00FFFFFFu) == DEM_DTC_GROUP_ALL_DTCS) ||
+        (((DTC & 0x00FFFFFFu) >= DEM_DTC_AIMODEL_CONSUMER_FAULT) &&
+         ((DTC & 0x00FFFFFFu) <
+          (DEM_DTC_AIMODEL_CONSUMER_FAULT + DEM_AIMODEL_CONSUMER_EVENT_COUNT))))
+    {
+        AiModel_NotifyDtcClear();
     }
 
     if ((DTC & 0x00FFFFFFu) == DEM_DTC_GROUP_ALL_DTCS)

@@ -1,0 +1,11 @@
+{
+  "global_epoch": 255,
+  "dataset_round": 2,
+  "best_val_loss": 0.3746571272611618,
+  "last_seed": 1980040377,
+  "last_train_loss": 0.37193815623010906,
+  "last_val_loss": 0.3880183964967728,
+  "last_val_class_accuracy": 0.97535,
+  "last_val_soon_accuracy": 0.97485,
+  "lr": 6.25e-05
+}

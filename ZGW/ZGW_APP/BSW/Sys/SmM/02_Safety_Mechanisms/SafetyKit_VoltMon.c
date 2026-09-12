@@ -37,6 +37,8 @@
 #define PMS_MILLIVOLT_TO_VOLT(value) ((float32)((value) / 1000.0f))
 #define PMS_TC007_MONSTAT1_REFRESH_WAIT_LIMIT 1000000u
 #define PMS_TC007_MONSTAT1_SETTLE_SAMPLES     4u
+#define PMS_TC007_MONSTAT1_VDD_LSB_V           0.0057692f
+#define PMS_TC007_MONSTAT1_VDDP3_LSB_V         0.015f
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
@@ -53,6 +55,8 @@ static void safetyKitPmsErrataCaptureRegisters(void);
 static void safetyKitPmsErrataUpdateStatus(uint32 failureMask);
 static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadFreshMonStat1(void);
 static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadSettledMonStat1(void);
+static float32 safetyKitPmsErrataConvertSecondaryVdd(uint8 adcResult);
+static float32 safetyKitPmsErrataConvertSecondaryVddp3(uint8 adcResult);
 static void safetyKitVerifyPmsTcH003Thresholds(void);
 
 /*********************************************************************************************************************/
@@ -127,6 +131,18 @@ static Ifx_PMS_MONSTAT1 safetyKitPmsErrataReadSettledMonStat1(void)
     return currentMonStat1;
 }
 
+static float32 safetyKitPmsErrataConvertSecondaryVdd(uint8 adcResult)
+{
+    /* EVRMONSTAT1 uses VIN = LSB * (ADC - 1), unlike the EVRADCSTAT conversion helpers. */
+    return PMS_TC007_MONSTAT1_VDD_LSB_V * ((float32)adcResult - 1.0f);
+}
+
+static float32 safetyKitPmsErrataConvertSecondaryVddp3(uint8 adcResult)
+{
+    /* EVRMONSTAT1 uses VIN = LSB * (ADC - 1), unlike the EVRADCSTAT conversion helpers. */
+    return PMS_TC007_MONSTAT1_VDDP3_LSB_V * ((float32)adcResult - 1.0f);
+}
+
 void initPmsErrataWorkarounds(void)
 {
     uint16 passwd;
@@ -147,8 +163,8 @@ void initPmsErrataWorkarounds(void)
     g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount = 0u;
     g_SafetyKitStatus.voltStatus.pmsErrataCheckStatus = SAFETYKIT_PMS_ERRATA_STATUS_NOT_EVALUATED;
     checkedMonStat1 = safetyKitPmsErrataReadSettledMonStat1();
-    vddp3Secondary = IfxPmsEvr_getAdcVddp3Result((float32)checkedMonStat1.B.ADC33V);
-    vddSecondary = IfxPmsEvr_getAdcVddResult((float32)checkedMonStat1.B.ADCCV);
+    vddp3Secondary = safetyKitPmsErrataConvertSecondaryVddp3(checkedMonStat1.B.ADC33V);
+    vddSecondary = safetyKitPmsErrataConvertSecondaryVdd(checkedMonStat1.B.ADCCV);
     tc007SamplesFresh =
             (g_SafetyKitStatus.voltStatus.pmsErrataTc007RefreshTimeoutCount == 0u) ? TRUE : FALSE;
     checkedEvrStat.U = PMS_EVRSTAT.U;

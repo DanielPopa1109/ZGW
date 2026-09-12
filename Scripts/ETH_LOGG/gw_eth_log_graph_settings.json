@@ -1,12 +1,75 @@
 {
+  "display": {
+    "auto_scroll": true,
+    "only_changes": false,
+    "show_packet_summary": false,
+    "show_signals": false,
+    "time_mode": "Relative",
+    "trace_mode": "Fixed",
+    "write_csv": false,
+    "write_text": false
+  },
+  "receiver": {
+    "bind_ip": "0.0.0.0",
+    "ports": "30600, 30490, 30500, 35000, 35001, 54088",
+    "protocol": "UDP",
+    "source_ip": "192.168.1.10"
+  },
   "selected_keys": [
+    "ETH:TimeSync:TimeSync:Version",
+    "ETH:MCUData:MCUData:TempPms",
+    "ETH:MCUData:MCUData:TempCore",
+    "ETH:TimeSync:TimeSync:VehicleTimeSeconds",
     "ETH:TimeSync:TimeSync:UtcTimeSeconds",
-    "ETH:MCUData:MCUData:TempPms"
+    "ETH:MCUData:MCUData:CpuLoadCore0",
+    "ETH:MCUData:MCUData:CpuLoadCore1",
+    "ETH:MCUData:MCUData:CpuLoadCore2"
   ],
   "signals": {
+    "ETH:MCUData:MCUData:CpuLoadCore0": "ETH | MCUData | MCUData | CpuLoadCore0",
+    "ETH:MCUData:MCUData:CpuLoadCore1": "ETH | MCUData | MCUData | CpuLoadCore1",
+    "ETH:MCUData:MCUData:CpuLoadCore2": "ETH | MCUData | MCUData | CpuLoadCore2",
+    "ETH:MCUData:MCUData:TempCore": "ETH | MCUData | MCUData | TempCore",
     "ETH:MCUData:MCUData:TempPms": "ETH | MCUData | MCUData | TempPms",
-    "ETH:TimeSync:TimeSync:UtcTimeSeconds": "ETH | TimeSync | TimeSync | UtcTimeSeconds"
+    "ETH:TimeSync:TimeSync:UtcTimeSeconds": "ETH | TimeSync | TimeSync | UtcTimeSeconds",
+    "ETH:TimeSync:TimeSync:VehicleTimeSeconds": "ETH | TimeSync | TimeSync | VehicleTimeSeconds",
+    "ETH:TimeSync:TimeSync:Version": "ETH | TimeSync | TimeSync | Version"
   },
+  "transmit_editor": {
+    "count": 0,
+    "enabled": true,
+    "format": "ASCII",
+    "interval": 0.1,
+    "name": "PCHeartbeat",
+    "payload": "PCHeartbeat",
+    "port": 30600,
+    "protocol": "UDP",
+    "target_ip": "192.168.1.255"
+  },
+  "transmit_packets": [
+    {
+      "count": 0,
+      "enabled": true,
+      "format": "ASCII",
+      "interval": 0.1,
+      "name": "PCHeartbeat",
+      "payload": "PCHeartbeat",
+      "port": 30600,
+      "protocol": "UDP",
+      "target_ip": "192.168.1.255"
+    },
+    {
+      "count": 0,
+      "enabled": true,
+      "format": "HEX",
+      "interval": 0.1,
+      "name": "SomeIpSdSubscribe",
+      "payload": "FF FF 81 00 00 00 00 24 00 01 00 01 01 01 02 00 C0 00 00 00 00 00 00 10 06 00 00 00 12 34 00 01 01 00 00 03 00 00 00 01 00 00 00 00",
+      "port": 30490,
+      "protocol": "UDP",
+      "target_ip": "192.168.1.10"
+    }
+  ],
   "view_mode": "Stacked",
-  "window_s": 32.0
+  "window_s": 1.7578125
 }

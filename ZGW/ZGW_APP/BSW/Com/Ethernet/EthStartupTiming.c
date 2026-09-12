@@ -28,18 +28,29 @@ const uint8 NvM_EthStartupTiming_Rom[ETHSTARTUPTIMING_NVM_IMAGE_SIZE] =
 };
 
 static IfxCpu_spinLock EthStartupTiming_Lock;
+/* The live boot capture must never share storage with the NvM ReadAll target.
+ * NvM_EthStartupTiming_Ram therefore remains the previous finalized boot until
+ * the current capture is closed and deliberately published to it. */
+static EthStartupTiming_NvImageType EthStartupTiming_ActiveImage;
 static boolean EthStartupTiming_Initialized;
 static boolean EthStartupTiming_NvMReady;
-static boolean EthStartupTiming_DirtyPending;
+static boolean EthStartupTiming_NvMReadAllComplete;
+static boolean EthStartupTiming_CaptureOpen;
+static boolean EthStartupTiming_SnapshotPending;
 static uint64 EthStartupTiming_FirstTxSubmitTicks;
 static uint64 EthStartupTiming_FirstTxCompleteTicks;
 
 static EthStartupTiming_NvImageType *EthStartupTiming_Image(void);
 static uint64 EthStartupTiming_ReadFrequency(void);
 static void EthStartupTiming_MarkDirty(void);
+static void EthStartupTiming_CloseCapture(boolean reinitObserved);
+static void EthStartupTiming_PublishSnapshot(void);
 static void EthStartupTiming_NormalizeMetadata(EthStartupTiming_NvImageType *image);
 static uint32 EthStartupTiming_MaskWord(EthStartupTiming_EventIdType eventId);
 static uint32 EthStartupTiming_MaskBit(EthStartupTiming_EventIdType eventId);
+static boolean EthStartupTiming_HasEvent(
+        const EthStartupTiming_NvImageType *image,
+        EthStartupTiming_EventIdType eventId);
 static void EthStartupTiming_UpdateMeasurementState(EthStartupTiming_NvImageType *image);
 static void EthStartupTiming_PutU16(uint8 *data, uint16 value);
 static void EthStartupTiming_PutU32(uint8 *data, uint32 value);
@@ -47,7 +58,7 @@ static void EthStartupTiming_PutU64(uint8 *data, uint64 value);
 
 static EthStartupTiming_NvImageType *EthStartupTiming_Image(void)
 {
-    return (EthStartupTiming_NvImageType *)NvM_EthStartupTiming_Ram;
+    return &EthStartupTiming_ActiveImage;
 }
 
 uint64 EthTiming_ReadStmTicks(void)
@@ -62,15 +73,44 @@ static uint64 EthStartupTiming_ReadFrequency(void)
 
 static void EthStartupTiming_MarkDirty(void)
 {
-    if (EthStartupTiming_NvMReady != FALSE)
+    /* Captures stay RAM-only. Publishing is intentionally deferred until the
+     * boot measurement is closed and NvM_ReadAll can no longer overwrite it. */
+    EthStartupTiming_SnapshotPending = TRUE;
+    EthStartupTiming_PublishSnapshot();
+}
+
+static void EthStartupTiming_PublishSnapshot(void)
+{
+    if ((EthStartupTiming_SnapshotPending == FALSE) ||
+            (EthStartupTiming_CaptureOpen != FALSE) ||
+            (EthStartupTiming_NvMReady == FALSE) ||
+            (EthStartupTiming_NvMReadAllComplete == FALSE))
     {
-        (void)NvM_SetRamBlockStatus(NVM_BLOCK_ID_ETH_STARTUP_TIMING, TRUE);
-        EthStartupTiming_DirtyPending = FALSE;
+        return;
     }
-    else
+
+    (void)memcpy(NvM_EthStartupTiming_Ram,
+            &EthStartupTiming_ActiveImage,
+            sizeof(EthStartupTiming_ActiveImage));
+    (void)NvM_SetRamBlockStatus(NVM_BLOCK_ID_ETH_STARTUP_TIMING, TRUE);
+    EthStartupTiming_SnapshotPending = FALSE;
+}
+
+static void EthStartupTiming_CloseCapture(boolean reinitObserved)
+{
+    if (EthStartupTiming_CaptureOpen == FALSE)
     {
-        EthStartupTiming_DirtyPending = TRUE;
+        return;
     }
+
+    EthStartupTiming_CaptureOpen = FALSE;
+    EthStartupTiming_ActiveImage.flags |= ETHSTARTUPTIMING_FLAG_CAPTURE_CLOSED;
+    if (reinitObserved != FALSE)
+    {
+        EthStartupTiming_ActiveImage.flags |= ETHSTARTUPTIMING_FLAG_REINIT_OBSERVED;
+    }
+    EthStartupTiming_MarkDirty();
+    EthStartupTiming_PublishSnapshot();
 }
 
 static void EthStartupTiming_NormalizeMetadata(EthStartupTiming_NvImageType *image)
@@ -152,25 +192,42 @@ static uint32 EthStartupTiming_MaskBit(EthStartupTiming_EventIdType eventId)
     return (1UL << ((uint32)eventId & 31u));
 }
 
+static boolean EthStartupTiming_HasEvent(
+        const EthStartupTiming_NvImageType *image,
+        EthStartupTiming_EventIdType eventId)
+{
+    return ((image->capturedMask[EthStartupTiming_MaskWord(eventId)] &
+            EthStartupTiming_MaskBit(eventId)) != 0u) ? TRUE : FALSE;
+}
+
 static void EthStartupTiming_UpdateMeasurementState(EthStartupTiming_NvImageType *image)
 {
-    if ((image->capturedMask[EthStartupTiming_MaskWord(ETHSTARTUPTIMING_EVENT_FIRST_TX_SUCCESS)] &
-            EthStartupTiming_MaskBit(ETHSTARTUPTIMING_EVENT_FIRST_TX_SUCCESS)) != 0u)
+    /* A transmitted ARP only proves that the MAC/DMA path works. Keep the
+     * startup window open until the stack, link-facing interface, DoIP and
+     * sockets are ready and real diagnostic traffic has traversed both RX and
+     * TX paths. PHY-specific events remain useful but are not mandatory: a
+     * first DoIP RX is stronger functional proof of an operational link. */
+    if ((EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_ETH_STARTUP_COMPLETE) != FALSE) &&
+            (EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP) != FALSE) &&
+            (EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_DOIP_INIT_COMPLETE) != FALSE) &&
+            (EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_SOCKET_READY) != FALSE) &&
+            (EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_FIRST_DOIP_RX) != FALSE) &&
+            (EthStartupTiming_HasEvent(image, ETHSTARTUPTIMING_EVENT_FIRST_TX_SUCCESS) != FALSE))
     {
         image->measurementState = ETHSTARTUPTIMING_STATE_COMPLETE;
     }
-    else if ((image->capturedMask[EthStartupTiming_MaskWord(ETHSTARTUPTIMING_EVENT_FIRST_DMA_TX_COMPLETE)] &
-            EthStartupTiming_MaskBit(ETHSTARTUPTIMING_EVENT_FIRST_DMA_TX_COMPLETE)) != 0u)
+    else if (EthStartupTiming_HasEvent(image,
+            ETHSTARTUPTIMING_EVENT_FIRST_DMA_TX_COMPLETE) != FALSE)
     {
         image->measurementState = ETHSTARTUPTIMING_STATE_TX_OBSERVED;
     }
-    else if ((image->capturedMask[EthStartupTiming_MaskWord(ETHSTARTUPTIMING_EVENT_FIRST_APP_RX)] &
-            EthStartupTiming_MaskBit(ETHSTARTUPTIMING_EVENT_FIRST_APP_RX)) != 0u)
+    else if (EthStartupTiming_HasEvent(image,
+            ETHSTARTUPTIMING_EVENT_FIRST_APP_RX) != FALSE)
     {
         image->measurementState = ETHSTARTUPTIMING_STATE_RX_OBSERVED;
     }
-    else if ((image->capturedMask[EthStartupTiming_MaskWord(ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP)] &
-            EthStartupTiming_MaskBit(ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP)) != 0u)
+    else if (EthStartupTiming_HasEvent(image,
+            ETHSTARTUPTIMING_EVENT_NETIF_LINK_UP) != FALSE)
     {
         image->measurementState = ETHSTARTUPTIMING_STATE_LINK_READY;
     }
@@ -224,6 +281,9 @@ void EthStartupTiming_Init(void)
     image->eventCapacity = ETHSTARTUPTIMING_MAX_EVENTS;
     image->stmFrequencyHz = frequencyHz;
     image->referenceTicks = nowTicks;
+    /* A reset starts a new generation. Each event also carries this marker in
+     * its reserved field, allowing a reader to reject mixed-generation data. */
+    image->reserved[1u] = (uint32)(nowTicks ^ (nowTicks >> 32u));
     if (frequencyHz == 0u)
     {
         image->flags |= ETHSTARTUPTIMING_FLAG_FREQ_INVALID;
@@ -237,7 +297,10 @@ void EthStartupTiming_Init(void)
     image->measurementState = ETHSTARTUPTIMING_STATE_IN_PROGRESS;
     image->events[ETHSTARTUPTIMING_EVENT_REFERENCE].valid = 1u;
     image->events[ETHSTARTUPTIMING_EVENT_REFERENCE].timestampTicks = nowTicks;
+    image->events[ETHSTARTUPTIMING_EVENT_REFERENCE].reserved = image->reserved[1u];
     image->capturedMask[0u] = EthStartupTiming_MaskBit(ETHSTARTUPTIMING_EVENT_REFERENCE);
+    EthStartupTiming_CaptureOpen = TRUE;
+    EthStartupTiming_SnapshotPending = FALSE;
     EthStartupTiming_Initialized = TRUE;
     EthStartupTiming_MarkDirty();
 }
@@ -245,10 +308,18 @@ void EthStartupTiming_Init(void)
 void EthStartupTiming_EnableNvMStatus(void)
 {
     EthStartupTiming_NvMReady = TRUE;
-    if (EthStartupTiming_DirtyPending != FALSE)
-    {
-        EthStartupTiming_MarkDirty();
-    }
+    EthStartupTiming_PublishSnapshot();
+}
+
+void EthStartupTiming_OnNvMReadAllComplete(void)
+{
+    EthStartupTiming_NvMReadAllComplete = TRUE;
+    EthStartupTiming_PublishSnapshot();
+}
+
+void EthStartupTiming_NotifyReinitialization(void)
+{
+    EthStartupTiming_CloseCapture(TRUE);
 }
 
 void EthStartupTiming_Capture(EthStartupTiming_EventIdType eventId)
@@ -277,6 +348,11 @@ void EthStartupTiming_CaptureWithMeta(EthStartupTiming_EventIdType eventId, uint
         return;
     }
 
+    if (EthStartupTiming_CaptureOpen == FALSE)
+    {
+        return;
+    }
+
     image = EthStartupTiming_Image();
     maskWord = EthStartupTiming_MaskWord(eventId);
     mask = EthStartupTiming_MaskBit(eventId);
@@ -298,6 +374,7 @@ void EthStartupTiming_CaptureWithMeta(EthStartupTiming_EventIdType eventId, uint
         image->events[eventId].valid = 1u;
         image->events[eventId].timestampTicks = nowTicks;
         image->events[eventId].metadata = metadata;
+        image->events[eventId].reserved = image->reserved[1u];
         if (nowTicks < image->referenceTicks)
         {
             image->flags |= ETH_TIMING_FLAG_TIMESTAMP_INVALID;
@@ -311,6 +388,10 @@ void EthStartupTiming_CaptureWithMeta(EthStartupTiming_EventIdType eventId, uint
     if (captured != FALSE)
     {
         EthStartupTiming_MarkDirty();
+        if (image->measurementState == ETHSTARTUPTIMING_STATE_COMPLETE)
+        {
+            EthStartupTiming_CloseCapture(FALSE);
+        }
     }
 }
 
@@ -325,6 +406,11 @@ void EthStartupTiming_CaptureFirstRx(uint32 rxClass)
         return;
     }
 
+    if (EthStartupTiming_CaptureOpen == FALSE)
+    {
+        return;
+    }
+
     image = EthStartupTiming_Image();
     if (image->firstRxClass == ETHSTARTUPTIMING_RX_NONE)
     {
@@ -335,7 +421,8 @@ void EthStartupTiming_CaptureFirstRx(uint32 rxClass)
 
 void EthStartupTiming_CaptureFirstTxSubmit(void)
 {
-    if (EthStartupTiming_FirstTxSubmitTicks == 0u)
+    if ((EthStartupTiming_CaptureOpen != FALSE) &&
+            (EthStartupTiming_FirstTxSubmitTicks == 0u))
     {
         EthStartupTiming_FirstTxSubmitTicks = EthTiming_ReadStmTicks();
         EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_DMA_TX_SUBMIT);
@@ -346,7 +433,8 @@ void EthStartupTiming_CaptureFirstTxSubmit(void)
 
 void EthStartupTiming_CaptureFirstTxComplete(void)
 {
-    if (EthStartupTiming_FirstTxCompleteTicks == 0u)
+    if ((EthStartupTiming_CaptureOpen != FALSE) &&
+            (EthStartupTiming_FirstTxCompleteTicks == 0u))
     {
         EthStartupTiming_FirstTxCompleteTicks = EthTiming_ReadStmTicks();
         EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_FIRST_DMA_TX_COMPLETE);

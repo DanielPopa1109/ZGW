@@ -5,7 +5,7 @@
 #include "Gtm/Std/IfxGtm_Tom.h"
 #include "_PinMap/IfxGtm_PinMap.h"
 
-#define GTMTOM_CLOCK_HZ_DEFAULT             200000000u
+#define GTMTOM_CLOCK_HZ_DEFAULT             100000000u
 #define GTMTOM_PERIOD_TICKS_MIN            2u
 #define GTMTOM_PERIOD_TICKS_MAX            65535u
 #define GTMTOM_DUTY_PERMILLE_MAX           1000u

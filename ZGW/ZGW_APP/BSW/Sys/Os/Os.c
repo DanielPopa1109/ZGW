@@ -68,6 +68,7 @@ void QM_BSW_Task_C0(void *pvParameters);
 void QM_APPL_Task_C0(void *pvParameters);
 void ASIL_BSW_Task_C1(void *pvParameters);
 void ASIL_APPL_Task_C1(void *pvParameters);
+void QM_APP_Task_C1(void *pvParameters);
 void ASIL_APPL_Task_C2(void *pvParameters);
 void QM_BSW_Task_C2(void *pvParameters);
 
@@ -80,6 +81,7 @@ void Alarm5ms_Callback_QM_BSW_Task_C0( TimerHandle_t_core0 xTimer_core0 );
 void Alarm5ms_Callback_QM_APPL_Task_C0( TimerHandle_t_core0 xTimer_core0 );
 void Alarm5ms_Callback_ASIL_BSW_Task_C1( TimerHandle_t_core1 xTimer_core1);
 void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
+void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
 
 #define OS_CPU_CORE_0                  0u
 #define OS_CPU_CORE_1                  1u
@@ -92,7 +94,8 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_STACK_CORE0_QM_LIN     ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE0_QM_APPL    ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE1_ASIL_BSW   ( configMINIMAL_STACK_SIZE_core1 * 8u )
-#define OS_TASK_STACK_CORE1_ASIL_APPL  ( configMINIMAL_STACK_SIZE_core1 )
+#define OS_TASK_STACK_CORE1_ASIL_APPL  ( configMINIMAL_STACK_SIZE_core1 * 8u )
+#define OS_TASK_STACK_CORE1_QM_APP     ( configMINIMAL_STACK_SIZE_core1 * 8u )
 #define OS_TASK_STACK_CORE2_APPL       ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_STACK_CORE2_QM_BSW     ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_PRIO_CORE0_ASIL_BSW    28u
@@ -101,6 +104,9 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_PRIO_CORE0_QM_LIN      24u
 #define OS_TASK_PRIO_CORE0_QM_DIAG     23u
 #define OS_TASK_PRIO_CORE0_QM_APPL     21u
+#define OS_TASK_PRIO_CORE1_ASIL_BSW    29u
+#define OS_TASK_PRIO_CORE1_ASIL_APPL   28u
+#define OS_TASK_PRIO_CORE1_QM_APP      27u
 #define OS_TASK_PRIO_CORE0_ASIL_NVM    20u
 #define OS_TASK_PRIO_CORE2_QM_BSW      29u
 #define OS_TASK_PRIO_CORE2_APPL        28u
@@ -143,6 +149,9 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_INIT_FAIL_C0_QM_CAN_START   28u
 #define OS_INIT_FAIL_C0_QM_LIN_START   29u
 #define OS_INIT_FAIL_C0_ASIL_NVM_START 30u
+#define OS_INIT_FAIL_C1_QM_APP_TASK    31u
+#define OS_INIT_FAIL_C1_QM_APP_TIMER   32u
+#define OS_INIT_FAIL_C1_QM_APP_START   33u
 
 enum
 {
@@ -213,6 +222,7 @@ uint8 Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_QM_APPL_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_ASIL_BSW_Task_C1 = 0u;
 uint8 Alarm5ms_Flag_ASIL_APPL_Task_C1 = 0u;
+uint8 Alarm5ms_Flag_QM_APP_Task_C1 = 0u;
 
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_DIAG_Task_C0;
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_CAN_Task_C0;
@@ -223,6 +233,7 @@ TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_BSW_Task_C0;
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_APPL_Task_C0;
 TimerHandle_t_core1 Handler_Alarm5ms_Callback_ASIL_BSW_Task_C1;
 TimerHandle_t_core1 Handler_Alarm5ms_Callback_ASIL_APPL_Task_C1;
+TimerHandle_t_core1 Handler_Alarm5ms_Callback_QM_APP_Task_C1;
 
 TaskHandle_t_core0 QM_DIAG_Task_C0_THandle ;
 TaskHandle_t_core0 QM_CAN_Task_C0_THandle ;
@@ -233,6 +244,7 @@ TaskHandle_t_core0 QM_BSW_Task_C0_THandle;
 TaskHandle_t_core0 QM_APPL_Task_C0_THandle;
 TaskHandle_t_core1 ASIL_BSW_Task_C1_THandle;
 TaskHandle_t_core1 ASIL_APPL_Task_C1_THandle;
+TaskHandle_t_core1 QM_APP_Task_C1_THandle;
 TaskHandle_t_core2 ASIL_APPL_Task_C2_THandle;
 TaskHandle_t_core2 QM_BSW_Task_C2_THandle;
 
@@ -249,6 +261,7 @@ long long QM_BSW_Task_C0_Counter = 0;
 long long QM_APPL_Task_C0_Counter = 0;
 long long ASIL_BSW_Task_C1_Counter = 0;
 long long ASIL_APPL_Task_C1_Counter = 0;
+long long QM_APP_Task_C1_Counter = 0;
 long long AiModel_MainFunction_Counter = 0;
 long long ASIL_APPL_Task_C2_Counter = 0;
 long long QM_BSW_Task_C2_Counter = 0;
@@ -409,12 +422,12 @@ void Os_Init_C0(void)
 
 void Os_Init_C1(void)
 {
-    if(xTaskCreate_core1(ASIL_BSW_Task_C1, "ASIL_BSW_Task_C1", OS_TASK_STACK_CORE1_ASIL_BSW, NULL, 29u, &ASIL_BSW_Task_C1_THandle) != pdPASS_core1)
+    if(xTaskCreate_core1(ASIL_BSW_Task_C1, "ASIL_BSW_Task_C1", OS_TASK_STACK_CORE1_ASIL_BSW, NULL, OS_TASK_PRIO_CORE1_ASIL_BSW, &ASIL_BSW_Task_C1_THandle) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_ASIL_TASK);
     }
 
-    if(xTaskCreate_core1(ASIL_APPL_Task_C1, "ASIL_APPL_Task_C1", OS_TASK_STACK_CORE1_ASIL_APPL, NULL, 28u, &ASIL_APPL_Task_C1_THandle) != pdPASS_core1)
+    if(xTaskCreate_core1(ASIL_APPL_Task_C1, "ASIL_APPL_Task_C1", OS_TASK_STACK_CORE1_ASIL_APPL, NULL, OS_TASK_PRIO_CORE1_ASIL_APPL, &ASIL_APPL_Task_C1_THandle) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_TASK);
     }
@@ -449,6 +462,11 @@ void Os_Init_C1(void)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_START);
     }
+
+//    if(xTimerStart_core1(Handler_Alarm5ms_Callback_QM_APP_Task_C1, pdMS_TO_TICKS_core1(5u)) != pdPASS_core1)
+//    {
+//        Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_QM_APP_START);
+//    }
 }
 
 void Os_Init_C2(void)
@@ -462,6 +480,7 @@ void Os_Init_C2(void)
     {
         Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_QM_TASK);
     }
+    CpuPerf_RegisterMonitoredTask(OS_CPU_CORE_2, (const void *)QM_BSW_Task_C2_THandle);
 }
 
 static void Os_InitFailure(uint8 CoreId, uint32 Step)
@@ -818,6 +837,9 @@ static void Os_NvMStartup_MainFunction(void)
             break;
 
         case OS_NVM_STARTUP_APPLY_READALL:
+            /* Release the finalized Ethernet timing snapshot only now. Before
+             * this point NvM owns its RAM mirror and may still replace it. */
+            EthStartupTiming_OnNvMReadAllComplete();
             CodingApp_OnNvMReadAllComplete();
             (void)TimeBase_LoadUtcFromNvM();
             Os_NvMStartupState = OS_NVM_STARTUP_TIME_LOAD_WAIT;
@@ -1115,7 +1137,6 @@ void ASIL_BSW_Task_C1(void *pvParameters)
         {
             Alarm5ms_Flag_ASIL_BSW_Task_C1 = 0u;
             serviceCpuWatchdog();
-            AiModel_MainFunction();
             ASIL_BSW_Task_C1_Counter++;
         }
         else
@@ -1134,7 +1155,27 @@ void ASIL_APPL_Task_C1(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASIL_APPL_Task_C1)
         {
             Alarm5ms_Flag_ASIL_APPL_Task_C1 = 0u;
+            AiModel_MainFunction();
             ASIL_APPL_Task_C1_Counter++;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        vTaskSuspend_core1(NULL);
+    }
+}
+
+void QM_APP_Task_C1(void *pvParameters)
+{
+    while(1)
+    {
+        if(1u == Alarm5ms_Flag_QM_APP_Task_C1)
+        {
+            Alarm5ms_Flag_QM_APP_Task_C1 = 0u;
+
+            QM_APP_Task_C1_Counter++;
         }
         else
         {
@@ -1241,6 +1282,7 @@ void QM_BSW_Task_C2(void *pvParameters)
     while(1)
     {
         CpuPerf_ContextType cpuPerfCtx;
+        CpuPerf_ContextType componentPerfCtx;
 
         vTaskDelayUntil_core2(&lastWakeTime, OS_CORE2_MAIN_PERIOD_TICKS);
         CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
@@ -1253,23 +1295,31 @@ void QM_BSW_Task_C2(void *pvParameters)
 
         if (Os_EthStackInitialized != 0u)
         {
+            CpuPerf_Start(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
             UdpNm_MainFunction();
             EthTimeSync_MainFunction(5u);
             Gptp_Lab_MainFunction(5u);
             SomeIpSd_MainFunction(5);
+            CpuPerf_Stop(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
 
+            CpuPerf_Start(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
             lwip_geth_Lwip_pollTimerFlags();
             lwip_geth_Lwip_pollReceiveFlags();
             lwip_geth_Lwip_watchRxProgress();
+            CpuPerf_Stop(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
             TcpIp_MainFunction();
             SoAd_MainFunction();
             GatewaySwc_EthernetMainFunction();
             DoIP_MainFunction(5);
             PduR_DoIPCore2MainFunction();
+            CpuPerf_Start(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
             SomeIp_MainFunction(5);
+            CpuPerf_Stop(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
 
+            CpuPerf_Start(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
             EthSM_MainFunction();
             EthernetDiag_MainFunction();
+            CpuPerf_Stop(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
         }
 
         Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
@@ -1330,4 +1380,10 @@ void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1 )
 {
     Alarm5ms_Flag_ASIL_APPL_Task_C1 = 1u;
     vTaskResume_core1(ASIL_APPL_Task_C1_THandle);
+}
+
+void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1 )
+{
+    Alarm5ms_Flag_QM_APP_Task_C1 = 1u;
+    vTaskResume_core1(QM_APP_Task_C1_THandle);
 }

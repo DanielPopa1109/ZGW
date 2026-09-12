@@ -15,6 +15,8 @@
 #define UDPNM_CB_REPEAT_MESSAGE         0x01u
 #define UDPNM_CB_ACTIVE_WAKEUP          0x02u
 #define UDPNM_TX_PERIOD_NS              (100ull * TIMEBASE_NS_PER_MS)
+#define UDPNM_RESTART_TX_PERIOD_NS      (5ull * TIMEBASE_NS_PER_MS)
+#define UDPNM_RESTART_TX_COUNT          10u
 #define UDPNM_TIMEOUT_TICKS             200u
 #define UDPNM_REPEAT_MESSAGE_TICKS      40u
 #define UDPNM_READY_SLEEP_TICKS         100u
@@ -27,6 +29,8 @@ typedef struct
     Nm_StateType state;
     Nm_ModeType mode;
     uint64 nextTxTimeNs;
+    uint8 restartTxRemaining;
+    uint8 txWasAllowed;
     uint16 timeoutTimer;
     uint16 repeatTimer;
     uint16 readySleepTimer;
@@ -40,7 +44,18 @@ static uint8 UdpNm_Initialized;
 
 static void UdpNm_UpdateNextTxDeadline(uint64 nowNs)
 {
-    UdpNm_ChannelState.nextTxTimeNs = nowNs + UDPNM_TX_PERIOD_NS;
+    uint64 periodNs = (UdpNm_ChannelState.restartTxRemaining > 0u) ?
+            UDPNM_RESTART_TX_PERIOD_NS : UDPNM_TX_PERIOD_NS;
+
+    /* Keep the phase across normal task jitter. After a missed interval,
+     * resume from now instead of sending a backlog in one activation.
+     */
+    if ((UdpNm_ChannelState.nextTxTimeNs == 0ull) ||
+            ((nowNs - UdpNm_ChannelState.nextTxTimeNs) >= periodNs))
+    {
+        UdpNm_ChannelState.nextTxTimeNs = nowNs;
+    }
+    UdpNm_ChannelState.nextTxTimeNs += periodNs;
 }
 
 static void UdpNm_SetState(Nm_StateType state, Nm_ModeType mode)
@@ -89,7 +104,7 @@ static void UdpNm_EnterNetwork(uint8 repeatMessage)
     }
 }
 
-static void UdpNm_TransmitNmPdu(void)
+static SoAd_ReturnType UdpNm_TransmitNmPdu(void)
 {
     uint8 data[UDPNM_MAX_PDU_LEN];
     uint8 i;
@@ -110,7 +125,7 @@ static void UdpNm_TransmitNmPdu(void)
     }
 
     len = (uint16)(UDPNM_HEADER_LEN + UdpNm_ChannelState.userDataLen);
-    (void)GatewaySwc_RequestSoAdIfTransmit(UDPNM_SOCON_ID, NULL_PTR, data, len);
+    return GatewaySwc_RequestSoAdIfTransmit(UDPNM_SOCON_ID, NULL_PTR, data, len);
 }
 
 static void UdpNm_HandleReleasedNetwork(void)
@@ -170,6 +185,8 @@ void UdpNm_Init(void)
     UdpNm_ChannelState.state = NM_STATE_BUS_SLEEP;
     UdpNm_ChannelState.mode = NM_MODE_BUS_SLEEP;
     UdpNm_ChannelState.nextTxTimeNs = 0ull;
+    UdpNm_ChannelState.restartTxRemaining = UDPNM_RESTART_TX_COUNT;
+    UdpNm_ChannelState.txWasAllowed = FALSE;
     UdpNm_ChannelState.timeoutTimer = 0u;
     UdpNm_ChannelState.repeatTimer = 0u;
     UdpNm_ChannelState.readySleepTimer = 0u;
@@ -185,6 +202,7 @@ void UdpNm_Init(void)
 void UdpNm_MainFunction(void)
 {
     uint64 nowNs;
+    uint8 txAllowed;
 
     if (UdpNm_Initialized == FALSE)
     {
@@ -227,17 +245,37 @@ void UdpNm_MainFunction(void)
             /* Stay in network mode. */
         }
 
+        txAllowed = ((ComM_IsTxAllowed(COMM_CH_ETH) != FALSE) &&
+                (GatewaySwc_IsNormalCommunicationTxEnabled() != FALSE)) ? TRUE : FALSE;
+        if (txAllowed == FALSE)
+        {
+            UdpNm_ChannelState.txWasAllowed = FALSE;
+            return;
+        }
+        if (UdpNm_ChannelState.txWasAllowed == FALSE)
+        {
+            UdpNm_ChannelState.restartTxRemaining = UDPNM_RESTART_TX_COUNT;
+            UdpNm_ChannelState.nextTxTimeNs = 0ull;
+        }
+        UdpNm_ChannelState.txWasAllowed = TRUE;
         nowNs = TimeBase_PlatformGetCounterNs();
 
         if ((UdpNm_ChannelState.nextTxTimeNs == 0ull) ||
             (nowNs >= UdpNm_ChannelState.nextTxTimeNs))
         {
-            UdpNm_TransmitNmPdu();
-            UdpNm_UpdateNextTxDeadline(nowNs);
+            if (UdpNm_TransmitNmPdu() == SOAD_OK)
+            {
+                if (UdpNm_ChannelState.restartTxRemaining > 0u)
+                {
+                    UdpNm_ChannelState.restartTxRemaining--;
+                }
+                UdpNm_UpdateNextTxDeadline(nowNs);
+            }
         }
     }
     else
     {
+        UdpNm_ChannelState.txWasAllowed = FALSE;
         UdpNm_HandleReleasedNetwork();
     }
 }
@@ -260,6 +298,7 @@ Std_ReturnType UdpNm_NetworkRequest(uint8 channel)
 
     if (startNetwork != FALSE)
     {
+        UdpNm_ChannelState.restartTxRemaining = UDPNM_RESTART_TX_COUNT;
         UdpNm_ChannelState.nextTxTimeNs = 0ull;
         UdpNm_EnterNetwork(TRUE);
     }

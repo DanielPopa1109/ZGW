@@ -22,6 +22,17 @@ Signals {
 	HVDCDC_ChargingActive: 1, 0, HVDCDC, ZGW;
 	ZGW_Enable_HVDCDC: 1, 0, ZGW, HVDCDC;
 	ZGW_TargetVoltage_HVDCDC: 8, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Minute: 6, 0, ZGW, HVDCDC;
+	ZGW_SDAT_TimeSource: 2, 3, ZGW, HVDCDC;
+	ZGW_SDAT_Second: 6, 0, ZGW, HVDCDC;
+	ZGW_SDAT_UtcValid: 1, 0, ZGW, HVDCDC;
+	ZGW_SDAT_DefaultTime: 1, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Year: 6, 0, ZGW, HVDCDC;
+	ZGW_SDAT_NvmRestored: 1, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Day: 5, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Hour: 5, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Month: 4, 0, ZGW, HVDCDC;
+	ZGW_SDAT_Millisecond: 8, 0, ZGW, HVDCDC;
 }
 
 Diagnostic_signals {
@@ -55,6 +66,19 @@ Frames {
 	ZGW_Request_HVDCDC: 0x03, ZGW, 2 {
 		ZGW_Enable_HVDCDC, 0;
 		ZGW_TargetVoltage_HVDCDC, 1;
+	}
+	ZGW_SDAT: 0x04, ZGW, 7 {
+		ZGW_SDAT_Minute, 0;
+		ZGW_SDAT_TimeSource, 6;
+		ZGW_SDAT_Second, 8;
+		ZGW_SDAT_UtcValid, 14;
+		ZGW_SDAT_DefaultTime, 15;
+		ZGW_SDAT_Year, 16;
+		ZGW_SDAT_NvmRestored, 22;
+		ZGW_SDAT_Day, 24;
+		ZGW_SDAT_Hour, 32;
+		ZGW_SDAT_Month, 40;
+		ZGW_SDAT_Millisecond, 48;
 	}
 }
 
@@ -93,6 +117,7 @@ Node_attributes {
 		configurable_frames {
 			HVDCDC_Status;
 			ZGW_Request_HVDCDC;
+			ZGW_SDAT;
 		}
 	} 
 }
@@ -101,6 +126,7 @@ Schedule_tables {
 	ZGW_LIN_4_Normal_Schedule_Table { 
 		ZGW_Request_HVDCDC delay 10 ms;
 		HVDCDC_Status delay 10 ms;
+		ZGW_SDAT delay 10 ms;
 	} 
 	ZGW_LIN_4_Diagnostics_Schedule_Table { 
 		MasterReq delay 10 ms;

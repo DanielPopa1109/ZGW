@@ -170,6 +170,16 @@ void CanSM_ControllerBusOff(uint8 ControllerId)
     CanSM_BusOffBeginNotification(ControllerId);
 }
 
+void CanSM_ConfirmBusOffRecovery(uint8 ControllerId)
+{
+    if ((ControllerId < CAN_NUM_CONTROLLERS) &&
+        (CanSM_Channel[ControllerId].initialized != FALSE))
+    {
+        /* Reset escalation only after CanDiag has proven stable, ACKed traffic. */
+        CanSM_Channel[ControllerId].busOffCounter = 0u;
+    }
+}
+
 static void CanSM_HandleBusOff(uint8 ControllerId)
 {
     if (CanSM_Channel[ControllerId].timer > 0u)
@@ -226,7 +236,6 @@ static void CanSM_HandleBusOff(uint8 ControllerId)
             CanIf_ControllerRecovered(ControllerId);
             CanSM_Channel[ControllerId].currentMode = CANSM_COMM_FULL_COMMUNICATION;
             CanSM_Channel[ControllerId].state = CANSM_BSM_FULL_COMMUNICATION;
-            CanSM_Channel[ControllerId].busOffCounter = 0u;
             CanSM_ModeChangeNotification(ControllerId, CANSM_COMM_FULL_COMMUNICATION);
         }
         else if (CanSM_Channel[ControllerId].requestedMode == CANSM_COMM_SILENT_COMMUNICATION)

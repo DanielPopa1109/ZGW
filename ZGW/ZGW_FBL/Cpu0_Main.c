@@ -221,10 +221,8 @@ static inline uint32 Fbl_ToNonCachedPflash(uint32 addr)
 #define FBL_RAM_CODE                     FBL_RAM_BLU_CODE
 
 extern void FblEth_Init(void);
-extern void FblEth_MainFunction(void);
 extern void FblEth_PollReceiveOnly(void);
 extern void FblEth_PollTimerOnly(void);
-extern uint8 FblEth_TcpReceive(uint8 *buf, uint16 *len);
 extern uint8 FblEth_TcpPeekFrame(const uint8 **buf, uint16 *len);
 extern void FblEth_TcpConsumeFrame(uint16 len);
 extern void FblEth_SetTcpRxPollPaused(uint8 paused);
@@ -918,7 +916,6 @@ static void FblCanAck_InitClassicNode(void)
 
     IfxCan_Can_initNodeConfig(&g_FblCanAckHw.nodeConfigClassic,
                               &g_FblCanAckHw.moduleClassic);
-
     g_FblCanAckHw.nodeConfigClassic.nodeId = IfxCan_NodeId_3;
     g_FblCanAckHw.nodeConfigClassic.baudRate.baudrate = 500000u;
     g_FblCanAckHw.nodeConfigClassic.calculateBitTimingValues = TRUE;
@@ -958,7 +955,6 @@ static void FblCanAck_InitFdNode(void)
 {
     IfxCan_Can_initNodeConfig(&g_FblCanAckHw.nodeConfigFd,
                               &g_FblCanAckHw.moduleFd);
-
     g_FblCanAckHw.nodeConfigFd.nodeId = IfxCan_NodeId_0;
     g_FblCanAckHw.nodeConfigFd.baudRate.baudrate = 500000u;
     g_FblCanAckHw.nodeConfigFd.baudRate.prescaler = 3u;
@@ -1923,6 +1919,16 @@ static void Fbl_UdsHandle(const uint8 *req, uint16 len, uint8 transport)
             g_blu.state = FBL_BLU_STATE_REBOOT_PENDING;
             g_blu.failure = FBL_BLU_FAILURE_NONE;
             Fbl_ScrWriteBluState(&g_blu);
+        }
+        else if((g_blu.imageKind == FBL_BLU_IMAGE_KIND_BOOTLOADER) &&
+                (g_blu.state == FBL_BLU_STATE_FBL_STARTED) &&
+                (Fbl_BluHasVerifiedFblEvidence() != 0u))
+        {
+            /* The verified replacement FBL has already booted. An ECUReset now
+             * ends an FBL-only update, so consume the durable BLU record and let
+             * the normal boot decision return to the preserved application. */
+            Fbl_BluResetRuntime();
+            Fbl_ScrClearBluState();
         }
 
         g_FblBluLastResetStage = 1u;

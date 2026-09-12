@@ -145,6 +145,8 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/Stm}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/Stm/Std}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/_Impl}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/_Lib}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/_Lib/DataHandling}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/_PinMap}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Libraries/iLLD/TC3xx/Tricore/_PinMap/TC37x}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/SCR}&quot;"/>
@@ -269,6 +271,8 @@
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/iLLD/TC3xx/Tricore/Asclin/Std"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/iLLD/TC3xx/Tricore/Geth/Eth"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/iLLD/TC3xx/Tricore/Geth/Std"/>
+						<entry excluding="DataHandling|InternalMux|" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/iLLD/TC3xx/Tricore/_Lib"/>
+						<entry excluding="" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/iLLD/TC3xx/Tricore/_Lib/DataHandling"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

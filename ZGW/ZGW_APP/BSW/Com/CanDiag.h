@@ -23,6 +23,7 @@ void CanDiag_MainFunction(void);
 
 void CanDiag_ReportBusOff(uint8 controllerId);
 void CanDiag_ReportControllerRecovered(uint8 controllerId);
+void CanDiag_ReportTxSuccess(uint8 controllerId);
 void CanDiag_ReportErrorPassive(uint8 controllerId);
 void CanDiag_ReportErrorWarning(uint8 controllerId);
 void CanDiag_ReportControllerFault(uint8 controllerId);

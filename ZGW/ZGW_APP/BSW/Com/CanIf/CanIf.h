@@ -157,6 +157,7 @@ void CanIf_ControllerErrorPassive(uint8 ControllerId);
 void CanIf_ControllerErrorWarning(uint8 ControllerId);
 
 void CanIf_AppControllerRecovered(uint8 ControllerId);
+void CanIf_AppTxConfirmation(uint8 ControllerId);
 void CanIf_AppErrorPassive(uint8 ControllerId);
 void CanIf_AppErrorWarning(uint8 ControllerId);
 

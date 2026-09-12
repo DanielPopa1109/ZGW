@@ -8,12 +8,12 @@ not contain verified TC37x event selector definitions for those counters.
 ## Counter Model
 
 - `CpuPerf_InitCore()` is called once from each CPU main function.
-- Initialization enables counting by setting `CCTRL.CM` to normal mode and
-  `CCTRL.CE` to enabled on the current core.
+- Initialization resets stale counter state once per core and starts normal
+  counting with `IfxCpu_resetAndStartCounters()`; it then validates that both
+  CCNT and ICNT advance before exposing them.
 - Per-region measurement reads the current core's `CCNT` and `ICNT` plus the
-  FreeRTOS-configured per-core STM runtime counter at start and stop. It does not call
-  `IfxCpu_resetAndStartCounters()` and never resets global core counters for a
-  scoped measurement.
+  FreeRTOS-configured per-core STM runtime counter at start and stop. Scoped
+  measurements never reset the global core counters.
 - Deltas are computed modulo the documented 31-bit counter value mask
   (`0x7FFFFFFF`). Sticky overflow state from `CCNT` or `ICNT` is accumulated in
   the measurement's overflow count.
@@ -50,7 +50,7 @@ The read response payload after the standard positive RoutineControl header is:
 | 6 | 2 | Total measurement ID count |
 | 8 | 1 | Start ID |
 | 9 | 1 | Returned entry count |
-| 10 | 2 | Entry length (`56`) |
+| 10 | 2 | Entry length (`104` for protocol v3) |
 | 12 | 4 | Counter value mask (`0x7FFFFFFF`) |
 | 16 | n | Entries |
 
@@ -59,6 +59,12 @@ last/average instructions, CPI x1000, sample count, overflow count, last/average
 nanoseconds measured from the FreeRTOS STM runtime counter, and accumulated byte count for byte oriented
 measurements such as CRC32. The STM timing keeps the diagnostic useful when
 private cycle/instruction counters are unavailable or return zero deltas.
+
+Protocol version 3 appends scheduler attribution. Measurements that start in
+the registered Core 2 QM BSW task report switched-out duration and switch-out
+counts. Entry flag `0x02` marks this data valid. The derived value
+`on-core+ISR = wall - scheduler-descheduled` still includes interrupt execution;
+working CCNT/ICNT data is required to separate that final component.
 
 ## Measurement IDs
 

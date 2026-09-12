@@ -7,6 +7,7 @@
 
 #define COM_TRUE  1u
 #define COM_FALSE 0u
+#define COM_NM_PERIOD_TICKS 20u /* 100 ms at the 5 ms COM task rate. */
 
 #define COM_RX_TIMEOUT_CYCLE_FACTOR 20u
 #define COM_RX_LIN_TIMEOUT_CYCLE_FACTOR 10u
@@ -102,7 +103,8 @@ static const Com_TxIpduConfigType Com_TxIpduCfg[] =
     { COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , COM_IPDU_GROUP_0, COM_TX_MODE_NONE, 0, 2u, 1u, 2u, 100u, 64u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 199u, 2u, 1u, 2u, 100u, 12u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
     { COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 19u, 2u, 1u, 2u, 100u, 5u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
-    { COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
+    { COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , COM_IPDU_GROUP_0, COM_TX_MODE_MIXED, 2u, 1u, 1u, 2u, 20u, 2u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} },
+    { COM_TX_PDU_LIN_ZGW_SDAT                           , COM_IPDU_GROUP_0, COM_TX_MODE_PERIODIC, 160u, 2u, 1u, 2u, 160u, 7u, {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u} }
 };
 
 static const Com_RxIpduConfigType Com_RxIpduCfg[] =
@@ -435,6 +437,17 @@ static const Com_SignalConfigType Com_SignalCfg[] =
     { COM_SIG_RX_CANFD_PDM1_DIAGRESPONSE_PDM1_DIAGRESP_BYTE07                                             , COM_FALSE, COM_RX_PDU_CANFD_PDM1_DIAGRESPONSE                                      , 56u, 8u, COM_SIGNAL_U8 , COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_ENABLE_HVDCDC                                 , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_TX_LIN_ZGW_REQUEST_HVDCDC_ZGW_TARGETVOLTAGE_HVDCDC                          , COM_TRUE,  COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_MINUTE                                                       , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 0u, 6u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x3Fu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_TIMESOURCE                                                   , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 6u, 2u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x3u        , 3u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_SECOND                                                       , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 8u, 6u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x3Fu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_UTCVALID                                                     , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 14u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_DEFAULTTIME                                                  , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 15u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_YEAR                                                         , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 16u, 6u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x3Fu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_NVMRESTORED                                                  , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 22u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_DAY                                                          , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 24u, 5u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1Fu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_HOUR                                                         , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 32u, 5u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1Fu       , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_MONTH                                                        , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 40u, 4u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFu        , 0u },
+    { COM_SIG_TX_LIN_ZGW_SDAT_MILLISECOND                                                  , COM_TRUE,  COM_TX_PDU_LIN_ZGW_SDAT                           , 48u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_RESPONSEERROR                              , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 0u, 1u, COM_SIGNAL_U8, COM_FALSE, 0u, 0x1u        , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_VOLTAGE                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 8u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
     { COM_SIG_RX_LIN_HVDCDC_STATUS_HVDCDC_LV_CURRENT                                 , COM_FALSE, COM_RX_PDU_LIN_HVDCDC_STATUS                      , 16u, 8u, COM_SIGNAL_U8, COM_FALSE, 0u, 0xFFu       , 0u },
@@ -787,12 +800,14 @@ static uint8 Com_IsNormalTxIpdu(const Com_TxIpduConfigType* cfg)
     return COM_FALSE;
 }
 
-static uint8 Com_IsRestartBurstTxIpdu(const Com_TxIpduConfigType* cfg)
+static uint8 Com_GetStartupTxCount(const Com_TxIpduConfigType* cfg)
 {
     if ((Com_IsNormalTxIpdu(cfg) != COM_FALSE) &&
             (cfg->periodTicks > 0u))
     {
-        return COM_TRUE;
+        /* Ten NM frames at the 5 ms COM task rate; other cyclic PDUs once. */
+        return ((cfg->pduId == COM_TX_PDU_NM3) ||
+                (cfg->pduId == COM_TX_PDU_CANFD_NM3)) ? 10u : 1u;
     }
 
     return COM_FALSE;
@@ -934,7 +949,8 @@ static uint8 Com_TxIpduBelongsToChannel(PduIdType pduId, uint8 channel)
                    COM_FALSE;
 
         case COMM_CH_LIN:
-            return (pduId == COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC) ?
+            return ((pduId == COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC) ||
+                    (pduId == COM_TX_PDU_LIN_ZGW_SDAT)) ?
                    COM_TRUE :
                    COM_FALSE;
 
@@ -991,9 +1007,23 @@ static Std_ReturnType Com_TriggerTransmit(uint8 txIdx)
     {
         Com_TxRt[txIdx].txInProgress = COM_TRUE;
         Com_TxRt[txIdx].mdtTimer = cfg->mdtTicks;
+        if ((Com_TxRt[txIdx].startupPending != COM_FALSE) &&
+                ((cfg->pduId == COM_TX_PDU_NM3) ||
+                 (cfg->pduId == COM_TX_PDU_CANFD_NM3)))
+        {
+            Com_TxRt[txIdx].mdtTimer = 1u;
+        }
         Com_TxRt[txIdx].deadlineTimer = Com_GetTxRetryTimeoutTicks(cfg);
         Com_TxRt[txIdx].dirty = COM_FALSE;
         Com_TxTriggerCounter[txIdx]++;
+
+        /* NM's 100 ms cycle starts at submission, not at a later confirmation. */
+        if ((cfg->pduId == COM_TX_PDU_NM3) ||
+                (cfg->pduId == COM_TX_PDU_CANFD_NM3))
+        {
+            Com_TxRt[txIdx].periodTimer = COM_NM_PERIOD_TICKS;
+            Com_TxRt[txIdx].periodDue = COM_FALSE;
+        }
 
         if (Com_MainFunctionTxActive != COM_FALSE)
         {
@@ -1030,7 +1060,7 @@ void Com_Init(void)
         Com_TxRt[i].deadlineTimer = Com_TxIpduCfg[i].deadlineTicks;
         Com_TxRt[i].active = COM_TRUE;
         Com_TxRt[i].periodDue = COM_FALSE;
-        Com_TxRt[i].startupPending = Com_IsRestartBurstTxIpdu(&Com_TxIpduCfg[i]);
+        Com_TxRt[i].startupPending = Com_GetStartupTxCount(&Com_TxIpduCfg[i]);
         Com_TxLastTriggerSequence[i] = 0u;
         Com_TxTriggerCounter[i] = 0u;
         Com_TxDuplicateSuppressedCounter[i] = 0u;
@@ -1056,7 +1086,7 @@ Std_ReturnType Com_IpduGroupStart(Com_IpduGroupIdType groupId)
         if (Com_TxIpduCfg[i].groupId == groupId)
         {
             Com_TxRt[i].active = COM_TRUE;
-            Com_TxRt[i].startupPending = Com_IsRestartBurstTxIpdu(&Com_TxIpduCfg[i]);
+            Com_TxRt[i].startupPending = Com_GetStartupTxCount(&Com_TxIpduCfg[i]);
         }
     }
 
@@ -1080,7 +1110,7 @@ void Com_TriggerFullComRestartBurst(uint8 channel)
     for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
     {
         if ((Com_TxRt[i].active == COM_FALSE) ||
-            (Com_IsRestartBurstTxIpdu(&Com_TxIpduCfg[i]) == COM_FALSE) ||
+            (Com_GetStartupTxCount(&Com_TxIpduCfg[i]) == COM_FALSE) ||
             (Com_TxIpduBelongsToChannel(Com_TxIpduCfg[i].pduId, channel) == COM_FALSE))
         {
             continue;
@@ -1090,7 +1120,7 @@ void Com_TriggerFullComRestartBurst(uint8 channel)
         Com_TxRt[i].mdtTimer = 0u;
         Com_TxRt[i].dirty = COM_TRUE;
         Com_TxRt[i].periodDue = COM_TRUE;
-        Com_TxRt[i].startupPending = COM_TRUE;
+        Com_TxRt[i].startupPending = Com_GetStartupTxCount(&Com_TxIpduCfg[i]);
     }
 }
 
@@ -1359,7 +1389,9 @@ void Com_TxConfirmation(PduIdType TxPduId)
 
     Com_TxRt[txIdx].txInProgress = COM_FALSE;
 
-    if (((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_PERIODIC) ||
+    if ((TxPduId != COM_TX_PDU_NM3) &&
+            (TxPduId != COM_TX_PDU_CANFD_NM3) &&
+            ((Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_PERIODIC) ||
             (Com_TxIpduCfg[txIdx].txMode == COM_TX_MODE_MIXED)) &&
             (Com_TxRt[txIdx].periodDue != COM_FALSE))
     {
@@ -1371,8 +1403,6 @@ void Com_TxConfirmation(PduIdType TxPduId)
 void Com_MainFunctionTx(void)
 {
     uint8 i;
-    uint8 startupActive;
-    uint8 startupSent;
 
     Com_MainFunctionTxSequence++;
     if (Com_MainFunctionTxSequence == 0u)
@@ -1382,18 +1412,6 @@ void Com_MainFunctionTx(void)
     }
 
     Com_MainFunctionTxActive = COM_TRUE;
-    startupActive = COM_FALSE;
-    startupSent = COM_FALSE;
-
-    for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
-    {
-        if ((Com_TxRt[i].active != COM_FALSE) &&
-                (Com_TxRt[i].startupPending != COM_FALSE))
-        {
-            startupActive = COM_TRUE;
-            break;
-        }
-    }
 
     for (i = 0u; i < COM_TX_IPDU_COUNT; i++)
     {
@@ -1427,6 +1445,7 @@ void Com_MainFunctionTx(void)
         }
 
         if ((Com_TxRt[i].repetitionsLeft > 0u) &&
+            (Com_TxRt[i].startupPending == COM_FALSE) &&
             (Com_TxRt[i].repetitionTimer == 0u) &&
             (Com_TxRt[i].txInProgress == COM_FALSE))
         {
@@ -1437,34 +1456,29 @@ void Com_MainFunctionTx(void)
             }
         }
 
-        if ((startupSent == COM_FALSE) &&
-            (Com_TxRt[i].startupPending != COM_FALSE) &&
-            (Com_TxRt[i].txInProgress == COM_FALSE))
+        /* A sleeping/busy channel must not block startup or cyclic traffic
+         * on another channel. Retry each pending PDU independently.
+         */
+        if (Com_TxRt[i].startupPending != COM_FALSE)
         {
             if (Com_TriggerTransmit(i) == E_OK)
             {
-                Com_TxRt[i].startupPending = COM_FALSE;
+                Com_TxRt[i].startupPending--;
                 Com_TxRt[i].periodDue = COM_FALSE;
-                Com_TxRt[i].periodTimer = Com_TxIpduCfg[i].periodTicks;
-                startupSent = COM_TRUE;
-            }
-            else
-            {
-                startupSent = COM_TRUE;
+                Com_TxRt[i].periodTimer = ((Com_TxIpduCfg[i].pduId == COM_TX_PDU_NM3) ||
+                        (Com_TxIpduCfg[i].pduId == COM_TX_PDU_CANFD_NM3)) ?
+                        COM_NM_PERIOD_TICKS : Com_TxIpduCfg[i].periodTicks;
             }
 
-            continue;
-        }
-
-        if (startupActive != COM_FALSE)
-        {
             continue;
         }
 
         if ((Com_TxIpduCfg[i].txMode == COM_TX_MODE_PERIODIC) ||
             (Com_TxIpduCfg[i].txMode == COM_TX_MODE_MIXED))
         {
-            if (Com_TxRt[i].txInProgress == COM_FALSE)
+            if ((Com_TxRt[i].txInProgress == COM_FALSE) ||
+                    (Com_TxIpduCfg[i].pduId == COM_TX_PDU_NM3) ||
+                    (Com_TxIpduCfg[i].pduId == COM_TX_PDU_CANFD_NM3))
             {
                 if (Com_TxRt[i].periodTimer > 0u)
                 {

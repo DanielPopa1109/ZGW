@@ -41,7 +41,8 @@ typedef enum
     NVM_SERVICE_INVALIDATE_BLOCK,
     NVM_SERVICE_ERASE_BLOCK,
     NVM_SERVICE_DEFERRED_DEFAULT_IMAGE,
-    NVM_SERVICE_INIT_WAIT
+    NVM_SERVICE_INIT_WAIT,
+    NVM_SERVICE_WRITEALL_TIMING_PERSIST
 } NvM_ServiceType;
 
 typedef enum
@@ -61,7 +62,9 @@ typedef enum
     NVM_STATE_INVALIDATE_START,
     NVM_STATE_INVALIDATE_WAIT,
     NVM_STATE_DEFERRED_FORMAT_START,
-    NVM_STATE_DEFERRED_FORMAT_WAIT
+    NVM_STATE_DEFERRED_FORMAT_WAIT,
+    NVM_STATE_WRITEALL_TIMING_START,
+    NVM_STATE_WRITEALL_TIMING_WAIT
 } NvM_InternalStateType;
 
 typedef struct
@@ -1011,10 +1014,10 @@ static void NvM_MainFunctionStep(void)
                 NvMTiming_MultiCounters(
                         NVMTIMING_OP_READ_ALL,
                         NVM_TOTAL_BLOCKS,
-                        (uint16)(NVM_TOTAL_BLOCKS - 1u),
-                        (uint16)(NVM_TOTAL_BLOCKS - 1u),
+                        NVM_TOTAL_BLOCKS,
+                        NVM_TOTAL_BLOCKS,
                         0u,
-                        1u);
+                        0u);
                 NvMTiming_MultiComplete(NVMTIMING_OP_READ_ALL, NVM_REQ_OK, MEMIF_JOB_OK);
                 NvMTiming_StartupEvent(NVMTIMING_STARTUP_READALL_COMPLETE);
                 NvMTiming_StartupEvent(NVMTIMING_STARTUP_NVM_READY);
@@ -1025,14 +1028,6 @@ static void NvM_MainFunctionStep(void)
             else
             {
                 idx = NvM_State.currentIndex;
-                if (NvM_BlockDescriptor[idx].blockId == NVM_BLOCK_ID_NVM_TIMING)
-                {
-                    NvM_Admin[idx].result = NVM_REQ_BLOCK_SKIPPED;
-                    NvM_Admin[idx].ramValid = TRUE;
-                    NvM_Admin[idx].ramChanged = TRUE;
-                    NvM_State.currentIndex++;
-                    break;
-                }
                 NvMTiming_MultiProcessing(NVMTIMING_OP_READ_ALL, NvM_BlockDescriptor[idx].blockId);
                 NvM_State.activeIndex = idx;
                 NvM_State.activePtr = NvM_GetRamPtr(idx);
@@ -1066,6 +1061,11 @@ static void NvM_MainFunctionStep(void)
                 idx = NvM_State.currentIndex;
                 NvM_State.activePtr = NvM_GetRamPtr(idx);
                 NvM_HandleReadCompletion(idx);
+                if ((NvM_BlockDescriptor[idx].blockId == NVM_BLOCK_ID_NVM_TIMING) &&
+                        (NvM_Admin[idx].result == NVM_REQ_OK))
+                {
+                    NvMTiming_LoadPersistedWriteAll();
+                }
                 NvMTiming_StartupEvent(NVMTIMING_STARTUP_READALL_LAST_MEMIF_COMPLETE);
                 NvM_State.currentIndex++;
                 NvM_State.state = NVM_STATE_READALL_NEXT;
@@ -1086,8 +1086,11 @@ static void NvM_MainFunctionStep(void)
                         NVMTIMING_OP_WRITE_ALL,
                         (NvM_WriteAllBlocksFailed == 0u) ? NVM_REQ_OK : NVM_REQ_NOT_OK,
                         (NvM_WriteAllBlocksFailed == 0u) ? MEMIF_JOB_OK : MEMIF_JOB_FAILED);
-                NvM_MarkTimingBlockChanged();
-                NvM_SetIdle();
+                /* Persist only after MultiComplete captured the real end time.
+                 * This internal follow-up is not added to the public operation
+                 * history and cannot recursively request another timing write. */
+                NvM_SetBusyInternal(NVM_SERVICE_WRITEALL_TIMING_PERSIST,
+                        NVM_STATE_WRITEALL_TIMING_START);
             }
             else
             {
@@ -1170,6 +1173,51 @@ static void NvM_MainFunctionStep(void)
                 }
                 NvM_State.currentIndex++;
                 NvM_State.state = NVM_STATE_WRITEALL_NEXT;
+            }
+            break;
+
+        case NVM_STATE_WRITEALL_TIMING_START:
+            idx = (uint16)NvM_FindBlockIndex(NVM_BLOCK_ID_NVM_TIMING);
+            NvM_State.activeIndex = idx;
+            NvMTiming_PreparePersistedImage();
+            NvM_Admin[idx].result = NVM_REQ_PENDING;
+            NvM_Admin[idx].ramValid = TRUE;
+            NvM_Admin[idx].ramChanged = FALSE;
+            NvM_CaptureWriteRamMirrorCrc(idx);
+            if (MemIf_Write(MEMIF_FEE_DEVICE_INDEX,
+                    NVM_BLOCK_ID_NVM_TIMING,
+                    NvM_GetRamPtr(idx)) != E_OK)
+            {
+                NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                NvM_Admin[idx].ramChanged = TRUE;
+                NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+                NvMTiming_PersistFailed();
+                NvM_SetIdle();
+            }
+            else
+            {
+                NvM_State.state = NVM_STATE_WRITEALL_TIMING_WAIT;
+            }
+            break;
+
+        case NVM_STATE_WRITEALL_TIMING_WAIT:
+            if (MemIf_GetStatus(MEMIF_FEE_DEVICE_INDEX) == MEMIF_IDLE)
+            {
+                idx = NvM_State.activeIndex;
+                if (MemIf_GetJobResult(MEMIF_FEE_DEVICE_INDEX) == MEMIF_JOB_OK)
+                {
+                    NvM_Admin[idx].result = NVM_REQ_OK;
+                    NvM_CommitWriteRamMirrorCrc(idx);
+                    NvMTiming_ClearDirty();
+                }
+                else
+                {
+                    NvM_Admin[idx].result = NVM_REQ_NOT_OK;
+                    NvM_Admin[idx].ramChanged = TRUE;
+                    NvM_Admin[idx].writeRamMirrorCrcValid = FALSE;
+                    NvMTiming_PersistFailed();
+                }
+                NvM_SetIdle();
             }
             break;
 

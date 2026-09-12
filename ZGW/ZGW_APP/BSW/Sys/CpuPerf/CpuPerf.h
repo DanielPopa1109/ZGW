@@ -46,13 +46,15 @@
 
 #define CPUPERF_ROUTINE_ID               (0xF194u)
 #define CPUPERF_MAGIC                    (0x43504631u)
-#define CPUPERF_VERSION                  (1u)
+#define CPUPERF_VERSION                  (3u)
 #define CPUPERF_CORE_COUNT               (3u)
 #define CPUPERF_CORE_UNKNOWN             (0xFFu)
 #define CPUPERF_COUNTER_VALUE_MASK       (0x7FFFFFFFUL)
 #define CPUPERF_RESPONSE_HEADER_LEN      (16u)
-#define CPUPERF_RESPONSE_ENTRY_LEN       (56u)
-#define CPUPERF_RESPONSE_MAX_ENTRIES     (4u)
+#define CPUPERF_RESPONSE_ENTRY_LEN       (104u)
+#define CPUPERF_RESPONSE_MAX_ENTRIES     (3u)
+#define CPUPERF_ENTRY_FLAG_HW_COUNTERS   (0x01u)
+#define CPUPERF_ENTRY_FLAG_SCHED_TRACE   (0x02u)
 
 typedef enum
 {
@@ -86,6 +88,10 @@ typedef enum
     CPUPERF_ID_GATEWAY_MAIN_C0,
     CPUPERF_ID_GATEWAY_ETH_MAIN_C2,
     CPUPERF_ID_CRC32,
+    CPUPERF_ID_C2_NETWORK_MGMT,
+    CPUPERF_ID_C2_LWIP_SERVICE,
+    CPUPERF_ID_C2_SOMEIP,
+    CPUPERF_ID_C2_ETH_STATE_DIAG,
     CPUPERF_ID_COUNT
 } CpuPerf_MeasurementIdType;
 
@@ -94,7 +100,10 @@ typedef struct
     uint32 startCycles;
     uint32 startInstructions;
     uint32 startTimeTicks;
+    uint64 startDescheduledTicks;
+    uint64 startSwitchOutCount;
     uint8 startCoreId;
+    uint8 schedulerTraceAvailable;
 } CpuPerf_ContextType;
 
 typedef struct
@@ -114,10 +123,21 @@ typedef struct
     uint32 maxNs;
     uint64 totalNs;
     uint64 totalBytes;
+    uint32 over5msCount;
+    uint32 over10msCount;
+    uint32 over20msCount;
+    uint32 lastDescheduledNs;
+    uint32 maxDescheduledNs;
+    uint64 totalDescheduledNs;
+    uint32 lastSwitchOutCount;
+    uint64 totalSwitchOutCount;
 } CpuPerf_StatsType;
 
 #if CPU_PERF_ENABLED
 void CpuPerf_InitCore(void);
+void CpuPerf_RegisterMonitoredTask(uint8 coreId, const void *taskHandle);
+void CpuPerf_TraceTaskSwitchedOut(uint8 coreId, const void *taskHandle);
+void CpuPerf_TraceTaskSwitchedIn(uint8 coreId, const void *taskHandle);
 void CpuPerf_Start(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *context);
 void CpuPerf_Stop(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *context);
 void CpuPerf_AddBytes(CpuPerf_MeasurementIdType measurementId, uint32 byteCount);
@@ -139,6 +159,9 @@ Dcm_ReturnType CpuPerf_HandleRoutineControl(
         Dcm_PduLengthType* respLen);
 #else
 static inline void CpuPerf_InitCore(void) {}
+static inline void CpuPerf_RegisterMonitoredTask(uint8 coreId, const void *taskHandle) { (void)coreId; (void)taskHandle; }
+static inline void CpuPerf_TraceTaskSwitchedOut(uint8 coreId, const void *taskHandle) { (void)coreId; (void)taskHandle; }
+static inline void CpuPerf_TraceTaskSwitchedIn(uint8 coreId, const void *taskHandle) { (void)coreId; (void)taskHandle; }
 static inline void CpuPerf_Start(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *context)
 {
     (void)measurementId;

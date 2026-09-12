@@ -10,6 +10,9 @@ payload format to names that are useful in the trace view.
 - Default receive ports: `30600, 30490, 30500, 35000, 35001, 54088`
 - The logger receiver can listen on multiple ports. Use comma-separated ports
   such as `30600,30490,30500`, or ranges such as `30600-30610`.
+- The UDP listener on port `30490` automatically joins the configured
+  SOME/IP-SD multicast group `224.244.224.245`, so periodic OfferService
+  packets are received as well as unicast SubscribeAcks.
 - The AURIX source IP filter is applied to every configured receiver port.
 - In the trace, `Src Port` is the sender's UDP/TCP source port from AURIX.
   `Rx Port` is the local logger/listener port that received the packet.
@@ -34,19 +37,32 @@ The fourth byte is the ZGW frame type.
 
 The old generic name `Gateway summary` is intentionally not used in the trace
 because it describes the container format, not the software data being traced.
-When a configured CAN, CAN FD, or LIN range has no readable COM signal values,
-the firmware still emits one header-only summary for that bus in the publish
-cycle. The logger shows those packets as `signals=0`, which makes disconnected
-or silent buses visible instead of making their Ethernet summary packet vanish.
+
+Bus summaries are omitted when their ranges contain no readable COM signals.
+Scheduled `AiModel` and `CpuPerf` frames remain independent of bus activity:
+the gateway holds a separate Ethernet-only communication request while normal
+communication transmission is enabled, so vehicle bus inactivity does not
+close their transport.
+
+`AiModel` and `CpuPerf` use the configured 1,000 ms gateway publish cycle.
+Invalid AI inputs are represented by validity fields and do not stop publication.
+Ethernet NM uses a 100 ms cycle, with ten successful transmit requests spaced
+at 5 ms on communication restart. CAN and CAN FD NM startup counters likewise
+request ten frames at the 5 ms COM rate; other enabled cyclic COM PDUs are
+requested once on their configured bus and retried if that bus is busy.
+Startup retries do not suspend cyclic traffic on other buses. Physical delivery
+and burst timing still depend on bus availability and transmit confirmation.
 
 ## Non-ZGW Payloads
 
-Payloads that do not start with `ZGW` are treated as known network-management
-status traffic when they match the observed 5-byte format.
+Network-management packets use `4E 4D 01`, followed by control flags and a
+user-data length byte (0–8), then that many user-data bytes. Both `02` (active
+wakeup) and `03` (active wakeup plus repeat message) retain the same trace name.
+The version and flags are not an NM index or state enum.
 
 | Trace name | Observed payload | Meaning |
 | --- | --- | --- |
-| `Networkmanagement3_Status` | `4E 4D 01 02 00` | Network-management status payload observed from the AURIX UDP stream. |
+| `Networkmanagement3_Status` | `4E 4D 01 <flags> <length> [user data]` | Network-management status, including both normal and repeat-message variants. |
 | `AURIXHeartbeatAck` | ASCII `AURIXHeartbeatAck` | UDP port `30600` response emitted by `SoAd.c` after receiving the logger's `PCHeartbeat` payload. |
 | `TimeSync` | Starts with `5A 54 53 31` (`ZTS1`) | Time sync broadcast from `EthTimeSync.c` on UDP port `35000`. The logger decodes sequence, vehicle time ns, UTC time ns, UTC valid flag, time source, sync status, and CRC. |
 | `MCUData` | Starts with `5A 4D 43 55` (`ZMCU`) | MCU/status payload from `GatewaySwc.c` on UDP port `35001`. The logger decodes sequence, vehicle time ns, init/wakeup flags, reset code fields, voltage values, temperature values, and CRC. |

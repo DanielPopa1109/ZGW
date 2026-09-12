@@ -208,6 +208,7 @@ static void lwip_geth_Lwip_advancePolledTime(uint8 elapsedMs)
 }
 #endif
 
+#if LWIP_GETH_FORCE_LINK_UP_FOR_BRINGUP
 static void lwip_geth_Lwip_configureForcedMacMode(IfxGeth_Eth *ethernetif)
 {
     if (ethernetif == NULL_PTR)
@@ -219,6 +220,7 @@ static void lwip_geth_Lwip_configureForcedMacMode(IfxGeth_Eth *ethernetif)
     IfxGeth_mac_setLineSpeed(ethernetif->gethSFR, IfxGeth_LineSpeed_100Mbps);
     g_LwipForcedMacConfigCounter++;
 }
+#endif
 
 static void lwip_geth_Lwip_applyLinkStatus(void)
 {

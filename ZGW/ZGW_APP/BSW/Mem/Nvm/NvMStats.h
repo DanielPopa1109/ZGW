@@ -31,10 +31,14 @@
  * Lifetime counters:
  * - bootCount: completed NvM_ReadAll startups that loaded or restored this image.
  * - nvmReadAllCount/nvmWriteAllCount: accepted NvM_ReadAll/NvM_WriteAll requests.
+ *   The current-boot ReadAll acceptance is held outside the NvM mirror and
+ *   merged after the statistics block has been restored.
  * - nvmWriteBlockRequests/Accepted/Rejected: external NvM_WriteBlock API requests by admission result.
  * - nvmSuccessfulLogicalWrites/nvmFailedLogicalWrites: completed non-statistics NvM logical writes by result.
  * - nvmReadBlockRequests/Accepted/Rejected: external NvM_ReadBlock API requests by admission result.
- * - nvmSuccessfulReads/nvmReadFailures: completed NvM block reads by result.
+ * - nvmSuccessfulReads/nvmReadFailures: all completed NvM block reads by
+ *   result, including blocks processed internally by NvM_ReadAll. These are
+ *   intentionally a broader scope than the external ReadBlock API counters.
  * - nvmCrcFailures: NvM read failures reported as MEMIF_BLOCK_INCONSISTENT.
  * - nvmInvalidBlockReads: NvM read failures reported as MEMIF_BLOCK_INVALID.
  * - nvmQueueRejections: requests rejected because the single-operation NvM state machine was busy.

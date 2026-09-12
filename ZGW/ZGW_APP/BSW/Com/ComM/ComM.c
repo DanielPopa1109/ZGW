@@ -34,7 +34,7 @@ static void ComM_SetChannelCurrentMode(ComM_ChannelType channel,
     previousMode = ComM_ChannelCurrentMode[channel];
     ComM_ChannelCurrentMode[channel] = mode;
 
-    if ((previousMode == COMM_NO_COMMUNICATION) &&
+    if ((previousMode != COMM_FULL_COMMUNICATION) &&
         (mode == COMM_FULL_COMMUNICATION))
     {
         Com_TriggerFullComRestartBurst(channel);
@@ -100,6 +100,12 @@ static ComM_ModeType ComM_GetLocalUserAggregateForChannel(ComM_ChannelType chann
 static ComM_ModeType ComM_GetUserAggregateForChannel(ComM_ChannelType channel)
 {
     ComM_ModeType highest = ComM_GetLocalUserAggregateForChannel(channel);
+
+    /* Expired bus activity gates every channel to no communication. */
+    if (SysMgr_BusActivityCounter == 0u)
+    {
+        return COMM_NO_COMMUNICATION;
+    }
 
     if (ComM_NmRemoteRequest[channel] != FALSE)
     {

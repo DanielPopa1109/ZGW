@@ -16,7 +16,8 @@
 #define COMM_USER_APP      4u
 #define COMM_USER_LIN_DIAG 5u
 #define COMM_USER_ETH_DIAG 6u
-#define COMM_NUM_USERS     7u
+#define COMM_USER_GATEWAY_ETH 7u
+#define COMM_NUM_USERS     8u
 
 typedef uint8 ComM_UserHandleType;
 typedef uint8 ComM_ChannelType;

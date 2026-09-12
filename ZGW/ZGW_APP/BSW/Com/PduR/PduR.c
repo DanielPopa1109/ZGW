@@ -230,7 +230,8 @@ static const PduR_ComTxRouteType PduR_ComTxRoutes[] =
     { TRUE, COM_TX_PDU_CANFD_PDM1_DIAGREQUEST                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_PDM1_DIAGREQUEST                                  , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_COMMANDLOAD_PDM1                                       , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_COMMANDLOAD_PDM1                                  , PDUR_SOAD_INVALID_SOCON },
     { TRUE, COM_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                                  , PDUR_IF_LOWER_CANIF, CANIF_TX_PDU_CANFD_ENERGYMANAGEMENTDATA3                             , PDUR_SOAD_INVALID_SOCON },
-    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_HVDCDC    , PDUR_SOAD_INVALID_SOCON }
+    { TRUE, COM_TX_PDU_LIN_ZGW_REQUEST_HVDCDC                 , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_REQUEST_HVDCDC    , PDUR_SOAD_INVALID_SOCON },
+    { TRUE, COM_TX_PDU_LIN_ZGW_SDAT                           , PDUR_IF_LOWER_LINIF, LINIF_TX_PDU_ZGW_SDAT              , PDUR_SOAD_INVALID_SOCON }
 };
 
 static const PduR_IfRxRouteType PduR_CanIfRxRoutes[] =

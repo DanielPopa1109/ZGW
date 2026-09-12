@@ -25,6 +25,10 @@ static uint16 NvMStats_SelfIndex = NVMSTATS_SELF_INDEX_INVALID;
 static uint32 NvMStats_CurrentGcPayloadBytes = 0u;
 static uint32 NvMStats_CurrentGcPhysicalBytes = 0u;
 static uint32 NvMStats_CurrentGcBlocks = 0u;
+/* NvM_ReadAll reads this module's own RAM mirror. Keep accepted calls outside
+ * that mirror until restoration completes, otherwise the just-incremented
+ * value is replaced by the persisted image. */
+static uint32 NvMStats_PendingReadAllAccepted = 0u;
 
 static NvMStats_NvImageType *NvMStats_Image(void)
 {
@@ -121,6 +125,7 @@ void NvMStats_Init(void)
     NvMStats_SuppressDirty = FALSE;
     NvMStats_Dirty = FALSE;
     NvMStats_BootCounted = FALSE;
+    NvMStats_PendingReadAllAccepted = 0u;
     NvMStats_SelfIndex = NVMSTATS_SELF_INDEX_INVALID;
     for (i = 0u; i < (uint16)NVM_TOTAL_BLOCKS; i++)
     {
@@ -135,6 +140,13 @@ void NvMStats_Init(void)
 void NvMStats_OnReadAllComplete(void)
 {
     NvMStats_EnsureValid();
+    if (NvMStats_PendingReadAllAccepted != 0u)
+    {
+        NvMStats_Add64(&NvMStats_Image()->nvmReadAllCount,
+                (uint64)NvMStats_PendingReadAllAccepted);
+        NvMStats_PendingReadAllAccepted = 0u;
+        NvMStats_Touch();
+    }
     if (NvMStats_BootCounted == FALSE)
     {
         NvMStats_Inc64(&NvMStats_Image()->bootCount);
@@ -184,7 +196,13 @@ void NvMStats_RecordNvMWriteBlockRejected(void) { NvMStats_Inc64(&NvMStats_Image
 void NvMStats_RecordNvMReadBlockRequest(void) { NvMStats_Inc64(&NvMStats_Image()->nvmReadBlockRequests); NvMStats_Touch(); }
 void NvMStats_RecordNvMReadBlockAccepted(void) { NvMStats_Inc64(&NvMStats_Image()->nvmReadBlockAccepted); NvMStats_Touch(); }
 void NvMStats_RecordNvMReadBlockRejected(void) { NvMStats_Inc64(&NvMStats_Image()->nvmReadBlockRejected); NvMStats_Touch(); }
-void NvMStats_RecordNvMReadAllAccepted(void) { NvMStats_Inc64(&NvMStats_Image()->nvmReadAllCount); NvMStats_Touch(); }
+void NvMStats_RecordNvMReadAllAccepted(void)
+{
+    if (NvMStats_PendingReadAllAccepted != NVMSTATS_UINT32_MAX)
+    {
+        NvMStats_PendingReadAllAccepted++;
+    }
+}
 void NvMStats_RecordNvMWriteAllAccepted(void) { NvMStats_Inc64(&NvMStats_Image()->nvmWriteAllCount); NvMStats_Touch(); }
 void NvMStats_RecordNvMBusyRejection(void) { NvMStats_Inc64(&NvMStats_Image()->nvmBusyRejections); NvMStats_Inc64(&NvMStats_Image()->nvmQueueRejections); NvMStats_Touch(); }
 void NvMStats_RecordNvMUninitRejection(void) { NvMStats_Inc64(&NvMStats_Image()->nvmUninitRejections); NvMStats_Touch(); }

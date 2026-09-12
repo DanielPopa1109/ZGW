@@ -292,10 +292,20 @@ def scenario_normal(t: float, step: int, state: ScenarioRuntime) -> tuple[float,
 def scenario_driving(t: float, step: int, state: ScenarioRuntime) -> tuple[float, list[float]]:
     voltage = 13.4 + 0.8 * smoothstep((t % 3.0) / 1.5)
     voltage += 0.25 * math.sin(2.0 * math.pi * 1.1 * t)
-    values = _healthy_currents(state, t, 1.0 + 0.20 * math.sin(2.0 * math.pi * 0.18 * t))
+
+    values = _healthy_currents(
+        state,
+        t,
+        0.78 + 0.08 * math.sin(2.0 * math.pi * 0.18 * t),
+    )
+
     for channel in (2, 7, 14, 25, 41, 58, 66):
         if int(t * 1.2 + channel) % 4 in (0, 1):
-            values[channel] = clip(values[channel] + 0.18 * CHANNEL_RATINGS_A[channel], 0.0, 250.0)
+            values[channel] += 0.06 * CHANNEL_RATINGS_A[channel]
+
+    for channel, rating in enumerate(CHANNEL_RATINGS_A):
+        values[channel] = clip(values[channel], 0.0, min(250.0, rating * 0.70))
+
     return voltage, values
 
 
@@ -578,7 +588,7 @@ class TSMasterBusBackend:
 class LoadSimApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title("PDM1 LoadSim - TC1012P")
+        self.root.title("LoadSim")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.geometry("1040x720")
         self.backend = TSMasterBusBackend()
@@ -604,6 +614,7 @@ class LoadSimApp:
         self.scenario_var = tk.StringVar(value=SCENARIOS[0].name)
         self.status_var = tk.StringVar(value="Idle")
         self.last_tx_var = tk.StringVar(value="-")
+        self.currents_var = tk.StringVar(value="Currents: -")
 
         self._build_ui()
 
@@ -663,6 +674,13 @@ class LoadSimApp:
         ttk.Label(status, textvariable=self.status_var).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Label(status, text="Last TX").grid(row=0, column=2, sticky="w", padx=4)
         ttk.Label(status, textvariable=self.last_tx_var).grid(row=0, column=3, sticky="ew", padx=4)
+        ttk.Label(
+            status,
+            textvariable=self.currents_var,
+            font=("Consolas", 9),
+            justify="left",
+            anchor="w",
+        ).grid(row=1, column=0, columnspan=4, sticky="ew", padx=4, pady=(3, 0))
 
         log_frame = ttk.LabelFrame(main, text="Log")
         log_frame.grid(row=3, column=0, columnspan=2, sticky="nsew")
@@ -848,15 +866,16 @@ class LoadSimApp:
                     last_status_s = elapsed
 
                 if (now - last_ui) >= 0.20:
-                    target_current = max(currents) if target_all else currents[target_ch]
+                    currents_snapshot = tuple(currents)
                     self.root.after(
                         0,
-                        lambda v=voltage, c=target_current, n=tx_count: self._set_live_status(
+                        lambda v=voltage, c=currents_snapshot, n=tx_count: self._set_live_status(
                             scenario.name,
                             v,
                             c,
                             n,
                             target_all,
+                            target_ch,
                         ),
                     )
                     last_ui = now
@@ -884,13 +903,22 @@ class LoadSimApp:
         self,
         scenario_name: str,
         voltage_v: float,
-        target_current_a: float,
+        currents_a: tuple[float, ...],
         tx_count: int,
         target_all: bool,
+        target_ch: int,
     ) -> None:
-        target_text = f"target max={target_current_a:.1f} A" if target_all else f"target={target_current_a:.1f} A"
+        if target_all:
+            target_text = f"max={max(currents_a):.1f} A"
+        else:
+            target_text = f"target CH{target_ch + 1:02d}={currents_a[target_ch]:.1f} A"
+
         self.status_var.set(f"Running {scenario_name}: Vin={voltage_v:.1f} V, {target_text}")
         self.last_tx_var.set(f"0x30A + 0x305..0x309, count={tx_count}")
+
+        items = [f"{ch + 1:02d}:{current:5.1f}A" for ch, current in enumerate(currents_a)]
+        rows = ["  ".join(items[start:start + 15]) for start in range(0, len(items), 15)]
+        self.currents_var.set("Currents  " + "\n          ".join(rows))
 
     def on_close(self) -> None:
         self.stop_event.set()

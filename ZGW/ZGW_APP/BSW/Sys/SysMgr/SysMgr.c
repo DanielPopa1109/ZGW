@@ -19,6 +19,7 @@
 #include "IfxPort_reg.h"
 #include "Dem.h"
 #include "Dem_Cfg.h"
+#include "Dcm.h"
 #include "SafetyKit_Main.h"
 #include "IfxAsclin_Lin.h"
 #include "IfxGeth.h"
@@ -143,34 +144,8 @@ void SysMgr_NotifyBusActivity(void)
 
 static boolean SysMgr_IsFullComActive(void)
 {
-#if (SYSMGR_KEEP_AWAKE_WHILE_FULL_COM == 1u)
-    CanSM_ComModeType canMode;
-    EthSM_ComModeType ethMode;
-
-    if ((CanSM_GetCurrentComMode(CAN_CONTROLLER_CLASSIC, &canMode) == E_OK) &&
-            (canMode == CANSM_COMM_FULL_COMMUNICATION))
-    {
-        return TRUE;
-    }
-
-    if ((CanSM_GetCurrentComMode(CAN_CONTROLLER_FD, &canMode) == E_OK) &&
-            (canMode == CANSM_COMM_FULL_COMMUNICATION))
-    {
-        return TRUE;
-    }
-
-    if (LinSM_GetState(0u) == LINSM_FULL_COMMUNICATION)
-    {
-        return TRUE;
-    }
-
-    if ((EthSM_GetCurrentComMode(0u, &ethMode) == E_OK) &&
-            (ethMode == ETHSM_FULL_COMMUNICATION))
-    {
-        return TRUE;
-    }
-#endif
-
+    /* ComM is gated by SysMgr_BusActivityCounter; controller mode alone is
+     * never a reason to postpone sleep. */
     return FALSE;
 }
 

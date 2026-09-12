@@ -17,7 +17,8 @@
 #define NVMTIMING_RESPONSE_ENTRY_LEN            (16u)
 #define NVMTIMING_RESPONSE_MAX_EVENTS           (14u)
 #define NVMTIMING_FLAG_FREQ_INVALID             (0x00000001u)
-#define NVMTIMING_FLAG_WRITEALL_LAGS_ONE_CYCLE  (0x00000002u)
+#define NVMTIMING_FLAG_WRITEALL_POST_PERSISTED  (0x00000002u)
+#define NVMTIMING_FLAG_WRITEALL_PREVIOUS_BOOT   (0x00000004u)
 #define NVMTIMING_SB_FLAG_ACCEPTED              (0x00000001u)
 #define NVMTIMING_SB_FLAG_FIRST_MAIN            (0x00000002u)
 #define NVMTIMING_SB_FLAG_PROCESSING            (0x00000004u)
@@ -48,6 +49,7 @@ static uint8 NvMTiming_ActiveMultiOperation;
 static uint32 NvMTiming_NvMMainCounter;
 static uint32 NvMTiming_FeeMainCounter;
 static uint32 NvMTiming_FlsMainCounter;
+static NvMTiming_NvImageType NvMTiming_ActiveImage;
 
 static NvMTiming_NvImageType *NvMTiming_Image(void);
 static uint64 NvMTiming_Now(void);
@@ -69,7 +71,7 @@ static void NvMTiming_WriteSingle(const NvMTiming_SingleBlockType *single, uint8
 
 static NvMTiming_NvImageType *NvMTiming_Image(void)
 {
-    return (NvMTiming_NvImageType *)NvM_NvMTiming_Ram;
+    return &NvMTiming_ActiveImage;
 }
 
 static uint64 NvMTiming_Now(void)
@@ -152,7 +154,7 @@ void NvMTiming_BootReference(void)
     image->historySize = NVMTIMING_HISTORY_SIZE;
     image->stmFrequencyHz = freq;
     image->bootReferenceTicks = now;
-    image->flags = NVMTIMING_FLAG_WRITEALL_LAGS_ONE_CYCLE;
+    image->flags = 0u;
     if (freq == 0u)
     {
         image->flags |= NVMTIMING_FLAG_FREQ_INVALID;
@@ -402,8 +404,10 @@ void NvMTiming_SingleComplete(uint16 blockId, uint8 result, uint8 memIfResult)
 
 void NvMTiming_SetRamStatus(uint16 blockId, boolean changed)
 {
+    /* This API is synchronous bookkeeping, not an NvM job. Recording every
+     * call displaced all useful asynchronous read/write history entries. */
+    (void)blockId;
     (void)changed;
-    NvMTiming_StartSingle(NVMTIMING_OP_SET_RAM_STATUS, blockId, E_NOT_OK, 0u);
 }
 
 void NvMTiming_FeeRequest(uint8 operation, uint16 blockId)
@@ -499,6 +503,40 @@ void NvMTiming_FeeMainCycle(void) { NvMTiming_FeeMainCounter++; }
 void NvMTiming_FlsMainCycle(void) { NvMTiming_FlsMainCounter++; }
 boolean NvMTiming_IsDirty(void) { return (NvMTiming_Image()->dirtyCounter != 0u) ? TRUE : FALSE; }
 void NvMTiming_ClearDirty(void) { NvMTiming_Image()->dirtyCounter = 0u; }
+
+void NvMTiming_LoadPersistedWriteAll(void)
+{
+    const NvMTiming_NvImageType *persisted =
+            (const NvMTiming_NvImageType *)NvM_NvMTiming_Ram;
+
+    if ((persisted->magic == NVMTIMING_MAGIC) &&
+            (persisted->version == NVMTIMING_VERSION) &&
+            (persisted->historySize == NVMTIMING_HISTORY_SIZE) &&
+            (persisted->lastWriteAll.operation == NVMTIMING_OP_WRITE_ALL) &&
+            ((persisted->lastWriteAll.flags & NVMTIMING_MB_FLAG_COMPLETE) != 0u) &&
+            (NvMTiming_Image()->lastWriteAll.operation != NVMTIMING_OP_WRITE_ALL))
+    {
+        NvMTiming_Image()->lastWriteAll = persisted->lastWriteAll;
+        NvMTiming_Image()->flags |= (NVMTIMING_FLAG_WRITEALL_POST_PERSISTED |
+                NVMTIMING_FLAG_WRITEALL_PREVIOUS_BOOT);
+    }
+}
+
+void NvMTiming_PreparePersistedImage(void)
+{
+    NvMTiming_NvImageType *image = NvMTiming_Image();
+
+    image->flags &= ~NVMTIMING_FLAG_WRITEALL_PREVIOUS_BOOT;
+    image->flags |= NVMTIMING_FLAG_WRITEALL_POST_PERSISTED;
+    image->dirtyCounter = 0u;
+    (void)memcpy(NvM_NvMTiming_Ram, image, sizeof(*image));
+}
+
+void NvMTiming_PersistFailed(void)
+{
+    NvMTiming_Image()->flags &= ~NVMTIMING_FLAG_WRITEALL_POST_PERSISTED;
+    NvMTiming_Touch();
+}
 
 void NvMTiming_BeginMulti(uint8 operation)
 {

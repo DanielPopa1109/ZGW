@@ -31,6 +31,7 @@ Std_ReturnType CanSM_GetCurrentComMode(uint8 ControllerId, CanSM_ComModeType* Co
 CanSM_StateType CanSM_GetState(uint8 ControllerId);
 
 void CanSM_ControllerBusOff(uint8 ControllerId);
+void CanSM_ConfirmBusOffRecovery(uint8 ControllerId);
 
 void CanSM_BusOffBeginNotification(uint8 ControllerId);
 void CanSM_BusOffEndNotification(uint8 ControllerId);

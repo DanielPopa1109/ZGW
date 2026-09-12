@@ -40,6 +40,8 @@ typedef struct
 {
     uint8 busOffPending;
     uint8 recoveredPending;
+    uint8 busOffActive;
+    uint8 txSuccessSeen;
     uint8 errorPassiveSeen;
     uint8 controllerFaultPending;
     uint16 errorPassiveFailTicks;
@@ -173,6 +175,8 @@ void CanDiag_Init(void)
     {
         CanDiag_Runtime[controller].busOffPending = FALSE;
         CanDiag_Runtime[controller].recoveredPending = FALSE;
+        CanDiag_Runtime[controller].busOffActive = FALSE;
+        CanDiag_Runtime[controller].txSuccessSeen = FALSE;
         CanDiag_Runtime[controller].errorPassiveSeen = FALSE;
         CanDiag_Runtime[controller].controllerFaultPending = FALSE;
         CanDiag_Runtime[controller].errorPassiveFailTicks = 0u;
@@ -190,8 +194,20 @@ void CanDiag_ReportBusOff(uint8 controllerId)
     {
         CanDiag_Runtime[controllerId].busOffPending = TRUE;
         CanDiag_Runtime[controllerId].recoveredPending = FALSE;
+        CanDiag_Runtime[controllerId].busOffActive = TRUE;
+        CanDiag_Runtime[controllerId].txSuccessSeen = FALSE;
         CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
         CanDiag_Runtime[controllerId].busOffCounter++;
+    }
+}
+
+void CanDiag_ReportTxSuccess(uint8 controllerId)
+{
+    if ((controllerId < CANDIAG_CHANNEL_COUNT) &&
+        (CanDiag_Runtime[controllerId].busOffActive != FALSE))
+    {
+        /* A hardware Tx confirmation proves that the frame was ACKed on the bus. */
+        CanDiag_Runtime[controllerId].txSuccessSeen = TRUE;
     }
 }
 
@@ -240,7 +256,9 @@ static void CanDiag_ProcessBusOff(uint8 controllerId)
         CanDiag_Runtime[controllerId].busOffRecoveryPassTicks = 0u;
     }
 
-    if (CanDiag_IsChannelOperational(controllerId) != FALSE)
+    if ((CanDiag_Runtime[controllerId].busOffActive != FALSE) &&
+        (CanDiag_Runtime[controllerId].txSuccessSeen != FALSE) &&
+        (CanDiag_IsChannelOperational(controllerId) != FALSE))
     {
         if (CanDiag_Runtime[controllerId].busOffRecoveryPassTicks < CANDIAG_BUS_OFF_RECOVERY_PASS_TICKS)
         {
@@ -250,6 +268,9 @@ static void CanDiag_ProcessBusOff(uint8 controllerId)
         if (CanDiag_Runtime[controllerId].busOffRecoveryPassTicks >= CANDIAG_BUS_OFF_RECOVERY_PASS_TICKS)
         {
             CanDiag_Report(controllerId, CANDIAG_FAULT_BUS_OFF, DEM_EVENT_STATUS_PASSED);
+            CanDiag_Runtime[controllerId].busOffActive = FALSE;
+            CanDiag_Runtime[controllerId].txSuccessSeen = FALSE;
+            CanSM_ConfirmBusOffRecovery(controllerId);
         }
     }
     else
@@ -430,6 +451,11 @@ void CanIf_AppBusOff(uint8 ControllerId)
 void CanIf_AppControllerRecovered(uint8 ControllerId)
 {
     CanDiag_ReportControllerRecovered(ControllerId);
+}
+
+void CanIf_AppTxConfirmation(uint8 ControllerId)
+{
+    CanDiag_ReportTxSuccess(ControllerId);
 }
 
 void CanIf_AppErrorPassive(uint8 ControllerId)

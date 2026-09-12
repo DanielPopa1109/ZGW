@@ -184,6 +184,8 @@ void lwip_geth_private_Phy_Dp83825i_reset(void)
     Dp83825i_Status.autonegDone = 0u;
     Dp83825i_Status.resetTimeoutCnt = 0u;
     Dp83825i_Status.autonegTimeoutCnt = 0u;
+    Dp83825i_Status.lastBmsr = 0u;
+    Dp83825i_Status.lastPhysts = 0u;
 
     (void)lwip_geth_private_Phy_Dp83825i_write_mdio_reg(
         DP83825I_PHY_ADDR,
@@ -211,6 +213,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
     Dp83825i_Status.mdioErrorCnt = 0u;
     Dp83825i_Status.linkDownCnt = 0u;
     Dp83825i_Status.linkUpCnt = 0u;
+    Dp83825i_Status.lastBmsr = 0u;
+    Dp83825i_Status.lastPhysts = 0u;
 
     EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_INIT_ENTER);
     EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_PHY_RESET_ASSERT);
@@ -283,6 +287,8 @@ uint32 lwip_geth_private_Phy_Dp83825i_init(void)
     {
         DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, bmsrSecond);
         DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, physts);
+        Dp83825i_Status.lastBmsr = (uint16)bmsrSecond;
+        Dp83825i_Status.lastPhysts = (uint16)physts;
         Dp83825i_Status.linkUp = 1u;
         Dp83825i_Status.speed100 = ((physts & DP83825I_PHYSTS_SPEED_10) == 0u) ? 1u : 0u;
         Dp83825i_Status.fullDuplex = ((physts & DP83825I_PHYSTS_FULL_DUPLEX) != 0u) ? 1u : 0u;
@@ -371,6 +377,7 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
                 break;
             }
             bmsr = bmsrSecond;
+            Dp83825i_Status.lastBmsr = (uint16)bmsr;
 
             if ((bmsr & DP83825I_BMSR_AUTONEG_DONE) != 0u)
             {
@@ -418,6 +425,8 @@ void lwip_geth_private_Phy_Dp83825i_mainFunction_100ms(void)
 
             DP83825I_DEBUG_ASSIGN(Dp83825i_DebugBmsr, bmsr);
             DP83825I_DEBUG_ASSIGN(Dp83825i_DebugPhysts, physts);
+            Dp83825i_Status.lastBmsr = (uint16)bmsr;
+            Dp83825i_Status.lastPhysts = (uint16)physts;
             if (((bmsr & DP83825I_BMSR_LINK_STATUS) != 0u) ||
                 ((physts & DP83825I_PHYSTS_LINK) != 0u))
             {

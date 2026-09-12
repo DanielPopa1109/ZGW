@@ -44,6 +44,8 @@ static uint8 AiModel_InferenceDivider;
 static uint32 AiModel_LastInputCycle;
 static uint32 AiModel_InferenceSequence;
 static uint8 AiModel_Initialized;
+static volatile uint32 AiModel_DtcClearGeneration;
+static uint32 AiModel_ObservedDtcClearGeneration;
 
 uint8 NvM_AiModel_Ram[AIMODEL_NVM_IMAGE_SIZE];
 const uint8 NvM_AiModel_Rom[AIMODEL_NVM_IMAGE_SIZE] = { 0u };
@@ -333,7 +335,7 @@ Std_ReturnType AiModel_CaptureDiagSnapshotData(Dem_EventIdType eventId, uint8 *b
     return E_OK;
 }
 
-static void AiModel_ReportDiagnostics(const AiModel_ResultType *result)
+static void AiModel_ReportDiagnostics(const AiModel_ResultType *result, uint8 inferenceAttempted)
 {
     Dem_EventStatusType inputStatus;
     Dem_EventStatusType inferenceStatus;
@@ -349,29 +351,40 @@ static void AiModel_ReportDiagnostics(const AiModel_ResultType *result)
 
     inputStatus = ((result->errorFlags & (AIMODEL_ERROR_INPUT_INVALID | AIMODEL_ERROR_INPUT_STALE)) != 0u) ?
             DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
-    inferenceStatus = ((result->windowReady != 0u) &&
-            ((result->inferenceValid == 0u) ||
-             ((result->errorFlags & AIMODEL_ERROR_INTERNAL_FAILURE) != 0u))) ?
-            DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
-    deadlineStatus = ((result->errorFlags & AIMODEL_ERROR_DEADLINE_EXCEEDED) != 0u) ?
-            DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
-    rangeStatus = ((result->errorFlags & AIMODEL_ERROR_OUTPUT_OUT_OF_RANGE) != 0u) ?
-            DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
-
     (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_INPUT_INVALID, inputStatus);
-    (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_INFERENCE_INVALID, inferenceStatus);
-    (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_DEADLINE_EXCEEDED, deadlineStatus);
-    (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_OUTPUT_OUT_OF_RANGE, rangeStatus);
+
+    /* These monitors describe an inference execution, so do not update them
+     * on the intervening 5 ms sampling cycles or while no inference exists. */
+    if (inferenceAttempted != 0u)
+    {
+        inferenceStatus = ((result->inferenceValid == 0u) ||
+                ((result->errorFlags & AIMODEL_ERROR_INTERNAL_FAILURE) != 0u)) ?
+                DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
+        deadlineStatus = ((result->errorFlags & AIMODEL_ERROR_DEADLINE_EXCEEDED) != 0u) ?
+                DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
+        rangeStatus = ((result->errorFlags & AIMODEL_ERROR_OUTPUT_OUT_OF_RANGE) != 0u) ?
+                DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED;
+
+        (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_INFERENCE_INVALID, inferenceStatus);
+        (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_DEADLINE_EXCEEDED, deadlineStatus);
+        (void)Dem_ReportErrorStatus(DEM_EVENT_ID_AIMODEL_OUTPUT_OUT_OF_RANGE, rangeStatus);
+    }
 
     for (channel = 0u; channel < BCM_NUM_CHANNELS; channel++)
     {
         const AiModel_ChannelResultType *channelResult = &result->channel[channel];
 
-        if ((result->windowReady == 0u) ||
+        if ((AiModel_ObservedDtcClearGeneration != AiModel_DtcClearGeneration) ||
+            (result->windowReady == 0u) ||
             (result->inputValid == 0u) ||
             (channelResult->inferenceValid == 0u))
         {
             consumerStatus = DEM_EVENT_STATUS_PREPASSED;
+        }
+        else if ((channelResult->actualOvercurrent != 0u) &&
+                 (channelResult->currentUtilization > 1.0f))
+        {
+            consumerStatus = DEM_EVENT_STATUS_FAILED;
         }
         else if ((channelResult->predictedFaultClass == AIMODEL_IMPENDING_OVERCURRENT_CLASS) &&
                  (channelResult->faultSoonProbability >= AIMODEL_CONSUMER_FAULT_FAIL_THRESHOLD) &&
@@ -412,6 +425,43 @@ static void AiModel_ClearHistory(void)
     AiModel_HistoryWriteIndex = 0u;
     AiModel_HistoryValidCount = 0u;
     AiModel_InferenceDivider = 0u;
+}
+
+static void AiModel_InvalidateInferenceResult(AiModel_ResultType *result)
+{
+    uint8 channel;
+
+    result->inputVoltage_V = 0.0f;
+    result->undervoltage = 0u;
+    result->overvoltage = 0u;
+    result->inputValid = 0u;
+    result->inferenceValid = 0u;
+    result->windowReady = 0u;
+    result->dominantFaultChannel = 0u;
+    result->dominantFault = 0u;
+    result->channelExecutionTimeUs = 0u;
+    result->totalInferenceTimeUs = 0u;
+
+    for (channel = 0u; channel < BCM_NUM_CHANNELS; channel++)
+    {
+        result->channel[channel].measuredCurrent_A = 0.0f;
+        result->channel[channel].predictedCurrent_A = 0.0f;
+        result->channel[channel].faultSoonProbability = 0.0f;
+        result->channel[channel].faultProbability[0u] = 0.0f;
+        result->channel[channel].faultProbability[1u] = 0.0f;
+        result->channel[channel].faultProbability[2u] = 0.0f;
+        result->channel[channel].faultProbability[3u] = 0.0f;
+        result->channel[channel].predictedFaultClass = 0u;
+        result->channel[channel].impendingOvercurrent = 0u;
+        result->channel[channel].actualOvercurrent = 0u;
+        result->channel[channel].currentUtilization = 0.0f;
+        result->channel[channel].inferenceValid = 0u;
+    }
+}
+
+void AiModel_NotifyDtcClear(void)
+{
+    AiModel_DtcClearGeneration++;
 }
 
 static void AiModel_InitMailboxResult(AiModel_ResultType *result)
@@ -463,6 +513,8 @@ void AiModel_Init(void)
     AiModel_MailboxIndex = 0u;
     AiModel_LastInputCycle = 0u;
     AiModel_InferenceSequence = 0u;
+    AiModel_DtcClearGeneration = 0u;
+    AiModel_ObservedDtcClearGeneration = 0u;
     AiModel_ClearHistory();
     AiModel_Initialized = 1u;
 
@@ -708,6 +760,7 @@ void AiModel_MainFunction(void)
     AiModel_Pdm1SnapshotType *snapshot = &AiModel_WorkSnapshot;
     AiModel_ResultType *result = &AiModel_WorkResult;
     uint32 processingStartUs;
+    uint8 inferenceAttempted = 0u;
 
     if (AiModel_Initialized == 0u)
     {
@@ -722,9 +775,18 @@ void AiModel_MainFunction(void)
     result->inputValid = 0u;
     result->windowReady = (AiModel_HistoryValidCount >= BCM_SEQ_LEN) ? 1u : 0u;
 
+    if (AiModel_ObservedDtcClearGeneration != AiModel_DtcClearGeneration)
+    {
+        AiModel_ClearHistory();
+        AiModel_InvalidateInferenceResult(result);
+        AiModel_ObservedDtcClearGeneration = AiModel_DtcClearGeneration;
+    }
+
     if (AiModel_GetPdm1Snapshot(snapshot) != E_OK)
     {
         result->errorFlags |= AIMODEL_ERROR_INPUT_INVALID;
+        AiModel_ClearHistory();
+        AiModel_InvalidateInferenceResult(result);
     }
     else
     {
@@ -735,12 +797,14 @@ void AiModel_MainFunction(void)
         {
             result->errorFlags |= AIMODEL_ERROR_INPUT_INVALID;
             AiModel_ClearHistory();
+            AiModel_InvalidateInferenceResult(result);
         }
         else if ((snapshot->cycleCounter == AiModel_LastInputCycle) ||
                 ((uint32)(AiModel_NowMs() - snapshot->timestamp) > AIMODEL_INPUT_STALE_LIMIT_MS))
         {
             result->errorFlags |= AIMODEL_ERROR_INPUT_STALE;
             AiModel_ClearHistory();
+            AiModel_InvalidateInferenceResult(result);
         }
         else
         {
@@ -762,14 +826,28 @@ void AiModel_MainFunction(void)
         if (AiModel_InferenceDivider >= AIMODEL_INFERENCE_TICKS)
         {
             AiModel_InferenceDivider = 0u;
+            inferenceAttempted = 1u;
             AiModel_RunInference(result);
         }
+    }
+
+    /* A clear can arrive from the diagnostic core while inference is running.
+     * Re-check the generation before publishing or reporting any result so the
+     * just-cleared consumer DTC cannot be re-entered from that stale inference. */
+    if (AiModel_ObservedDtcClearGeneration != AiModel_DtcClearGeneration)
+    {
+        AiModel_ClearHistory();
+        AiModel_InvalidateInferenceResult(result);
+        result->inputValid = 0u;
+        result->errorFlags |= AIMODEL_ERROR_WINDOW_NOT_READY;
+        inferenceAttempted = 0u;
+        AiModel_ObservedDtcClearGeneration = AiModel_DtcClearGeneration;
     }
 
     result->processingTimeUs = AiModel_NowUs() - processingStartUs;
     result->maxProcessingTimeUs = AiModel_MaxU32(result->maxProcessingTimeUs, result->processingTimeUs);
     AiModel_PublishResult(result);
-    AiModel_ReportDiagnostics(result);
+    AiModel_ReportDiagnostics(result, inferenceAttempted);
     AiModel_MainFunction_Counter++;
     CpuPerf_Stop(CPUPERF_ID_AI_MODEL_MAIN_C1, &cpuPerfCtx);
 }

@@ -8,5 +8,6 @@ const uint8 ComM_UserChannelMap[COMM_NUM_USERS] =
     COMM_CHANNEL_MASK_ETH,
     COMM_CHANNEL_MASK_ALL,
     COMM_CHANNEL_MASK_LIN,
-    COMM_CHANNEL_MASK_ETH
+    COMM_CHANNEL_MASK_ETH,
+    COMM_CHANNEL_MASK_ETH /* Gateway telemetry is independent of vehicle bus activity. */
 };

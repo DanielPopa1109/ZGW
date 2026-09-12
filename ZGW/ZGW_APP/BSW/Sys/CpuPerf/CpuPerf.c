@@ -18,10 +18,23 @@ typedef struct
     CpuPerf_StatsType stats;
     uint8 coreId;
     uint8 valid;
+    uint8 schedulerTraceValid;
 } CpuPerf_RecordType;
+
+typedef struct
+{
+    const void *monitoredTask;
+    const void *currentTask;
+    uint32 switchedOutTick;
+    uint64 totalDescheduledTicks;
+    uint64 switchOutCount;
+    uint8 switchedOut;
+} CpuPerf_SchedulerTraceType;
 
 static CpuPerf_RecordType CpuPerf_Records[CPUPERF_ID_COUNT];
 static volatile uint8 CpuPerf_CoreInitialized[CPUPERF_CORE_COUNT];
+static volatile uint8 CpuPerf_HardwareCountersAvailable[CPUPERF_CORE_COUNT];
+static CpuPerf_SchedulerTraceType CpuPerf_SchedulerTrace[CPUPERF_CORE_COUNT];
 
 static uint8 CpuPerf_GetCoreId(void);
 static uint32 CpuPerf_ReadCounter(uint16 counterAddress);
@@ -33,7 +46,8 @@ static uint32 CpuPerf_ReadTimeTicks(uint8 coreId);
 static uint32 CpuPerf_ElapsedNs(uint8 coreId, uint32 startTicks, uint32 stopTicks);
 static void CpuPerf_ResetOne(CpuPerf_RecordType *record);
 static CpuPerf_StatsType CpuPerf_ReadStatsSnapshot(const CpuPerf_RecordType *record);
-static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint32 instructions, uint32 elapsedNs, boolean overflow);
+static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint32 instructions,
+        uint32 elapsedNs, uint32 descheduledNs, uint32 switchOutCount, boolean overflow);
 static void CpuPerf_PutU16(uint8 *data, uint16 value);
 static void CpuPerf_PutU32(uint8 *data, uint32 value);
 static void CpuPerf_PutU64(uint8 *data, uint64 value);
@@ -139,6 +153,14 @@ static void CpuPerf_ResetOne(CpuPerf_RecordType *record)
     record->stats.maxNs = 0u;
     record->stats.totalNs = 0u;
     record->stats.totalBytes = 0u;
+    record->stats.over5msCount = 0u;
+    record->stats.over10msCount = 0u;
+    record->stats.over20msCount = 0u;
+    record->stats.lastDescheduledNs = 0u;
+    record->stats.maxDescheduledNs = 0u;
+    record->stats.totalDescheduledNs = 0u;
+    record->stats.lastSwitchOutCount = 0u;
+    record->stats.totalSwitchOutCount = 0u;
 }
 
 static CpuPerf_StatsType CpuPerf_ReadStatsSnapshot(const CpuPerf_RecordType *record)
@@ -155,11 +177,14 @@ static CpuPerf_StatsType CpuPerf_ReadStatsSnapshot(const CpuPerf_RecordType *rec
     return snapshot;
 }
 
-static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint32 instructions, uint32 elapsedNs, boolean overflow)
+static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint32 instructions,
+        uint32 elapsedNs, uint32 descheduledNs, uint32 switchOutCount, boolean overflow)
 {
     record->stats.lastCycles = cycles;
     record->stats.lastInstructions = instructions;
     record->stats.lastNs = elapsedNs;
+    record->stats.lastDescheduledNs = descheduledNs;
+    record->stats.lastSwitchOutCount = switchOutCount;
     if (record->stats.sampleCount == 0u)
     {
         record->stats.minCycles = cycles;
@@ -168,6 +193,7 @@ static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint
         record->stats.maxInstructions = instructions;
         record->stats.minNs = elapsedNs;
         record->stats.maxNs = elapsedNs;
+        record->stats.maxDescheduledNs = descheduledNs;
     }
     else
     {
@@ -177,6 +203,7 @@ static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint
         if (instructions > record->stats.maxInstructions) { record->stats.maxInstructions = instructions; }
         if (elapsedNs < record->stats.minNs) { record->stats.minNs = elapsedNs; }
         if (elapsedNs > record->stats.maxNs) { record->stats.maxNs = elapsedNs; }
+        if (descheduledNs > record->stats.maxDescheduledNs) { record->stats.maxDescheduledNs = descheduledNs; }
     }
 
     if ((0xFFFFFFFFFFFFFFFFULL - record->stats.totalCycles) >= (uint64)cycles)
@@ -191,13 +218,35 @@ static void CpuPerf_UpdateRecord(CpuPerf_RecordType *record, uint32 cycles, uint
     {
         record->stats.totalNs += (uint64)elapsedNs;
     }
-    if (record->stats.sampleCount < 0xFFFFFFFFu)
+    if ((0xFFFFFFFFFFFFFFFFULL - record->stats.totalDescheduledNs) >= (uint64)descheduledNs)
     {
-        record->stats.sampleCount++;
+        record->stats.totalDescheduledNs += (uint64)descheduledNs;
+    }
+    if ((0xFFFFFFFFFFFFFFFFULL - record->stats.totalSwitchOutCount) >= (uint64)switchOutCount)
+    {
+        record->stats.totalSwitchOutCount += (uint64)switchOutCount;
     }
     if ((overflow != FALSE) && (record->stats.overflowCount < 0xFFFFFFFFu))
     {
         record->stats.overflowCount++;
+    }
+    if ((elapsedNs > 5000000u) && (record->stats.over5msCount < 0xFFFFFFFFu))
+    {
+        record->stats.over5msCount++;
+    }
+    if ((elapsedNs > 10000000u) && (record->stats.over10msCount < 0xFFFFFFFFu))
+    {
+        record->stats.over10msCount++;
+    }
+    if ((elapsedNs > 20000000u) && (record->stats.over20msCount < 0xFFFFFFFFu))
+    {
+        record->stats.over20msCount++;
+    }
+    /* Publish the sample last; snapshot readers use this as the sequence
+     * boundary for every field above, including the overrun histogram. */
+    if (record->stats.sampleCount < 0xFFFFFFFFu)
+    {
+        record->stats.sampleCount++;
     }
 }
 
@@ -233,7 +282,10 @@ static uint8 CpuPerf_RecordCore(CpuPerf_MeasurementIdType measurementId)
 void CpuPerf_InitCore(void)
 {
     uint8 coreId = CpuPerf_GetCoreId();
-    Ifx_CPU_CCTRL cctrl;
+    uint32 beforeCycles;
+    uint32 afterCycles;
+    uint32 beforeInstructions;
+    uint32 afterInstructions;
 
     if (coreId >= CPUPERF_CORE_COUNT)
     {
@@ -242,12 +294,62 @@ void CpuPerf_InitCore(void)
 
     if (CpuPerf_CoreInitialized[coreId] == 0u)
     {
-        cctrl.U = __mfcr(CPU_CCTRL);
-        cctrl.B.CM = IfxCpu_CounterMode_normal;
-        cctrl.B.CE = 1u;
-        __mtcr(CPU_CCTRL, cctrl.U);
+        /* Clear stale/debugger-owned counter state before enabling normal mode. */
+        IfxCpu_resetAndStartCounters(IfxCpu_CounterMode_normal);
+        __isync();
+        beforeCycles = CpuPerf_ReadCounter(CPU_CCNT);
+        beforeInstructions = CpuPerf_ReadCounter(CPU_ICNT);
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        afterCycles = CpuPerf_ReadCounter(CPU_CCNT);
+        afterInstructions = CpuPerf_ReadCounter(CPU_ICNT);
+        CpuPerf_HardwareCountersAvailable[coreId] =
+                ((afterCycles != beforeCycles) &&
+                 (afterInstructions != beforeInstructions)) ? 1u : 0u;
         CpuPerf_CoreInitialized[coreId] = 1u;
     }
+}
+
+void CpuPerf_RegisterMonitoredTask(uint8 coreId, const void *taskHandle)
+{
+    if (coreId < CPUPERF_CORE_COUNT)
+    {
+        CpuPerf_SchedulerTrace[coreId].monitoredTask = taskHandle;
+        CpuPerf_SchedulerTrace[coreId].switchedOut = 0u;
+    }
+}
+
+void CpuPerf_TraceTaskSwitchedOut(uint8 coreId, const void *taskHandle)
+{
+    CpuPerf_SchedulerTraceType *trace;
+    if (coreId >= CPUPERF_CORE_COUNT) { return; }
+    trace = &CpuPerf_SchedulerTrace[coreId];
+    trace->currentTask = NULL_PTR;
+    if ((taskHandle == trace->monitoredTask) && (taskHandle != NULL_PTR) && (trace->switchedOut == 0u))
+    {
+        trace->switchedOutTick = CpuPerf_ReadTimeTicks(coreId);
+        trace->switchedOut = 1u;
+        if (trace->switchOutCount < 0xFFFFFFFFFFFFFFFFULL) { trace->switchOutCount++; }
+    }
+}
+
+void CpuPerf_TraceTaskSwitchedIn(uint8 coreId, const void *taskHandle)
+{
+    CpuPerf_SchedulerTraceType *trace;
+    uint32 now;
+    if (coreId >= CPUPERF_CORE_COUNT) { return; }
+    trace = &CpuPerf_SchedulerTrace[coreId];
+    if ((taskHandle == trace->monitoredTask) && (taskHandle != NULL_PTR) && (trace->switchedOut != 0u))
+    {
+        now = CpuPerf_ReadTimeTicks(coreId);
+        trace->totalDescheduledTicks += (uint64)((uint32)(now - trace->switchedOutTick));
+        trace->switchedOut = 0u;
+    }
+    trace->currentTask = taskHandle;
 }
 
 void CpuPerf_Start(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *context)
@@ -261,10 +363,34 @@ void CpuPerf_Start(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType 
     }
 
     coreId = CpuPerf_GetCoreId();
-    context->startCycles = CpuPerf_ReadCounter(CPU_CCNT);
-    context->startInstructions = CpuPerf_ReadCounter(CPU_ICNT);
+    if ((coreId < CPUPERF_CORE_COUNT) &&
+            (CpuPerf_HardwareCountersAvailable[coreId] != 0u))
+    {
+        context->startCycles = CpuPerf_ReadCounter(CPU_CCNT);
+        context->startInstructions = CpuPerf_ReadCounter(CPU_ICNT);
+    }
+    else
+    {
+        context->startCycles = 0u;
+        context->startInstructions = 0u;
+    }
     context->startTimeTicks = CpuPerf_ReadTimeTicks(coreId);
     context->startCoreId = coreId;
+    if ((coreId < CPUPERF_CORE_COUNT) &&
+            (CpuPerf_SchedulerTrace[coreId].currentTask == CpuPerf_SchedulerTrace[coreId].monitoredTask) &&
+            (CpuPerf_SchedulerTrace[coreId].monitoredTask != NULL_PTR) &&
+            (CpuPerf_SchedulerTrace[coreId].switchedOut == 0u))
+    {
+        context->startDescheduledTicks = CpuPerf_SchedulerTrace[coreId].totalDescheduledTicks;
+        context->startSwitchOutCount = CpuPerf_SchedulerTrace[coreId].switchOutCount;
+        context->schedulerTraceAvailable = 1u;
+    }
+    else
+    {
+        context->startDescheduledTicks = 0u;
+        context->startSwitchOutCount = 0u;
+        context->schedulerTraceAvailable = 0u;
+    }
 }
 
 void CpuPerf_Stop(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *context)
@@ -276,6 +402,8 @@ void CpuPerf_Stop(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *
     uint32 cycles;
     uint32 instructions;
     uint32 elapsedNs;
+    uint32 descheduledNs = 0u;
+    uint32 switchOutCount = 0u;
     boolean overflow;
     uint8 coreId;
 
@@ -284,8 +412,6 @@ void CpuPerf_Stop(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *
         return;
     }
 
-    stopCycles = CpuPerf_ReadCounter(CPU_CCNT);
-    stopInstructions = CpuPerf_ReadCounter(CPU_ICNT);
     coreId = CpuPerf_GetCoreId();
     if (context->startCoreId != coreId)
     {
@@ -293,15 +419,40 @@ void CpuPerf_Stop(CpuPerf_MeasurementIdType measurementId, CpuPerf_ContextType *
     }
 
     stopTimeTicks = CpuPerf_ReadTimeTicks(coreId);
-    overflow = CpuPerf_HasOverflow();
-    cycles = CpuPerf_Delta31(context->startCycles, stopCycles);
-    instructions = CpuPerf_Delta31(context->startInstructions, stopInstructions);
+    if ((coreId < CPUPERF_CORE_COUNT) &&
+            (CpuPerf_HardwareCountersAvailable[coreId] != 0u))
+    {
+        stopCycles = CpuPerf_ReadCounter(CPU_CCNT);
+        stopInstructions = CpuPerf_ReadCounter(CPU_ICNT);
+        overflow = CpuPerf_HasOverflow();
+        cycles = CpuPerf_Delta31(context->startCycles, stopCycles);
+        instructions = CpuPerf_Delta31(context->startInstructions, stopInstructions);
+    }
+    else
+    {
+        overflow = FALSE;
+        cycles = 0u;
+        instructions = 0u;
+    }
     elapsedNs = CpuPerf_ElapsedNs(coreId, (uint32)context->startTimeTicks, stopTimeTicks);
+    if ((context->schedulerTraceAvailable != 0u) &&
+            (coreId < CPUPERF_CORE_COUNT) &&
+            (CpuPerf_SchedulerTrace[coreId].switchedOut == 0u))
+    {
+        uint64 descheduledTicks = CpuPerf_SchedulerTrace[coreId].totalDescheduledTicks - context->startDescheduledTicks;
+        uint64 switches = CpuPerf_SchedulerTrace[coreId].switchOutCount - context->startSwitchOutCount;
+        uint64 frequencyHz = (uint64)CpuPerf_StmClockHz(coreId);
+        uint64 ns = (frequencyHz != 0u) ?
+                (((descheduledTicks * 1000000000ULL) + (frequencyHz / 2u)) / frequencyHz) : 0u;
+        descheduledNs = (ns > (uint64)elapsedNs) ? elapsedNs : (uint32)ns;
+        switchOutCount = (switches > 0xFFFFFFFFULL) ? 0xFFFFFFFFu : (uint32)switches;
+    }
 
     record = &CpuPerf_Records[measurementId];
     record->coreId = coreId;
     record->valid = 1u;
-    CpuPerf_UpdateRecord(record, cycles, instructions, elapsedNs, overflow);
+    record->schedulerTraceValid = context->schedulerTraceAvailable;
+    CpuPerf_UpdateRecord(record, cycles, instructions, elapsedNs, descheduledNs, switchOutCount, overflow);
 }
 
 void CpuPerf_AddBytes(CpuPerf_MeasurementIdType measurementId, uint32 byteCount)
@@ -328,6 +479,7 @@ void CpuPerf_ResetStatistics(void)
     {
         CpuPerf_ResetOne(&CpuPerf_Records[id]);
         CpuPerf_Records[id].valid = 0u;
+        CpuPerf_Records[id].schedulerTraceValid = 0u;
     }
 }
 
@@ -401,6 +553,8 @@ Std_ReturnType CpuPerf_BuildSnapshotPayload(uint8 startId, uint8 requestedCount,
     CpuPerf_RecordType *record;
     CpuPerf_StatsType stats;
     uint8 coreId;
+    uint8 availableCore;
+    uint32 counterMask;
 
     if ((respData == NULL_PTR) || (respLen == NULL_PTR) ||
             (startId >= (uint8)CPUPERF_ID_COUNT))
@@ -421,7 +575,16 @@ Std_ReturnType CpuPerf_BuildSnapshotPayload(uint8 startId, uint8 requestedCount,
     respData[8u] = startId;
     respData[9u] = count;
     CpuPerf_PutU16(&respData[10u], (uint16)CPUPERF_RESPONSE_ENTRY_LEN);
-    CpuPerf_PutU32(&respData[12u], CPUPERF_COUNTER_VALUE_MASK);
+    counterMask = 0u;
+    for (availableCore = 0u; availableCore < CPUPERF_CORE_COUNT; availableCore++)
+    {
+        if (CpuPerf_HardwareCountersAvailable[availableCore] != 0u)
+        {
+            counterMask = CPUPERF_COUNTER_VALUE_MASK;
+            break;
+        }
+    }
+    CpuPerf_PutU32(&respData[12u], counterMask);
     offset = CPUPERF_RESPONSE_HEADER_LEN;
 
     for (index = 0u; index < count; index++)
@@ -434,7 +597,13 @@ Std_ReturnType CpuPerf_BuildSnapshotPayload(uint8 startId, uint8 requestedCount,
         respData[offset + 0u] = (uint8)((uint16)startId + (uint16)index);
         respData[offset + 1u] = record->valid;
         respData[offset + 2u] = coreId;
-        respData[offset + 3u] = 0u;
+        respData[offset + 3u] = ((coreId < CPUPERF_CORE_COUNT) &&
+                (CpuPerf_HardwareCountersAvailable[coreId] != 0u)) ?
+                CPUPERF_ENTRY_FLAG_HW_COUNTERS : 0u;
+        if (record->schedulerTraceValid != 0u)
+        {
+            respData[offset + 3u] |= CPUPERF_ENTRY_FLAG_SCHED_TRACE;
+        }
         CpuPerf_PutU32(&respData[offset + 4u], stats.lastCycles);
         CpuPerf_PutU32(&respData[offset + 8u], stats.minCycles);
         CpuPerf_PutU32(&respData[offset + 12u], stats.maxCycles);
@@ -447,6 +616,19 @@ Std_ReturnType CpuPerf_BuildSnapshotPayload(uint8 startId, uint8 requestedCount,
         CpuPerf_PutU32(&respData[offset + 40u], stats.lastNs);
         CpuPerf_PutU32(&respData[offset + 44u], CpuPerf_GetAverageNs(&stats));
         CpuPerf_PutU64(&respData[offset + 48u], stats.totalBytes);
+        CpuPerf_PutU32(&respData[offset + 56u], stats.minNs);
+        CpuPerf_PutU32(&respData[offset + 60u], stats.maxNs);
+        CpuPerf_PutU32(&respData[offset + 64u], stats.over5msCount);
+        CpuPerf_PutU32(&respData[offset + 68u], stats.over10msCount);
+        CpuPerf_PutU32(&respData[offset + 72u], stats.over20msCount);
+        CpuPerf_PutU32(&respData[offset + 76u], stats.lastDescheduledNs);
+        CpuPerf_PutU32(&respData[offset + 80u], (stats.sampleCount != 0u) ?
+                (uint32)(stats.totalDescheduledNs / stats.sampleCount) : 0u);
+        CpuPerf_PutU32(&respData[offset + 84u], stats.maxDescheduledNs);
+        CpuPerf_PutU64(&respData[offset + 88u], stats.totalDescheduledNs);
+        CpuPerf_PutU32(&respData[offset + 96u], stats.lastSwitchOutCount);
+        CpuPerf_PutU32(&respData[offset + 100u], (stats.totalSwitchOutCount > 0xFFFFFFFFULL) ?
+                0xFFFFFFFFu : (uint32)stats.totalSwitchOutCount);
         offset = (uint16)(offset + CPUPERF_RESPONSE_ENTRY_LEN);
     }
 

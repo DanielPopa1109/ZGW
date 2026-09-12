@@ -272,6 +272,12 @@ Std_ReturnType CanNm_NetworkRequest(uint8 channel)
         return E_NOT_OK;
     }
 
+    if ((CanNm_ChannelState[index].localRequested != FALSE) &&
+            (CanNm_ChannelState[index].mode == NM_MODE_NETWORK))
+    {
+        return E_OK;
+    }
+
     CanNm_ChannelState[index].localRequested = TRUE;
     CanNm_ChannelState[index].txTimer = 0u;
     CanNm_EnterNetwork(index, TRUE);

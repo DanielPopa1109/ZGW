@@ -35,10 +35,16 @@ static const Lin_FrameConfigType LinIf_Frame_HVDCDC_STATUS =
     0x0Bu, 0u, 5u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
 };
 
+static const Lin_FrameConfigType LinIf_Frame_ZGW_SDAT =
+{
+    0x04u, 0u, 7u, LIN_CS_ENHANCED, LIN_FRM_UNCONDITIONAL, 20u
+};
+
 static const LinIf_ScheduleEntryType LinIf_NormalEntries[] =
 {
     { &LinIf_Frame_ZGW_REQUEST_HVDCDC, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE },
-    { &LinIf_Frame_HVDCDC_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE }
+    { &LinIf_Frame_HVDCDC_STATUS, LINIF_LDF_SLOT_TICKS, LIN_SLAVE_RESPONSE },
+    { &LinIf_Frame_ZGW_SDAT, LINIF_LDF_SLOT_TICKS, LIN_MASTER_RESPONSE }
 };
 
 
@@ -104,7 +110,8 @@ static uint8 LinIf_GetPublisherNad(const LinIf_ScheduleEntryType* entry)
 
 static const LinIf_AppPduConfigType LinIf_AppTxPduCfg[] =
 {
-    { LINIF_TX_PDU_ZGW_REQUEST_HVDCDC, 0x03u, 2u }
+    { LINIF_TX_PDU_ZGW_REQUEST_HVDCDC, 0x03u, 2u },
+    { LINIF_TX_PDU_ZGW_SDAT, 0x04u, 7u }
 };
 
 static const LinIf_AppPduConfigType LinIf_AppRxPduCfg[] =

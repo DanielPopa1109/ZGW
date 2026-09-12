@@ -27,12 +27,21 @@
 #define CODINGAPP_ROUTINE_REQUEST_RESULTS       0x03u
 
 #define CODINGAPP_IMAGE_MAGIC                   0x434F4447u
-#define CODINGAPP_IMAGE_VERSION                 0x0002u
+#define CODINGAPP_IMAGE_VERSION                 0x0004u
 
 #define CODINGAPP_RX_MESSAGE_EXPECTED_BYTES     (((uint16)GATEWAYSWC_RX_MESSAGE_DIAG_COUNT + 7u) / 8u)
-#define CODINGAPP_TX_PDU_COUNT                  18u
+#define CODINGAPP_TX_PDU_COUNT                  17u
 #define CODINGAPP_TX_PDU_ENABLED_BYTES          (((uint16)CODINGAPP_TX_PDU_COUNT + 7u) / 8u)
 #define CODINGAPP_MASK_BYTES                    (CODINGAPP_RX_MESSAGE_EXPECTED_BYTES + CODINGAPP_TX_PDU_ENABLED_BYTES)
+
+/* Logical PDU IDs used to apply the common TX coding mask to Ethernet
+ * application frames that do not pass through Com. */
+#define CODINGAPP_TX_PDU_ETH_SUMMARY            ((PduIdType)0x8001u)
+#define CODINGAPP_TX_PDU_ETH_DTC_TRANSITION     ((PduIdType)0x8002u)
+#define CODINGAPP_TX_PDU_ETH_MCU_STATUS         ((PduIdType)0x8003u)
+#define CODINGAPP_TX_PDU_ETH_AI_MODEL           ((PduIdType)0x8004u)
+#define CODINGAPP_TX_PDU_ETH_CPU_PERF           ((PduIdType)0x8005u)
+#define CODINGAPP_TX_PDU_ETH_VEHICLESTATE       ((PduIdType)0x8006u)
 
 #define CODINGAPP_STATE_NOT_CODED               0u
 #define CODINGAPP_STATE_CODED                   1u

@@ -584,9 +584,15 @@ typedef struct
 static const Dcm_ServiceAccessType Dcm_ServiceAccessTable[] =
 {
         { DCM_SID_DIAGNOSTIC_SESSION_CONTROL, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
+        /* Recovery and fault inspection must remain usable from every session.
+         * In particular, FCD intentionally runs these while session 0x41
+         * (Coding) is active. */
         { DCM_SID_ECU_RESET,                  DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
-        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED },
-        { DCM_SID_READ_DTC_INFORMATION,       DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED },
+        /* Clearing fault memory is a recovery/maintenance operation just like
+         * reading it. Keep it available if the tester is already in the
+         * programming or coding session instead of forcing a session change. */
+        { DCM_SID_CLEAR_DIAGNOSTIC_INFORMATION, DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
+        { DCM_SID_READ_DTC_INFORMATION,       DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
         { DCM_SID_READ_DATA_BY_IDENTIFIER,    DCM_SESSION_MASK_DEFAULT | DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_CODING },
         { DCM_SID_COMMUNICATION_CONTROL,      DCM_SESSION_MASK_EXTENDED },
         { DCM_SID_ROUTINE_CONTROL,            DCM_SESSION_MASK_EXTENDED | DCM_SESSION_MASK_PROGRAMMING | DCM_SESSION_MASK_CODING },

@@ -45,6 +45,7 @@ HEARTBEAT_INTERVAL_S = 1.0
 MAGIC = b"ZGW"
 SOMEIPSD_SUBSCRIBE_DEFAULT_TARGET = "192.168.1.10"
 SOMEIPSD_PORT = 30490
+SOMEIPSD_MULTICAST_GROUP = "224.244.224.245"
 SOMEIPSD_SERVICE_ID = 0x1234
 SOMEIPSD_INSTANCE_ID = 0x0001
 SOMEIPSD_EVENTGROUP_ID = 0x0001
@@ -53,7 +54,6 @@ SOMEIPSD_TTL_S = 3
 
 # High-throughput GUI settings. These intentionally use more CPU so the
 # producer queue is drained faster than 100 ms Ethernet bursts can fill it.
-QUEUE_MAX_ITEMS = 50000
 GUI_POLL_MS = 1
 MAX_QUEUE_ITEMS_PER_POLL = 5000
 MAX_QUEUE_DRAIN_SECONDS = 0.200
@@ -66,6 +66,41 @@ MAX_GRAPH_POINTS = 600
 GRAPH_WINDOW_S = 30.0
 GRAPH_COLORS = ("#005a9e", "#c2410c", "#15803d", "#7c3aed", "#b45309", "#be123c", "#0369a1", "#4d7c0f")
 GRAPH_SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gw_eth_log_graph_settings.json")
+
+# Must stay in the same numeric order as CpuPerf_MeasurementIdType in
+# ZGW_APP/BSW/Sys/CpuPerf/CpuPerf.h.
+CPU_PERF_MEASUREMENT_TEXT = dict(enumerate((
+    "OsAsilBswTaskC0",
+    "OsAsilNvmTaskC0",
+    "OsNvmStartupMainC0",
+    "OsNvmFlsMainC0",
+    "OsNvmFeeMainC0",
+    "OsNvmNvmMainC0",
+    "NvmMainStepC0",
+    "FeeMainStepC0",
+    "FlsMainStepC0",
+    "CanIrqRxClassicC0",
+    "CanIrqRxFdC0",
+    "EthIrqTxC2",
+    "EthIrqRxC2",
+    "OsQmBswTaskC2",
+    "DoipMainC2",
+    "PdurDoipCore0MainC0",
+    "PdurDoipCore2MainC2",
+    "DcmMainC0",
+    "AiModelMainC1",
+    "CanMainC0",
+    "CanIfRxIndicationC0",
+    "CanTpRxIndicationC0",
+    "CanTpMainC0",
+    "LinIfMainC0",
+    "LinTpMainC0",
+    "SoAdMainC2",
+    "TcpIpMainC2",
+    "GatewayMainC0",
+    "GatewayEthMainC2",
+    "Crc32",
+)))
 
 
 BUS_NAMES = {
@@ -87,7 +122,7 @@ ZGW_DATA_FRAME_BY_BUS = {
     "LIN": "LINData",
 }
 
-NETWORK_MANAGEMENT_STATUS_PAYLOAD = bytes.fromhex("4E 4D 01 02 00")
+NETWORK_MANAGEMENT_PREFIX = bytes.fromhex("4E 4D 01")
 TIME_SYNC_MAGIC = b"ZTS1"
 MCU_DATA_MAGIC = b"ZMCU"
 FCD_TRACE_MIRROR_MAGIC = b"FCDT"
@@ -1176,13 +1211,18 @@ def non_gateway_event(data):
     someipsd = decode_someipsd_event(data)
     if someipsd is not None:
         return someipsd
-    if data == NETWORK_MANAGEMENT_STATUS_PAYLOAD:
+    if (len(data) >= 5 and data.startswith(NETWORK_MANAGEMENT_PREFIX)
+            and data[4] <= 8 and len(data) == 5 + data[4]):
+        flags = data[3]
+        info = (f"NM version={data[2]} flags=0x{flags:02X} "
+                f"repeatMessage={int(bool(flags & 0x01))} "
+                f"activeWakeup={int(bool(flags & 0x02))} userDataLength={data[4]}")
         return {
             "kind": "network_management",
             "frame_name": "Networkmanagement3_Status",
             "length": len(data),
-            "info": "NM index=3 state=0x02 flags=0x00",
-            "text": "Networkmanagement3_Status: NM index=3 state=0x02 flags=0x00",
+            "info": info,
+            "text": f"Networkmanagement3_Status: {info}",
         }
     if data == HEARTBEAT_ACK_PAYLOAD:
         return {
@@ -1345,10 +1385,40 @@ def decode_gateway_payload(data):
     return events
 
 
+class PacketDecoder(threading.Thread):
+    """Decode captured payloads without blocking either sockets or Tk."""
+    def __init__(self, in_queue, out_queue):
+        super().__init__(daemon=True)
+        self.in_queue = in_queue
+        self.out_queue = out_queue
+
+    def run(self):
+        while True:
+            item = self.in_queue.get()
+            if item is None:
+                return
+            now, protocol, src_ip, src_port, rx_port, data = item
+            try:
+                events = decode_gateway_payload(data)
+            except Exception as exc:
+                # A single unexpected payload must not kill the only decoder
+                # and make the logger appear permanently frozen.
+                events = [{
+                    "kind": "decode_error",
+                    "frame_name": "DecodeError",
+                    "length": len(data),
+                    "info": f"{type(exc).__name__}: {exc}",
+                    "text": f"Decode failed: {type(exc).__name__}: {exc}",
+                }]
+            self.out_queue.put(("packet", now, protocol, src_ip, src_port,
+                                rx_port, data, events))
+
+
 class UdpListener(threading.Thread):
-    def __init__(self, out_queue, stop_event, bind_ip, port, source_filter):
+    def __init__(self, out_queue, packet_queue, stop_event, bind_ip, port, source_filter):
         super().__init__(daemon=True)
         self.out_queue = out_queue
+        self.packet_queue = packet_queue
         self.stop_event = stop_event
         self.bind_ip = bind_ip
         self.port = port
@@ -1364,8 +1434,19 @@ class UdpListener(threading.Thread):
             except Exception:
                 pass
             sock.bind((self.bind_ip, self.port))
+            # A wildcard UDP bind does not subscribe to an IPv4 multicast
+            # group on Windows.  Without this membership the logger sees
+            # unicast SubscribeAcks but misses periodic SOME/IP-SD Offers.
+            if self.port == SOMEIPSD_PORT:
+                interface_ip = (self.bind_ip if self.bind_ip != "0.0.0.0"
+                                else "0.0.0.0")
+                membership = socket.inet_aton(SOMEIPSD_MULTICAST_GROUP) + socket.inet_aton(interface_ip)
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
             sock.settimeout(0.2)
-            self.out_queue.put(("status", f"UDP listening on {self.bind_ip}:{self.port}"))
+            status = f"UDP listening on {self.bind_ip}:{self.port}"
+            if self.port == SOMEIPSD_PORT:
+                status += f" (joined {SOMEIPSD_MULTICAST_GROUP})"
+            self.out_queue.put(("status", status))
         except Exception as exc:
             self.out_queue.put(("error", f"Cannot bind UDP socket on {self.bind_ip}:{self.port}: {exc}"))
             try:
@@ -1387,12 +1468,10 @@ class UdpListener(threading.Thread):
             if self.source_filter and src_ip != self.source_filter and not data.startswith(FCD_TRACE_MIRROR_MAGIC):
                 continue
 
-            now = _dt.datetime.now()
-            events = decode_gateway_payload(data)
-            try:
-                self.out_queue.put_nowait(("packet", now, "UDP", src_ip, src_port, self.port, data, events))
-            except queue.Full:
-                pass
+            # Keep the socket thread dedicated to reception.  Decoding here
+            # leaves the kernel socket buffer unattended during packet bursts.
+            self.packet_queue.put((_dt.datetime.now(), "UDP", src_ip,
+                                   src_port, self.port, data))
 
         try:
             sock.close()
@@ -1402,9 +1481,10 @@ class UdpListener(threading.Thread):
 
 
 class TcpClientWorker(threading.Thread):
-    def __init__(self, out_queue, stop_event, conn, addr, local_port):
+    def __init__(self, out_queue, packet_queue, stop_event, conn, addr, local_port):
         super().__init__(daemon=True)
         self.out_queue = out_queue
+        self.packet_queue = packet_queue
         self.stop_event = stop_event
         self.conn = conn
         self.addr = addr
@@ -1431,12 +1511,8 @@ class TcpClientWorker(threading.Thread):
                 if not data:
                     break
 
-                now = _dt.datetime.now()
-                events = decode_gateway_payload(data)
-                try:
-                    self.out_queue.put_nowait(("packet", now, "TCP", src_ip, src_port, self.local_port, data, events))
-                except queue.Full:
-                    pass
+                self.packet_queue.put((_dt.datetime.now(), "TCP", src_ip,
+                                       src_port, self.local_port, data))
         finally:
             try:
                 self.conn.close()
@@ -1446,9 +1522,10 @@ class TcpClientWorker(threading.Thread):
 
 
 class TcpListener(threading.Thread):
-    def __init__(self, out_queue, stop_event, bind_ip, port, source_filter):
+    def __init__(self, out_queue, packet_queue, stop_event, bind_ip, port, source_filter):
         super().__init__(daemon=True)
         self.out_queue = out_queue
+        self.packet_queue = packet_queue
         self.stop_event = stop_event
         self.bind_ip = bind_ip
         self.port = port
@@ -1492,7 +1569,7 @@ class TcpListener(threading.Thread):
                     pass
                 continue
 
-            worker = TcpClientWorker(self.out_queue, self.stop_event, conn, addr, self.port)
+            worker = TcpClientWorker(self.out_queue, self.packet_queue, self.stop_event, conn, addr, self.port)
             self.workers.append(worker)
             worker.start()
 
@@ -1568,17 +1645,14 @@ class PacketSender(threading.Thread):
                 self._put_limited_error(f"UDP {self.label} receive failed: {exc}")
                 return
             src_ip, src_port = addr
-            events = decode_gateway_payload(data)
             rtt_ms = None
             if self.last_udp_tx_time is not None:
                 rtt_ms = (time.monotonic() - self.last_udp_tx_time) * 1000.0
-            try:
-                self.out_queue.put_nowait(("packet", _dt.datetime.now(), "UDP", src_ip, src_port, local_port, data, events, {
-                    "tx_label": self.label,
-                    "tx_rtt_ms": rtt_ms,
-                }))
-            except queue.Full:
-                return
+            self.out_queue.put(("packet_raw", _dt.datetime.now(), "UDP",
+                                src_ip, src_port, local_port, data, {
+                                    "tx_label": self.label,
+                                    "tx_rtt_ms": rtt_ms,
+                                }))
 
     def _connect_tcp(self):
         if self.tcp_sock is not None:
@@ -1667,10 +1741,16 @@ HeartbeatSender = PacketSender
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AURIX Gateway Ethernet Logger")
+        self.title("Ethernet Logger")
         self.geometry("1180x760")
 
-        self.q = queue.Queue(maxsize=QUEUE_MAX_ITEMS)
+        # Never silently discard received packets.  Socket threads only copy
+        # datagrams into this unbounded queue; decoding and rendering happen on
+        # the GUI thread, which may temporarily lag behind a receive burst.
+        self.q = queue.Queue()
+        self.packet_q = queue.Queue()
+        self.packet_decoder = PacketDecoder(self.packet_q, self.q)
+        self.packet_decoder.start()
         self.stop_event = threading.Event()
         self.tx_stop_event = threading.Event()
         self.listeners = []
@@ -1683,7 +1763,6 @@ class App(tk.Tk):
         self.last_values = {}
         self.packet_count = 0
         self.signal_count = 0
-        self.dropped_packets = 0
         self.preview_lines = 0
         self.trace_rows = 0
         self.trace_start_time = None
@@ -1720,6 +1799,9 @@ class App(tk.Tk):
         self._last_file_flush = time.time()
         self._last_status_update = 0.0
         self._text_buffer = []
+        self._graph_list_dirty = False
+        self._graph_redraw_dirty = False
+        self._graph_settings_dirty = False
 
         self.bind_ip = tk.StringVar(value="0.0.0.0")
         self.ports = tk.StringVar(value=DEFAULT_RX_PORTS)
@@ -1747,7 +1829,9 @@ class App(tk.Tk):
         self.write_csv = tk.BooleanVar(value=True)
         self.write_text = tk.BooleanVar(value=True)
 
+        self._restore_app_settings()
         self._build_ui()
+        self._refresh_tx_table()
         self._refresh_graph_signal_list()
         self._redraw_graph()
         self.after(GUI_POLL_MS, self._poll_queue)
@@ -2030,6 +2114,36 @@ class App(tk.Tk):
             "signals": signal_names,
             "window_s": window_s,
             "view_mode": view_mode,
+            # Runtime state is deliberately not persisted: the logger always
+            # starts stopped, even if it was recording when it was closed.
+            "receiver": {
+                "bind_ip": self.bind_ip.get(),
+                "ports": self.ports.get(),
+                "source_ip": self.source_ip.get(),
+                "protocol": self.rx_protocol.get(),
+            },
+            "transmit_editor": {
+                "enabled": bool(self.heartbeat_enabled.get()),
+                "name": self.tx_name.get(),
+                "target_ip": self.heartbeat_target_ip.get(),
+                "port": self.heartbeat_port.get(),
+                "protocol": self.heartbeat_protocol.get(),
+                "interval": self.heartbeat_interval.get(),
+                "payload": self.heartbeat_payload.get(),
+                "format": self.tx_payload_format.get(),
+                "count": self.tx_count.get(),
+            },
+            "transmit_packets": self.tx_packets,
+            "display": {
+                "trace_mode": self.trace_mode.get(),
+                "time_mode": self.time_mode.get(),
+                "auto_scroll": bool(self.auto_scroll.get()),
+                "only_changes": bool(self.only_changes.get()),
+                "show_packet_summary": bool(self.show_packet_summary.get()),
+                "show_signals": bool(self.show_signals.get()),
+                "write_csv": bool(self.write_csv.get()),
+                "write_text": bool(self.write_text.get()),
+            },
         }
 
         tmp_file = GRAPH_SETTINGS_FILE + ".tmp"
@@ -2202,6 +2316,7 @@ class App(tk.Tk):
             return
         self.tx_packets.append(cfg)
         self._refresh_tx_table()
+        self._save_graph_settings()
         self._restart_tx_senders_if_running()
 
     def update_selected_tx_packet(self):
@@ -2219,6 +2334,7 @@ class App(tk.Tk):
             self.tx_packets[index] = cfg
             self._refresh_tx_table()
             self.tx_table.selection_set(str(index))
+            self._save_graph_settings()
             self._restart_tx_senders_if_running()
 
     def _on_tx_packet_select(self, _event=None):
@@ -2247,6 +2363,7 @@ class App(tk.Tk):
             if 0 <= index < len(self.tx_packets):
                 self.tx_packets.pop(index)
         self._refresh_tx_table()
+        self._save_graph_settings()
         self._restart_tx_senders_if_running()
 
     def toggle_selected_tx_packet(self, _event=None):
@@ -2257,6 +2374,7 @@ class App(tk.Tk):
         if 0 <= index < len(self.tx_packets):
             self.tx_packets[index]["enabled"] = not self.tx_packets[index].get("enabled", True)
             self._refresh_tx_table()
+            self._save_graph_settings()
             self._restart_tx_senders_if_running()
 
     def _ensure_default_tx_packet(self):
@@ -2284,6 +2402,53 @@ class App(tk.Tk):
         self.tx_senders = []
         self.heartbeat_sender = None
 
+    def _restore_app_settings(self):
+        """Restore safe UI preferences; never restore an active logger."""
+        receiver = self.graph_settings.get("receiver", {})
+        if isinstance(receiver, dict):
+            self.bind_ip.set(str(receiver.get("bind_ip", self.bind_ip.get())))
+            self.ports.set(str(receiver.get("ports", self.ports.get())))
+            self.source_ip.set(str(receiver.get("source_ip", self.source_ip.get())))
+            protocol = str(receiver.get("protocol", self.rx_protocol.get()))
+            if protocol in ("UDP", "TCP", "UDP+TCP"):
+                self.rx_protocol.set(protocol)
+
+        editor = self.graph_settings.get("transmit_editor", {})
+        if isinstance(editor, dict):
+            self.heartbeat_enabled.set(bool(editor.get("enabled", self.heartbeat_enabled.get())))
+            self.tx_name.set(str(editor.get("name", self.tx_name.get())))
+            self.heartbeat_target_ip.set(str(editor.get("target_ip", self.heartbeat_target_ip.get())))
+            self.heartbeat_port.set(editor.get("port", self.heartbeat_port.get()))
+            protocol = str(editor.get("protocol", self.heartbeat_protocol.get()))
+            if protocol in ("UDP", "TCP", "UDP+TCP"):
+                self.heartbeat_protocol.set(protocol)
+            self.heartbeat_interval.set(editor.get("interval", self.heartbeat_interval.get()))
+            self.heartbeat_payload.set(str(editor.get("payload", self.heartbeat_payload.get())))
+            payload_format = str(editor.get("format", self.tx_payload_format.get()))
+            if payload_format in ("ASCII", "HEX"):
+                self.tx_payload_format.set(payload_format)
+            self.tx_count.set(editor.get("count", self.tx_count.get()))
+
+        saved_packets = self.graph_settings.get("transmit_packets", [])
+        if isinstance(saved_packets, list):
+            self.tx_packets = [dict(packet) for packet in saved_packets if isinstance(packet, dict)]
+
+        display = self.graph_settings.get("display", {})
+        if isinstance(display, dict):
+            trace_mode = str(display.get("trace_mode", self.trace_mode.get()))
+            if trace_mode in ("Fixed", "Chronological"):
+                self.trace_mode.set(trace_mode)
+            time_mode = str(display.get("time_mode", self.time_mode.get()))
+            if time_mode in ("Relative", "Real-time"):
+                self.time_mode.set(time_mode)
+            for name, variable in (("auto_scroll", self.auto_scroll),
+                                   ("only_changes", self.only_changes),
+                                   ("show_packet_summary", self.show_packet_summary),
+                                   ("show_signals", self.show_signals),
+                                   ("write_csv", self.write_csv),
+                                   ("write_text", self.write_text)):
+                if name in display:
+                    variable.set(bool(display[name]))
     def _start_tx_senders(self):
         self.tx_stop_event.clear()
         self.tx_senders = []
@@ -2357,9 +2522,9 @@ class App(tk.Tk):
         self.listeners = []
         for port in ports:
             if rx_protocol in ("UDP", "UDP+TCP", "BOTH"):
-                self.listeners.append(UdpListener(self.q, self.stop_event, bind_ip, port, source_ip))
+                self.listeners.append(UdpListener(self.q, self.packet_q, self.stop_event, bind_ip, port, source_ip))
             if rx_protocol in ("TCP", "UDP+TCP", "BOTH"):
-                self.listeners.append(TcpListener(self.q, self.stop_event, bind_ip, port, source_ip))
+                self.listeners.append(TcpListener(self.q, self.packet_q, self.stop_event, bind_ip, port, source_ip))
 
         for listener in self.listeners:
             listener.start()
@@ -2922,9 +3087,9 @@ class App(tk.Tk):
         self.signal_value_text[key] = ev.get("value_text", str(raw))
         if key not in self.signal_history:
             self.signal_history[key] = deque(maxlen=MAX_GRAPH_POINTS)
-            self._refresh_graph_signal_list()
+            self._graph_list_dirty = True
         elif known_label != label:
-            self._refresh_graph_signal_list()
+            self._graph_list_dirty = True
         if self.trace_start_time is None:
             self.trace_start_time = now
         t = (now - self.trace_start_time).total_seconds()
@@ -2935,9 +3100,9 @@ class App(tk.Tk):
         if known_label != label and key in self.graph_selected_keys:
             settings_changed = True
         if settings_changed:
-            self._save_graph_settings()
+            self._graph_settings_dirty = True
         if key in self.graph_selected_keys:
-            self._redraw_graph()
+            self._graph_redraw_dirty = True
 
     def _redraw_graph(self):
         self.graph.delete("all")
@@ -3215,6 +3380,9 @@ class App(tk.Tk):
         # Aggressively drain the producer queue. Text output is batched, so this
         # can process thousands of received packets per GUI cycle without doing
         # thousands of expensive Tk insert/see/status operations.
+        # Schedule first so an exceptional packet cannot permanently cancel
+        # polling (Tk callbacks are otherwise lost when they raise).
+        self.after(GUI_POLL_MS, self._poll_queue)
         processed = 0
         start = time.time()
         max_items = MAX_QUEUE_ITEMS_PER_POLL
@@ -3236,7 +3404,14 @@ class App(tk.Tk):
                 self._flush_text_buffer()
                 messagebox.showerror("Logger error", item[1])
                 self.stop()
+            elif typ == "packet_raw":
+                _, now, protocol, src_ip, src_port, rx_port, data, *extra = item
+                extra_info = extra[0] if extra else None
+                events = decode_gateway_payload(data)
+                self._handle_packet(now, protocol, src_ip, src_port, rx_port, data, events, extra_info)
             elif typ == "packet":
+                # Backward compatibility for already-queued items during a
+                # source reload/debug session.
                 _, now, protocol, src_ip, src_port, rx_port, data, events, *extra = item
                 extra_info = extra[0] if extra else None
                 self._handle_packet(now, protocol, src_ip, src_port, rx_port, data, events, extra_info)
@@ -3255,12 +3430,23 @@ class App(tk.Tk):
                     ("tx", frame_name, protocol, local_ip, local_port, target_ip, port),
                 )
 
-        self.after(GUI_POLL_MS, self._poll_queue)
+        # Expensive Tk list/canvas operations are coalesced across the entire
+        # receive batch instead of being repeated for every decoded signal.
+        if self._graph_list_dirty:
+            self._refresh_graph_signal_list()
+            self._graph_list_dirty = False
+        if self._graph_settings_dirty:
+            self._save_graph_settings()
+            self._graph_settings_dirty = False
+        if self._graph_redraw_dirty:
+            self._redraw_graph()
+            self._graph_redraw_dirty = False
 
     def destroy(self):
         try:
             self._save_graph_settings()
             self.stop()
+            self.packet_q.put(None)
         finally:
             super().destroy()
 
