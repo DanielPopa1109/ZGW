@@ -2,6 +2,7 @@
 #define BCM_INFER_H
 
 #include <stdint.h>
+
 #include "bcm_model.h"
 
 typedef struct {
@@ -23,9 +24,14 @@ void BCM_BuildInput(const float input_voltage_v[BCM_SEQ_LEN],
                     const float channel_current_a[BCM_SEQ_LEN],
                     float channel_current_rating_a,
                     float input[BCM_INPUT_SIZE]);
+
 void BCM_Infer(const float input[BCM_INPUT_SIZE], float raw_output[BCM_OUTPUT_SIZE]);
-void BCM_DecodeOutput(const float raw_output[BCM_OUTPUT_SIZE], BCM_InferenceResult *result);
+
+void BCM_DecodeOutput(const float raw_output[BCM_OUTPUT_SIZE],
+                      BCM_InferenceResult *result);
+
 void BCM_EvaluateProtectionStatus(float input_voltage_v, float channel_current_a,
-                                  float channel_current_rating_a, BCM_ProtectionStatus *status);
+                                  float channel_current_rating_a,
+                                  BCM_ProtectionStatus *status);
 
 #endif /* BCM_INFER_H */

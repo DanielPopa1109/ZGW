@@ -115,6 +115,7 @@ FRAME_TYPES = {
     0x04: "DTCTransition",
     0x05: "AiModel",
     0x06: "CpuPerf",
+    0x07: "VehicleState",
 }
 
 ZGW_DATA_FRAME_BY_BUS = {
@@ -1063,6 +1064,40 @@ def decode_cpu_perf_event(data):
     return events
 
 
+def decode_vehicle_state_event(data):
+    if len(data) < 12:
+        return [{
+            "kind": "unknown",
+            "frame_name": "VehicleState",
+            "length": len(data),
+            "text": f"Malformed VehicleState frame: {len(data)} bytes",
+        }]
+
+    main_cycles = u32_be(data, 4)
+    vehicle_status = u32_be(data, 8)
+    events = [{
+        "kind": "packet",
+        "frame_type": 0x07,
+        "frame_name": "VehicleState",
+        "main_cycles": main_cycles,
+        "bus": "ETH",
+        "entry_count": 1,
+        "length": len(data),
+        "trailing": len(data) - 12,
+        "text": (
+            f"VehicleState: mainCycles={main_cycles}, "
+            f"vehicleStatus=0x{vehicle_status:08X}"
+        ),
+    }]
+    events.append(scalar_event(
+        "VehicleState",
+        "VehicleStatus",
+        vehicle_status,
+        f"0x{vehicle_status:08X}",
+    ))
+    return events
+
+
 def decode_time_sync_event(data):
     if len(data) < 40:
         return {
@@ -1342,6 +1377,9 @@ def decode_gateway_payload(data):
 
     if frame_type == 0x06:
         return decode_cpu_perf_event(data)
+
+    if frame_type == 0x07:
+        return decode_vehicle_state_event(data)
 
     if frame_type == 0x04:
         if len(data) < 17:

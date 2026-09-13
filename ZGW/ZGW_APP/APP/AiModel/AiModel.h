@@ -22,69 +22,69 @@
 
 typedef struct
 {
-    uint8 channelId;
-    float32 measuredCurrent_A;
-    float32 currentRating_A;
-    float32 predictedCurrent_A;
-    float32 faultSoonProbability;
-    float32 faultProbability[BCM_NUM_FAULT_CLASSES];
-    float32 currentUtilization;
-    uint8 predictedFaultClass;
-    uint8 impendingOvercurrent;
-    uint8 actualOvercurrent;
-    uint8 inferenceValid;
+        uint8 channelId;
+        float32 measuredCurrent_A;
+        float32 currentRating_A;
+        float32 predictedCurrent_A;
+        float32 faultSoonProbability;
+        float32 faultProbability[BCM_NUM_FAULT_CLASSES];
+        float32 currentUtilization;
+        uint8 predictedFaultClass;
+        uint8 impendingOvercurrent;
+        uint8 actualOvercurrent;
+        uint8 inferenceValid;
 } AiModel_ChannelResultType;
 
 typedef struct
 {
-    float32 inputVoltage_V;
-    uint8 undervoltage;
-    uint8 overvoltage;
-    uint8 inputValid;
-    uint8 inferenceValid;
-    uint8 windowReady;
-    uint8 dominantFaultChannel;
-    uint8 dominantFault;
-    uint32 inputTimestamp;
-    uint32 inferenceSequence;
-    uint32 channelExecutionTimeUs;
-    uint32 totalInferenceTimeUs;
-    uint32 processingTimeUs;
-    uint32 maxChannelExecutionTimeUs;
-    uint32 maxTotalInferenceTimeUs;
-    uint32 maxProcessingTimeUs;
-    uint32 errorFlags;
+        float32 inputVoltage_V;
+        uint8 undervoltage;
+        uint8 overvoltage;
+        uint8 inputValid;
+        uint8 inferenceValid;
+        uint8 windowReady;
+        uint8 dominantFaultChannel;
+        uint8 dominantFault;
+        uint32 inputTimestamp;
+        uint32 inferenceSequence;
+        uint32 channelExecutionTimeUs;
+        uint32 totalInferenceTimeUs;
+        uint32 processingTimeUs;
+        uint32 maxChannelExecutionTimeUs;
+        uint32 maxTotalInferenceTimeUs;
+        uint32 maxProcessingTimeUs;
+        uint32 errorFlags;
 } AiModel_GlobalResultType;
 
 typedef struct
 {
-    float32 inputVoltage_V;
-    AiModel_ChannelResultType channel[BCM_NUM_CHANNELS];
-    uint8 undervoltage;
-    uint8 overvoltage;
-    uint8 inputValid;
-    uint8 inferenceValid;
-    uint8 windowReady;
-    uint8 dominantFaultChannel;
-    uint8 dominantFault;
-    uint32 inputTimestamp;
-    uint32 inferenceSequence;
-    uint32 channelExecutionTimeUs;
-    uint32 totalInferenceTimeUs;
-    uint32 processingTimeUs;
-    uint32 maxChannelExecutionTimeUs;
-    uint32 maxTotalInferenceTimeUs;
-    uint32 maxProcessingTimeUs;
-    uint32 errorFlags;
+        float32 inputVoltage_V;
+        AiModel_ChannelResultType channel[BCM_NUM_CHANNELS];
+        uint8 undervoltage;
+        uint8 overvoltage;
+        uint8 inputValid;
+        uint8 inferenceValid;
+        uint8 windowReady;
+        uint8 dominantFaultChannel;
+        uint8 dominantFault;
+        uint32 inputTimestamp;
+        uint32 inferenceSequence;
+        uint32 channelExecutionTimeUs;
+        uint32 totalInferenceTimeUs;
+        uint32 processingTimeUs;
+        uint32 maxChannelExecutionTimeUs;
+        uint32 maxTotalInferenceTimeUs;
+        uint32 maxProcessingTimeUs;
+        uint32 errorFlags;
 } AiModel_ResultType;
 
 typedef struct
 {
-    float32 voltage_V;
-    float32 current_A[BCM_NUM_CHANNELS];
-    uint8 signalValid;
-    uint32 timestamp;
-    uint32 cycleCounter;
+        float32 voltage_V;
+        float32 current_A[BCM_NUM_CHANNELS];
+        uint8 signalValid;
+        uint32 timestamp;
+        uint32 cycleCounter;
 } AiModel_Pdm1SnapshotType;
 
 void AiModel_Init(void);

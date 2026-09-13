@@ -2032,7 +2032,7 @@ void PduR_DoIPCore2MainFunction(void)
 
     CpuPerf_Start(CPUPERF_ID_PDUR_DOIP_CORE2_MAIN_C2, &cpuPerfCtx);
 
-    PduR_DoIPMonitorSessionReset();
+    //PduR_DoIPMonitorSessionReset();
 
     if (PduR_DoIPTxMailbox.state == PDUR_DOIP_TX_STATE_PENDING)
     {

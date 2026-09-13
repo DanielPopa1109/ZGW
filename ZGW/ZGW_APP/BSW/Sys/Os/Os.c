@@ -67,9 +67,8 @@ void QM_LIN_Task_C0(void *pvParameters);
 void QM_BSW_Task_C0(void *pvParameters);
 void QM_APPL_Task_C0(void *pvParameters);
 void ASIL_BSW_Task_C1(void *pvParameters);
-void ASIL_APPL_Task_C1(void *pvParameters);
-void QM_APP_Task_C1(void *pvParameters);
-void ASIL_APPL_Task_C2(void *pvParameters);
+void QM_APPL_Task_C1(void *pvParameters);
+void ASIL_BSW_Task_C2(void *pvParameters);
 void QM_BSW_Task_C2(void *pvParameters);
 
 void Alarm5ms_Callback_QM_DIAG_Task_C0( TimerHandle_t_core0 xTimer_core0 );
@@ -80,8 +79,9 @@ void Alarm5ms_Callback_ASIL_BSW_Task_C0( TimerHandle_t_core0 xTimer_core0 );
 void Alarm5ms_Callback_QM_BSW_Task_C0( TimerHandle_t_core0 xTimer_core0 );
 void Alarm5ms_Callback_QM_APPL_Task_C0( TimerHandle_t_core0 xTimer_core0 );
 void Alarm5ms_Callback_ASIL_BSW_Task_C1( TimerHandle_t_core1 xTimer_core1);
-void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
-void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
+void Alarm5ms_Callback_QM_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1);
+void Alarm5ms_Callback_ASIL_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2);
+void Alarm5ms_Callback_QM_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2);
 
 #define OS_CPU_CORE_0                  0u
 #define OS_CPU_CORE_1                  1u
@@ -94,9 +94,8 @@ void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_STACK_CORE0_QM_LIN     ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE0_QM_APPL    ( configMINIMAL_STACK_SIZE_core0 * 2u )
 #define OS_TASK_STACK_CORE1_ASIL_BSW   ( configMINIMAL_STACK_SIZE_core1 * 8u )
-#define OS_TASK_STACK_CORE1_ASIL_APPL  ( configMINIMAL_STACK_SIZE_core1 * 8u )
-#define OS_TASK_STACK_CORE1_QM_APP     ( configMINIMAL_STACK_SIZE_core1 * 8u )
-#define OS_TASK_STACK_CORE2_APPL       ( configMINIMAL_STACK_SIZE_core2 * 8u )
+#define OS_TASK_STACK_CORE1_QM_APPL    ( configMINIMAL_STACK_SIZE_core1 * 8u )
+#define OS_TASK_STACK_CORE2_ASIL_BSW   ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_STACK_CORE2_QM_BSW     ( configMINIMAL_STACK_SIZE_core2 * 8u )
 #define OS_TASK_PRIO_CORE0_ASIL_BSW    28u
 #define OS_TASK_PRIO_CORE0_QM_BSW      26u
@@ -105,12 +104,10 @@ void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_TASK_PRIO_CORE0_QM_DIAG     23u
 #define OS_TASK_PRIO_CORE0_QM_APPL     21u
 #define OS_TASK_PRIO_CORE1_ASIL_BSW    29u
-#define OS_TASK_PRIO_CORE1_ASIL_APPL   28u
-#define OS_TASK_PRIO_CORE1_QM_APP      27u
+#define OS_TASK_PRIO_CORE1_QM_APPL     28u
 #define OS_TASK_PRIO_CORE0_ASIL_NVM    20u
-#define OS_TASK_PRIO_CORE2_QM_BSW      29u
-#define OS_TASK_PRIO_CORE2_APPL        28u
-#define OS_CORE2_MAIN_PERIOD_TICKS     pdMS_TO_TICKS_core2(5u)
+#define OS_TASK_PRIO_CORE2_QM_BSW      28u
+#define OS_TASK_PRIO_CORE2_ASIL_BSW    29u
 #define OS_ETH_STARTUP_INIT_YIELD_RETRIES 16u
 /*
  * Max Fls/Fee/NvM stack cycles ASIL_NVM runs per 5ms activation. Keep the batch
@@ -132,7 +129,7 @@ void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_INIT_FAIL_C1_APPL_TIMER     10u
 #define OS_INIT_FAIL_C1_ASIL_START     11u
 #define OS_INIT_FAIL_C1_APPL_START     12u
-#define OS_INIT_FAIL_C2_APPL_TASK      13u
+#define OS_INIT_FAIL_C2_ASIL_BSW_TASK  13u
 #define OS_INIT_FAIL_C2_QM_TASK        14u
 #define OS_INIT_FAIL_C0_QM_APPL_TASK   15u
 #define OS_INIT_FAIL_C0_QM_APPL_TIMER  16u
@@ -149,26 +146,27 @@ void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1);
 #define OS_INIT_FAIL_C0_QM_CAN_START   28u
 #define OS_INIT_FAIL_C0_QM_LIN_START   29u
 #define OS_INIT_FAIL_C0_ASIL_NVM_START 30u
-#define OS_INIT_FAIL_C1_QM_APP_TASK    31u
-#define OS_INIT_FAIL_C1_QM_APP_TIMER   32u
-#define OS_INIT_FAIL_C1_QM_APP_START   33u
+#define OS_INIT_FAIL_C2_ASIL_BSW_TIMER 31u
+#define OS_INIT_FAIL_C2_QM_TIMER       32u
+#define OS_INIT_FAIL_C2_ASIL_BSW_START 33u
+#define OS_INIT_FAIL_C2_QM_START       34u
 
 enum
 {
-        OS_NVM_STARTUP_INIT_WAIT = 0,
-        OS_NVM_STARTUP_READALL_START,
-        OS_NVM_STARTUP_READALL_WAIT,
-        OS_NVM_STARTUP_APPLY_READALL,
-        OS_NVM_STARTUP_TIME_LOAD_WAIT,
-        OS_NVM_STARTUP_TIME_STANDBY_PREPARE,
-        OS_NVM_STARTUP_TIME_STANDBY_WAIT,
-        OS_NVM_STARTUP_DEM_INIT,
-        OS_NVM_STARTUP_DEM_WAIT,
-        OS_NVM_STARTUP_OPERATION_CYCLE_START,
-        OS_NVM_STARTUP_OPERATION_CYCLE_WAIT,
-        OS_NVM_STARTUP_DEFERRED_FORMAT_START,
-        OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT,
-        OS_NVM_STARTUP_DONE
+    OS_NVM_STARTUP_INIT_WAIT = 0,
+    OS_NVM_STARTUP_READALL_START,
+    OS_NVM_STARTUP_READALL_WAIT,
+    OS_NVM_STARTUP_APPLY_READALL,
+    OS_NVM_STARTUP_TIME_LOAD_WAIT,
+    OS_NVM_STARTUP_TIME_STANDBY_PREPARE,
+    OS_NVM_STARTUP_TIME_STANDBY_WAIT,
+    OS_NVM_STARTUP_DEM_INIT,
+    OS_NVM_STARTUP_DEM_WAIT,
+    OS_NVM_STARTUP_OPERATION_CYCLE_START,
+    OS_NVM_STARTUP_OPERATION_CYCLE_WAIT,
+    OS_NVM_STARTUP_DEFERRED_FORMAT_START,
+    OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT,
+    OS_NVM_STARTUP_DONE
 };
 
 typedef struct
@@ -210,7 +208,7 @@ volatile uint8 Os_EthStackInitialized = 0u;
 volatile uint8 Os_EthNetifReadyBeforeStackInit = 0u;
 volatile uint32 Os_EthNetifWaitLoops = 0u;
 volatile uint32 Os_EthStartupYieldRetries = 0u;
-volatile uint32 Os_Core2AsilApplStackHighWater = 0u;
+volatile uint32 Os_Core2AsilBswStackHighWater = 0u;
 volatile uint32 Os_Core2QmBswStackHighWater = 0u;
 
 uint8 Alarm5ms_Flag_QM_DIAG_Task_C0 = 0u;
@@ -221,8 +219,9 @@ uint8 Alarm5ms_Flag_ASIL_BSW_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_QM_APPL_Task_C0 = 0u;
 uint8 Alarm5ms_Flag_ASIL_BSW_Task_C1 = 0u;
-uint8 Alarm5ms_Flag_ASIL_APPL_Task_C1 = 0u;
-uint8 Alarm5ms_Flag_QM_APP_Task_C1 = 0u;
+uint8 Alarm5ms_Flag_QM_APPL_Task_C1 = 0u;
+uint8 Alarm5ms_Flag_ASIL_BSW_Task_C2 = 0u;
+uint8 Alarm5ms_Flag_QM_BSW_Task_C2 = 0u;
 
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_DIAG_Task_C0;
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_CAN_Task_C0;
@@ -232,8 +231,9 @@ TimerHandle_t_core0 Handler_Alarm5ms_Callback_ASIL_BSW_Task_C0;
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_BSW_Task_C0;
 TimerHandle_t_core0 Handler_Alarm5ms_Callback_QM_APPL_Task_C0;
 TimerHandle_t_core1 Handler_Alarm5ms_Callback_ASIL_BSW_Task_C1;
-TimerHandle_t_core1 Handler_Alarm5ms_Callback_ASIL_APPL_Task_C1;
-TimerHandle_t_core1 Handler_Alarm5ms_Callback_QM_APP_Task_C1;
+TimerHandle_t_core1 Handler_Alarm5ms_Callback_QM_APPL_Task_C1;
+TimerHandle_t_core2 Handler_Alarm5ms_Callback_ASIL_BSW_Task_C2;
+TimerHandle_t_core2 Handler_Alarm5ms_Callback_QM_BSW_Task_C2;
 
 TaskHandle_t_core0 QM_DIAG_Task_C0_THandle ;
 TaskHandle_t_core0 QM_CAN_Task_C0_THandle ;
@@ -243,9 +243,8 @@ TaskHandle_t_core0 ASIL_BSW_Task_C0_THandle ;
 TaskHandle_t_core0 QM_BSW_Task_C0_THandle;
 TaskHandle_t_core0 QM_APPL_Task_C0_THandle;
 TaskHandle_t_core1 ASIL_BSW_Task_C1_THandle;
-TaskHandle_t_core1 ASIL_APPL_Task_C1_THandle;
-TaskHandle_t_core1 QM_APP_Task_C1_THandle;
-TaskHandle_t_core2 ASIL_APPL_Task_C2_THandle;
+TaskHandle_t_core1 QM_APPL_Task_C1_THandle;
+TaskHandle_t_core2 ASIL_BSW_Task_C2_THandle;
 TaskHandle_t_core2 QM_BSW_Task_C2_THandle;
 
 volatile uint8 Os_FreeRtosInitFailureCore = 0xFFu;
@@ -260,10 +259,9 @@ long long QM_LIN_Task_C0_Counter = 0;
 long long QM_BSW_Task_C0_Counter = 0;
 long long QM_APPL_Task_C0_Counter = 0;
 long long ASIL_BSW_Task_C1_Counter = 0;
-long long ASIL_APPL_Task_C1_Counter = 0;
-long long QM_APP_Task_C1_Counter = 0;
+long long QM_APPL_Task_C1_Counter = 0;
 long long AiModel_MainFunction_Counter = 0;
-long long ASIL_APPL_Task_C2_Counter = 0;
+long long ASIL_BSW_Task_C2_Counter = 0;
 long long QM_BSW_Task_C2_Counter = 0;
 volatile uint32 Os_NvMBudgetHitCounter = 0u;
 volatile uint8 Os_NvMStartupState = OS_NVM_STARTUP_INIT_WAIT;
@@ -315,6 +313,7 @@ void Os_Init_C0(void)
             1u,
             NULL,
             Alarm5ms_Callback_QM_DIAG_Task_C0);
+
     if(Handler_Alarm5ms_Callback_QM_DIAG_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_QM_DIAG_TIMER);
@@ -325,6 +324,7 @@ void Os_Init_C0(void)
             1u,
             NULL,
             Alarm5ms_Callback_QM_CAN_Task_C0);
+
     if(Handler_Alarm5ms_Callback_QM_CAN_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_QM_CAN_TIMER);
@@ -335,22 +335,22 @@ void Os_Init_C0(void)
             1u,
             NULL,
             Alarm5ms_Callback_QM_LIN_Task_C0);
+
     if(Handler_Alarm5ms_Callback_QM_LIN_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_QM_LIN_TIMER);
     }
-
 
     Handler_Alarm5ms_Callback_ASIL_NVM_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASIL_NVM_Task_C0",
             pdMS_TO_TICKS_core0(5u),
             1u,
             NULL,
             Alarm5ms_Callback_ASIL_NVM_Task_C0);
+
     if(Handler_Alarm5ms_Callback_ASIL_NVM_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_ASIL_NVM_TIMER);
     }
-
 
     Handler_Alarm5ms_Callback_ASIL_BSW_Task_C0 = xTimerCreate_core0("Alarm5ms_Callback_ASIL_BSW_Task_C0",
             pdMS_TO_TICKS_core0(5u),
@@ -368,6 +368,7 @@ void Os_Init_C0(void)
             1u,
             NULL,
             Alarm5ms_Callback_QM_BSW_Task_C0);
+
     if(Handler_Alarm5ms_Callback_QM_BSW_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_QM_TIMER);
@@ -378,6 +379,7 @@ void Os_Init_C0(void)
             1u,
             NULL,
             Alarm5ms_Callback_QM_APPL_Task_C0);
+
     if(Handler_Alarm5ms_Callback_QM_APPL_Task_C0 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_QM_APPL_TIMER);
@@ -403,7 +405,6 @@ void Os_Init_C0(void)
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_ASIL_NVM_START);
     }
 
-
     if(xTimerStart_core0(Handler_Alarm5ms_Callback_ASIL_BSW_Task_C0, pdMS_TO_TICKS_core0(5u)) != pdPASS_core0)
     {
         Os_InitFailure(OS_CPU_CORE_0, OS_INIT_FAIL_C0_ASIL_START);
@@ -427,7 +428,7 @@ void Os_Init_C1(void)
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_ASIL_TASK);
     }
 
-    if(xTaskCreate_core1(ASIL_APPL_Task_C1, "ASIL_APPL_Task_C1", OS_TASK_STACK_CORE1_ASIL_APPL, NULL, OS_TASK_PRIO_CORE1_ASIL_APPL, &ASIL_APPL_Task_C1_THandle) != pdPASS_core1)
+    if(xTaskCreate_core1(QM_APPL_Task_C1, "QM_APPL_Task_C1", OS_TASK_STACK_CORE1_QM_APPL, NULL, OS_TASK_PRIO_CORE1_QM_APPL, &QM_APPL_Task_C1_THandle) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_TASK);
     }
@@ -443,12 +444,12 @@ void Os_Init_C1(void)
     }
 
 
-    Handler_Alarm5ms_Callback_ASIL_APPL_Task_C1 = xTimerCreate_core1("Alarm5ms_Callback_ASIL_APPL_Task_C1",
+    Handler_Alarm5ms_Callback_QM_APPL_Task_C1 = xTimerCreate_core1("Alarm5ms_Callback_QM_APPL_Task_C1",
             pdMS_TO_TICKS_core1(5u),
             1u,
             NULL,
-            Alarm5ms_Callback_ASIL_APPL_Task_C1);
-    if(Handler_Alarm5ms_Callback_ASIL_APPL_Task_C1 == NULL)
+            Alarm5ms_Callback_QM_APPL_Task_C1);
+    if(Handler_Alarm5ms_Callback_QM_APPL_Task_C1 == NULL)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_TIMER);
     }
@@ -458,28 +459,54 @@ void Os_Init_C1(void)
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_ASIL_START);
     }
 
-    if(xTimerStart_core1(Handler_Alarm5ms_Callback_ASIL_APPL_Task_C1, pdMS_TO_TICKS_core1(5u)) != pdPASS_core1)
+    if(xTimerStart_core1(Handler_Alarm5ms_Callback_QM_APPL_Task_C1, pdMS_TO_TICKS_core1(5u)) != pdPASS_core1)
     {
         Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_APPL_START);
     }
-
-//    if(xTimerStart_core1(Handler_Alarm5ms_Callback_QM_APP_Task_C1, pdMS_TO_TICKS_core1(5u)) != pdPASS_core1)
-//    {
-//        Os_InitFailure(OS_CPU_CORE_1, OS_INIT_FAIL_C1_QM_APP_START);
-//    }
 }
 
 void Os_Init_C2(void)
 {
-    if(xTaskCreate_core2(ASIL_APPL_Task_C2, "ASIL_APPL_Task_C2", OS_TASK_STACK_CORE2_APPL, NULL, OS_TASK_PRIO_CORE2_APPL, &ASIL_APPL_Task_C2_THandle) != pdPASS_core2)
+    if(xTaskCreate_core2(ASIL_BSW_Task_C2, "ASIL_BSW_Task_C2", OS_TASK_STACK_CORE2_ASIL_BSW, NULL, OS_TASK_PRIO_CORE2_ASIL_BSW, &ASIL_BSW_Task_C2_THandle) != pdPASS_core2)
     {
-        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_APPL_TASK);
+        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_ASIL_BSW_TASK);
     }
 
     if(xTaskCreate_core2(QM_BSW_Task_C2, "QM_BSW_Task_C2", OS_TASK_STACK_CORE2_QM_BSW, NULL, OS_TASK_PRIO_CORE2_QM_BSW, &QM_BSW_Task_C2_THandle) != pdPASS_core2)
     {
         Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_QM_TASK);
     }
+
+    Handler_Alarm5ms_Callback_ASIL_BSW_Task_C2 = xTimerCreate_core2("Alarm5ms_Callback_ASIL_BSW_Task_C2",
+            pdMS_TO_TICKS_core2(5u),
+            1u,
+            NULL,
+            Alarm5ms_Callback_ASIL_BSW_Task_C2);
+    if(Handler_Alarm5ms_Callback_ASIL_BSW_Task_C2 == NULL)
+    {
+        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_ASIL_BSW_TIMER);
+    }
+
+    Handler_Alarm5ms_Callback_QM_BSW_Task_C2 = xTimerCreate_core2("Alarm5ms_Callback_QM_BSW_Task_C2",
+            pdMS_TO_TICKS_core2(5u),
+            1u,
+            NULL,
+            Alarm5ms_Callback_QM_BSW_Task_C2);
+    if(Handler_Alarm5ms_Callback_QM_BSW_Task_C2 == NULL)
+    {
+        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_QM_TIMER);
+    }
+
+    if(xTimerStart_core2(Handler_Alarm5ms_Callback_ASIL_BSW_Task_C2, pdMS_TO_TICKS_core2(5u)) != pdPASS_core2)
+    {
+        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_ASIL_BSW_START);
+    }
+
+    if(xTimerStart_core2(Handler_Alarm5ms_Callback_QM_BSW_Task_C2, pdMS_TO_TICKS_core2(5u)) != pdPASS_core2)
+    {
+        Os_InitFailure(OS_CPU_CORE_2, OS_INIT_FAIL_C2_QM_START);
+    }
+
     CpuPerf_RegisterMonitoredTask(OS_CPU_CORE_2, (const void *)QM_BSW_Task_C2_THandle);
 }
 
@@ -894,15 +921,20 @@ static void Os_NvMStartup_MainFunction(void)
             }
 
             (void)Dem_SetOperationCycleState(DEM_DEFAULT_OPERATION_CYCLE, DEM_CYCLE_STATE_START);
+
             Os_NvMStartupState = OS_NVM_STARTUP_OPERATION_CYCLE_WAIT;
+
             break;
 
         case OS_NVM_STARTUP_OPERATION_CYCLE_WAIT:
+
             Dem_MainFunction();
+
             if (NvM_GetStatus() == NVM_IDLE)
             {
                 Os_NvMStartupState = OS_NVM_STARTUP_DEFERRED_FORMAT_START;
             }
+
             break;
 
         case OS_NVM_STARTUP_DEFERRED_FORMAT_START:
@@ -921,6 +953,7 @@ static void Os_NvMStartup_MainFunction(void)
                 Os_NvMStartup_RecordError();
                 Os_NvMStartupState = OS_NVM_STARTUP_DONE;
             }
+
             break;
 
         case OS_NVM_STARTUP_DEFERRED_FORMAT_WAIT:
@@ -928,6 +961,7 @@ static void Os_NvMStartup_MainFunction(void)
             {
                 Os_NvMStartupState = OS_NVM_STARTUP_DONE;
             }
+
             break;
 
         case OS_NVM_STARTUP_DONE:
@@ -936,7 +970,6 @@ static void Os_NvMStartup_MainFunction(void)
     }
 }
 
-
 void ASIL_BSW_Task_C0(void *pvParameters)
 {
     while(1)
@@ -944,12 +977,17 @@ void ASIL_BSW_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_ASIL_BSW_Task_C0)
         {
             CpuPerf_ContextType cpuPerfCtx;
+
             Alarm5ms_Flag_ASIL_BSW_Task_C0 = 0u;
+
             CpuPerf_Start(CPUPERF_ID_OS_ASIL_BSW_TASK_C0, &cpuPerfCtx);
+
             SysMgr_MainFunction();
             serviceCpuWatchdog();
             serviceSafetyWatchdog();
+
             CpuPerf_Stop(CPUPERF_ID_OS_ASIL_BSW_TASK_C0, &cpuPerfCtx);
+
             ASIL_BSW_Task_C0_Counter ++;
 
         }
@@ -972,30 +1010,44 @@ void ASIL_NVM_Task_C0(void *pvParameters)
         {
             CpuPerf_ContextType activationPerfCtx;
             CpuPerf_ContextType segmentPerfCtx;
+
             Alarm5ms_Flag_ASIL_NVM_Task_C0 = 0u;
+
             CpuPerf_Start(CPUPERF_ID_OS_ASIL_NVM_TASK_C0, &activationPerfCtx);
             CpuPerf_Start(CPUPERF_ID_OS_NVM_STARTUP_MAIN_C0, &segmentPerfCtx);
+
             Os_NvMStartup_MainFunction();
+
             CpuPerf_Stop(CPUPERF_ID_OS_NVM_STARTUP_MAIN_C0, &segmentPerfCtx);
             nvmCycleBudget = OS_NVM_MAIN_CYCLES_PER_ACTIVATION;
+
             do
             {
                 CpuPerf_Start(CPUPERF_ID_OS_NVM_FLS_MAIN_C0, &segmentPerfCtx);
+
                 Fls_MainFunction();
+
                 CpuPerf_Stop(CPUPERF_ID_OS_NVM_FLS_MAIN_C0, &segmentPerfCtx);
                 CpuPerf_Start(CPUPERF_ID_OS_NVM_FEE_MAIN_C0, &segmentPerfCtx);
+
                 Fee_MainFunction();
+
                 CpuPerf_Stop(CPUPERF_ID_OS_NVM_FEE_MAIN_C0, &segmentPerfCtx);
                 CpuPerf_Start(CPUPERF_ID_OS_NVM_NVM_MAIN_C0, &segmentPerfCtx);
+
                 NvM_MainFunction();
+
                 CpuPerf_Stop(CPUPERF_ID_OS_NVM_NVM_MAIN_C0, &segmentPerfCtx);
 
                 ASIL_NVM_Task_C0_Counter ++;
+
                 if (nvmCycleBudget > 0u)
                 {
                     nvmCycleBudget--;
                 }
+
                 taskYIELD_core0();
+
             } while ((nvmCycleBudget > 0u) && (Os_NvMStackHasPendingJobs() != FALSE));
 
             if ((nvmCycleBudget == 0u) && (Os_NvMStackHasPendingJobs() != FALSE))
@@ -1022,7 +1074,6 @@ void QM_BSW_Task_C0(void *pvParameters)
         {
             Alarm5ms_Flag_QM_BSW_Task_C0 = 0u;
             Com_MainFunctionRx();
-            GatewaySwc_RequestComMainFunctionTx();
             ComM_MainFunction();
             Nm_MainFunction();
             CanNm_MainFunction();
@@ -1045,10 +1096,17 @@ void QM_APPL_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_QM_APPL_Task_C0)
         {
             Alarm5ms_Flag_QM_APPL_Task_C0 = 0u;
+
             if (SYSMGR_RUN == SysMgr_EcuState)
             {
                 GatewaySwc_MainFunction();
+                CodingApp_MainFunction();
+                ParallelFlashSwc_MainFunction();
             }
+
+            GatewaySwc_RequestLinIfMainFunction();
+            GatewaySwc_RequestComMainFunctionTx();
+            TimeBase_MainFunction();
             QM_APPL_Task_C0_Counter++;
         }
         else
@@ -1068,7 +1126,6 @@ void QM_LIN_Task_C0(void *pvParameters)
         {
             Alarm5ms_Flag_QM_LIN_Task_C0 = 0u;
             LinSM_MainFunction();
-            GatewaySwc_RequestLinIfMainFunction();
             LinTp_MainFunction();
             LinDiag_MainFunction();
             QM_LIN_Task_C0_Counter ++;
@@ -1112,12 +1169,9 @@ void QM_DIAG_Task_C0(void *pvParameters)
         if(1u == Alarm5ms_Flag_QM_DIAG_Task_C0)
         {
             Alarm5ms_Flag_QM_DIAG_Task_C0 = 0u;
-            TimeBase_MainFunction();
             PduR_DoIPCore0MainFunction();
             Dcm_MainFunction();
             Dem_MainFunction();
-            CodingApp_MainFunction();
-            ParallelFlashSwc_MainFunction();
             QM_DIAG_Task_C0_Counter ++;
         }
         else
@@ -1148,15 +1202,15 @@ void ASIL_BSW_Task_C1(void *pvParameters)
     }
 }
 
-void ASIL_APPL_Task_C1(void *pvParameters)
+void QM_APPL_Task_C1(void *pvParameters)
 {
     while(1)
     {
-        if(1u == Alarm5ms_Flag_ASIL_APPL_Task_C1)
+        if(1u == Alarm5ms_Flag_QM_APPL_Task_C1)
         {
-            Alarm5ms_Flag_ASIL_APPL_Task_C1 = 0u;
+            Alarm5ms_Flag_QM_APPL_Task_C1 = 0u;
             AiModel_MainFunction();
-            ASIL_APPL_Task_C1_Counter++;
+            QM_APPL_Task_C1_Counter++;
         }
         else
         {
@@ -1167,43 +1221,25 @@ void ASIL_APPL_Task_C1(void *pvParameters)
     }
 }
 
-void QM_APP_Task_C1(void *pvParameters)
+void ASIL_BSW_Task_C2(void *pvParameters)
 {
-    while(1)
-    {
-        if(1u == Alarm5ms_Flag_QM_APP_Task_C1)
-        {
-            Alarm5ms_Flag_QM_APP_Task_C1 = 0u;
-
-            QM_APP_Task_C1_Counter++;
-        }
-        else
-        {
-            /* Do nothing. */
-        }
-
-        vTaskSuspend_core1(NULL);
-    }
-}
-
-void ASIL_APPL_Task_C2(void *pvParameters)
-{
-    TickType_t_core2 lastWakeTime;
-
     (void)pvParameters;
 
-    lastWakeTime = xTaskGetTickCount_core2();
-
     while(1)
     {
-        CpuPerf_ContextType cpuPerfCtx;
-        vTaskDelayUntil_core2(&lastWakeTime, OS_CORE2_MAIN_PERIOD_TICKS);
-        CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
+        if(1u == Alarm5ms_Flag_ASIL_BSW_Task_C2)
+        {
+            Alarm5ms_Flag_ASIL_BSW_Task_C2 = 0u;
+            Os_Core2AsilBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(ASIL_BSW_Task_C2_THandle);
+            serviceCpuWatchdog();
+            ASIL_BSW_Task_C2_Counter++;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
 
-        Os_Core2AsilApplStackHighWater =
-                (uint32)uxTaskGetStackHighWaterMark_core2(ASIL_APPL_Task_C2_THandle);
-        serviceCpuWatchdog();
-        ASIL_APPL_Task_C2_Counter++;
+        vTaskSuspend_core2(NULL);
     }
 }
 
@@ -1222,11 +1258,17 @@ static uint8 Os_TryInitEthStackCore2(void)
     Os_EthNetifReadyBeforeStackInit = 1u;
 
     EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_ETH_STARTUP_ENTER);
+
     EthStack_Init();
+
     EthTimeSync_Init();
+
     Gptp_Lab_Init();
+
     UdpNm_Init();
+
     EthSM_Init();
+
     Os_EthStackInitialized = 1u;
 
     return 1u;
@@ -1234,97 +1276,134 @@ static uint8 Os_TryInitEthStackCore2(void)
 
 void QM_BSW_Task_C2(void *pvParameters)
 {
-    TickType_t_core2 lastWakeTime;
     uint32 startupRetry;
 
     (void)pvParameters;
 
-    /* This must run after the core2 scheduler starts. With NO_SYS == 0,
-     * LWIP_GETH_Init() calls tcpip_init(), which creates tcpip_thread; the
-     * netif is initialized inside tcpip_thread, not synchronously in core2_main().
-     */
-
     EthStartupTiming_Capture(ETHSTARTUPTIMING_EVENT_ETH_STARTUP_ENTER);
+
     (void)LWIP_GETH_Init(lwip_geth_handle);
 
     Os_EthNetifWaitLoops = 0u;
+
     for (startupRetry = 0u;
             (startupRetry < OS_ETH_STARTUP_INIT_YIELD_RETRIES) &&
-            (Os_TryInitEthStackCore2() == 0u);
+                    (Os_TryInitEthStackCore2() == 0u);
             startupRetry++)
     {
         Os_EthStartupYieldRetries++;
         taskYIELD_core2();
     }
 
-    lastWakeTime = xTaskGetTickCount_core2();
     if (Os_EthStackInitialized != 0u)
     {
         UdpNm_MainFunction();
         EthTimeSync_MainFunction(5u);
+
         Gptp_Lab_MainFunction(5u);
+
         SomeIpSd_MainFunction(5);
 
         lwip_geth_Lwip_pollTimerFlags();
+
         lwip_geth_Lwip_pollReceiveFlags();
+
         lwip_geth_Lwip_watchRxProgress();
+
         TcpIp_MainFunction();
+
         SoAd_MainFunction();
+
         GatewaySwc_EthernetMainFunction();
+
         DoIP_MainFunction(5);
+
         PduR_DoIPCore2MainFunction();
+
         SomeIp_MainFunction(5);
 
         EthSM_MainFunction();
+
         EthernetDiag_MainFunction();
     }
 
     while(1)
     {
-        CpuPerf_ContextType cpuPerfCtx;
-        CpuPerf_ContextType componentPerfCtx;
-
-        vTaskDelayUntil_core2(&lastWakeTime, OS_CORE2_MAIN_PERIOD_TICKS);
-        CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
-
-        if (Os_EthStackInitialized == 0u)
+        if(1u == Alarm5ms_Flag_QM_BSW_Task_C2)
         {
-            Os_EthNetifWaitLoops++;
-            (void)Os_TryInitEthStackCore2();
+            CpuPerf_ContextType cpuPerfCtx;
+            CpuPerf_ContextType componentPerfCtx;
+
+            Alarm5ms_Flag_QM_BSW_Task_C2 = 0u;
+            CpuPerf_Start(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
+
+            if (Os_EthStackInitialized == 0u)
+            {
+                Os_EthNetifWaitLoops++;
+                (void)Os_TryInitEthStackCore2();
+            }
+
+            if (Os_EthStackInitialized != 0u)
+            {
+                CpuPerf_Start(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
+
+                UdpNm_MainFunction();
+
+                EthTimeSync_MainFunction(5u);
+
+                Gptp_Lab_MainFunction(5u);
+
+                SomeIpSd_MainFunction(5);
+
+                CpuPerf_Stop(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
+
+                CpuPerf_Start(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
+
+                lwip_geth_Lwip_pollTimerFlags();
+
+                lwip_geth_Lwip_pollReceiveFlags();
+
+                lwip_geth_Lwip_watchRxProgress();
+
+                CpuPerf_Stop(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
+
+                TcpIp_MainFunction();
+
+                SoAd_MainFunction();
+
+                GatewaySwc_EthernetMainFunction();
+
+                DoIP_MainFunction(5);
+
+                PduR_DoIPCore2MainFunction();
+
+                CpuPerf_Start(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
+
+                SomeIp_MainFunction(5);
+
+                CpuPerf_Stop(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
+
+                CpuPerf_Start(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
+
+                EthSM_MainFunction();
+
+                EthernetDiag_MainFunction();
+
+                CpuPerf_Stop(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
+            }
+
+            Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
+
+            CpuPerf_Stop(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
+
+            QM_BSW_Task_C2_Counter++;
+        }
+        else
+        {
+            /* Do nothing. */
         }
 
-        if (Os_EthStackInitialized != 0u)
-        {
-            CpuPerf_Start(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
-            UdpNm_MainFunction();
-            EthTimeSync_MainFunction(5u);
-            Gptp_Lab_MainFunction(5u);
-            SomeIpSd_MainFunction(5);
-            CpuPerf_Stop(CPUPERF_ID_C2_NETWORK_MGMT, &componentPerfCtx);
-
-            CpuPerf_Start(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
-            lwip_geth_Lwip_pollTimerFlags();
-            lwip_geth_Lwip_pollReceiveFlags();
-            lwip_geth_Lwip_watchRxProgress();
-            CpuPerf_Stop(CPUPERF_ID_C2_LWIP_SERVICE, &componentPerfCtx);
-            TcpIp_MainFunction();
-            SoAd_MainFunction();
-            GatewaySwc_EthernetMainFunction();
-            DoIP_MainFunction(5);
-            PduR_DoIPCore2MainFunction();
-            CpuPerf_Start(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
-            SomeIp_MainFunction(5);
-            CpuPerf_Stop(CPUPERF_ID_C2_SOMEIP, &componentPerfCtx);
-
-            CpuPerf_Start(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
-            EthSM_MainFunction();
-            EthernetDiag_MainFunction();
-            CpuPerf_Stop(CPUPERF_ID_C2_ETH_STATE_DIAG, &componentPerfCtx);
-        }
-
-        Os_Core2QmBswStackHighWater = (uint32)uxTaskGetStackHighWaterMark_core2(QM_BSW_Task_C2_THandle);
-        CpuPerf_Stop(CPUPERF_ID_OS_QM_BSW_TASK_C2, &cpuPerfCtx);
-        QM_BSW_Task_C2_Counter++;
+        vTaskSuspend_core2(NULL);
     }
 }
 
@@ -1376,14 +1455,20 @@ void Alarm5ms_Callback_ASIL_BSW_Task_C1( TimerHandle_t_core1 xTimer_core1 )
     vTaskResume_core1(ASIL_BSW_Task_C1_THandle);
 }
 
-void Alarm5ms_Callback_ASIL_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1 )
+void Alarm5ms_Callback_QM_APPL_Task_C1( TimerHandle_t_core1 xTimer_core1 )
 {
-    Alarm5ms_Flag_ASIL_APPL_Task_C1 = 1u;
-    vTaskResume_core1(ASIL_APPL_Task_C1_THandle);
+    Alarm5ms_Flag_QM_APPL_Task_C1 = 1u;
+    vTaskResume_core1(QM_APPL_Task_C1_THandle);
 }
 
-void Alarm5ms_Callback_QM_APP_Task_C1( TimerHandle_t_core1 xTimer_core1 )
+void Alarm5ms_Callback_ASIL_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2 )
 {
-    Alarm5ms_Flag_QM_APP_Task_C1 = 1u;
-    vTaskResume_core1(QM_APP_Task_C1_THandle);
+    Alarm5ms_Flag_ASIL_BSW_Task_C2 = 1u;
+    vTaskResume_core2(ASIL_BSW_Task_C2_THandle);
+}
+
+void Alarm5ms_Callback_QM_BSW_Task_C2( TimerHandle_t_core2 xTimer_core2 )
+{
+    Alarm5ms_Flag_QM_BSW_Task_C2 = 1u;
+    vTaskResume_core2(QM_BSW_Task_C2_THandle);
 }

@@ -130,13 +130,6 @@ void safetyKitSswLbist(void)
                     /* SM:LBIST_CFG */
                     safetyKitTriggerLbist();
                 }
-                else
-                {
-                    while(1)
-                    {
-                        __debug();
-                    }
-                }
             }
 
             McuSm_SswStatusData.lbistStatus = (uint8)g_SafetyKitStatus.sswStatus.lbistStatus;

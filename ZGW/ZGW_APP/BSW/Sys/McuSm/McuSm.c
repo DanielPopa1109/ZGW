@@ -363,8 +363,6 @@ void McuSm_PerformResetHook(uint32 resetReason, uint32 resetInformation)
      * session once it reaches the [49,52] window. */
     McuSm_PublishFblResetCounter();
 
-    while(1){__debug();}
-
     McuSm_ResetHookPerformCounter++;
 
     IfxScuRcu_performReset(IfxScuRcu_ResetType_system, 0u);

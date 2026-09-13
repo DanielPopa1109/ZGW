@@ -1,13 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="QM_APP_Task_C1"/>
+		<item key="selection" value="PduR"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
+			<item value="pdur"/>
+			<item value="Alarm5ms_Flag_QM_DIAG_Task_C0"/>
+			<item value="Alarm5ms_Callback_QM_DIAG_Task_C0"/>
+			<item value="OS_TASK_PRIO_CORE2_APPL"/>
+			<item value="ASIL_APPL_Task_C2"/>
+			<item value="QM_BSW_Task_C2"/>
+			<item value="OS_TASK_PRIO_CORE2_QM_BSW"/>
+			<item value="c1"/>
 			<item value="QM_APP_Task_C1"/>
 			<item value="qm_app_task_c1"/>
 			<item value="qm"/>
@@ -15,14 +23,6 @@
 			<item value="Fbl_FlashProgram"/>
 			<item value="program"/>
 			<item value="Program"/>
-			<item value="flash"/>
-			<item value="prgoram"/>
-			<item value="compat"/>
-			<item value="Fbl_EnableCpuSysconSafetyProtection"/>
-			<item value="trap7"/>
-			<item value="IfxSmu_Alarm_SMU_Safety_FfCorrectableErrorDetected"/>
-			<item value="core0_main"/>
-			<item value="performreset"/>
 		</list>
 		<list key="replacehistory">
 		</list>
