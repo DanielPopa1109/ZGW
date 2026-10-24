@@ -164,7 +164,7 @@ static uint8 ParallelFlashSwc_LinForwardExt;
  * slave response that later arrives on DCM_RX_..._EXT_PHYS / DCM_RX_LIN_PHYS can be
  * tagged with the originating node's extended address before the Dcm relays it back
  * to the DoIP tester. */
-#define PARALLELFLASHSWC_RESP_EXT_PDU_COUNT 12u
+#define PARALLELFLASHSWC_RESP_EXT_PDU_COUNT 13u
 static uint8 ParallelFlashSwc_RespExtByPdu[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 static uint8 ParallelFlashSwc_RespExtValid[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
 static ParallelFlashSwc_ForwardTxAckContextType ParallelFlashSwc_ForwardTxAckCtx[PARALLELFLASHSWC_RESP_EXT_PDU_COUNT];
@@ -187,6 +187,13 @@ static const PduIdType ParallelFlashSwc_CanExtTxPdus[] =
 {
     DCM_TX_CAN_EXT_PHYS,
     DCM_TX_CAN_EXT_PHYS_2
+};
+
+/* G26 replies on 0x709. Its dedicated TP channel also uses real target FC
+ * and never substitutes a CAN TX confirmation for a UDS response. */
+static const PduIdType ParallelFlashSwc_G26ExtTxPdus[] =
+{
+    DCM_TX_CAN_G26_PHYS
 };
 
 static const PduIdType ParallelFlashSwc_CanFdExtTxPdus[] =
@@ -421,7 +428,7 @@ void ParallelFlashSwc_BroadcastTesterPresent(void)
     {
         0x42u,                                /* CAN-FD: PDM1              */
         0x51u,                                /* LIN:    HVDCDC            */
-        0x54u, 0x56u, 0x58u, 0x59u          /* CAN:    CBM, DMU, ELC, FRBE */
+        0x54u, 0x55u, 0x56u, 0x58u, 0x59u   /* CAN: CBM, G26, DMU, ELC, FRBE */
     };
     /* 3E 80: TesterPresent, suppressPositiveResponse - the nodes refresh their session
      * timeout without replying, so no response relay traffic is generated. */
@@ -852,6 +859,14 @@ static Std_ReturnType ParallelFlashSwc_SendForwardOnBus(GatewaySwc_BusType busTy
     switch (busType)
     {
         case GATEWAYSWC_BUS_CAN:
+            if (extendedAddress == 0x55u)
+            {
+                return ParallelFlashSwc_SendDiagnosticFrame(ParallelFlashSwc_G26ExtTxPdus,
+                                                            1u,
+                                                            extendedAddress,
+                                                            udsRequest,
+                                                            udsRequestLength);
+            }
             return ParallelFlashSwc_SendDiagnosticFrame(ParallelFlashSwc_CanExtTxPdus,
                                                        (uint8)(sizeof(ParallelFlashSwc_CanExtTxPdus) /
                                                                sizeof(ParallelFlashSwc_CanExtTxPdus[0])),
@@ -1343,7 +1358,8 @@ static Std_ReturnType ParallelFlashSwc_SendDiagnosticFrame(const PduIdType *canT
         }
 
         usedCanTpTxSduId = canTpTxSduIds[idx];
-        if (PARALLELFLASHSWC_FORWARD_ASSUME_CAN_FC != FALSE)
+        if ((extendedAddress != 0x55u) &&
+            (PARALLELFLASHSWC_FORWARD_ASSUME_CAN_FC != FALSE))
         {
             result = CanTp_TransmitExtendedAddressAssumeFlowControl(usedCanTpTxSduId,
                                                                     extendedAddress,
@@ -1373,10 +1389,13 @@ static Std_ReturnType ParallelFlashSwc_SendDiagnosticFrame(const PduIdType *canT
         /* Remember which node was addressed on this TP channel so its reply can be
          * tagged and relayed back to the tester (DCM TX/RX PDU ids share numbering). */
         ParallelFlashSwc_RecordForwardResponseExt(usedCanTpTxSduId, extendedAddress);
-        ParallelFlashSwc_RecordForwardTxAck(usedCanTpTxSduId,
-                                            extendedAddress,
-                                            udsRequest,
-                                            udsRequestLength);
+        if (extendedAddress != 0x55u)
+        {
+            ParallelFlashSwc_RecordForwardTxAck(usedCanTpTxSduId,
+                                                 extendedAddress,
+                                                 udsRequest,
+                                                 udsRequestLength);
+        }
     }
     else
     {

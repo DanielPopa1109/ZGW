@@ -1036,7 +1036,8 @@ static uint8 Dcm_IsBusForwardRxPdu(Dcm_PduIdType rxPduId)
      * request the ZGW should service. */
     if (((rxPduId >= DCM_RX_CAN_EXT_PHYS) && (rxPduId <= DCM_RX_CANFD_EXT_PHYS)) ||
         (rxPduId == DCM_RX_CAN_EXT_PHYS_3) ||
-        (rxPduId == DCM_RX_CAN_EXT_PHYS_4))
+        (rxPduId == DCM_RX_CAN_EXT_PHYS_4) ||
+        (rxPduId == DCM_RX_CAN_G26_PHYS))
     {
         return TRUE;
     }

@@ -36,6 +36,14 @@ const Dcm_ConnectionConfigType Dcm_DefaultConnections[] =
         DCM_BUS_CAN_CLASSIC
     },
     {
+        DCM_RX_CAN_G26_PHYS,
+        DCM_TX_CAN_G26_PHYS,
+        0x709u,
+        0x710u,
+        DCM_ADDR_PHYSICAL,
+        DCM_BUS_CAN_CLASSIC
+    },
+    {
         DCM_RX_CANFD_EXT_PHYS,
         DCM_TX_CANFD_EXT_PHYS,
         0x710u,

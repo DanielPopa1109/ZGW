@@ -1,0 +1,9 @@
+{
+  "schema":"zgw-compatibility-contracts-v1",
+  "scope":"checked-in configuration, not hardware validation",
+  "doip":{"gateway_ipv4":"192.168.1.10","udp_port":13400,"tcp_port":13400,"version":"0x02","inverse":"0xFD","tester":"0x0710","zgw_target":"0x1001","routing_activation":"0x00","diagnostic_type":"0x8001","refs":["ZGW/ZGW_APP/BSW/Com/Ethernet/EthStack_Cfg.c","ZGW/ZGW_APP/BSW/Com/Ethernet/DoIP.c","Scripts/FCD/FCD.pyw"]},
+  "can":{"classic_controller":0,"fd_controller":1,"main_period_ms":5,"diagnostic_id":"0x710","max_tp_payload":256,"classic_dlc_max":8,"fd_dlc_max":64,"forwarding_assumes_fc":true,"refs":["ZGW/ZGW_APP/BSW/Com/Can/Can.h","ZGW/ZGW_APP/BSW/Com/CanIf/CanIf.c","ZGW/ZGW_APP/BSW/Com/CanTp/CanTp.c","ZGW/ZGW_APP/APP/ParallelFlashSwc/ParallelFlashSwc.c"]},
+  "lin":{"protocol":"LIN 2.1","bitrate":19200,"master":"ZGW","hvdcdc_nad":"0x04","route":"0x51","mrf":"0x3C","srf":"0x3D","interframe_ms":60,"frames":[{"name":"ZGW_REQUEST_HVDCDC","id":"0x03","dlc":2},{"name":"HVDCDC_STATUS","id":"0x0B","dlc":5},{"name":"ZGW_SDAT","id":"0x04","dlc":7}],"refs":["DB/ZGW_LIN_4.ldf","ZGW/ZGW_APP/BSW/Com/Lin/LinIf.c","ZGW/ZGW_APP/APP/ParallelFlashSwc/ParallelFlashSwc.c"]},
+  "route_defaults":{"0x41":"ZGW local target","0x42":"CAN FD","0x51":"LIN NAD 0x04","0x53-0x59":"classic CAN","0x60-0x7F":"CAN FD","0x90-0xAF":"classic CAN","0x46-0x4F":"LIN"},
+  "source_of_truth":"NETWORK_CONTRACTS.md and cited source/configuration"
+}

@@ -1,11 +1,11 @@
 {
-  "global_epoch": 255,
-  "dataset_round": 2,
+  "global_epoch": 269,
+  "dataset_round": 3,
   "best_val_loss": 0.3746571272611618,
-  "last_seed": 1980040377,
-  "last_train_loss": 0.37193815623010906,
-  "last_val_loss": 0.3880183964967728,
-  "last_val_class_accuracy": 0.97535,
-  "last_val_soon_accuracy": 0.97485,
-  "lr": 6.25e-05
+  "last_seed": 2062524209,
+  "last_train_loss": 0.37440393477436,
+  "last_val_loss": 0.38605254352092744,
+  "last_val_class_accuracy": 0.97492,
+  "last_val_soon_accuracy": 0.97468,
+  "lr": 1.5625e-05
 }
