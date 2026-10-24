@@ -112,6 +112,7 @@ static const Can_StdIdFilterConfigType Can_ClassicStdIdFilters[] =
     { 0x751u, "Error_702" }, /* Error_702, sender FRBE */
     { 0x750u, "Error_700" }, /* Error_700, sender CBM */
     { 0x710u, "DiagRequest_710" }, /* DiagRequest_710, sender Tester */
+    { 0x709u, "DiagResponse_709" }, /* DiagResponse_709, sender G26 */
     { 0x707u, "DiagResponse_707" }, /* DiagResponse_707, sender ELC */
     { 0x705u, "DiagResponse_705" }, /* DiagResponse_705, sender DMU */
     { 0x703u, "DiagResponse_703" }, /* DiagResponse_703, sender FRBE */

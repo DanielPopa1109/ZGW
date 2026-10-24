@@ -10,19 +10,21 @@
 
 For ZGW FBL block, FCD selects software block using RID `0200`, starts RAM updater RID `0155`, erases RID `0001`, downloads/transfers/exits and validates per FBL. ZGW application update includes app programming preamble/session and transitions to FBL; exact sequencing code is in `FCD.pyw::_execute_payload`, `_select_fbl_software_block`, `ZGW/ZGW_FBL/Cpu0_Main.c` UDS dispatch and `Fbl_RamUpdater_AURIX.c`. Block values are target-specific; do not infer a downstream ECU supports `0200/0155/0001`.
 
+For G26, FCD validates one contiguous image and vectors before any erase. Its APP flow uses DID `F187` to prove `G26A2` to resident `G26F2` handover, then `31 01 00 01` erase at `0x08020200`, `34 00 44`, `36` with at most 240 data bytes, `37` with big-endian IEEE CRC32, and reset/readiness identity. Its resident-FBL replacement flow skips ZGW-only RID `0200`, requests RID `0155`, then uses the SRAM updater's erase/download/transfer/exit path at `0x08000000`. G26 currently rejects `0155` because physical updater activation is interlocked. Neither path has a connected hardware result.
+
 ## Per-target requirements
 
 For each image/target, establish: image target/address/range; block type; supported session; comm/DTC control; security; erase RID/options; RequestDownload address/length widths; ECU max block length; TransferData BSC and retry semantics; transfer exit; integrity check algorithm/byte order; reset type and readiness; interrupted transfer recovery. These are not portable across all configured ECUs. The FCD package manifest is metadata, not proof of target capability/signature.
 
 ## FCD parallel package format
 
-`Scripts/FCD/fcd_parallel.py::create_bundle` writes ZIP `.pfpkg` bundles containing `manifest.json` plus selected payload files under `payloads/`. Manifest schema is `FCD_PARALLEL_PACKAGE_V1`; payload integrity entries record byte size and CRC32. This is corruption detection metadata, not a signed/authenticated package contract. `load_bundle` checks schema and returns manifest; FCD later loads payload entries and executes schedule events. Schedule generation places non-ZGW targets before ZGW, separates `flash` then `coding`, sorts bus lanes, caps active targets per bus at 2 (`MAX_ACTIVE_PER_BUS`), and the UI worker pool is capped at 6 (`PARALLEL_BUNDLE_MAX_WORKERS`). The package is an FCD input/output artifact; ZGW firmware does not consume this ZIP schema.
+`Scripts/FCD/FCD.pyw::create_bundle` writes ZIP `.pfpkg` bundles containing `manifest.json` plus selected payload files under `payloads/`. Manifest schema is `FCD_PARALLEL_PACKAGE_V1`; payload integrity entries record byte size and CRC32. This is corruption detection metadata, not a signed/authenticated package contract. `load_bundle` checks schema and returns manifest; FCD later loads payload entries and executes schedule events. Schedule generation places non-ZGW targets before ZGW, separates `flash` then `coding`, sorts bus lanes, caps active targets per bus at 2 (`MAX_ACTIVE_PER_BUS`), and the UI worker pool is capped at 6 (`PARALLEL_BUNDLE_MAX_WORKERS`). The older `fcd_parallel.py` remains as a separate importable implementation. The package is an FCD input/output artifact; ZGW firmware does not consume this ZIP schema.
 
 ## Limitations
 
 - FBL transport config permits up to 32768 image bytes per `36` transfer plus UDS bytes for direct Ethernet; downstream routed CAN/LIN cannot carry this in one TP request.
-- ZGW forwarding config assumes CAN FC in the selected path; test segmented real ECU transfers.
+- Generic ZGW forwarding can assume CAN FC on selected routes. G26 route `0x55` uses real FC; its segmented request/reply exchange still needs a connected bus trace.
 - `ParallelFlashSwc` bundle-flash stepper currently has stub transport steps and no public submit API; it is not the FCD flashing engine.
 - A successful transfer/CRC does not establish bootability, application health, rollback or power-loss safety. Reset recovery needs hardware proof.
 
-Sources: `Scripts/FCD/FCD.pyw::_execute_payload`, `Scripts/FCD/fcd_parallel.py::build_schedule`, `ZGW/ZGW_FBL/FblTransport_Cfg.h`, `ZGW/ZGW_FBL/Cpu0_Main.c`, `ZGW/ZGW_FBL/Fbl_RamUpdater_AURIX.c`, `ZGW/ZGW_APP/APP/ParallelFlashSwc/ParallelFlashSwc.c`.
+Sources: `Scripts/FCD/FCD.pyw::_execute_payload`, `Scripts/FCD/FCD.pyw::build_schedule`, `ZGW/ZGW_FBL/FblTransport_Cfg.h`, `ZGW/ZGW_FBL/Cpu0_Main.c`, `ZGW/ZGW_FBL/Fbl_RamUpdater_AURIX.c`, `ZGW/ZGW_APP/APP/ParallelFlashSwc/ParallelFlashSwc.c`.

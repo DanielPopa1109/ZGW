@@ -8,9 +8,10 @@ Reference and navigation guide for integrating downstream ECUs with this checkou
 | Buses, frames and timing | [network contracts](NETWORK_CONTRACTS.md), [contracts.json](contracts.json) |
 | UDS | [diagnostic contracts](DIAGNOSTIC_CONTRACTS.md) |
 | Programming | [flashing contracts](FLASHING_CONTRACTS.md), [workflows](INTEGRATION_WORKFLOWS.md) |
+| G26 lab route and update profile | [ECU requirements](ECU_REQUIREMENTS.md), [flashing contracts](FLASHING_CONTRACTS.md), [compatibility tests](COMPATIBILITY_TESTS.md) |
 | Coding | [coding contracts](CODING_CONTRACTS.md) |
 | Verification | [compatibility tests](COMPATIBILITY_TESTS.md) |
 
 **Status terms:** implemented = active source path; configured = static configuration, not proof of hardware; experimental = lab/simulation path; incomplete = stub/scaffold; unsupported = no active support; unresolved = source evidence is insufficient. No universal downstream UDS, flash, security or coding profile exists. Do not infer these from ZGW's own FBL.
 
-Reference implementation: `ZGW/ZGW_APP/`, `ZGW/ZGW_FBL/`; reference engineering tool: `Scripts/FCD/FCD.pyw`, `Scripts/FCD/fcd_parallel.py`. Key bus data: `DB/ZGW_CAN_3.dbc`, `DB/ZGW_CANFD_2.dbc`, `DB/ZGW_LIN_4.ldf`. For the broader inventory of supporting tools, see [knowledge: supporting tools](../knowledge/tools.md). Simulation under `SIM/` and FCD defaults are not proof of live ECU support. See each page for source pointers.
+Reference implementation: `ZGW/ZGW_APP/`, `ZGW/ZGW_FBL/`; reference engineering tool: `Scripts/FCD/FCD.pyw` (including its current bundle scheduler). The older `Scripts/FCD/fcd_parallel.py` is retained for existing importers. Key bus data: `DB/ZGW_CAN_3.dbc`, `DB/ZGW_CANFD_2.dbc`, `DB/ZGW_LIN_4.ldf`. For the broader inventory of supporting tools, see [knowledge: supporting tools](../knowledge/tools.md). Simulation under `SIM/` and FCD defaults are not proof of live ECU support. See each page for source pointers.

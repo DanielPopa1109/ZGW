@@ -9,7 +9,7 @@
     "local_ip": "auto"
   },
   "data_editor": {
-    "output_folder": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Scripts\\FCD\\Generated",
+    "output_folder": "D:\\GitHub_Repos\\ZGW\\Scripts\\FCD\\Generated",
     "nodes": {
       "PDM1": {
         "selected": false,
@@ -45,6 +45,11 @@
         "selected": true,
         "node_kind": "Real",
         "extended_diag_address": "0x41"
+      },
+      "CM5": {
+        "selected": false,
+        "node_kind": "Real",
+        "extended_diag_address": ""
       }
     },
     "hex_rows": [
@@ -55,7 +60,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\CBM_APP.hex"
       },
       {
         "ecu": "CBM_FBL",
@@ -64,7 +69,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\CBM_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\CBM_FBL.hex"
       },
       {
         "ecu": "DMU_APP",
@@ -73,7 +78,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\DMU_APP.hex"
       },
       {
         "ecu": "DMU_FBL",
@@ -82,7 +87,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\DMU_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\DMU_FBL.hex"
       },
       {
         "ecu": "ELC_APP",
@@ -91,7 +96,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\ELC_APP.hex"
       },
       {
         "ecu": "ELC_FBL",
@@ -100,7 +105,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ELC_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\ELC_FBL.hex"
       },
       {
         "ecu": "FRBE_APP",
@@ -109,7 +114,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\FRBE_APP.hex"
       },
       {
         "ecu": "FRBE_FBL",
@@ -118,7 +123,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\FRBE_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\FRBE_FBL.hex"
       },
       {
         "ecu": "HVDCDC_APP",
@@ -127,7 +132,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\HVDCDC_APP.hex"
       },
       {
         "ecu": "HVDCDC_FBL",
@@ -136,7 +141,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\HVDCDC_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\HVDCDC_FBL.hex"
       },
       {
         "ecu": "PDM1_APP",
@@ -145,7 +150,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_APP.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\PDM1_APP.hex"
       },
       {
         "ecu": "PDM1_FBL",
@@ -154,7 +159,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0x08000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\PDM1_FBL.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\PDM1_FBL.hex"
       },
       {
         "ecu": "ZGW_APP_EDITED",
@@ -163,7 +168,7 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0xA0030000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_APP_edited.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\ZGW_APP_edited.hex"
       },
       {
         "ecu": "ZGW_FBL_EDITED",
@@ -172,8 +177,38 @@
         "resp": "0x711",
         "did": "0xF186",
         "base": "0xA0000000",
-        "hex": "C:\\Users\\Daniel\\Desktop\\ZGW_Repo\\Binary\\ZGW_FBL_edited.hex"
+        "hex": "D:\\GitHub_Repos\\ZGW\\Binary\\ZGW_FBL_edited.hex"
       }
     ]
+  },
+  "cm5": {
+    "host": "192.168.1.157",
+    "port": "13400",
+    "fingerprint": "0C:43:FD:F1:45:05:46:22:D5:DF:9C:1E:C1:0E:64:FB:07:14:55:69:C6:AD:97:08:2C:E5:D7:84:7D:6C:A6:A5",
+    "nmea_path": "/media/cm5healthusb/GPS_NMEA_LOG",
+    "health_path": "/media/cm5healthusb/CM5_HEALTH_LOG",
+    "inventory_path": "/media/cm5healthusb/CM5_HEALTH_LOG/INVENTORY",
+    "output_path": "D:\\GitHub_Repos\\ZGW\\Scripts\\FCD\\CM5_Reads"
+  },
+  "cm5_diagnostics": {
+    "host": "192.168.1.157",
+    "port": "13400"
+  },
+  "cm5_sota": {
+    "host": "192.168.1.158",
+    "port": "13400",
+    "gateway_host": "192.168.1.138",
+    "gateway_port": "13400",
+    "gateway_profile": "hybrid-zgw-v1",
+    "new_bundle": "",
+    "rollback_bundle": ""
+  },
+  "cm5_backup": {
+    "host": "192.168.1.157",
+    "port": "13400",
+    "fingerprint": "0C:43:FD:F1:45:05:46:22:D5:DF:9C:1E:C1:0E:64:FB:07:14:55:69:C6:AD:97:08:2C:E5:D7:84:7D:6C:A6:A5",
+    "destination": "D:/GitHub_Repos/CM5_Dump",
+    "remember_token": true,
+    "bandwidth_limit": "Unlimited"
   }
 }

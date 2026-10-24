@@ -16,10 +16,12 @@ Origin FCD -> DoIP TCP diag request payload `[0710][1001][route][UDS...]` -> DoI
 
 FCD reads target package/image, selects the ECU descriptor and sends per-target UDS through same routed workflow. It sequences only what that target descriptor/branch specifies: session/control, optional erase, RequestDownload, TransferData blocks with BSC, TransferExit, CRC/verification, and reset/readiness where supported. ZGW routes frames; it does not perform downstream flash erase itself. Exact per-target routine/security/reset profile is unresolved unless target code/metadata states it.
 
+The G26 source profile fixes route `0x55` and checks DID `F187` before programming. The G26 APP and SRAM resident-FBL sequences are documented in [flashing contracts](FLASHING_CONTRACTS.md). Routed `0x55 7F SID 78` is held by FCD until a final response; a missing G26 response fails, including when its UI descriptor is still marked simulated. Target reachability, board timing, erase, reset and recovery remain bench checks.
+
 ## ZGW application/FBL update
 
 FCD talks directly to ZGW at DoIP target `1001`. App enters update path and transitions/reset to ZGW FBL; FBL serves its own UDS/DoIP update contract. FCD selects ZGW software block and FBL RAM updater as needed, performs erase/download/transfer/exit/verification and reset/reconnect. This workflow programs ZGW memory using ZGW FBL and is not the downstream route flow. `Fbl_GetTransport` selects Ethernet; do not infer CAN FBL programming from CAN ACK support.
 
 ## Bundle scheduler
 
-FCD `fcd_parallel.py::create_bundle` creates ZIP `.pfpkg` containing `manifest.json`, payload files and size/CRC32 integrity entries; schema `FCD_PARALLEL_PACKAGE_V1`. Schedule order is non-ZGW then ZGW; flash then coding; at most 2 active targets per bus, up to 6 UI workers. `FCD.pyw` performs actual UDS worker operations. ZGW `ParallelFlashSwc` contains route forwarding but its internal bundle stepper is incomplete (transport/coding step stubs, no public submit API). Package schema is not a wire protocol and not evidence of firmware acceptance. See [flashing contracts](FLASHING_CONTRACTS.md).
+FCD `FCD.pyw::create_bundle` creates ZIP `.pfpkg` containing `manifest.json`, payload files and size/CRC32 integrity entries; schema `FCD_PARALLEL_PACKAGE_V1`. Schedule order is non-ZGW then ZGW; flash then coding; at most 2 active targets per bus, up to 6 UI workers. `FCD.pyw` performs actual UDS worker operations. ZGW `ParallelFlashSwc` contains route forwarding but its internal bundle stepper is incomplete (transport/coding step stubs, no public submit API). Package schema is not a wire protocol and not evidence of firmware acceptance. See [flashing contracts](FLASHING_CONTRACTS.md).

@@ -1,0 +1,8 @@
+codex_credentials.env
+/Scripts/FCD/token.txt
+/Scripts/FCD/CM5_Dumps/
+/Scripts/FCD/CM5_Reads/
+/Scripts/FCD/SOTALogs/
+/Scripts/FCD/.test-tmp/
+__pycache__/
+*.pyc

@@ -4,12 +4,12 @@ import pathlib
 import sys
 import unittest
 
-
 MODULE_PATH = pathlib.Path(__file__).with_name("FCD.pyw")
 sys.path.insert(0, str(MODULE_PATH.parent))
 LOADER = importlib.machinery.SourceFileLoader("fcd_pyw", str(MODULE_PATH))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 fcd = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = fcd
 LOADER.exec_module(fcd)
 
 
@@ -45,7 +45,7 @@ class AcquisitionTests(unittest.TestCase):
             "Item",
             "RoutineControl (0x31)",
             "Routine 0xF192",
-            b"\x31\x03\xF1\x92",
+            b"\x31\x03\xf1\x92",
             decoder,
             timeout=0.1,
         )
@@ -68,14 +68,14 @@ class AcquisitionTests(unittest.TestCase):
     def test_positive_response_is_persisted(self):
         def send(_request, _name, timeout=None, allow_no_response=False):
             send.last_nrc78_count = 0
-            return b"\x71\x03\xF1\x92"
+            return b"\x71\x03\xf1\x92"
 
         result = self.acquire(send)
 
         self.assertEqual(result.state, "SUCCESS")
         self.assertTrue(result.attempted)
         self.assertTrue(result.request_sent)
-        self.assertEqual(result.response, b"\x71\x03\xF1\x92")
+        self.assertEqual(result.response, b"\x71\x03\xf1\x92")
 
     def test_negative_response_is_terminal(self):
         def send(_request, _name, timeout=None, allow_no_response=False):
@@ -90,7 +90,7 @@ class AcquisitionTests(unittest.TestCase):
     def test_response_pending_count_is_retained(self):
         def send(_request, _name, timeout=None, allow_no_response=False):
             send.last_nrc78_count = 3
-            return b"\x71\x03\xF1\x92"
+            return b"\x71\x03\xf1\x92"
 
         result = self.acquire(send)
 
@@ -109,9 +109,11 @@ class AcquisitionTests(unittest.TestCase):
 
     def test_parser_failure_is_terminal(self):
         def send(_request, _name, timeout=None, allow_no_response=False):
-            return b"\x71\x03\xF1\x92"
+            return b"\x71\x03\xf1\x92"
 
-        result = self.acquire(send, decoder=lambda _response: (_ for _ in ()).throw(fcd.FcdError("short payload")))
+        result = self.acquire(
+            send, decoder=lambda _response: (_ for _ in ()).throw(fcd.FcdError("short payload"))
+        )
 
         self.assertEqual(result.state, "FAILED_RESPONSE_LENGTH")
         self.assertTrue(result.invalid_response)
@@ -129,14 +131,14 @@ class AcquisitionTests(unittest.TestCase):
         response = bytes.fromhex(
             "71 03 F1 92 "
             "54 48 54 45 "  # 0x45544854 stored little-endian/native
-            "01 00 "        # version = 1
-            "1E 00 "        # event capacity = 30
+            "01 00 "  # version = 1
+            "1E 00 "  # event capacity = 30
             "00 E1 F5 05 00 00 00 00 "  # STM frequency = 100000000 Hz
             "88 77 66 55 44 33 22 11 "  # reference ticks
-            "00 01 02 03 "              # start, returned, flags, missed locks
-            "00 01 01 00 "              # event id, valid byte, raw valid uint16
+            "00 01 02 03 "  # start, returned, flags, missed locks
+            "00 01 01 00 "  # event id, valid byte, raw valid uint16
             "99 88 77 66 55 44 33 22 "  # timestamp ticks
-            "40 42 0F 00"               # elapsed = 1000000 us
+            "40 42 0F 00"  # elapsed = 1000000 us
         )
 
         timing = fcd.FcdApp._decode_eth_startup_timing_chunk(self.harness, response)
@@ -154,7 +156,9 @@ class AcquisitionTests(unittest.TestCase):
 
     def test_parser_error_can_retain_positive_response(self):
         response = bytes.fromhex("71 03 F1 92 00 00 00 00 00 00 00 00")
-        exc = fcd.DiagnosticParserError("positive response received, but payload parsing failed", response)
+        exc = fcd.DiagnosticParserError(
+            "positive response received, but payload parsing failed", response
+        )
         result = fcd.DiagnosticAcquisitionResult(
             key="eth_startup_timing",
             item="Ethernet Startup Timing",

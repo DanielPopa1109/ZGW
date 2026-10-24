@@ -6,6 +6,8 @@ Project code is in `ZGW/ZGW_APP/BSW/Com/Can/Can.c`, `CanIf/CanIf.c`, `CanTp/CanT
 
 `Com` holds signal-level data. PduR routes interface and TP traffic among CANIF/CANTP, LINIF/LINTP, SoAd and DCM. Gateway signal route tables and bus ranges are in `APP/GatewaySwc/GatewaySwc.h/.c`; do not treat the entire COM signal catalog as routed without checking its tables and coding state.
 
+The G26 lab route uses Classic CAN request `0x710` with target EA `0x55`, response `0x709` with tester EA `0xF0`, and gateway response flow control EA `0x41`. The M_CAN Classic RX filter admits `0x709`; CanIf PDU 3/8, DCM/PduR PDU 12 and a dedicated CanTp channel carry the reverse path. `ParallelFlashSwc` uses real G26 FC and target replies; it does not treat CAN TX confirmation as a G26 programming response. This is source configuration, not a built or measured gateway session.
+
 ## LIN
 
 `BSW/Com/Lin/` contains low-level LIN driver, protocol, interface, state manager, transport protocol and diagnostics. LIN configuration resides in `Lin_Cfg.*`; `Cpu0_Main.c` initializes LIN state manager/transport and requests full communication. `Os.c` runs LIN periodic functions in the QM LIN task. For frame/schedule behavior, inspect local LIN config and `DB/ZGW_LIN_4.ldf`; the LDF is reference input, not proof that each frame is active in firmware.

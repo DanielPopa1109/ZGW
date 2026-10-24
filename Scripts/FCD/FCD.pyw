@@ -1,34 +1,2681 @@
+from __future__ import annotations
+
 import base64
 import binascii
+import ctypes
+import hashlib
 import json
+import os
 import queue
+import re
 import select
+import shlex
+import shutil
 import socket
+import ssl
 import struct
+import subprocess
 import threading
 import time
 import traceback
 import zipfile
+from cm5_ethernet import EthernetPath
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from fcd_parallel import (
-    build_schedule,
-    bus_category,
-    create_bundle,
-    discover_nodes,
-    load_bundle,
-    manifest_from_targets,
-    node_to_target,
-    to_jsonable_events,
-    validate_schedule,
-)
+# -----------------------------------------------------------------------------
+# Parallel node discovery, scheduling, and package manifests
+# -----------------------------------------------------------------------------
+BUNDLE_SCHEMA = "FCD_PARALLEL_PACKAGE_V1"
+BUNDLE_MANIFEST = "manifest.json"
+SOTA_UPLOAD_NEW = 1
+SOTA_STATUS = 2
+SOTA_EXECUTE = 3
+SOTA_UPLOAD_ROLLBACK = 4
+SOTA_TRANSPORT = 5
+SOTA_RECOVER = 6
+SOTA_STOP = 7
+SOTA_PREFLIGHT = 8
+SOTA_EVENTS = 9
+SOTA_TERMINAL_STATES = {"IDLE", "READY", "COMPLETED", "FAILED", "RECOVERY_REQUIRED", "CANCELLED", "INTERRUPTED"}
+SOTA_VEHICLE_NODES = {"CBM", "DMU", "ELC", "FRBE", "HVDCDC", "PDM1", "ZGW"}
+MAX_ACTIVE_PER_BUS = 2
+BUS_ORDER = {"CANFD": 0, "CAN": 1, "LIN": 2, "ETHERNET": 3, "ETH": 3, "UNKNOWN": 9}
 
 
+def bus_category(bus_type: str) -> str:
+    text = str(bus_type or "UNKNOWN").upper()
+    if "CANFD" in text:
+        return "CANFD"
+    if "CAN" in text:
+        return "CAN"
+    if "LIN" in text:
+        return "LIN"
+    if text in ("ETH", "ETHERNET", "DOIP"):
+        return "ETHERNET"
+    return text or "UNKNOWN"
+
+
+def bus_sort_key(bus_type: str) -> int:
+    return BUS_ORDER.get(bus_category(bus_type), BUS_ORDER["UNKNOWN"])
+
+
+@dataclass
+class NodeInfo:
+    node_name: str
+    bus_type: str
+    source_file: str
+    request_id: str = ""
+    response_id: str = ""
+    target_logical_address: str = ""
+    is_zgw: bool = False
+    inferred: bool = False
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ScheduleEvent:
+    time_slot: int
+    phase: str
+    bus_type: str
+    node_name: str
+    active_on_bus: int
+    is_zgw: bool
+
+
+def _repo_relative(path: Path, root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _bus_from_path(path: Path) -> str:
+    if path.suffix.lower() in (".dbc", ".pdbc", ".ldf"):
+        return path.stem
+    return "UNKNOWN"
+
+
+def _merge_node(nodes: dict[str, NodeInfo], node: NodeInfo) -> None:
+    if node.node_name.upper() == "TESTER":
+        return
+    if node.node_name.upper() == "ZGW":
+        node.bus_type = "ETHERNET"
+        node.is_zgw = True
+    existing = nodes.get(node.node_name)
+    if existing is None:
+        nodes[node.node_name] = node
+        return
+    if existing.bus_type == "UNKNOWN" and node.bus_type != "UNKNOWN":
+        existing.bus_type = node.bus_type
+    if node.source_file not in existing.source_file.split(";"):
+        existing.source_file = existing.source_file + ";" + node.source_file
+    existing.is_zgw = existing.is_zgw or node.is_zgw
+    existing.inferred = existing.inferred or node.inferred
+    for note in node.notes:
+        if note not in existing.notes:
+            existing.notes.append(note)
+
+
+def _parse_dbc_nodes(path: Path, root: Path) -> list[NodeInfo]:
+    text = path.read_text(encoding="latin-1", errors="ignore")
+    bus = _bus_from_path(path)
+    rel = _repo_relative(path, root)
+    nodes: dict[str, NodeInfo] = {}
+    for match in re.finditer(r"^BU_:\s*(.*)$", text, re.MULTILINE):
+        for name in match.group(1).split():
+            _merge_node(nodes, NodeInfo(name, bus, rel, is_zgw=(name.upper() == "ZGW")))
+    for match in re.finditer(r"^BO_\s+(\d+)\s+\w+:\s+\d+\s+([A-Za-z0-9_]+)", text, re.MULTILINE):
+        frame_id = int(match.group(1))
+        name = match.group(2)
+        node = NodeInfo(name, bus, rel, is_zgw=(name.upper() == "ZGW"), inferred=True)
+        if 0x700 <= frame_id <= 0x7FF:
+            node.request_id = f"0x{frame_id:X}"
+            node.notes.append("Diagnostic-looking CAN identifier inferred from DBC frame ID")
+        _merge_node(nodes, node)
+    return sorted(nodes.values(), key=lambda n: (bus_sort_key(n.bus_type), n.node_name))
+
+
+def _parse_ldf_nodes(path: Path, root: Path) -> list[NodeInfo]:
+    text = path.read_text(encoding="latin-1", errors="ignore")
+    rel = _repo_relative(path, root)
+    nodes: dict[str, NodeInfo] = {}
+    nodes_block = re.search(r"Nodes\s*\{(?P<body>.*?)\}", text, re.DOTALL)
+    if nodes_block:
+        body = nodes_block.group("body")
+        master = re.search(r"Master:\s*([A-Za-z0-9_]+)", body)
+        if master:
+            name = master.group(1)
+            _merge_node(nodes, NodeInfo(name, "LIN", rel, is_zgw=(name.upper() == "ZGW")))
+        slaves = re.search(r"Slaves:\s*([^;]+);", body)
+        if slaves:
+            for name in re.split(r"[\s,]+", slaves.group(1).strip()):
+                if name:
+                    _merge_node(nodes, NodeInfo(name, "LIN", rel, is_zgw=(name.upper() == "ZGW")))
+    return sorted(nodes.values(), key=lambda n: n.node_name)
+
+
+def discover_nodes(root: Path) -> tuple[list[NodeInfo], list[str]]:
+    root = Path(root)
+    candidates = []
+    for pattern in ("*.dbc", "*.pdbc", "*.ldf", "*.arxml", "*.xml", "*.json"):
+        candidates.extend(root.rglob(pattern))
+    nodes: dict[str, NodeInfo] = {}
+    logs: list[str] = []
+    for path in sorted(set(candidates)):
+        suffix = path.suffix.lower()
+        try:
+            parsed = []
+            if suffix in (".dbc", ".pdbc"):
+                parsed = _parse_dbc_nodes(path, root)
+            elif suffix == ".ldf":
+                parsed = _parse_ldf_nodes(path, root)
+            elif any(part.lower().startswith("diagnostic") for part in path.parts):
+                continue
+            for node in parsed:
+                _merge_node(nodes, node)
+        except Exception as exc:
+            logs.append(f"{_repo_relative(path, root)} skipped: {exc}")
+    if nodes and not any(name in nodes for name in ("G26", "I4G26")):
+        nodes["G26"] = NodeInfo(
+            node_name="G26", bus_type="CAN", source_file="FCD built-in G26 lab profile",
+            request_id="0x710", response_id="0x709", inferred=True,
+            notes=["Configured route 0x55; board presence must be verified"],
+        )
+    out = sorted(nodes.values(), key=lambda n: (n.is_zgw, bus_sort_key(n.bus_type), n.node_name))
+    if not out:
+        logs.append("No nodes discovered from repository databases")
+    return out, logs
+
+
+def build_schedule(
+    targets: list[dict], include_flash=True, include_coding=True
+) -> list[ScheduleEvent]:
+    events: list[ScheduleEvent] = []
+    for phase, enabled in (("flash", include_flash), ("coding", include_coding)):
+        if not enabled:
+            continue
+        slot = 0
+        non_zgw = [t for t in targets if not t.get("is_zgw")]
+        zgw = [t for t in targets if t.get("is_zgw")]
+        for group in (non_zgw, zgw):
+            queues: dict[str, list[dict]] = {}
+            for target in sorted(
+                group,
+                key=lambda t: (bus_sort_key(t.get("bus_type", "UNKNOWN")), t.get("node_name", "")),
+            ):
+                queues.setdefault(bus_category(target.get("bus_type", "UNKNOWN")), []).append(
+                    target
+                )
+            while any(queues.values()):
+                for bus in sorted(queues, key=bus_sort_key):
+                    active = queues[bus][:MAX_ACTIVE_PER_BUS]
+                    queues[bus] = queues[bus][MAX_ACTIVE_PER_BUS:]
+                    for target in active:
+                        events.append(
+                            ScheduleEvent(
+                                slot,
+                                phase,
+                                bus,
+                                target.get("node_name", ""),
+                                len(active),
+                                bool(target.get("is_zgw")),
+                            )
+                        )
+                slot += 1
+    return events
+
+
+def validate_schedule(events: list[ScheduleEvent]) -> list[str]:
+    errors = []
+    by_slot_phase_bus: dict[tuple[int, str, str], int] = {}
+    for event in events:
+        key = (event.time_slot, event.phase, event.bus_type)
+        by_slot_phase_bus[key] = by_slot_phase_bus.get(key, 0) + 1
+    for key, count in by_slot_phase_bus.items():
+        if count > MAX_ACTIVE_PER_BUS:
+            errors.append(f"{key}: {count} active jobs exceeds {MAX_ACTIVE_PER_BUS}")
+    for phase in ("flash", "coding"):
+        zgw_slots = [e.time_slot for e in events if e.phase == phase and e.is_zgw]
+        non_zgw_slots = [e.time_slot for e in events if e.phase == phase and not e.is_zgw]
+        if zgw_slots and non_zgw_slots and min(zgw_slots) <= max(non_zgw_slots):
+            errors.append(f"{phase}: ZGW is not scheduled after all non-ZGW targets")
+    return errors
+
+
+def create_bundle(bundle_path: Path, manifest: dict, payload_files: list[tuple[Path, str]]) -> Path:
+    bundle_path = Path(bundle_path)
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = dict(manifest)
+    manifest["schema"] = BUNDLE_SCHEMA
+    manifest["generated_timestamp"] = manifest.get(
+        "generated_timestamp"
+    ) or datetime.now().isoformat(timespec="seconds")
+    manifest.setdefault("integrity", {})
+    with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for source, arcname in payload_files:
+            data = Path(source).read_bytes()
+            manifest["integrity"][arcname.replace("\\", "/")] = {
+                "size": len(data),
+                "crc32": f"0x{binascii.crc32(data) & 0xFFFFFFFF:08X}",
+            }
+            archive.writestr(arcname.replace("\\", "/"), data)
+        manifest["integrity_note"] = (
+            "Payload entries are covered here; manifest.json is protected by the ZIP container."
+        )
+        archive.writestr(BUNDLE_MANIFEST, json.dumps(manifest, indent=2, sort_keys=True))
+    return bundle_path
+
+
+def load_bundle(bundle_path: Path) -> dict:
+    with zipfile.ZipFile(bundle_path, "r") as archive:
+        manifest = json.loads(archive.read(BUNDLE_MANIFEST).decode("utf-8"))
+        if manifest.get("schema") != BUNDLE_SCHEMA:
+            raise ValueError(f"Unsupported bundle schema {manifest.get('schema')}")
+        return manifest
+
+
+def validate_sota_manifest(manifest: dict, role: str) -> None:
+    """Require all fourteen ECU images, allowing multiple segments per image."""
+    if manifest.get("schema") != BUNDLE_SCHEMA:
+        raise ValueError("Unsupported SOTA bundle schema")
+    if manifest.get("sota_bundle_role") != role:
+        raise ValueError(f"Expected {role} SOTA bundle for destination bank")
+    required = SOTA_VEHICLE_NODES
+    coverage = {}
+    targets = manifest.get("targets")
+    if not isinstance(targets, list):
+        raise ValueError("Missing or invalid SOTA vehicle targets")
+    for target in targets:
+        if not isinstance(target, dict):
+            raise ValueError("Invalid SOTA vehicle target")
+        name = target.get("node_name")
+        if not isinstance(name, str) or name not in required or name in coverage:
+            raise ValueError(f"Unexpected or duplicate SOTA vehicle target: {name}")
+        blocks = target.get("payload_blocks")
+        if not isinstance(blocks, list):
+            raise ValueError(f"Missing payload blocks for {name}")
+        kinds = set()
+        for block in blocks:
+            if not isinstance(block, dict) or block.get("flash_kind") not in ("FBL", "APPL"):
+                raise ValueError(f"Invalid FBL/APPL payload kind for {name}")
+            kinds.add(block["flash_kind"])
+        coverage[name] = kinds
+    for name in sorted(required):
+        if coverage.get(name) != {"FBL", "APPL"}:
+            raise ValueError(f"Complete vehicle bundle requires FBL and APPL images for {name}")
+
+
+# A single lock covers uploads, polling and controls across connections.
+_SOTA_WIFI_LOCK = threading.Lock()
+_SOTA_WIFI_LAST_REQUEST = 0.0
+_SOTA_TEXT_LOG_LOCK = threading.Lock()
+
+
+def sota_request(host: str, port: int, command: int, payload: bytes = b"", timeout=30.0, log=None, progress=None) -> str:
+    """SOTA lab UDS profile over Wi-Fi-bound DoIP. Ordinary Flash is unchanged."""
+    global _SOTA_WIFI_LAST_REQUEST
+    with _SOTA_WIFI_LOCK:
+        client = DoipClient(host, port, 0x0710, 0x0E80, timeout=timeout)
+        client.request_spacing_seconds = max(REQUEST_SPACING_SECONDS, 0.101)
+        client._last_request_ts = _SOTA_WIFI_LAST_REQUEST
+        try:
+            client.connect()
+            client.routing_activation()
+
+            def uds(data):
+                if log:
+                    log(f"Wi-Fi UDS TX SID=0x{data[0]:02X} bytes={len(data)} crc32={binascii.crc32(data) & 0xffffffff:08X} prefix={data[:32].hex()}")
+                response = client.send_uds(data, timeout=timeout)
+                if log:
+                    log(f"Wi-Fi UDS RX SID=0x{response[0]:02X} bytes={len(response)} prefix={response[:32].hex()}" if response else "Wi-Fi UDS RX empty")
+                # Include transfer/response time in SOTA's quiet interval. This
+                # also leaves >=100 ms after a segmented request has arrived.
+                client._last_request_ts = time.monotonic()
+                if response[:1] == b"\x7f":
+                    detail = client.send_uds(b"\x22\xf0\xa2", timeout=timeout)
+                    client._last_request_ts = time.monotonic()
+                    if detail[:3] == b"\x62\xf0\xa2":
+                        raise RuntimeError(detail[3:].decode("utf-8"))
+                    raise RuntimeError(f"SOTA UDS rejected: {response.hex()}")
+                if not response or response[0] != data[0] + 0x40:
+                    raise RuntimeError("Invalid SOTA UDS service response")
+                if data[0] in (0x10, 0x36) and response[1:2] != data[1:2]:
+                    raise RuntimeError("SOTA session/block counter echo mismatch")
+                if data[0] == 0x22 and response[1:3] != data[1:3]:
+                    raise RuntimeError("SOTA DID echo mismatch")
+                if data[0] == 0x31 and response[1:4] != data[1:4]:
+                    raise RuntimeError("SOTA routine echo mismatch")
+                return response
+
+            transport = uds(b"\x22\xf0\xa0")[3:].decode("utf-8")
+            validate_sota_transport(transport, client.sock.getpeername()[0], client.sock.getsockname()[0])
+            if command == SOTA_TRANSPORT:
+                return transport
+            if command == SOTA_STATUS:
+                return uds(b"\x22\xf0\xa1")[3:].decode("utf-8")
+            if command in (SOTA_UPLOAD_NEW, SOTA_UPLOAD_ROLLBACK):
+                if not payload or len(payload) > 256 * 1024 * 1024:
+                    raise ValueError("SOTA package must contain 1..256 MiB")
+                if progress:
+                    progress(0, len(payload))
+                uds(b"\x10\x03")
+                uds(b"\x10\x02")
+                role = 1 if command == SOTA_UPLOAD_NEW else 2
+                selected = uds(b"\x31\x01\xf0\xa0" + bytes([role]))
+                if selected[4:] != bytes([role]):
+                    raise RuntimeError("SOTA package role echo mismatch")
+                reply = uds(b"\x34\x00\x44" + struct.pack("!II", 0, len(payload)))
+                width = reply[1] >> 4 if len(reply) >= 2 else 0
+                if width not in (1, 2, 3, 4) or reply[1] & 15 or len(reply) != width + 2:
+                    raise RuntimeError("Invalid SOTA download block length")
+                chunk = min(32768, int.from_bytes(reply[2:], "big") - 2)
+                if chunk <= 0:
+                    raise RuntimeError("Invalid SOTA download capacity")
+                for index, offset in enumerate(range(0, len(payload), chunk), 1):
+                    uds(bytes([0x36, index & 255]) + payload[offset:offset + chunk])
+                    if progress:
+                        progress(min(offset + chunk, len(payload)), len(payload))
+                result = uds(b"\x37" + struct.pack("!I", binascii.crc32(payload) & 0xffffffff))[1:].decode("utf-8")
+                uds(b"\x10\x01")
+                return result
+            if command == SOTA_EVENTS:
+                return uds(b"\x31\x03\xf0\xa5" + payload)[4:].decode("utf-8")
+            routines = {SOTA_EXECUTE: 0xA1, SOTA_RECOVER: 0xA2, SOTA_STOP: 0xA3, SOTA_PREFLIGHT: 0xA4}
+            if command not in routines:
+                raise ValueError("Unknown SOTA command")
+            return uds(bytes([0x31, 1, 0xf0, routines[command]]) + payload)[4:].decode("utf-8")
+        finally:
+            _SOTA_WIFI_LAST_REQUEST = client._last_request_ts
+            client.close()
+
+
+def validate_sota_transport(response, remote_ip, local_ip):
+    if not response.startswith("OK "):
+        raise RuntimeError("Wi-Fi SOTA endpoint did not provide transport proof")
+    info = json.loads(response[3:])
+    if (info.get("capability") != "sota-wifi-uds-v1" or info.get("interface") != "wlan0"
+            or info.get("wifi") is not True or info.get("bound") is not True
+            or info.get("local_ip") != remote_ip or info.get("peer_ip") != local_ip):
+        raise RuntimeError("SOTA requires the CM5 wlan0 Wi-Fi address; no Ethernet fallback")
+    return info
+
+
+def parse_sota_status(response):
+    if not response.startswith("OK "):
+        raise RuntimeError(response)
+    result = json.loads(response[3:])
+    if not isinstance(result, dict) or "state" not in result:
+        raise RuntimeError("Invalid CM5 SOTA job status")
+    return result
+
+
+class SotaEventJournal:
+    """Durable client copy; cursor advances only after the complete batch is synced."""
+    def __init__(self, root):
+        self.root = Path(root)
+        self._records = {}
+
+    def records(self, job):
+        if not str(job).isdigit() or len(str(job)) > 24:
+            raise ValueError("Invalid SOTA event job ID")
+        if job not in self._records:
+            path = self.root / (str(job) + ".jsonl")
+            records = []
+            if path.exists():
+                with path.open("rb+") as source:
+                    while True:
+                        offset = source.tell()
+                        line = source.readline()
+                        if not line:
+                            break
+                        # A power loss may leave the last append incomplete. Its
+                        # cursor was never committed, so fetch that entry again.
+                        if not line.endswith(b"\n"):
+                            source.truncate(offset)
+                            source.flush()
+                            os.fsync(source.fileno())
+                            break
+                        event = json.loads(line)
+                        if str(event.get("job_id")) != str(job) or int(event["sequence"]) != len(records) + 1:
+                            raise RuntimeError("Local SOTA event journal sequence mismatch")
+                        records.append(event)
+            self._records[job] = records
+        return self._records[job]
+
+    def cursor(self, job):
+        return len(self.records(job))
+
+    def append_page(self, job, response):
+        if not response.startswith("OK "):
+            raise RuntimeError(response)
+        page = json.loads(response[3:])
+        if str(page.get("job_id")) != str(job):
+            raise RuntimeError("SOTA event page job mismatch")
+        events = page.get("events") or []  # property_tree represents empty arrays as empty strings
+        if not isinstance(events, list):
+            raise RuntimeError("Invalid SOTA event page")
+        cached = self.records(job)
+        cursor = len(cached)
+        fresh = []
+        for event in events:
+            seq = int(event["sequence"])
+            if seq < 1:
+                raise RuntimeError("Invalid SOTA event sequence")
+            if str(event.get("job_id")) != str(job):
+                raise RuntimeError("SOTA event job mismatch")
+            if seq <= cursor:
+                if cached[seq - 1] != event:
+                    raise RuntimeError("SOTA event replay differs from durable record")
+                continue
+            if seq != cursor + len(fresh) + 1:
+                raise RuntimeError("SOTA event gap; cursor retained for retry")
+            fresh.append(event)
+        if int(page["next_cursor"]) != cursor + len(fresh):
+            raise RuntimeError("Invalid SOTA event cursor")
+        if fresh:
+            self.root.mkdir(parents=True, exist_ok=True)
+            raw = b"".join((json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8") for event in [*cached, *fresh])
+            path = self.root / (str(job) + ".jsonl")
+            temporary = path.with_suffix(".jsonl.part")
+            with temporary.open("wb") as target:
+                target.write(raw)
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(temporary, path)
+            cached.extend(fresh)
+        more = page.get("more") in (True, "true")
+        if more and not fresh:
+            raise RuntimeError("SOTA event page made no progress")
+        return fresh, more
+
+
+class SotaLiveJob:
+    """Derive fine byte progress and duration from durable, sequenced events."""
+    def __init__(self):
+        self.cursor = 0
+        self.started_us = self.latest_us = 0
+        self.target_bytes = {}
+        self.terminal_state = None
+
+    def consume(self, events):
+        for event in events:
+            sequence = int(event["sequence"])
+            if sequence <= self.cursor:
+                continue
+            if sequence != self.cursor + 1:
+                raise RuntimeError("SOTA live progress event gap")
+            stamp = int(event.get("timestamp_us", 0))
+            if not self.started_us:
+                self.started_us = stamp
+            self.latest_us = max(self.latest_us, stamp)
+            if (event.get("kind") == "PHASE" and not event.get("target")
+                    and event.get("state") in SOTA_TERMINAL_STATES):
+                self.terminal_state = event["state"]
+            if event.get("kind") == "UDS_RESPONSE" and int(event.get("sid", 0)) == 0x36:
+                response = bytes.fromhex(event.get("response_hex", ""))
+                counter = int(event.get("subfunction_or_bsc", -1))
+                if len(response) == 2 and response == bytes([0x76, counter & 255]) and counter >= 0:
+                    target = event["target"]
+                    routed = int(event.get("route", -1 if target == "ZGW" else 0)) >= 0
+                    count = int(event["wire_size"]) - 2 - int(routed)
+                    if count < 0:
+                        raise RuntimeError("Invalid SOTA acknowledged block size")
+                    self.target_bytes[target] = self.target_bytes.get(target, 0) + count
+            self.cursor = sequence
+
+    def status(self, snapshot):
+        result = dict(snapshot)
+        result["completed_bytes"] = max(int(snapshot.get("completed_bytes", 0)), sum(self.target_bytes.values()))
+        result["targets"] = {name: dict(target) for name, target in snapshot.get("targets", {}).items()}
+        for name, count in self.target_bytes.items():
+            target = result["targets"].setdefault(name, {})
+            target["completed_bytes"] = max(int(target.get("completed_bytes", 0)), count)
+        terminal = snapshot.get("state") in SOTA_TERMINAL_STATES
+        if terminal and self.terminal_state != snapshot.get("state"):
+            # A finished job may take several pages to archive on first attach.
+            # Avoid presenting each partial page's duration as its final time.
+            job = str(snapshot.get("job_id", ""))
+            if job.isdigit() and snapshot.get("updated_at"):
+                result["elapsed_seconds"] = max(0, int(snapshot["updated_at"]) - int(job) / 1000000)
+                result["elapsed_event_us"] = 0
+        elif self.started_us:
+            result["elapsed_seconds"] = max(0, self.latest_us - self.started_us) / 1000000
+            result["elapsed_event_us"] = self.latest_us
+        return result
+
+
+def format_sota_event(event, started_us=None):
+    stamp = datetime.fromtimestamp(int(event.get("timestamp_us", 0)) / 1000000).strftime("%H:%M:%S.%f")[:-3]
+    place = "/".join(filter(None, (event.get("target"), event.get("image"))))
+    kind = event.get("kind", "PHASE")
+    detail = event.get("detail", event.get("event", event.get("state", "")))
+    if kind.startswith("UDS_"):
+        detail = f"SID=0x{int(event['sid']):02X} bytes={event.get('wire_size', '?')}"
+        if "subfunction_or_bsc" in event:
+            detail += f" subfunction/BSC=0x{int(event['subfunction_or_bsc']):02X}"
+        if kind == "UDS_REQUEST":
+            detail += f" crc32={int(event.get('wire_crc32', 0)):08X} wire={event.get('wire_prefix_hex', '')}"
+        elif kind == "UDS_RESPONSE":
+            detail += f" response={event.get('response_hex', '')}"
+        else:
+            detail += " " + event.get("error", "Unknown UDS failure")
+    if kind == "PROGRESS":
+        detail += f" ({event.get('completed_bytes', '?')} bytes)"
+    elapsed = ""
+    if started_us is not None:
+        milliseconds = max(0, int(event.get("timestamp_us", started_us)) - started_us) // 1000
+        elapsed = f" [+{elapsed_text(milliseconds // 1000)}.{milliseconds % 1000:03d}]"
+    return f"CM5 SOTA job {event['job_id']} #{event['sequence']} [{stamp}]{elapsed} {kind} {place}: {detail}"
+
+
+def sota_node_modes(node_rows):
+    """Snapshot current node-editor choices, including changes after bundle creation."""
+    modes = {}
+    for target in node_rows:
+        name = str(target.get("node_name", "")).upper()
+        if name not in SOTA_VEHICLE_NODES:
+            continue
+        kind = target.get("node_kind", "Real")
+        if kind not in ("Real", "Simulated"):
+            raise ValueError(f"Invalid SOTA node kind for {name}: {kind}")
+        modes[name] = kind
+    return modes
+
+
+def node_to_target(
+    node: NodeInfo, extended_diag_address: str = "", simulated_enabled: bool = True
+) -> dict:
+    return {
+        "node_name": node.node_name,
+        "bus_type": node.bus_type,
+        "node_kind": "Real" if node.is_zgw else "Simulated",
+        "simulated_enabled": simulated_enabled,
+        "extended_diag_address": extended_diag_address,
+        "route_metadata": {
+            "source_file": node.source_file,
+            "request_id": node.request_id,
+            "response_id": node.response_id,
+            "target_logical_address": node.target_logical_address,
+            "inferred": node.inferred,
+            "notes": node.notes,
+        },
+        "is_zgw": node.is_zgw,
+        "flash_order_group": 99 if node.is_zgw else 10,
+        "coding_order_group": 99 if node.is_zgw else 10,
+        "payload_blocks": [],
+        "coding_descriptor": {},
+    }
+
+
+def manifest_from_targets(
+    project: str, vin: str, source_db_files: list[str], targets: list[dict]
+) -> dict:
+    ordered = sorted(
+        targets,
+        key=lambda t: (
+            t.get("is_zgw", False),
+            bus_sort_key(t.get("bus_type", "UNKNOWN")),
+            t.get("node_name", ""),
+        ),
+    )
+    return {
+        "project": project,
+        "vin": vin,
+        "source_db_files": sorted(source_db_files),
+        "targets": ordered,
+        "assumptions": [
+            "Extended diagnostic addressing is treated as opaque per-target metadata.",
+            "ZGW flash/coding is skipped when any prerequisite non-ZGW target fails.",
+            "Missing route metadata is logged and left blank rather than guessed.",
+        ],
+    }
+
+
+def to_jsonable_events(events: list[ScheduleEvent]) -> list[dict]:
+    return [asdict(event) for event in events]
+
+
+# -----------------------------------------------------------------------------
+# CM5 backup transport client
+# -----------------------------------------------------------------------------
+MAGIC = b"C5BK"
+VERSION = 1
+HEADER = struct.Struct("!4sBBHIQ")
+DEFAULT_PORT = 13400
+DEFAULT_BLOCK_SIZE = 1024 * 1024
+MAX_CONTROL = 4 * 1024 * 1024
+MAX_DATA = 8 * 1024 * 1024 + 16
+HELLO, AUTH, INFO, INIT, START, DATA, PROGRESS, CANCEL, COMPLETE, ERROR = range(1, 11)
+SET_BANDWIDTH = 13
+TRANSPORT = 14
+
+
+class BackupError(RuntimeError):
+    pass
+
+
+class BackupCancelled(BackupError):
+    pass
+
+
+@dataclass
+class Frame:
+    kind: int
+    request_id: int
+    payload: bytes
+    flags: int = 0
+
+
+def recv_exact(sock, length):
+    result = bytearray()
+    while len(result) < length:
+        chunk = sock.recv(length - len(result))
+        if not chunk:
+            raise ConnectionError("connection closed during frame")
+        result.extend(chunk)
+    return bytes(result)
+
+
+def send_frame(sock, kind, request_id, payload=b"", flags=0):
+    payload = bytes(payload)
+    limit = MAX_DATA if kind == DATA else MAX_CONTROL
+    if len(payload) > limit:
+        raise BackupError("outgoing payload exceeds protocol limit")
+    sock.sendall(HEADER.pack(MAGIC, VERSION, kind, flags, len(payload), request_id) + payload)
+
+
+def recv_frame(sock):
+    magic, version, kind, flags, length, request_id = HEADER.unpack(recv_exact(sock, HEADER.size))
+    if magic != MAGIC or version != VERSION:
+        raise BackupError("invalid protocol header")
+    limit = MAX_DATA if kind == DATA else MAX_CONTROL
+    if length > limit:
+        raise BackupError("incoming payload exceeds protocol limit")
+    return Frame(kind, request_id, recv_exact(sock, length), flags)
+
+
+def encode_json(value):
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def decode_json(payload):
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BackupError(f"invalid JSON payload: {exc}") from exc
+    if not isinstance(value, dict):
+        raise BackupError("JSON payload is not an object")
+    return value
+
+
+def normalize_fingerprint(value):
+    return "".join(character for character in value.lower() if character in "0123456789abcdef")
+
+
+def sha256_file(path, progress=None):
+    total = path.stat().st_size
+    done = 0
+    digest = hashlib.sha256()
+    with path.open("rb", buffering=0) as source:
+        while True:
+            block = source.read(4 * 1024 * 1024)
+            if not block:
+                break
+            digest.update(block)
+            done += len(block)
+            if progress:
+                progress(done, total)
+    return digest.hexdigest()
+
+
+def inspect_partition_table(path):
+    with path.open("rb") as image:
+        header = image.read(1024)
+    mbr = len(header) >= 512 and header[510:512] == b"\x55\xaa"
+    gpt = len(header) >= 520 and header[512:520] == b"EFI PART"
+    return {
+        "mbr_signature": mbr,
+        "gpt_header": gpt,
+        "classification": "GPT" if gpt else "MBR" if mbr else "unrecognized",
+    }
+
+
+def available_bytes(path):
+    return shutil.disk_usage(path).free
+
+
+def supports_large_files(path):
+    """Probe the destination without allocating a multi-gigabyte file."""
+    probe = Path(path) / f".fcd-large-file-probe-{os.getpid()}"
+    try:
+        with probe.open("xb") as output:
+            output.seek(4 * 1024**3)
+            output.write(b"\0")
+            output.flush()
+            os.fsync(output.fileno())
+        return probe.stat().st_size > 4 * 1024**3
+    except (OSError, OverflowError):
+        return False
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+class _DataBlob(ctypes.Structure):
+    _fields_ = [("cbData", ctypes.c_uint32), ("pbData", ctypes.POINTER(ctypes.c_ubyte))]
+
+
+def cm5_token_credential_path():
+    override = os.environ.get("FCD_CM5_TOKEN_CREDENTIAL_PATH")
+    if override:
+        return Path(override)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        raise BackupError("LOCALAPPDATA is unavailable for protected token storage")
+    return Path(local_app_data) / "FCD" / "cm5_emmc_dump_token.dpapi"
+
+
+def _dpapi_blob(data):
+    buffer = ctypes.create_string_buffer(data)
+    return buffer, _DataBlob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)))
+
+
+def save_cm5_token(token):
+    token = str(token).strip()
+    if len(token) < 32:
+        raise BackupError("authentication token is too short to save")
+    _buffer, source = _dpapi_blob(token.encode("utf-8"))
+    protected = _DataBlob()
+    if not ctypes.windll.crypt32.CryptProtectData(
+        ctypes.byref(source), "FCD CM5 eMMC Dump", None, None, None, 1, ctypes.byref(protected)
+    ):
+        raise ctypes.WinError()
+    try:
+        encrypted = ctypes.string_at(protected.pbData, protected.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(protected.pbData)
+    path = cm5_token_credential_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_bytes(encrypted)
+    temporary.replace(path)
+
+
+def load_cm5_token():
+    path = cm5_token_credential_path()
+    if not path.exists():
+        return ""
+    encrypted = path.read_bytes()
+    _buffer, source = _dpapi_blob(encrypted)
+    clear = _DataBlob()
+    if not ctypes.windll.crypt32.CryptUnprotectData(
+        ctypes.byref(source), None, None, None, None, 1, ctypes.byref(clear)
+    ):
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(clear.pbData, clear.cbData).decode("utf-8")
+    finally:
+        ctypes.windll.kernel32.LocalFree(clear.pbData)
+
+
+def delete_cm5_token():
+    cm5_token_credential_path().unlink(missing_ok=True)
+
+
+def load_or_migrate_cm5_token():
+    legacy = SCRIPT_DIR / "token.txt"
+    if legacy.is_file():
+        token = legacy.read_text(encoding="utf-8").strip()
+        if len(token) < 32:
+            raise BackupError("FCD/token.txt does not contain a valid authentication token")
+        return token
+    protected = load_cm5_token()
+    if protected:
+        legacy.write_text(protected + "\n", encoding="utf-8")
+    return protected
+
+
+class Cm5BackupClient:
+    def __init__(self, host, port=DEFAULT_PORT, token="", fingerprint="", timeout=120.0):
+        self.host = host
+        self.port = int(port)
+        self.token = token
+        self.fingerprint = normalize_fingerprint(fingerprint)
+        self.timeout = float(timeout)
+        self.sock = None
+        self.request_id = 0
+        self.info = {}
+        self.session = {}
+        self.send_lock = threading.Lock()
+        self.stream_request_id = None
+        self.ethernet = None
+        self.transport_evidence = {}
+        self.log = lambda message: None
+        self.transport_failure = None
+        self.configured_bandwidth_mbps = 50
+
+    def close(self):
+        current, self.sock = self.sock, None
+        if current:
+            try:
+                current.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            current.close()
+
+    def connect(self):
+        self.close()
+        if len(self.fingerprint) != 64:
+            raise BackupError("enter the agent certificate SHA-256 fingerprint")
+        try:
+            # Bootstrap is pinned TLS + HELLO only; it cannot start an acquisition.
+            self.log(f"Discovery-only HELLO to {self.host}:{self.port}; eMMC data requires verified Ethernet")
+            hello = self._connect_tls(socket.create_connection((self.host, self.port), self.timeout))
+            self.log(f"Discovery TCP endpoints (metadata only): {self.sock.getsockname()} -> {self.sock.getpeername()}")
+            if "ethernet-only-v1" not in hello.get("extensions", []):
+                raise BackupError("Ethernet-only: agent 2.3.0 with ethernet-only-v1 required; dump aborted")
+            addresses = hello.get("ethernet_addresses", [])
+            self.close()
+            self.ethernet = EthernetPath.discover(addresses)
+            hello = self._connect_tls(self.ethernet.connect(self.port, self.timeout))
+            if "ethernet-only-v1" not in hello.get("extensions", []):
+                raise BackupError("Ethernet-only: destination agent lacks transport verification")
+            self.request(AUTH, {"token": self.token})
+            # Connect is metadata-only. Reinspect the local route before INIT,
+            # then keep inspecting it while eMMC data is streamed.
+            self.verify_transport(inspect_local=False)
+            return hello
+        except Exception:
+            self.close()
+            raise
+
+    def _connect_tls(self, raw):
+        raw.settimeout(self.timeout)
+        if self.port == 13400:
+            raw.sendall(b"FCDB")
+        raw.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        for option, value in (
+            (getattr(socket, "TCP_KEEPIDLE", None), 30),
+            (getattr(socket, "TCP_KEEPINTVL", None), 10),
+            (getattr(socket, "TCP_KEEPCNT", None), 3),
+        ):
+            if option is not None:
+                try:
+                    raw.setsockopt(socket.IPPROTO_TCP, option, value)
+                except OSError:
+                    pass
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        try:
+            tls = context.wrap_socket(raw, server_hostname=self.host)
+            certificate = tls.getpeercert(binary_form=True)
+            actual = hashlib.sha256(certificate).hexdigest() if certificate else ""
+            if actual != self.fingerprint:
+                raise BackupError(f"certificate fingerprint mismatch; received {actual}")
+            self.sock = tls
+            hello = self.request(HELLO, {"client": "FCD", "protocol": VERSION})
+            return hello
+        except Exception:
+            if self.sock:
+                self.sock.close()
+            raw.close()
+            self.sock = None
+            raise
+
+    def verify_transport(self, inspect_local=True):
+        if not self.sock or not self.ethernet:
+            raise BackupError("Ethernet-only: verified Ethernet connection required")
+        try:
+            remote = self.request(TRANSPORT, {})
+            self.transport_evidence = self.ethernet.verify_remote(
+                self.sock, remote, inspect_path=inspect_local)
+            self.transport_evidence["verified_at"] = datetime.now().astimezone().isoformat()
+            self.transport_evidence["bandwidth_mbps"] = self.configured_bandwidth_mbps
+            self.log("Ethernet verified: " + json.dumps(self.transport_evidence, sort_keys=True))
+            return self.transport_evidence
+        except Exception:
+            self.close()
+            raise
+
+    def request(self, kind, value):
+        if not self.sock:
+            raise BackupError("not connected")
+        self.request_id += 1
+        request_id = self.request_id
+        with self.send_lock:
+            send_frame(self.sock, kind, request_id, encode_json(value))
+        frame = recv_frame(self.sock)
+        if frame.request_id != request_id:
+            raise BackupError("response request ID mismatch")
+        response = decode_json(frame.payload)
+        if frame.kind == ERROR:
+            raise BackupError(response.get("error", "agent error"))
+        if frame.kind != kind:
+            raise BackupError(f"unexpected response type {frame.kind}")
+        return response
+
+    def get_info(self):
+        self.info = self.request(INFO, {})
+        return self.info
+
+    def initialize(self, mode, resume=None, bandwidth_mbps=50):
+        self.configured_bandwidth_mbps = int(bandwidth_mbps or 0)
+        self.verify_transport()
+        self.transport_evidence["bandwidth_mbps"] = int(bandwidth_mbps or 0)
+        self.log(f"Configured throughput limit: {int(bandwidth_mbps or 0)} Mbps (0 = Unlimited)")
+        value = {
+            "mode": mode,
+            "block_size": DEFAULT_BLOCK_SIZE,
+            "bandwidth_mbps": int(bandwidth_mbps or 0),
+        }
+        if resume:
+            value["resume"] = resume
+        self.session = self.request(INIT, value)
+        return self.session
+
+    def _stream(self, output, offset, cancel_event, progress):
+        if not self.sock:
+            raise BackupError("not connected")
+        self.request_id += 1
+        request_id = self.request_id
+        with self.send_lock:
+            send_frame(self.sock, START, request_id, encode_json({"offset": offset}))
+        self.stream_request_id = request_id
+        total = int(self.session.get("size", 0))
+        received = offset
+        started = time.monotonic()
+        while True:
+            if cancel_event.is_set():
+                with self.send_lock:
+                    send_frame(self.sock, CANCEL, self.request_id + 1, encode_json({}))
+                raise BackupCancelled("backup cancelled")
+            frame = recv_frame(self.sock)
+            if frame.request_id != request_id:
+                raise BackupError("stream request ID mismatch")
+            if frame.kind == DATA:
+                if len(frame.payload) < 8:
+                    raise BackupError("short data frame")
+                frame_offset = struct.unpack("!Q", frame.payload[:8])[0]
+                block = frame.payload[8:]
+                if (
+                    frame_offset != received
+                    or not block
+                    or (total and received + len(block) > total)
+                ):
+                    raise BackupError("invalid or non-sequential data frame")
+                output.write(block)
+                received += len(block)
+                progress(received, total, max(time.monotonic() - started, 0.001))
+            elif frame.kind == PROGRESS:
+                continue
+            elif frame.kind == COMPLETE:
+                result = decode_json(frame.payload)
+                actual = int(result.get("size", -1))
+                if actual != received or (total and received != total):
+                    raise BackupError("completed image size mismatch")
+                return result
+            elif frame.kind == ERROR:
+                raise BackupError(decode_json(frame.payload).get("error", "agent error"))
+            else:
+                raise BackupError(f"unexpected stream frame {frame.kind}")
+
+    def stream(self, output, offset, cancel_event, progress):
+        self.verify_transport()
+        self.transport_failure = None
+        stopped = threading.Event()
+        current = self.sock
+
+        def watch_ethernet():
+            while not stopped.wait(1.0):
+                try:
+                    self.ethernet.verify(current)
+                except Exception as exc:
+                    self.transport_failure = str(exc)
+                    self.close()
+                    return
+
+        watcher = threading.Thread(target=watch_ethernet, name="cm5-ethernet-guard", daemon=True)
+        watcher.start()
+        try:
+            result = self._stream(output, offset, cancel_event, progress)
+            if self.transport_failure:
+                raise BackupError(self.transport_failure)
+            self.ethernet.verify(current)
+            return result
+        except Exception as exc:
+            self.close()
+            if self.transport_failure:
+                raise BackupError(self.transport_failure) from exc
+            raise
+        finally:
+            stopped.set()
+            watcher.join(timeout=16)
+            self.stream_request_id = None
+            if watcher.is_alive():
+                self.close()
+                raise BackupError("Ethernet-only: transport inspection did not finish; dump incomplete")
+            if self.transport_failure:
+                self.close()
+                raise BackupError(self.transport_failure)
+
+    def set_bandwidth(self, bandwidth_mbps):
+        if not self.sock or self.stream_request_id is None:
+            return False
+        with self.send_lock:
+            send_frame(
+                self.sock,
+                SET_BANDWIDTH,
+                self.stream_request_id,
+                encode_json({"bandwidth_mbps": int(bandwidth_mbps or 0)}),
+            )
+        self.configured_bandwidth_mbps = int(bandwidth_mbps or 0)
+        self.log(f"Configured throughput limit changed: {self.configured_bandwidth_mbps} Mbps (0 = Unlimited)")
+        return True
+
+
+# -----------------------------------------------------------------------------
+# CM5 backup package format and validation
+# -----------------------------------------------------------------------------
+FORMAT = "fcd-cm5-backup"
+FORMAT_VERSION = 2
+MANIFEST_NAME = "manifest.json"
+
+
+class PackageError(RuntimeError):
+    pass
+
+
+def _safe_name(name: str) -> str:
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        raise PackageError(f"unsafe package member name: {name!r}")
+    return str(path)
+
+
+class _HashingWriter:
+    def __init__(self, output):
+        self.output = output
+        self.digest = hashlib.sha256()
+        self.size = 0
+
+    def write(self, data):
+        written = self.output.write(data)
+        if written is None:
+            written = len(data)
+        self.digest.update(memoryview(data)[:written])
+        self.size += written
+        return written
+
+    def flush(self):
+        return self.output.flush()
+
+
+class BackupPackageWriter:
+    """Create a package while images arrive from the network."""
+
+    def __init__(self, path, manifest):
+        self.path = Path(path)
+        self.manifest = dict(manifest)
+        self.manifest.update({"format": FORMAT, "format_version": FORMAT_VERSION})
+        self.manifest.setdefault("entries", [])
+        self._zip = zipfile.ZipFile(
+            self.path, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True
+        )
+        self._closed = False
+
+    @contextmanager
+    def entry(self, name, *, role, partition=None, backend=None, compression="none"):
+        name = _safe_name(name)
+        if name == MANIFEST_NAME:
+            raise PackageError("manifest name is reserved")
+        info = zipfile.ZipInfo(name)
+        info.compress_type = zipfile.ZIP_STORED if compression == "zstd" else zipfile.ZIP_DEFLATED
+        info.flag_bits |= 0x08
+        raw = self._zip.open(info, "w", force_zip64=True)
+        writer = _HashingWriter(raw)
+        try:
+            yield writer
+        finally:
+            raw.close()
+            record = {
+                "name": name,
+                "role": role,
+                "size": writer.size,
+                "sha256": writer.digest.hexdigest(),
+                "compression": compression,
+            }
+            if partition is not None:
+                record["partition"] = partition
+            if backend is not None:
+                record["backend"] = backend
+            self.manifest["entries"].append(record)
+
+    def complete(self):
+        if self._closed:
+            return
+        self.manifest["completion_status"] = "complete"
+        payload = json.dumps(self.manifest, indent=2, sort_keys=True).encode("utf-8")
+        self._zip.writestr(MANIFEST_NAME, payload)
+        self._zip.close()
+        self._closed = True
+
+    def abort(self):
+        if not self._closed:
+            self._zip.close()
+            self._closed = True
+
+
+def read_manifest(path):
+    try:
+        with zipfile.ZipFile(path, "r") as archive:
+            manifest = json.loads(archive.read(MANIFEST_NAME).decode("utf-8"))
+    except (OSError, KeyError, zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as exc:
+        raise PackageError(f"invalid backup package: {exc}") from exc
+    if manifest.get("format") != FORMAT or manifest.get("format_version") != FORMAT_VERSION:
+        raise PackageError("unsupported backup package format/version")
+    if manifest.get("completion_status") != "complete":
+        raise PackageError("backup package is not marked complete")
+    return manifest
+
+
+def verify_package(path, progress=None):
+    manifest = read_manifest(path)
+    expected = {entry["name"]: entry for entry in manifest.get("entries", [])}
+    with zipfile.ZipFile(path, "r") as archive:
+        actual = set(archive.namelist()) - {MANIFEST_NAME}
+        if actual != set(expected):
+            raise PackageError("manifest/member set mismatch")
+        total = sum(int(item.get("size", 0)) for item in expected.values())
+        done = 0
+        for name, entry in expected.items():
+            digest = hashlib.sha256()
+            size = 0
+            with archive.open(_safe_name(name)) as source:
+                while block := source.read(4 * 1024 * 1024):
+                    digest.update(block)
+                    size += len(block)
+                    done += len(block)
+                    if progress:
+                        progress(done, total, name)
+            if size != int(entry["size"]) or digest.hexdigest() != entry["sha256"]:
+                raise PackageError(f"integrity check failed for {name}")
+    return manifest
+
+
+def validate_restore_plan(manifest, target, *, mounted_devices=(), running_root=None):
+    """Validate an offline restore target without modifying it."""
+    target = os.path.realpath(os.fspath(target))
+    mounted = {os.path.realpath(os.fspath(item)) for item in mounted_devices}
+    if target in mounted:
+        raise PackageError("refusing to restore to a mounted target device")
+    if running_root and target == os.path.realpath(os.fspath(running_root)):
+        raise PackageError("refusing to overwrite the currently running root device")
+    required = int(manifest.get("disk", {}).get("size_bytes", 0))
+    try:
+        available = os.path.getsize(target)
+    except OSError as exc:
+        raise PackageError(f"target device is unavailable: {exc}") from exc
+    if required <= 0:
+        raise PackageError("manifest has no valid source disk size")
+    if available < required:
+        raise PackageError(f"target is too small: requires {required}, has {available}")
+    partitions = manifest.get("partitions", [])
+    if manifest.get("backup_mode") == "live-filesystem":
+        roles = [entry.get("role") for entry in manifest.get("entries", [])]
+        if roles.count("live-root-archive") != 1 or roles.count("live-boot-archive") < 1:
+            raise PackageError("live package is missing root or boot archive data")
+        if int(manifest.get("acquisition_error_count", 0)):
+            raise PackageError("live package contains unresolved acquisition errors")
+    else:
+        image_parts = {
+            entry.get("partition")
+            for entry in manifest.get("entries", [])
+            if entry.get("role") == "partition-image"
+        }
+        missing = [
+            item.get("number") for item in partitions if item.get("number") not in image_parts
+        ]
+        if missing:
+            raise PackageError(f"missing partition image data: {missing}")
+    return {
+        "target": target,
+        "required_bytes": required,
+        "available_bytes": available,
+        "partition_count": len(partitions),
+        "dry_run": True,
+    }
+
+
+# -----------------------------------------------------------------------------
+# CM5 backup Tkinter panel
+# -----------------------------------------------------------------------------
+def human_bytes(value):
+    amount = float(value)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if amount < 1024 or unit == "TiB":
+            return f"{amount:.2f} {unit}"
+        amount /= 1024
+
+
+def elapsed_text(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
+
+
+class Cm5BackupPanel:
+    def __init__(self, app, parent):
+        self.app = app
+        self.root = app.root
+        self.parent = parent
+        self.client = None
+        self.info = {}
+        self.cancel_event = threading.Event()
+        self.busy_lock = threading.Lock()
+        self.busy = False
+        self._build()
+
+    def _entry(self, parent, row, label, variable, width=24, column=0, show=None):
+        ttk.Label(parent, text=label).grid(row=row, column=column, sticky="w", padx=5, pady=3)
+        entry = ttk.Entry(parent, textvariable=variable, width=width, show=show)
+        entry.grid(row=row, column=column + 1, sticky="ew", padx=5, pady=3)
+        return entry
+
+    def _build(self):
+        saved = self.app.settings.get("cm5_backup", {})
+        outer = ttk.Frame(self.parent)
+        outer.pack(fill="both", expand=True, padx=8, pady=8)
+        outer.columnconfigure(0, weight=1)
+        outer.columnconfigure(1, weight=1)
+        outer.rowconfigure(2, weight=1)
+
+        connection = ttk.LabelFrame(outer, text="CM5 connection — TLS 1.3")
+        connection.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        connection.columnconfigure(1, weight=1)
+        connection.columnconfigure(3, weight=1)
+        self.host_var = tk.StringVar(value=saved.get("host", "raspberrypi"))
+        self.port_var = tk.StringVar(value="13400")
+        try:
+            saved_token = load_or_migrate_cm5_token()
+        except Exception:
+            saved_token = ""
+        cm5_panel = getattr(self.app, "cm5_panel", None)
+        self.token_var = (
+            cm5_panel.token_var if cm5_panel is not None else tk.StringVar(value=saved_token)
+        )
+        self.remember_token_var = tk.BooleanVar(
+            value=bool(saved.get("remember_token", True))
+        )
+        self.bandwidth_var = tk.StringVar(value=saved.get("bandwidth_limit", "50 Mbps"))
+        self.fingerprint_var = tk.StringVar(value=saved.get("fingerprint", ""))
+        self.connection_var = tk.StringVar(value="Disconnected")
+        self.identity_var = tk.StringVar(value="Hostname / OS: --")
+        self._entry(connection, 0, "Discovery host/IP", self.host_var, 22, 0)
+        self._entry(connection, 1, "Authentication token", self.token_var, 48, 0, "•")
+        self._entry(connection, 2, "Certificate SHA-256", self.fingerprint_var, 76, 0)
+        buttons = ttk.Frame(connection)
+        buttons.grid(row=3, column=0, columnspan=4, sticky="w", padx=4, pady=4)
+        ttk.Checkbutton(
+            buttons,
+            text="Remember token in FCD/token.txt (plaintext lab mode)",
+            variable=self.remember_token_var,
+        ).pack(side="left", padx=12)
+        ttk.Label(buttons, textvariable=self.connection_var).pack(side="left", padx=12)
+        ttk.Label(connection, textvariable=self.identity_var, wraplength=650).grid(
+            row=4, column=0, columnspan=4, sticky="w", padx=5, pady=3
+        )
+        ttk.Label(connection, text="Bandwidth limit").grid(
+            row=5, column=0, sticky="w", padx=5, pady=3
+        )
+        bandwidth = ttk.Combobox(
+            connection,
+            textvariable=self.bandwidth_var,
+            values=("10 Mbps", "25 Mbps", "50 Mbps", "75 Mbps", "100 Mbps", "Unlimited"),
+            state="readonly",
+            width=16,
+        )
+        bandwidth.grid(row=5, column=1, sticky="w", padx=5, pady=3)
+        bandwidth.bind("<<ComboboxSelected>>", self._bandwidth_changed)
+
+        destination = ttk.LabelFrame(outer, text="Dump destination")
+        destination.grid(row=0, column=1, sticky="nsew", padx=4, pady=4)
+        destination.columnconfigure(1, weight=1)
+        self.destination_var = tk.StringVar(
+            value=saved.get("destination", str(SCRIPT_DIR / "CM5_Dumps"))
+        )
+        self.space_var = tk.StringVar(value="Required/free space: --")
+        self._entry(destination, 0, "Directory", self.destination_var, 48)
+        ttk.Button(destination, text="Browse...", command=self.browse).grid(row=0, column=2, padx=4)
+        ttk.Label(destination, textvariable=self.space_var).grid(
+            row=1, column=0, columnspan=3, sticky="w", padx=5, pady=4
+        )
+
+        information = ttk.LabelFrame(outer, text="eMMC information")
+        information.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4, pady=4)
+        information.columnconfigure(1, weight=1)
+        self.device_var = tk.StringVar(value="Device: --")
+        self.capacity_var = tk.StringVar(value="Capacity / logical sector / sector count: --")
+        self.root_var = tk.StringVar(value="Root filesystem: --")
+        self.consistency_var = tk.StringVar(value="Agent / capabilities: --")
+        self.inventory_var = tk.StringVar(value="Partition table: --")
+        for row, variable in enumerate(
+            (
+                self.device_var,
+                self.capacity_var,
+                self.root_var,
+                self.inventory_var,
+                self.consistency_var,
+            )
+        ):
+            ttk.Label(information, textvariable=variable, wraplength=1200).grid(
+                row=row, column=0, columnspan=2, sticky="w", padx=5, pady=2
+            )
+
+        control = ttk.LabelFrame(outer, text="Full eMMC dump control")
+        control.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=4, pady=4)
+        control.columnconfigure(0, weight=1)
+        self.mode_var = tk.StringVar(value="Raw full-device dump")
+        self.status_var = tk.StringVar(value="Idle")
+        self.metrics_var = tk.StringVar(value="0 B / 0 B — rate -- — remaining --")
+        self.hash_var = tk.StringVar(value="SHA-256: --")
+        self.live_warning_var = tk.StringVar(
+            value="LIVE RAW ACQUISITION — The mounted filesystem may change while sectors are read. A matching transfer hash does not prove filesystem consistency or restorability."
+        )
+        self.detail_var = tk.StringVar(
+            value="Current filesystem: -- | Changed files: -- | Errors: -- | Compression: --"
+        )
+        actions = ttk.Frame(control)
+        actions.grid(row=0, column=0, sticky="ew", padx=4, pady=3)
+        ttk.Button(actions, text="Start Dump", command=self.start).pack(side="left", padx=8)
+        ttk.Button(actions, text="Cancel Dump", command=self.cancel).pack(side="left", padx=4)
+        self.progress = ttk.Progressbar(
+            control,
+            maximum=100,
+            mode="determinate",
+            style="Green.Horizontal.TProgressbar",
+        )
+        self.progress.grid(row=1, column=0, sticky="ew", padx=8, pady=5)
+        ttk.Label(control, textvariable=self.live_warning_var, foreground="#a06000").grid(
+            row=2, column=0, sticky="w", padx=8
+        )
+        ttk.Label(control, textvariable=self.metrics_var).grid(row=3, column=0, sticky="w", padx=8)
+        ttk.Label(control, textvariable=self.detail_var).grid(row=4, column=0, sticky="w", padx=8)
+        ttk.Label(control, textvariable=self.hash_var, wraplength=1200).grid(
+            row=5, column=0, sticky="w", padx=8
+        )
+        ttk.Label(control, textvariable=self.status_var, wraplength=1200).grid(
+            row=6, column=0, sticky="w", padx=8, pady=3
+        )
+
+    def _ui(self, function):
+        self.root.after(0, function)
+
+    def _set(self, variable, value):
+        self._ui(lambda: variable.set(value))
+
+    def log(self, message):
+        self.app.log("CM5 eMMC Dump: " + message)
+
+    def _run(self, name, action):
+        with self.busy_lock:
+            if self.busy:
+                messagebox.showerror("FCD", "A CM5 eMMC dump operation is already running")
+                return
+            self.busy = True
+
+        def worker():
+            try:
+                action()
+            except Exception as exc:
+                self.log(f"{name} failed: {exc}")
+                self._set(self.status_var, f"{name} failed: {exc}")
+            finally:
+                with self.busy_lock:
+                    self.busy = False
+
+        threading.Thread(target=worker, name=f"cm5-{name}", daemon=True).start()
+
+    def _new_client(self):
+        client = Cm5BackupClient(
+            self.host_var.get().strip(),
+            int(self.port_var.get()),
+            self.token_var.get(),
+            self.fingerprint_var.get(),
+        )
+        client.log = self.log
+        return client
+
+    def bandwidth_mbps(self):
+        value = self.bandwidth_var.get().strip()
+        return 0 if value == "Unlimited" else int(value.split()[0])
+
+    def _bandwidth_changed(self, _event=None):
+        if self.client and self.client.set_bandwidth(self.bandwidth_mbps()):
+            self.log(f"active dump bandwidth limit changed to {self.bandwidth_var.get()}")
+            self._set(self.status_var, f"Bandwidth limit: {self.bandwidth_var.get()}")
+
+    def connect(self):
+        self._run("connection", self._connect)
+
+    def _connect(self):
+        self._set(self.connection_var, "Connecting...")
+        client = self._new_client()
+        try:
+            hello = client.connect()
+            info = client.get_info()
+        except Exception:
+            client.close()
+            raise
+        old, self.client = self.client, client
+        if old:
+            old.close()
+        self.info = info
+        self._set(self.connection_var, f"Connected — agent {hello.get('agent_version', '?')} — Ethernet {client.sock.getsockname()[0]} → {client.sock.getpeername()[0]}")
+        self._set(
+            self.identity_var,
+            f"Hostname / OS: {info.get('hostname', '?')} — {info.get('os', '?')} — "
+            f"kernel {info.get('kernel', '?')}",
+        )
+        self._set(self.device_var, f"Device: {info.get('device', '?')} — {info.get('model', '')}")
+        self._set(
+            self.capacity_var,
+            f"Capacity: {int(info.get('capacity', 0)):,} bytes ({int(info.get('capacity', 0)) / 1024**3:.3f} GiB) — "
+            f"logical sector {info.get('sector_size', '?')} bytes — "
+            f"{int(info.get('capacity', 0)) // max(int(info.get('sector_size', 512)), 1):,} sectors",
+        )
+        self._set(
+            self.root_var,
+            f"Root filesystem: {info.get('root_source', '?')} "
+            f"({info.get('root_filesystem', '?')}, {info.get('root_options', '?')})",
+        )
+        partitions = info.get("partitions", [])
+        summary = (
+            ", ".join(
+                f"{p.get('name', '?')} start {int(p.get('start', 0)):,} bytes, size {human_bytes(int(p.get('size', 0)))}"
+                for p in partitions
+            )
+            or "none"
+        )
+        self._set(
+            self.inventory_var,
+            f"Partition table entries: {summary}",
+        )
+        capabilities = ", ".join(info.get("protocol_extensions", [])) or "none advertised"
+        self._set(
+            self.consistency_var,
+            f"Agent {info.get('agent_version', '?')} / protocol {info.get('protocol_version', '?')} — capabilities: {capabilities}",
+        )
+        self._update_space()
+        self._set(
+            self.status_var,
+            f"Securely connected to {info.get('hostname')} ({info.get('device')})",
+        )
+        self.log(f"securely connected to {info.get('hostname')} ({info.get('device')})")
+        self.persist_token()
+
+    def disconnect(self):
+        if self.client:
+            self.client.close()
+            self.client = None
+        self.connection_var.set("Disconnected")
+
+    def browse(self):
+        selected = filedialog.askdirectory(initialdir=self.destination_var.get() or None)
+        if selected:
+            self.destination_var.set(selected)
+            self._update_space()
+
+    def _update_space(self):
+        try:
+            required = int(self.info.get("capacity", 0)) + sum(
+                int(item.get("size", 0))
+                for item in self.info.get("supplementary_devices", [])
+                if item.get("readable")
+            )
+            free = available_bytes(Path(self.destination_var.get()))
+            self._set(
+                self.space_var, f"Required {human_bytes(required)} / free {human_bytes(free)}"
+            )
+        except Exception:
+            self._set(self.space_var, "Required/free space: unavailable")
+
+    def start(self):
+        if not self.client or not self.info:
+            messagebox.showerror("FCD", "Connect to the CM5 backup agent first")
+            return
+        if "raw-full-device-v1" not in self.info.get("protocol_extensions", []):
+            messagebox.showerror("FCD", "The connected agent does not advertise raw-full-device-v1")
+            return
+        if not messagebox.askokcancel(
+            "Raw live-image consistency warning",
+            "This reads every sector while Debian remains running. The filesystem may change, so a matching SHA-256 proves transfer integrity only—not filesystem consistency or restorability. Continue?",
+        ):
+            return
+        self._run("dump", self._backup)
+
+    def _backup(self):
+        self.cancel_event.clear()
+        destination = Path(self.destination_var.get())
+        destination.mkdir(parents=True, exist_ok=True)
+        if not supports_large_files(destination):
+            raise BackupError("destination filesystem does not support files larger than 4 GiB")
+        components = [("user", "raw", int(self.info["capacity"]), "")]
+        for item in self.info.get("supplementary_devices", []):
+            if item.get("readable") and item.get("name", "").endswith(("boot0", "boot1")):
+                suffix = "boot0" if item["name"].endswith("boot0") else "boot1"
+                components.append((suffix, f"raw_{suffix}", int(item["size"]), f"_{suffix}"))
+        required = sum(item[2] for item in components)
+        margin = max(64 * 1024 * 1024, required // 50)
+        if available_bytes(destination) < required + margin:
+            raise BackupError("insufficient destination storage")
+        stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        base = destination / f"CM5_eMMC_{stamp}"
+        metadata_path = base.with_suffix(".json")
+        checksum_path = base.with_suffix(".sha256")
+        paths = []
+        for name, _mode, _size, suffix in components:
+            image = destination / f"{base.name}{suffix}.img"
+            partial = Path(str(image) + ".partial")
+            if image.exists() or partial.exists():
+                raise BackupError(f"refusing to overwrite existing acquisition file: {image}")
+            paths.append((name, image, partial))
+        if metadata_path.exists() or checksum_path.exists():
+            raise BackupError("refusing to overwrite existing acquisition metadata")
+        started_wall = datetime.now().astimezone()
+        metadata = {
+            "completion_status": "incomplete",
+            "live_acquisition_warning": "The source was live and mounted filesystems could change during acquisition. Matching transfer hashes do not establish filesystem consistency or restorability.",
+            "source": self.info,
+            "started": started_wall.isoformat(),
+            "required_bytes": required,
+            "components": [],
+            "errors": [],
+        }
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        overall_started = time.monotonic()
+        completed_bytes = 0
+        checksum_lines = []
+        try:
+            for index, ((name, mode, expected_size, _suffix), (_n, image, partial)) in enumerate(zip(components, paths)):
+                session = self.client.initialize(mode, bandwidth_mbps=self.bandwidth_mbps())
+                metadata.setdefault("ethernet_transport", []).append(dict(self.client.transport_evidence))
+                metadata["ethernet_transport"][-1]["bandwidth_mbps"] = self.bandwidth_mbps()
+                metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+                if int(session.get("size", -1)) != expected_size:
+                    raise BackupError(f"agent reported an unexpected {name} size")
+                previous = [time.monotonic(), 0]
+                before = completed_bytes
+
+                def progress(done, expected, _elapsed, label=name, prefix=before):
+                    now = time.monotonic()
+                    current_rate = (done - previous[1]) / max(now - previous[0], 0.001)
+                    overall_done = prefix + done
+                    average_rate = overall_done / max(now - overall_started, 0.001)
+                    remaining = (required - overall_done) / average_rate if average_rate else 0
+                    previous[:] = [now, done]
+                    self._ui(lambda: (
+                        self.progress.configure(value=min(100, overall_done * 100 / required)),
+                        self.metrics_var.set(f"{human_bytes(overall_done)} / {human_bytes(required)} ({overall_done * 100 / required:.2f}%) — limit {self.bandwidth_var.get()} — actual current {current_rate * 8 / 1000000:.1f}, average {average_rate * 8 / 1000000:.1f} Mbps — remaining {elapsed_text(remaining)}"),
+                        self.detail_var.set(f"Reading {label}: {human_bytes(done)} / {human_bytes(expected)}"),
+                    ))
+
+                self.log(f"starting {name} acquisition to {partial}")
+                with partial.open("xb", buffering=0) as output:
+                    result = self.client.stream(output, 0, self.cancel_event, progress)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if partial.stat().st_size != expected_size:
+                    raise BackupError(f"{name} image length does not match source capacity")
+                self._set(self.status_var, f"Hashing {name} independently on Windows...")
+                local_digest = sha256_file(partial)
+                remote_digest = str(result.get("sha256", "")).lower()
+                if local_digest != remote_digest:
+                    raise BackupError(f"{name} SHA-256 mismatch: CM5 {remote_digest}, Windows {local_digest}")
+                partial.replace(image)
+                component = {
+                    "name": name, "source_mode": mode, "path": str(image),
+                    "size_bytes": image.stat().st_size, "sha256": local_digest,
+                    "agent_sha256": remote_digest, "status": "complete",
+                }
+                if name == "user":
+                    component["partition_table"] = inspect_partition_table(image)
+                metadata["components"].append(component)
+                metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+                checksum_lines.append(f"{local_digest} *{image.name}\n")
+                completed_bytes += expected_size
+                self.log(f"completed and verified {image}")
+            duration = max(time.monotonic() - overall_started, 0.001)
+            metadata.update({
+                "completion_status": "complete", "completed": datetime.now().astimezone().isoformat(),
+                "total_bytes": completed_bytes, "duration_seconds": duration,
+                "average_bytes_per_second": completed_bytes / duration,
+            })
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+            checksum_path.write_text("".join(checksum_lines), encoding="ascii")
+            self._ui(lambda: self.progress.configure(value=100))
+            self._set(self.hash_var, "All source and independently calculated Windows SHA-256 values match")
+            self._set(self.status_var, f"eMMC dump completed: {paths[0][1]}")
+            self.log(f"metadata saved to {metadata_path}; checksums saved to {checksum_path}")
+        except Exception as exc:
+            metadata["errors"].append(str(exc))
+            metadata["ended"] = datetime.now().astimezone().isoformat()
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+            partials = [str(p) for _n, _i, p in paths if p.exists()]
+            self._set(self.status_var, f"Dump incomplete; partial files retained: {', '.join(partials) or 'none'}")
+            self.log(f"dump incomplete: {exc}")
+            raise
+
+    def cancel(self):
+        self.cancel_event.set()
+        self.status_var.set("Cancellation requested...")
+
+    def verify_local(self):
+        selected = filedialog.askopenfilename(
+            filetypes=(("CM5 backups", "*.fcdbackup *.img *.partial"), ("All files", "*.*"))
+        )
+        if selected:
+            self._run("local verification", lambda: self._verify(Path(selected)))
+
+    def open_ab_builder(self):
+        """Open the CM5 C++17 image-builder controls.
+
+        The selected Windows directory must already be exported and mounted on
+        the CM5. Large artifacts stay in that directory; only bounded buffers
+        and loop mounts exist on the CM5.
+        """
+        window = tk.Toplevel(self.root)
+        window.title("Create CM5 A/B update images")
+        window.transient(self.root)
+        window.columnconfigure(1, weight=1)
+        saved = self.app.settings.get("cm5_ab_builder", {})
+        package_var = tk.StringVar(value=saved.get("package", ""))
+        saved_ssh_host = str(saved.get("ssh_host", "")).strip()
+        if saved_ssh_host in ("", "cm5", "raspberrypi"):
+            saved_ssh_host = "danielpopa1109@192.168.1.157"
+        ssh_var = tk.StringVar(value=saved_ssh_host)
+        remote_var = tk.StringVar(value=saved.get("remote_workspace", "/mnt/fcd-build"))
+        share_var = tk.StringVar(value=saved.get("windows_share", "//192.168.1.142/FCD_BUILD"))
+        share_user_var = tk.StringVar(value=saved.get("windows_user", "Daniel"))
+        slot_var = tk.StringVar(value=saved.get("slot", "b"))
+        version_var = tk.StringVar(value=saved.get("version", datetime.now().strftime("%Y.%m.%d")))
+        builder_status = tk.StringVar(value="Run preflight before building the real images.")
+        builder_progress = ttk.Progressbar(window, maximum=100, mode="indeterminate")
+
+        def row(number, label, variable, width=55):
+            ttk.Label(window, text=label).grid(row=number, column=0, sticky="w", padx=7, pady=4)
+            ttk.Entry(window, textvariable=variable, width=width).grid(
+                row=number, column=1, sticky="ew", padx=7, pady=4
+            )
+
+        row(0, "Backup package on Windows", package_var)
+        ttk.Button(
+            window,
+            text="Browse...",
+            command=lambda: package_var.set(
+                filedialog.askopenfilename(
+                    filetypes=(("FCD backup", "*.fcdbackup"),),
+                    initialdir=self.destination_var.get(),
+                )
+                or package_var.get()
+            ),
+        ).grid(row=0, column=2, padx=7)
+        row(1, "CM5 SSH hostname", ssh_var)
+        row(2, "CM5 network mount", remote_var)
+        row(3, "Windows SMB share", share_var)
+        row(4, "Windows share user", share_user_var, 24)
+        ttk.Label(window, text="Target inactive slot").grid(
+            row=5, column=0, sticky="w", padx=7, pady=4
+        )
+        ttk.Combobox(
+            window, textvariable=slot_var, values=("a", "b"), state="readonly", width=8
+        ).grid(row=5, column=1, sticky="w", padx=7, pady=4)
+        row(6, "Software version", version_var, 24)
+        ttk.Label(
+            window,
+            text=(
+                "The package must be directly inside the Windows folder mounted at the CM5 path above. "
+                "The builder refuses local eMMC workspaces and creates slot-specific images only; it does not flash them."
+            ),
+            wraplength=680,
+        ).grid(row=7, column=0, columnspan=3, sticky="w", padx=7, pady=7)
+        builder_progress.grid(row=8, column=0, columnspan=3, sticky="ew", padx=7, pady=5)
+        ttk.Label(window, textvariable=builder_status, wraplength=680).grid(
+            row=9, column=0, columnspan=3, sticky="w", padx=7, pady=5
+        )
+
+        def collect_values():
+            package = Path(package_var.get()) if package_var.get() else None
+            return package, {
+                "package": str(package) if package else "",
+                "ssh_host": ssh_var.get().strip(),
+                "remote_workspace": remote_var.get().strip(),
+                "windows_share": share_var.get().strip(),
+                "windows_user": share_user_var.get().strip(),
+                "slot": slot_var.get(),
+                "version": version_var.get().strip(),
+            }
+
+        def launch(preflight):
+            package, values = collect_values()
+            if not preflight:
+                if not package or not package.is_file():
+                    messagebox.showerror(
+                        "A/B builder", "Select an existing .fcdbackup package", parent=window
+                    )
+                    return
+                try:
+                    verify_package(package)
+                except Exception as exc:
+                    messagebox.showerror(
+                        "A/B builder", f"Backup verification failed: {exc}", parent=window
+                    )
+                    return
+            self.app.settings["cm5_ab_builder"] = values
+            self._run(
+                "A/B image preflight" if preflight else "A/B image build",
+                lambda: self._run_ab_builder(values, preflight, builder_status, builder_progress),
+            )
+
+        def mount_workspace():
+            _package, values = collect_values()
+            if not values["windows_share"].startswith("//") or not values["windows_user"]:
+                messagebox.showerror(
+                    "A/B builder",
+                    "Enter a //server/share path and Windows share user",
+                    parent=window,
+                )
+                return
+            self.app.settings["cm5_ab_builder"] = values
+            self._launch_mount_workspace_terminal(values, builder_status)
+
+        buttons = ttk.Frame(window)
+        buttons.grid(row=10, column=0, columnspan=3, sticky="e", padx=7, pady=8)
+        ttk.Button(buttons, text="Mount Windows workspace", command=mount_workspace).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Run preflight", command=lambda: launch(True)).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Build slot images", command=lambda: launch(False)).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Close", command=window.destroy).pack(side="left", padx=4)
+
+    def _run_ab_builder(self, values, preflight, status_var, progress):
+        workspace = values["remote_workspace"]
+        args = ["sudo", "-n", "/usr/local/sbin/cm5_ab_image_builder", "--workspace", workspace]
+        if preflight:
+            args.append("--preflight")
+        else:
+            args += [
+                "--package",
+                f"{workspace.rstrip('/')}/{Path(values['package']).name}",
+                "--slot",
+                values["slot"],
+                "--version",
+                values["version"],
+                "--root-bytes",
+                str(11 * 1024 * 1024 * 1024),
+            ]
+        remote_command = " ".join(shlex.quote(item) for item in args)
+        command = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            values["ssh_host"],
+            remote_command,
+        ]
+        self._ui(lambda: (progress.configure(mode="indeterminate", value=0), progress.start(12)))
+        self._set(status_var, "Connecting to CM5 builder...")
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        assert process.stdout is not None
+        output_lines = []
+        try:
+            for line in process.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                output_lines.append(line)
+                try:
+                    update = json.loads(line)
+                    phase = update.get("phase", "build")
+                    message = update.get("message", line)
+                    percent = update.get("percent")
+                    self._set(status_var, f"{phase}: {message}")
+                    self.log(f"A/B builder [{phase}] {message}")
+                    if percent is not None:
+                        self._ui(
+                            lambda p=percent: (
+                                progress.stop(),
+                                progress.configure(mode="determinate", value=p),
+                            )
+                        )
+                    else:
+                        self._ui(
+                            lambda: (progress.configure(mode="indeterminate"), progress.start(12))
+                        )
+                except json.JSONDecodeError:
+                    self.log("A/B builder: " + line)
+            result = process.wait()
+            if result:
+                combined_output = "\n".join(output_lines).lower()
+                if any(
+                    prompt_needed in combined_output
+                    for prompt_needed in (
+                        "sudo: a password is required",
+                        "permission denied",
+                        "host key verification failed",
+                    )
+                ):
+                    self._launch_ab_builder_terminal(values, preflight, status_var)
+                    return
+                raise BackupError(f"CM5 image builder exited with status {result}")
+            self._ui(lambda: (progress.stop(), progress.configure(mode="determinate", value=100)))
+            self._set(
+                status_var,
+                (
+                    "Preflight completed"
+                    if preflight
+                    else "A/B slot images completed on Windows storage"
+                ),
+            )
+        finally:
+            self._ui(progress.stop)
+
+    def _launch_ab_builder_terminal(self, values, preflight, status_var):
+        """Run the builder in a visible terminal so SSH and sudo can prompt safely."""
+        workspace = values["remote_workspace"]
+        args = ["sudo", "/usr/local/sbin/cm5_ab_image_builder", "--workspace", workspace]
+        if preflight:
+            args.append("--preflight")
+        else:
+            args += [
+                "--package",
+                f"{workspace.rstrip('/')}/{Path(values['package']).name}",
+                "--slot",
+                values["slot"],
+                "--version",
+                values["version"],
+                "--root-bytes",
+                str(11 * 1024 * 1024 * 1024),
+            ]
+        remote_command = " ".join(shlex.quote(item) for item in args)
+        ssh_target = str(values.get("ssh_host", "")).strip() or "danielpopa1109@192.168.1.157"
+
+        def ps_quote(text):
+            return "'" + str(text).replace("'", "''") + "'"
+
+        action = "preflight" if preflight else "slot image build"
+        script = "\n".join(
+            (
+                "$Host.UI.RawUI.WindowTitle = 'FCD CM5 A/B image builder'",
+                "Write-Host 'Connecting to the CM5. Enter the SSH or sudo password when prompted.' -ForegroundColor Cyan",
+                f"Write-Host {ps_quote('Target: ' + ssh_target)}",
+                f"& ssh.exe -t -- {ps_quote(ssh_target)} {ps_quote(remote_command)}",
+                "$result = $LASTEXITCODE",
+                "Write-Host ''",
+                "if ($result -eq 0) { Write-Host 'CM5 A/B builder completed successfully.' -ForegroundColor Green } "
+                "else { Write-Host ('CM5 A/B builder exited with status ' + $result + '.') -ForegroundColor Red }",
+                "Write-Host 'You may close this window after reviewing the result.'",
+            )
+        )
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+        creation_flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+        subprocess.Popen(
+            ["powershell.exe", "-NoLogo", "-NoProfile", "-NoExit", "-EncodedCommand", encoded],
+            creationflags=creation_flags,
+        )
+        self._set(
+            status_var,
+            f"Interactive {action} opened in PowerShell; complete the password prompt there",
+        )
+        self.log(f"A/B builder: opened interactive PowerShell for {action} on {ssh_target}")
+
+    def _launch_mount_workspace_terminal(self, values, status_var):
+        """Install CIFS support if needed and interactively mount the Windows workspace."""
+        ssh_target = str(values.get("ssh_host", "")).strip() or "danielpopa1109@192.168.1.157"
+        workspace = str(values.get("remote_workspace", "")).strip() or "/mnt/fcd-build"
+        share = str(values.get("windows_share", "")).strip()
+        share_user = str(values.get("windows_user", "")).strip()
+        mount_options = f"username={share_user},vers=3.0,iocharset=utf8"
+        remote_command = " ".join(
+            (
+                "set -e;",
+                "if ! command -v mount.cifs >/dev/null 2>&1; then",
+                "echo 'Installing required cifs-utils package...';",
+                "sudo apt-get update && sudo apt-get install -y cifs-utils;",
+                "fi;",
+                "sudo mkdir -p",
+                shlex.quote(workspace) + ";",
+                "if mountpoint -q",
+                shlex.quote(workspace) + "; then",
+                "echo 'Workspace is already mounted:'; findmnt -T",
+                shlex.quote(workspace) + ";",
+                "else",
+                "echo 'Mounting Windows share; enter the Windows share password when prompted.';",
+                "sudo mount -t cifs",
+                shlex.quote(share),
+                shlex.quote(workspace),
+                "-o",
+                shlex.quote(mount_options) + ";",
+                "findmnt -T",
+                shlex.quote(workspace),
+                "-o SOURCE,TARGET,FSTYPE,OPTIONS;",
+                "fi",
+            )
+        )
+
+        def ps_quote(text):
+            return "'" + str(text).replace("'", "''") + "'"
+
+        script = "\n".join(
+            (
+                "$Host.UI.RawUI.WindowTitle = 'FCD Mount Windows build workspace'",
+                "Write-Host 'Connecting to the CM5. Enter sudo and Windows share passwords when prompted.' -ForegroundColor Cyan",
+                f"Write-Host {ps_quote('Target: ' + ssh_target)}",
+                f"Write-Host {ps_quote('Share: ' + share + ' -> ' + workspace)}",
+                f"& ssh.exe -t -- {ps_quote(ssh_target)} {ps_quote(remote_command)}",
+                "$result = $LASTEXITCODE",
+                "Write-Host ''",
+                "if ($result -eq 0) { Write-Host 'Windows build workspace mounted successfully.' -ForegroundColor Green } "
+                "else { Write-Host ('Workspace setup exited with status ' + $result + '.') -ForegroundColor Red }",
+                "Write-Host 'After success, return to FCD and click Run preflight.'",
+                "Write-Host 'You may close this window after reviewing the result.'",
+            )
+        )
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+        creation_flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+        subprocess.Popen(
+            ["powershell.exe", "-NoLogo", "-NoProfile", "-NoExit", "-EncodedCommand", encoded],
+            creationflags=creation_flags,
+        )
+        self._set(
+            status_var,
+            "Workspace setup opened in PowerShell; complete the sudo and share-password prompts",
+        )
+        self.log(f"A/B builder: opened Windows workspace setup for {share} on {ssh_target}")
+
+    def _verify(self, path):
+        if path.suffix == ".fcdbackup":
+            manifest = verify_package(
+                path,
+                lambda done, total, name: self._set(
+                    self.hash_var,
+                    f"Package verification: {done * 100 / max(total, 1):.1f}% — {name}",
+                ),
+            )
+            self._set(self.hash_var, "Package manifest and all SHA-256 hashes verified")
+            self._set(self.status_var, f"Valid complete {manifest.get('backup_mode')} package")
+            return
+        digest = sha256_file(
+            path,
+            lambda done, total: self._set(
+                self.hash_var, f"Local SHA-256 verification: {done * 100 / total:.1f}%"
+            ),
+        )
+        partition = inspect_partition_table(path)
+        self._set(self.hash_var, f"SHA-256: {digest}")
+        self._set(
+            self.status_var,
+            f"Local image hashed; partition table: {partition['classification']}",
+        )
+
+    def settings(self):
+        self.persist_token()
+        return {
+            "host": self.host_var.get(),
+            "port": self.port_var.get(),
+            "fingerprint": self.fingerprint_var.get(),
+            "destination": self.destination_var.get(),
+            "remember_token": self.remember_token_var.get(),
+            "bandwidth_limit": self.bandwidth_var.get(),
+        }
+
+    def persist_token(self):
+        if self.remember_token_var.get():
+            if self.token_var.get().strip():
+                save_cm5_token(self.token_var.get())
+                (SCRIPT_DIR / "token.txt").write_text(
+                    self.token_var.get().strip() + "\n", encoding="utf-8"
+                )
+        else:
+            delete_cm5_token()
+            (SCRIPT_DIR / "token.txt").unlink(missing_ok=True)
+
+    def close(self):
+        self.cancel_event.set()
+        self.disconnect()
+
+
+# -----------------------------------------------------------------------------
+# CM5 diagnostics and report acquisition
+# -----------------------------------------------------------------------------
+CM5E_HEADER = struct.Struct(">4sBBHIIQII")
+CM5E_MAGIC = b"CM5E"
+CM5E_MAX_PAYLOAD = 32 * 1024 * 1024
+CM5_COMMANDS = {
+    "authenticate": 0,
+    "identity": 1,
+    "current_health": 2,
+    "statistics": 3,
+    "self_tests": 4,
+    "system_status": 5,
+    "agent_status": 6,
+    "ping": 7,
+    "versions": 8,
+    "gps_status": 9,
+    "nmea_trace": 10,
+    "health_report": 11,
+    "inventory_report": 12,
+    "storage_status": 13,
+    "check_updates": 14,
+    "install_updates": 15,
+}
+CM5_SERVICE_IDS = {
+    "versions": 0xB0,
+    "gps_status": 0xB1,
+    "nmea_trace": 0xB2,
+    "health_report": 0xB3,
+    "inventory_report": 0xB4,
+    "current_health": 0xB5,
+    "statistics": 0xB6,
+    "self_tests": 0xB7,
+    "system_status": 0xB8,
+    "agent_status": 0xB9,
+    "storage_status": 0xBA,
+    "check_updates": 0xBB,
+    "install_updates": 0xBC,
+}
+CM5_ACTION_TITLES = {
+    "connect": "CM5 secure connection",
+    "versions": "CM5 application versions",
+    "gps_status": "CM5 GPS logger status",
+    "nmea_trace": "CM5 NMEA trace retrieval",
+    "health_report": "CM5 health report retrieval",
+    "inventory_report": "CM5 inventory retrieval",
+    "current_health": "CM5 current health",
+    "statistics": "CM5 health statistics",
+    "self_tests": "CM5 self-test results",
+    "system_status": "CM5 system status",
+    "agent_status": "CM5 Ethernet agent status",
+    "storage_status": "CM5 storage status",
+    "check_updates": "CM5 package update check",
+    "install_updates": "CM5 package installation",
+}
+
+
+def cm5_offline_nrc(action):
+    return bytes((0x7F, CM5_SERVICE_IDS.get(action, 0xBF), 0x22))
+
+
+def cm5_display_label(value):
+    aliases = {
+        "agent_version": "Agent version",
+        "status_text": "Status",
+        "health_monitor_available": "Health Monitor available",
+        "tx_messages": "Messages transmitted",
+        "rx_messages": "Messages received",
+        "malformed_packets": "Malformed packets",
+        "socket_errors": "Socket errors",
+        "tcp_connections": "TCP connections",
+        "request_timeouts": "Request timeouts",
+        "size_bytes": "Size",
+        "saved_to": "Saved on Windows",
+        "source": "Source on CM5",
+        "uptime_seconds": "Uptime",
+        "pong": "Diagnostic channel",
+        "files_total": "Files synchronized",
+        "files_added": "New files added",
+        "files_replaced": "Existing files replaced",
+        "total_bytes": "Data transferred",
+        "destination": "Windows destination",
+    }
+    return aliases.get(str(value), str(value).replace("_", " ").strip().capitalize())
+
+
+def cm5_display_value(key, value):
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if value is None:
+        return "Not available"
+    if key == "pong":
+        return "Ready"
+    if key.endswith("_bytes") and isinstance(value, (int, float)):
+        return f"{human_bytes(int(value))} ({int(value):,} bytes)"
+    if key == "uptime_seconds" and isinstance(value, (int, float)):
+        total = int(value)
+        days, remainder = divmod(total, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{days}d {hours:02d}h {minutes:02d}m {seconds:02d}s"
+    return str(value)
+
+
+def cm5_format_fields(value, indent=0):
+    prefix = "  " * indent
+    lines = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if item == "":
+                continue
+            label = cm5_display_label(key)
+            if isinstance(item, (dict, list)):
+                lines.append(f"{prefix}{label}:")
+                lines.extend(cm5_format_fields(item, indent + 1))
+            elif key in ("status_text", "output") and "\n" in str(item):
+                lines.append(f"{prefix}{label}:")
+                lines.extend(f"{prefix}  {line}" for line in str(item).splitlines())
+            else:
+                lines.append(f"{prefix}{label}: {cm5_display_value(str(key), item)}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value, 1):
+            if isinstance(item, dict):
+                name = item.get("name") or f"Item {index}"
+                lines.append(f"{prefix}{name}:")
+                lines.extend(
+                    cm5_format_fields({k: v for k, v in item.items() if k != "name"}, indent + 1)
+                )
+            else:
+                lines.append(f"{prefix}- {cm5_display_value('', item)}")
+    else:
+        lines.append(f"{prefix}{value}")
+    return lines
+
+
+def cm5_format_response(action, value):
+    if action == "versions" and isinstance(value, dict):
+        lines = []
+        for application in value.get("applications", []):
+            name = str(application.get("name", "Unknown application")).strip()
+            version = application.get("version")
+            version = version.strip() if isinstance(version, str) else ""
+            lines.append(f"{name}: {version or 'unknown'}")
+        return "\n".join(lines)
+    title = CM5_ACTION_TITLES.get(action, f"CM5 {cm5_display_label(action)}")
+    lines = [title, "=" * len(title)]
+    if action == "connect" and isinstance(value, dict) and value.get("pong"):
+        lines.extend(
+            ("Transport: TLS 1.3", "Authentication: Successful", "Diagnostic channel: Ready")
+        )
+    else:
+        lines.extend(cm5_format_fields(value))
+    return "\n".join(lines)
+
+
+def cm5_save_report(response, folder):
+    raw = base64.b64decode(response["content_base64"], validate=True)
+    expected = int(response.get("size_bytes", len(raw)))
+    if len(raw) != expected:
+        raise Cm5AgentError(f"CM5 report size mismatch: expected {expected}, received {len(raw)}")
+    name = PurePosixPath(response["path"]).name
+    if not name or name in (".", ".."):
+        raise Cm5AgentError("CM5 returned an invalid report filename")
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = folder / name
+    existed = destination.exists()
+    temporary = destination.with_name(f".{destination.name}.cm5-part")
+    try:
+        temporary.write_bytes(raw)
+        temporary.replace(destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return destination, existed, len(raw)
+
+
+def cm5_sync_reports(client, action, source, folder):
+    folder = Path(folder)
+    response = client.request(CM5_COMMANDS[action], source)
+    entries = response.get("files") if isinstance(response, dict) else None
+    if entries is None:
+        entries = [{"path": response["path"], "size_bytes": response.get("size_bytes", 0)}]
+    names = {}
+    for entry in entries:
+        name = PurePosixPath(entry["path"]).name
+        previous = names.get(name)
+        if previous and previous != entry["path"]:
+            raise Cm5AgentError(f"duplicate report filename in CM5 directories: {name}")
+        names[name] = entry["path"]
+    added = replaced = transferred = 0
+    last_destination = folder
+    for entry in entries:
+        file_response = client.request(CM5_COMMANDS[action], entry["path"])
+        destination, existed, size = cm5_save_report(file_response, folder)
+        last_destination = destination
+        transferred += size
+        replaced += int(existed)
+        added += int(not existed)
+    if len(entries) == 1:
+        return {
+            "source": entries[0]["path"],
+            "saved_to": str(last_destination),
+            "size_bytes": transferred,
+        }
+    return {
+        "source": response.get("directory", source),
+        "destination": str(folder),
+        "files_total": len(entries),
+        "files_added": added,
+        "files_replaced": replaced,
+        "total_bytes": transferred,
+    }
+
+
+class Cm5AgentError(Exception):
+    pass
+
+
+class Cm5AgentResponseError(Cm5AgentError):
+    """A complete, correlated application error; the TLS session remains usable."""
+
+
+class Cm5DiagnosticsClient:
+    def __init__(self, host, port=13400, token="", fingerprint="", timeout=30.0):
+        self.host, self.port, self.timeout = host, int(port), float(timeout)
+        self.token = token
+        self.fingerprint = normalize_fingerprint(fingerprint)
+        self.sock = None
+        self.sequence = 0
+        self.lock = threading.RLock()
+        self._allow_reconnect = False
+        self.on_connection_event = None
+
+    @property
+    def can_reconnect(self):
+        return self._allow_reconnect
+
+    @property
+    def connected(self):
+        return self.sock is not None
+
+    def connect(self):
+        with self.lock:
+            self._allow_reconnect = False
+            result = self._connect()
+            self._allow_reconnect = True
+            return result
+
+    def _connect(self):
+        self._close_socket()
+        if not self.token:
+            raise Cm5AgentError("enter or load the CM5 authentication token")
+        if len(self.fingerprint) != 64:
+            raise Cm5AgentError("enter the CM5 certificate SHA-256 fingerprint")
+        raw = socket.create_connection((self.host, self.port), self.timeout)
+        raw.settimeout(self.timeout)
+        if self.port == 13400:
+            raw.sendall(b"FCDA")
+        raw.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.maximum_version = ssl.TLSVersion.TLSv1_3
+        try:
+            tls = context.wrap_socket(raw, server_hostname=self.host)
+            certificate = tls.getpeercert(binary_form=True)
+            actual = hashlib.sha256(certificate).hexdigest() if certificate else ""
+            if actual != self.fingerprint:
+                raise Cm5AgentError(f"certificate fingerprint mismatch; received {actual}")
+            self.sock = tls
+            self._request_once(CM5_COMMANDS["authenticate"], self.token)
+            return self._request_once(CM5_COMMANDS["ping"])
+        except Exception:
+            self._close_socket()
+            try:
+                raw.close()
+            except OSError:
+                pass
+            raise
+
+    def disconnect(self):
+        self._allow_reconnect = False
+        with self.lock:
+            self._allow_reconnect = False
+            self._close_socket()
+
+    def _close_socket(self):
+        sock, self.sock = self.sock, None
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            sock.close()
+
+    @staticmethod
+    def _recv_exact(sock, size):
+        data = bytearray()
+        while len(data) < size:
+            chunk = sock.recv(size - len(data))
+            if not chunk:
+                raise ConnectionError("CM5 connection closed during response")
+            data.extend(chunk)
+        return bytes(data)
+
+    def request(self, command, argument="", timeout=None):
+        # Replay only read-only commands, on a fresh authenticated TLS stream, once.
+        safe_read = int(command) in range(1, 14)
+        with self.lock:
+            try:
+                if self.sock is None:
+                    raise ConnectionError("CM5 session is disconnected")
+                return self._request_once(command, argument, timeout)
+            except (ConnectionError, OSError):
+                if not safe_read or not self._allow_reconnect:
+                    self._allow_reconnect = False
+                    raise
+                if self.on_connection_event:
+                    self.on_connection_event("CM5 connection lost; reconnecting once for a read-only request")
+                try:
+                    self._connect()
+                    self._allow_reconnect = True
+                    result = self._request_once(command, argument, timeout)
+                except Cm5AgentResponseError:
+                    # Recovery succeeded even when the optional application is unavailable.
+                    raise
+                except Exception:
+                    self._allow_reconnect = False
+                    self._close_socket()
+                    raise
+                if self.on_connection_event:
+                    self.on_connection_event("CM5 authenticated connection restored")
+                return result
+
+    def _request_once(self, command, argument="", timeout=None):
+        with self.lock:
+            if self.sock is None:
+                raise ConnectionError("CM5 is not connected")
+            self.sequence = (self.sequence + 1) & 0xFFFFFFFF or 1
+            payload = struct.pack(">HH", int(command), 0) + str(argument or "").encode("utf-8")
+            header = CM5E_HEADER.pack(
+                CM5E_MAGIC,
+                1,
+                7,
+                0,
+                len(payload),
+                self.sequence,
+                int(time.time() * 1_000_000),
+                0x46434401,
+                self.sequence,
+            )
+            try:
+                previous_timeout = None
+                if timeout is not None:
+                    previous_timeout = self.sock.gettimeout()
+                    self.sock.settimeout(timeout)
+                self.sock.sendall(header + payload)
+                response_header = self._recv_exact(self.sock, CM5E_HEADER.size)
+                magic, version, kind, _flags, length, _seq, _stamp, _source, correlation = (
+                    CM5E_HEADER.unpack(response_header)
+                )
+                if magic != CM5E_MAGIC or version != 1 or correlation != self.sequence:
+                    raise Cm5AgentError("invalid CM5 response header or correlation")
+                if length > CM5E_MAX_PAYLOAD:
+                    raise Cm5AgentError("CM5 response exceeds protocol limit")
+                response = self._recv_exact(self.sock, length)
+                if len(response) < 4:
+                    raise Cm5AgentError("short CM5 response")
+                response_command, result = struct.unpack(">HH", response[:4])
+                if response_command != int(command):
+                    raise Cm5AgentError("CM5 response command mismatch")
+                data = json.loads(response[4:].decode("utf-8"))
+                if kind not in (8, 9) or (kind == 9 and not result):
+                    raise Cm5AgentError(f"unexpected CM5 response type {kind}")
+                if result:
+                    detail = data.get("error", f"CM5 result {result}")
+                    if data.get("output"):
+                        detail += "\n" + data["output"]
+                    if result in (5, 6):
+                        raise Cm5AgentError(detail)
+                    raise Cm5AgentResponseError(detail)
+                if kind != 8:
+                    raise Cm5AgentError(f"unexpected CM5 response type {kind}")
+                return data
+            except Cm5AgentResponseError:
+                raise
+            except (ConnectionError, OSError):
+                self._close_socket()
+                raise
+            except Exception:
+                self._allow_reconnect = False
+                self._close_socket()
+                raise
+            finally:
+                if self.sock is not None and timeout is not None:
+                    self.sock.settimeout(previous_timeout)
+
+
+class Cm5Panel:
+    def __init__(self, app, parent):
+        self.app, self.parent, self.client, self.busy = app, parent, None, False
+        saved = app.settings.get("cm5", {})
+        self.host_var = tk.StringVar(value=str(saved.get("host", "192.168.1.157")))
+        self.port_var = tk.StringVar(value="13400")
+        try:
+            saved_token = load_or_migrate_cm5_token()
+        except Exception:
+            saved_token = ""
+        self.token_var = tk.StringVar(value=saved_token)
+        self.fingerprint_var = tk.StringVar(value=str(saved.get("fingerprint", "")))
+        self.nmea_path_var = tk.StringVar(
+            value=str(saved.get("nmea_path", "/media/cm5healthusb/GPS_NMEA_LOG"))
+        )
+        self.health_path_var = tk.StringVar(
+            value=str(saved.get("health_path", "/media/cm5healthusb/CM5_HEALTH_LOG"))
+        )
+        self.inventory_path_var = tk.StringVar(
+            value=str(saved.get("inventory_path", "/media/cm5healthusb/CM5_HEALTH_LOG/INVENTORY"))
+        )
+        self.output_path_var = tk.StringVar(
+            value=str(saved.get("output_path", str(SCRIPT_DIR / "CM5_Reads")))
+        )
+        self.status_var = tk.StringVar(value="Disconnected")
+        self._build()
+
+    def settings(self):
+        return {
+            "host": self.host_var.get().strip(),
+            "port": self.port_var.get().strip(),
+            "fingerprint": self.fingerprint_var.get().strip(),
+            "nmea_path": self.nmea_path_var.get().strip(),
+            "health_path": self.health_path_var.get().strip(),
+            "inventory_path": self.inventory_path_var.get().strip(),
+            "output_path": self.output_path_var.get().strip(),
+        }
+
+    def _entry(self, parent, row, label, variable, browse=False, show=None, command=None):
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=6, pady=4)
+        ttk.Entry(parent, textvariable=variable, show=show).grid(
+            row=row, column=1, sticky="ew", padx=6, pady=4
+        )
+        if browse or command:
+            ttk.Button(parent, text="Browse...", command=command or self._browse_output).grid(
+                row=row, column=2, padx=6
+            )
+
+    def _build(self):
+        outer = ttk.Frame(self.parent)
+        outer.pack(fill="both", expand=True, padx=8, pady=8)
+        outer.columnconfigure(0, weight=1)
+        connection = ttk.LabelFrame(outer, text="CM5 connection")
+        connection.grid(row=0, column=0, sticky="ew")
+        connection.columnconfigure(1, weight=1)
+        self._entry(connection, 0, "CM5 IP / host", self.host_var)
+        self._entry(
+            connection,
+            2,
+            "Authentication token",
+            self.token_var,
+            show="•",
+            command=self._browse_token,
+        )
+        self._entry(connection, 3, "Certificate SHA-256", self.fingerprint_var)
+        ttk.Label(connection, textvariable=self.status_var).grid(
+            row=4, column=0, columnspan=3, sticky="w", padx=6, pady=4
+        )
+        paths = ttk.LabelFrame(outer, text="CM5 input paths and Windows storage")
+        paths.grid(row=1, column=0, sticky="ew", pady=6)
+        paths.columnconfigure(1, weight=1)
+        self._entry(paths, 0, "NMEA input path", self.nmea_path_var)
+        self._entry(paths, 1, "Health report path", self.health_path_var)
+        self._entry(paths, 2, "Inventory path", self.inventory_path_var)
+        self._entry(paths, 3, "Store retrieved data in", self.output_path_var, True)
+        actions = ttk.LabelFrame(outer, text="CM5 reads")
+        actions.grid(row=2, column=0, sticky="ew", pady=6)
+        specs = [
+            ("Versions", "versions", None),
+            ("GPS status", "gps_status", None),
+            ("Read NMEA trace", "nmea_trace", (self.nmea_path_var, "GPS")),
+            ("Read health report", "health_report", (self.health_path_var, "Health")),
+            ("Read inventory", "inventory_report", (self.inventory_path_var, "Inventory")),
+            ("Current health", "current_health", None),
+            ("Statistics", "statistics", None),
+            ("Self-tests", "self_tests", None),
+            ("System status", "system_status", None),
+            ("Agent status", "agent_status", None),
+            ("Storage", "storage_status", None),
+            ("Check updates", "check_updates", None),
+            ("Install updates", "install_updates", None),
+        ]
+        for index, (label, action, file_args) in enumerate(specs):
+            command = lambda a=action, f=file_args: (
+                self._read_file(a, *f) if f else self._read_json(a)
+            )
+            ttk.Button(actions, text=label, command=command).grid(
+                row=index // 4, column=index % 4, padx=4, pady=4, sticky="ew"
+            )
+            actions.columnconfigure(index % 4, weight=1)
+
+    def _browse_output(self):
+        value = filedialog.askdirectory(initialdir=self.output_path_var.get() or str(SCRIPT_DIR))
+        if value:
+            self.output_path_var.set(value)
+
+    def _browse_token(self):
+        value = filedialog.askopenfilename(title="Load CM5 authentication token")
+        if value:
+            self.token_var.set(Path(value).read_text(encoding="utf-8").strip())
+            self.app.cm5_backup_panel.persist_token()
+            self.app.log(f"CM5 authentication token loaded from {value}")
+
+    def _show(self, action, value):
+        self.app.log(cm5_format_response(action, value))
+
+    def _run(self, label, work):
+        if self.busy:
+            messagebox.showinfo("FCD", "A CM5 operation is already running")
+            return
+        self.busy = True
+
+        def runner():
+            try:
+                value = work()
+                self.app.root.after(0, lambda a=label, v=value: self._show(a, v))
+            except Exception as exc:
+                self.app.log(f"CM5 {label} failed: {exc}")
+                self.app.root.after(0, lambda a=label, e=str(exc): self._show(a, f"FAILED: {e}"))
+                self.app.root.after(
+                    0,
+                    lambda: self.status_var.set(
+                        "Disconnected"
+                        if not self.client or not self.client.connected
+                        else "Connected"
+                    ),
+                )
+            finally:
+                self.busy = False
+
+        threading.Thread(target=runner, name=f"cm5-{label}", daemon=True).start()
+
+    def connect(self):
+        try:
+            self.app.cm5_backup_panel.persist_token()
+        except Exception as exc:
+            messagebox.showerror("FCD", f"Could not save CM5 authentication token: {exc}")
+            return
+        self.status_var.set("Connecting...")
+
+        def work():
+            client = Cm5DiagnosticsClient(
+                self.host_var.get().strip(),
+                int(self.port_var.get()),
+                self.token_var.get(),
+                self.fingerprint_var.get(),
+            )
+            client.on_connection_event = self.app.log
+            pong = client.connect()
+            self.client = client
+            self.app.root.after(
+                0, lambda: self.status_var.set(f"Securely connected to {client.host}:{client.port}")
+            )
+            self.app.log(f"CM5 TLS 1.3 connection authenticated to {client.host}:{client.port}")
+            return pong
+
+        self._run("connect", work)
+
+    def disconnect(self):
+        if self.client:
+            self.client.disconnect()
+        self.client = None
+        self.status_var.set("Disconnected")
+        self.app.log("CM5 disconnected")
+
+    def _connected(self, action):
+        if self.client and (self.client.connected or self.client.can_reconnect):
+            return True
+        nrc = cm5_offline_nrc(action)
+        text = f"{nrc.hex(' ').upper()} — NRC 0x22 ({NRC_TEXT[0x22]}): connect the CM5 first"
+        self._show(action, text)
+        return False
+
+    def _read_json(self, action):
+        if self._connected(action):
+            if action == "install_updates" and not messagebox.askyesno(
+                "CM5 package updates",
+                "Install all currently available normal package updates on the CM5?\n\n"
+                "Packages will not be removed and the CM5 will not reboot automatically.",
+            ):
+                return
+            timeout = 3600 if action in ("check_updates", "install_updates") else None
+            if timeout:
+                self.app.log(
+                    f"{CM5_ACTION_TITLES[action]} started; waiting for the CM5 package manager..."
+                )
+            self._run(action, lambda: self.client.request(CM5_COMMANDS[action], timeout=timeout))
+
+    def _read_file(self, action, source_var, category):
+        if not self._connected(action):
+            return
+
+        def work():
+            folder = Path(self.output_path_var.get()).expanduser() / category
+            return cm5_sync_reports(self.client, action, source_var.get().strip(), folder)
+
+        self._run(action, work)
+
+    def close(self):
+        self.disconnect()
+
+
+# -----------------------------------------------------------------------------
+# Main FCD application
+# -----------------------------------------------------------------------------
 APP_NAME = "FCD"
 APP_TITLE = "FCD"
 DEFAULT_HOST = "192.168.1.10"
@@ -40,6 +2687,13 @@ FCD_TRACE_MIRROR_PORT = 54088
 FCD_TRACE_MIRROR_MAGIC = b"FCDT"
 DEFAULT_APP_START = 0xA0030000
 DEFAULT_APP_END = 0xA05CFFFF
+G26_APP_VECTOR = 0x08020200
+G26_APP_END = 0x08060000
+G26_FBL_BASE = 0x08000000
+G26_FBL_END = 0x08010000
+G26_MAX_APP_BLOCK_DATA = 240
+G26_APP_IDENTITY = b"\x62\xF1\x87G26A2"
+G26_FBL_IDENTITY = b"\x62\xF1\x87G26F2"
 # Normal ZGW DoIP TransferData carries 32768 firmware bytes by default; the ECU
 # advertises the active maximum in RequestDownload.
 DEFAULT_BLOCK_SIZE = 32768
@@ -378,12 +3032,28 @@ def _build_coding_parameter_names():
     """
     rx_names = [
         # CAN: COM_RX_PDU_CENTRALLOCKDATA .. COM_RX_PDU_DMU_ALIVE
-        "CENTRALLOCKDATA", "LIGHTDATA1", "STATUSACTUATOR", "OUTSIDETEMPERATURESTATUS",
-        "CENTRALCOMMAND1", "DMUSTATUS", "BATTFULLSTAT", "PDCSTAT", "MILEAGE", "DMU_ALIVE",
+        "CENTRALLOCKDATA",
+        "LIGHTDATA1",
+        "STATUSACTUATOR",
+        "OUTSIDETEMPERATURESTATUS",
+        "CENTRALCOMMAND1",
+        "DMUSTATUS",
+        "BATTFULLSTAT",
+        "PDCSTAT",
+        "MILEAGE",
+        "DMU_ALIVE",
         # CAN: COM_RX_PDU_VOLTAGECURRENT .. COM_RX_PDU_L1_I2T_COUNTER
-        "VOLTAGECURRENT", "TEMPMEAS", "LOADSTATUS", "L1_I2T_COUNTER",
+        "VOLTAGECURRENT",
+        "TEMPMEAS",
+        "LOADSTATUS",
+        "L1_I2T_COUNTER",
         # CAN: COM_RX_PDU_BATTSOCSOH .. COM_RX_PDU_BATTCAPRES
-        "BATTSOCSOH", "BATTSOC", "BATTDIAGNOSIS", "BATTCURRENT", "BATTCAPDISCHARGE", "BATTCAPRES",
+        "BATTSOCSOH",
+        "BATTSOC",
+        "BATTDIAGNOSIS",
+        "BATTCURRENT",
+        "BATTCAPDISCHARGE",
+        "BATTCAPRES",
     ]
     # CAN-FD: PDM1 load/current/InputT30 receive diagnostics.
     rx_names += ["CANFD_PDM1_LOADSTATUS"]
@@ -428,7 +3098,13 @@ CODING_PARAMETER_INDEX = {name: idx for idx, name in enumerate(CODING_PARAMETER_
 CODING_VISIBLE_PARAMETER_NAMES = tuple(
     name for name in CODING_PARAMETER_NAMES if not name.startswith("(reserved")
 )
-CODING_RX_PARAMETER_COUNT = len([name for name in CODING_PARAMETER_NAMES if not name.startswith("TX_") and not name.startswith("(reserved")])
+CODING_RX_PARAMETER_COUNT = len(
+    [
+        name
+        for name in CODING_PARAMETER_NAMES
+        if not name.startswith("TX_") and not name.startswith("(reserved")
+    ]
+)
 CODING_RX_MASK_BYTES = (CODING_RX_PARAMETER_COUNT + 7) // 8
 CODING_TX_PDU_COUNT = len([name for name in CODING_PARAMETER_NAMES if name.startswith("TX_")])
 CODING_MASK_BYTES = CODING_RX_MASK_BYTES + ((CODING_TX_PDU_COUNT + 7) // 8)
@@ -450,7 +3126,7 @@ def coding_parameter_index(name):
     prefix = "(reserved bit "
     if text.startswith(prefix) and text.endswith(")"):
         try:
-            return int(text[len(prefix):-1].strip(), 10)
+            return int(text[len(prefix) : -1].strip(), 10)
         except ValueError:
             return None
     return None
@@ -458,6 +3134,7 @@ def coding_parameter_index(name):
 
 def is_reserved_coding_parameter(name):
     return str(name).strip().startswith("(reserved bit ")
+
 
 DEM_DTC_MCUSM_SW_ERROR = 0x010101
 DEM_DTC_PMS_ERRATA_STARTUP = 0x010102
@@ -547,13 +3224,19 @@ STATIC_DTC_DESCRIPTIONS = {
     DEM_DTC_ETH_RESOURCE_EXHAUSTION: "Ethernet Resource Exhaustion",
 }
 
+
 def is_aimodel_consumer_dtc(dtc):
-    return DEM_DTC_AIMODEL_CONSUMER_FAULT <= dtc < (
-        DEM_DTC_AIMODEL_CONSUMER_FAULT + DEM_AIMODEL_CONSUMER_EVENT_COUNT)
+    return (
+        DEM_DTC_AIMODEL_CONSUMER_FAULT
+        <= dtc
+        < (DEM_DTC_AIMODEL_CONSUMER_FAULT + DEM_AIMODEL_CONSUMER_EVENT_COUNT)
+    )
+
 
 def describe_aimodel_consumer_dtc(dtc):
     channel = (dtc - DEM_DTC_AIMODEL_CONSUMER_FAULT) + 1
     return f"AiModel consumer {channel:02d} predicted fault"
+
 
 # Plain-language maps used to decode the ZGW Dem Snapshot Data buffers. The
 # byte layouts mirror the firmware capture callbacks and every multi-byte field
@@ -597,7 +3280,11 @@ LINDIAG_FAULT_TEXT = {
     3: "Wakeup Failure",
     4: "Sleep Transition Failure",
 }
-LINDIAG_SCHEDULE_TEXT = {0: "Normal", 1: "Diagnostic Master Request", 2: "Diagnostic Slave Response"}
+LINDIAG_SCHEDULE_TEXT = {
+    0: "Normal",
+    1: "Diagnostic Master Request",
+    2: "Diagnostic Slave Response",
+}
 LINDIAG_LINSM_STATE_TEXT = {
     0: "UNINIT",
     1: "NO_COMMUNICATION",
@@ -1103,13 +3790,42 @@ DEFAULT_EXTENDED_DIAG_ADDRESSES = {
     "PDM1": 0x42,
     "HVDCDC": 0x51,
     "CBM": 0x54,
+    "G26": 0x55,
+    "I4G26": 0x55,
     "DMU": 0x56,
     "ELC": 0x58,
     "FRBE": 0x59,
 }
 
+# The lab vehicle layout remains usable when the external repository databases
+# are unavailable. Database discovery takes precedence whenever DBC/LDF files
+# exist; this map is only the explicit, visible fallback.
+FALLBACK_NODE_BUSES = {
+    "CBM": "CAN",
+    "CM5": "ETHERNET",
+    "DMU": "CAN",
+    "ELC": "CAN",
+    "FRBE": "CAN",
+    "G26": "CAN",
+    "PDM1": "CANFD",
+    "HVDCDC": "LIN",
+    "ZGW": "ETHERNET",
+}
+
 LOCAL_UDS_SERVICE_IDS = {
-    0x10, 0x11, 0x14, 0x19, 0x22, 0x28, 0x31, 0x34, 0x35, 0x36, 0x37, 0x3E, 0x85
+    0x10,
+    0x11,
+    0x14,
+    0x19,
+    0x22,
+    0x28,
+    0x31,
+    0x34,
+    0x35,
+    0x36,
+    0x37,
+    0x3E,
+    0x85,
 }
 
 EXTENDED_DIAG_FALLBACK_RANGES = {
@@ -1140,6 +3856,42 @@ def default_extended_diag_address(node_name, bus_type=None):
     return int_hex(value, 2)
 
 
+def is_g26_target(target, payload=None):
+    names = {str(target.get("node_name", "")).upper()} if target else set()
+    if payload:
+        names.add(str(payload.get("node_name") or payload.get("ecu") or "").upper())
+    return bool(names & {"G26", "I4G26"})
+
+
+def validate_g26_target_info(target, payload=None):
+    """Reject a G26 image paired with a different ECU or bus descriptor."""
+    name = str((target or {}).get("node_name", "")).upper()
+    bus = str((target or {}).get("bus_type", "")).upper()
+    if name not in ("G26", "I4G26") or bus != "CAN" or target.get("is_zgw"):
+        raise FcdError("G26 image requires a G26 Classic CAN target descriptor")
+    if parse_int(target.get("extended_diag_address") or "0x55") != 0x55:
+        raise FcdError("G26 requires ZGW route 0x55")
+    if payload:
+        for field in ("node_name", "ecu"):
+            value = str(payload.get(field) or "").upper()
+            if value and value not in ("G26", "I4G26"):
+                raise FcdError(f"G26 image conflicts with payload {field}={value}")
+
+
+def validate_g26_image(address, data, is_fbl):
+    """Check the wire image before any G26 erase or updater handover."""
+    base = G26_FBL_BASE if is_fbl else G26_APP_VECTOR
+    limit = G26_FBL_END if is_fbl else G26_APP_END
+    kind = "FBL" if is_fbl else "APP"
+    if address != base or len(data) < 8 or len(data) > limit - base:
+        raise FcdError(f"G26 {kind} image must start at 0x{base:08X} and fit before 0x{limit:08X}")
+    stack, entry = struct.unpack_from("<II", data)
+    if not (0x20000000 < stack <= 0x2001FC00 and stack % 8 == 0):
+        raise FcdError(f"G26 {kind} image has an invalid initial stack pointer")
+    if not (entry & 1 and base <= (entry & ~1) < base + len(data)):
+        raise FcdError(f"G26 {kind} image has an invalid reset vector")
+
+
 def ecu_name_from_hex_stem(stem):
     name = str(stem).strip().upper()
     changed = True
@@ -1164,11 +3916,36 @@ def current_layout_node_names(root_path):
     return {str(node.node_name).strip().upper() for node in nodes}
 
 
+def fallback_vehicle_nodes(settings):
+    """Return the saved/built-in lab layout when repository databases are absent."""
+    data_editor = settings.get("data_editor", {})
+    names = {
+        str(name).strip().upper() for name in data_editor.get("nodes", {}) if str(name).strip()
+    }
+    for row in data_editor.get("hex_rows", []):
+        hex_path = str(row.get("hex", "")).strip()
+        name = ecu_name_from_hex_stem(row.get("ecu") or (Path(hex_path).stem if hex_path else ""))
+        if name:
+            names.add(name)
+    names.update(FALLBACK_NODE_BUSES)
+    nodes = []
+    for name in sorted(names, key=lambda item: (item == "ZGW", item)):
+        nodes.append(
+            NodeInfo(
+                node_name=name,
+                bus_type=FALLBACK_NODE_BUSES.get(name, "UNKNOWN"),
+                source_file="FCD built-in fallback layout",
+                target_logical_address=(int_hex(DEFAULT_TARGET_ADDR) if name == "ZGW" else ""),
+                is_zgw=(name == "ZGW"),
+                inferred=True,
+                notes=["Repository database unavailable; using saved/built-in FCD layout"],
+            )
+        )
+    return nodes
+
+
 def filtered_hex_rows_for_layout(rows, root_path):
     valid_nodes = current_layout_node_names(root_path)
-    if not valid_nodes:
-        return list(rows)
-
     filtered = []
     seen = set()
     for row in rows:
@@ -1176,9 +3953,17 @@ def filtered_hex_rows_for_layout(rows, root_path):
         if not hex_path_text:
             continue
         ecu_name = ecu_name_from_hex_stem(row.get("ecu") or Path(hex_path_text).stem)
-        if ecu_name not in valid_nodes:
+        if valid_nodes and ecu_name not in valid_nodes:
             continue
         hex_path = Path(hex_path_text)
+        if not hex_path.exists():
+            workspace_candidate = Path(root_path) / "Binary" / hex_path.name
+            if not workspace_candidate.exists():
+                workspace_candidate = SCRIPT_DIR.parents[1] / "Firmware" / "Binary" / hex_path.name
+            if workspace_candidate.exists():
+                row = dict(row)
+                row["hex"] = str(workspace_candidate)
+                hex_path = workspace_candidate
         if not hex_path.exists():
             continue
         dedupe_key = (ecu_name, str(hex_path).lower())
@@ -1197,7 +3982,11 @@ def uds_request_log_text(data):
     data = bytes(data)
     if len(data) > TRANSFER_LOG_FULL_HEX_LIMIT and data and data[0] == 0x36:
         edge = min(TRANSFER_LOG_EDGE_BYTES, len(data) // 2)
-        payload = data[TRANSFER_DATA_OVERHEAD_BYTES:] if len(data) >= TRANSFER_DATA_OVERHEAD_BYTES else b""
+        payload = (
+            data[TRANSFER_DATA_OVERHEAD_BYTES:]
+            if len(data) >= TRANSFER_DATA_OVERHEAD_BYTES
+            else b""
+        )
         omitted = max(0, len(data) - (edge * 2))
         return (
             f"len={len(data)} payload_len={len(payload)} "
@@ -1247,8 +4036,10 @@ FCD_TRACE_MIRROR = FcdTraceMirror()
 def u16_be(data, offset):
     return (data[offset] << 8) | data[offset + 1]
 
+
 def u16_le(data, offset):
     return data[offset] | (data[offset + 1] << 8)
+
 
 def s16_be(data, offset):
     value = u16_be(data, offset)
@@ -1256,24 +4047,22 @@ def s16_be(data, offset):
         value -= 0x10000
     return value
 
+
 def u32_be(data, offset):
     return (
-        (data[offset] << 24)
-        | (data[offset + 1] << 16)
-        | (data[offset + 2] << 8)
-        | data[offset + 3]
+        (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]
     )
+
 
 def u32_le(data, offset):
     return (
-        data[offset]
-        | (data[offset + 1] << 8)
-        | (data[offset + 2] << 16)
-        | (data[offset + 3] << 24)
+        data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)
     )
+
 
 def ip4_to_text(value):
     return ".".join(str((value >> shift) & 0xFF) for shift in (24, 16, 8, 0))
+
 
 def s32_be(data, offset):
     value = u32_be(data, offset)
@@ -1281,15 +4070,17 @@ def s32_be(data, offset):
         value -= 0x100000000
     return value
 
+
 def u64_be(data, offset):
     value = 0
-    for byte in data[offset:offset + 8]:
+    for byte in data[offset : offset + 8]:
         value = (value << 8) | byte
     return value
 
+
 def u64_le(data, offset):
     value = 0
-    for shift, byte in enumerate(data[offset:offset + 8]):
+    for shift, byte in enumerate(data[offset : offset + 8]):
         value |= byte << (shift * 8)
     return value
 
@@ -1401,8 +4192,6 @@ def reset_reason_name(reason, info):
     return "none" if reason == 0 else "unknown"
 
 
-
-
 def local_ipv4_addresses():
     ips = set()
     try:
@@ -1442,7 +4231,9 @@ def local_bind_candidates(target_host, preferred="auto"):
         return [text]
 
     candidates = [""]
-    local_ips = sorted(local_ipv4_addresses(), key=lambda ip: (0 if same_ipv4_24(ip, target_host) else 1, ip))
+    local_ips = sorted(
+        local_ipv4_addresses(), key=lambda ip: (0 if same_ipv4_24(ip, target_host) else 1, ip)
+    )
     for ip in local_ips:
         if ip not in candidates:
             candidates.append(ip)
@@ -1487,9 +4278,7 @@ def require_positive_response(response, request_sid):
         raise FcdError("Malformed negative response")
     expected = (request_sid + 0x40) & 0xFF
     if response[0] != expected:
-        raise FcdError(
-            f"Unexpected positive SID 0x{response[0]:02X}; expected 0x{expected:02X}"
-        )
+        raise FcdError(f"Unexpected positive SID 0x{response[0]:02X}; expected 0x{expected:02X}")
 
 
 def uds_response_matches_request(response, request):
@@ -1524,9 +4313,7 @@ def uds_response_matches_request(response, request):
 
     if sid == 0x31:
         return len(request) < 4 or (
-            len(response) >= 4
-            and response[1] == request[1]
-            and response[2:4] == request[2:4]
+            len(response) >= 4 and response[1] == request[1] and response[2:4] == request[2:4]
         )
 
     if sid == 0x36:
@@ -1603,7 +4390,7 @@ def parse_intel_hex(path):
             offset = start - cur_start
             needed = offset + len(data) - len(cur_data)
             if needed > 0:
-                cur_data.extend(b"\xFF" * needed)
+                cur_data.extend(b"\xff" * needed)
             cur_data[offset : offset + len(data)] = data
         else:
             segments.append(HexSegment(cur_start, bytes(cur_data)))
@@ -1612,6 +4399,25 @@ def parse_intel_hex(path):
 
     segments.append(HexSegment(cur_start, bytes(cur_data)))
     return segments
+
+
+def coalesce_g26_hex_image(segments, is_fbl):
+    """Turn linker gaps into erased bytes for G26's one-image UDS contract."""
+    base = G26_FBL_BASE if is_fbl else G26_APP_VECTOR
+    limit = G26_FBL_END if is_fbl else G26_APP_END
+    if not segments or segments[0].address != base:
+        raise FcdError(f"G26 image must begin at 0x{base:08X}")
+    end = max(segment.address + len(segment.data) for segment in segments)
+    if end > limit:
+        raise FcdError(f"G26 image extends beyond 0x{limit:08X}")
+    image = bytearray(b"\xFF" * (end - base))
+    for segment in segments:
+        if segment.address < base:
+            raise FcdError("G26 image contains data below its partition")
+        start = segment.address - base
+        image[start : start + len(segment.data)] = segment.data
+    validate_g26_image(base, image, is_fbl)
+    return [HexSegment(base, bytes(image))]
 
 
 def download_address_from_hex_address(address):
@@ -1718,7 +4524,9 @@ class DoipClient:
     def _send_frame(self, payload_type, payload=b"", send_timeout=None):
         if self.sock is None:
             raise DoipError("Not connected")
-        header = struct.pack(">BBHI", DOIP_PROTO_VER, DOIP_INV_PROTO_VER, payload_type, len(payload))
+        header = struct.pack(
+            ">BBHI", DOIP_PROTO_VER, DOIP_INV_PROTO_VER, payload_type, len(payload)
+        )
         data = header + payload
         view = memoryview(data)
         sent = 0
@@ -1747,7 +4555,9 @@ class DoipClient:
                     self.close()
                     raise DoipError("TCP connection closed")
                 sent += count
-            FCD_TRACE_MIRROR.emit_doip("T", payload_type, self.source_addr, self.target_addr, payload)
+            FCD_TRACE_MIRROR.emit_doip(
+                "T", payload_type, self.source_addr, self.target_addr, payload
+            )
         except TimeoutError:
             raise
         except OSError:
@@ -1812,7 +4622,9 @@ class DoipClient:
             raise DoipError(f"Unexpected routing activation response 0x{payload_type:04X}")
         tester, ecu, code = struct.unpack(">HHB", response[:5])
         if tester != self.source_addr:
-            raise DoipError(f"Routing response for source 0x{tester:04X}, expected 0x{self.source_addr:04X}")
+            raise DoipError(
+                f"Routing response for source 0x{tester:04X}, expected 0x{self.source_addr:04X}"
+            )
         if code != 0x10:
             raise DoipError(f"Routing activation denied: 0x{code:02X}")
         return ecu, code
@@ -1869,9 +4681,13 @@ class DoipClient:
                 source, target = struct.unpack(">HH", response[:4])
                 uds = response[4:]
                 if target != self.source_addr:
-                    raise DoipError(f"Diagnostic response target 0x{target:04X} does not match tester")
+                    raise DoipError(
+                        f"Diagnostic response target 0x{target:04X} does not match tester"
+                    )
                 if source != self.target_addr:
-                    raise DoipError(f"Diagnostic response source 0x{source:04X} does not match target")
+                    raise DoipError(
+                        f"Diagnostic response source 0x{source:04X} does not match target"
+                    )
 
                 if not uds_response_matches_request(uds, request):
                     if (resent_after_stale_response is False) and (time.monotonic() < deadline):
@@ -1880,12 +4696,16 @@ class DoipClient:
                         self._send_frame(DOIP_PT_DIAG_MSG, payload)
                     continue
 
-                if len(uds) >= 3 and uds[0] == 0x7F and uds[2] == 0x78:
+                uds_body = (
+                    uds[1:] if len(request) > 1 and len(uds) > 1 and uds[0] == request[0]
+                    else uds
+                )
+                if len(uds_body) >= 3 and uds_body[0] == 0x7F and uds_body[2] == 0x78:
                     nrc78_count += 1
                     self.last_nrc78_count = nrc78_count
                     deadline = time.monotonic() + timeout
                     continue
-                if len(uds) >= 3 and uds[0] == 0x7F and uds[2] == 0x21:
+                if len(uds_body) >= 3 and uds_body[0] == 0x7F and uds_body[2] == 0x21:
                     if time.monotonic() >= deadline:
                         return uds
                     time.sleep(0.05)
@@ -1916,11 +4736,13 @@ class DoipClient:
         for expected in expected_requests:
             label, request = expected[:2]
             tolerate_negative_ack = bool(expected[2]) if len(expected) > 2 else False
-            pending.append({
-                "label": str(label),
-                "request": bytes(request),
-                "tolerate_negative_ack": tolerate_negative_ack,
-            })
+            pending.append(
+                {
+                    "label": str(label),
+                    "request": bytes(request),
+                    "tolerate_negative_ack": tolerate_negative_ack,
+                }
+            )
         completed = []
 
         with self.lock:
@@ -1931,7 +4753,9 @@ class DoipClient:
                     labels = ", ".join(item["label"] for item in pending[:4])
                     if len(pending) > 4:
                         labels += f", ... +{len(pending) - 4} more"
-                    raise TimeoutError(f"Timed out waiting for ZGW routed transport ack: {labels}") from exc
+                    raise TimeoutError(
+                        f"Timed out waiting for ZGW routed transport ack: {labels}"
+                    ) from exc
 
                 if payload_type == DOIP_PT_ALIVE_CHECK_REQ:
                     self._send_frame(DOIP_PT_ALIVE_CHECK_RES, struct.pack(">H", self.source_addr))
@@ -2027,9 +4851,13 @@ class DoipClient:
                 source, target = struct.unpack(">HH", response[:4])
                 uds = response[4:]
                 if target != self.source_addr:
-                    raise DoipError(f"Diagnostic response target 0x{target:04X} does not match tester")
+                    raise DoipError(
+                        f"Diagnostic response target 0x{target:04X} does not match tester"
+                    )
                 if source != self.target_addr:
-                    raise DoipError(f"Diagnostic response source 0x{source:04X} does not match target")
+                    raise DoipError(
+                        f"Diagnostic response source 0x{source:04X} does not match target"
+                    )
                 return uds
 
     @staticmethod
@@ -2101,7 +4929,9 @@ class DoipClient:
                     pass
 
     @staticmethod
-    def discover(port=DEFAULT_PORT, timeout=2.0, extra_hosts=None, local_ip="auto", include_broadcast=True):
+    def discover(
+        port=DEFAULT_PORT, timeout=2.0, extra_hosts=None, local_ip="auto", include_broadcast=True
+    ):
         req = struct.pack(">BBHI", DOIP_PROTO_VER, DOIP_INV_PROTO_VER, DOIP_PT_VID_REQ, 0)
         port = int(port)
         targets = []
@@ -2201,6 +5031,7 @@ class DoipClient:
             "eid": eid,
             "gid": gid,
         }
+
 
 class RawTcpUdsClient:
     def __init__(self, host, port, timeout=3.0, local_ip="auto"):
@@ -2308,6 +5139,400 @@ class RawTcpUdsClient:
                 return response
 
 
+class Cm5DiagnosticManagerPanel:
+    """Dedicated DiagnosticManager DCM/DLT/DEM interrogation panel."""
+
+    SOURCE_ADDRESS = 0x0E00
+    TARGET_ADDRESS = 0x0E80
+    DTC_NAMES = {
+        0xC10101: "ZGW VehicleState message timeout",
+        0xC10102: "ZGW SDAT message timeout",
+        0xC10103: "ZGW NM3 message timeout",
+        0xC10201: "ELC LoadStatus message timeout",
+        0xC10202: "ELC VoltageCurrent message timeout",
+        0xC10203: "ELC BatteryState message timeout",
+        0xC10301: "CBM CentralCommand1 message timeout",
+        0xC10302: "CBM ActuatorStatus message timeout",
+        0xC10401: "DMU Alive message timeout",
+        0xC10402: "DMU Mileage message timeout",
+        0xC10501: "DEC VehicleState message timeout",
+        0xC10502: "DEC SafeIgnition message timeout",
+        0xC10601: "I4G26 BodyStatus message timeout",
+        0xC10602: "I4G26 LightStatus message timeout",
+        0xC10603: "I4G26 PdcStatus message timeout",
+        0xC10604: "I4G26 Health message timeout",
+    }
+    for _catalog_path in (
+        SCRIPT_DIR / "dtc_names.json",
+        SCRIPT_DIR.parent / "DiagnosticManager" / "config" / "dtc_names.json",
+    ):
+        try:
+            with _catalog_path.open(encoding="utf-8") as _catalog:
+                DTC_NAMES.update(
+                    {int(code, 16): name for code, name in json.load(_catalog).items()}
+                )
+            break
+        except (OSError, ValueError, TypeError):
+            continue
+
+    def __init__(self, app, parent):
+        self.app = app
+        saved = app.settings.get("cm5_diagnostics", {})
+        self.host_var = tk.StringVar(value=str(saved.get("host", "192.168.1.157")))
+        self.port_var = tk.StringVar(value="13400")
+        self.status_var = tk.StringVar(value="Disconnected")
+        self.client = None
+        self.busy = False
+        outer = ttk.Frame(parent, padding=10)
+        outer.pack(fill="both", expand=True)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(3, weight=1)
+        connection = ttk.LabelFrame(outer, text="CM5 DiagnosticManager — DoIP / UDS")
+        connection.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        ttk.Label(connection, text="CM5 IPv4 / host").grid(row=0, column=0, padx=6, pady=6)
+        ttk.Entry(connection, textvariable=self.host_var, width=24).grid(
+            row=0, column=1, padx=6, pady=6
+        )
+        ttk.Label(connection, textvariable=self.status_var).grid(row=0, column=6, padx=10)
+        actions = ttk.Frame(outer)
+        actions.grid(row=1, column=0, sticky="w", pady=4)
+        ttk.Button(actions, text="Read Identity", command=self.read_identity).grid(
+            row=0, column=0, padx=4, pady=2, sticky="ew"
+        )
+        ttk.Button(actions, text="Read FaultMemory", command=self.read_fault_memory).grid(
+            row=0, column=1, padx=4, pady=2, sticky="ew"
+        )
+        for column, (label, command) in enumerate(
+            [
+                ("Read DLT Log", self.read_dlt),
+                ("Save DLT Logs", self.save_dlt_logs),
+                ("Delete DLT Logs", self.delete_dlt_logs),
+                ("Clear DTCs", self.clear_dtcs),
+            ],
+            start=2,
+        ):
+            ttk.Button(actions, text=label, command=command).grid(
+                row=0, column=column, padx=4, pady=2, sticky="ew"
+            )
+        ttk.Label(
+            outer,
+            text="Snapshot fields: system date/time, CPU load, RAM used and CPU temperature only.",
+        ).grid(row=2, column=0, sticky="w", pady=(2, 6))
+        dtc_frame = ttk.LabelFrame(outer, text="Diagnostic Trouble Codes")
+        dtc_frame.grid(row=3, column=0, sticky="nsew")
+        dtc_frame.columnconfigure(0, weight=1)
+        dtc_frame.rowconfigure(0, weight=1)
+        columns = ("node", "dtc", "status", "description", "snapshot_data")
+        self.dtc_tree = ttk.Treeview(
+            dtc_frame, columns=columns, show="headings", selectmode="browse"
+        )
+        for col, text, width in [
+            ("node", "Node", 110),
+            ("dtc", "DTC", 100),
+            ("status", "Status", 90),
+            ("description", "DTC Name", 420),
+            ("snapshot_data", "Snapshot Data", 900),
+        ]:
+            self.dtc_tree.heading(col, text=text)
+            self.dtc_tree.column(col, width=width, stretch=False)
+        self.dtc_tree.grid(row=0, column=0, sticky="nsew")
+        dtc_scroll = ttk.Scrollbar(dtc_frame, orient="vertical", command=self.dtc_tree.yview)
+        dtc_scroll.grid(row=0, column=1, sticky="ns")
+        dtc_hscroll = ttk.Scrollbar(dtc_frame, orient="horizontal", command=self.dtc_tree.xview)
+        dtc_hscroll.grid(row=1, column=0, sticky="ew")
+        self.dtc_tree.configure(yscrollcommand=dtc_scroll.set, xscrollcommand=dtc_hscroll.set)
+        self.app._attach_tree_tooltip(self.dtc_tree)
+
+    def settings(self):
+        return {"host": self.host_var.get(), "port": self.port_var.get()}
+
+    def _run(self, title, operation, trace_result=True):
+        if self.busy:
+            messagebox.showinfo("FCD", "A CM5 diagnostic operation is already running")
+            return
+        self.busy = True
+
+        def worker():
+            try:
+                value = operation()
+                if trace_result:
+                    self.app.log(f"CM5 Diagnostics: {title} completed\n{value}")
+            except Exception as exc:
+                self.app.log(f"CM5 Diagnostics: {title} failed: {exc}")
+                self.app.root.after(0, messagebox.showerror, "CM5 Diagnostics", str(exc))
+            finally:
+                self.busy = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def connect(self):
+        def operation():
+            self.close()
+            client = DoipClient(
+                self.host_var.get().strip(),
+                int(self.port_var.get()),
+                self.SOURCE_ADDRESS,
+                self.TARGET_ADDRESS,
+                timeout=3.0,
+            )
+            client.connect()
+            client.routing_activation()
+            response = client.send_uds(b"\x10\x03")
+            if not response.startswith(b"\x50\x03"):
+                raise DoipError(f"Extended session rejected: {bytes_to_hex(response)}")
+            self.client = client
+            self.app.root.after(0, self.status_var.set, "Connected — extended session")
+            return "Connected to DiagnosticManager at " + self.host_var.get().strip()
+
+        self._run("Connection", operation)
+
+    def close(self):
+        if self.client is not None:
+            self.client.close()
+            self.client = None
+        self.status_var.set("Disconnected")
+
+    def _uds(self, request):
+        if self.client is None or not self.client.connected:
+            raise DoipError("Connect to CM5 DiagnosticManager first")
+        response = self.client.send_uds(request, timeout=5.0)
+        if response.startswith(b"\x7f"):
+            raise DoipError("Negative response: " + bytes_to_hex(response))
+        return response
+
+    def _read_did_text(self, did):
+        response = self._uds(b"\x22" + struct.pack(">H", did))
+        expected = b"\x62" + struct.pack(">H", did)
+        if not response.startswith(expected):
+            raise DoipError("Unexpected DID response: " + bytes_to_hex(response))
+        return response[3:].decode("utf-8", errors="replace")
+
+    def read_identity(self):
+        def operation():
+            identity = self._read_did_text(0xF190)
+            version = self._read_did_text(0xF187)
+            session = self._uds(b"\x22\xf1\x86")
+            return f"Identity: {identity}\nSoftware: {version}\nActive session: 0x{session[-1]:02X}"
+
+        self._run("DiagnosticManager identity", operation)
+
+    def _read_active_dtc_rows(self):
+        count_response = self._uds(b"\x19\x01\xff")
+        if len(count_response) < 6 or count_response[:2] != b"\x59\x01":
+            raise DoipError("Malformed DTC count response: " + bytes_to_hex(count_response))
+        list_response = self._uds(b"\x19\x02\x09")
+        if (
+            len(list_response) < 3
+            or list_response[:2] != b"\x59\x02"
+            or (len(list_response) - 3) % 4
+        ):
+            raise DoipError("Malformed DTC list response: " + bytes_to_hex(list_response))
+        rows = []
+        for offset in range(3, len(list_response), 4):
+            dtc = int.from_bytes(list_response[offset : offset + 3], "big")
+            status = list_response[offset + 3]
+            snapshot = self._read_dtc_snapshot(dtc)
+            rows.append(
+                (
+                    "CM5",
+                    f"0x{dtc:06X}",
+                    f"ACTIVE (0x{status:02X})",
+                    self.DTC_NAMES.get(dtc, "CM5 diagnostic event"),
+                    snapshot,
+                )
+            )
+        return rows
+
+    def _read_dtc_snapshot(self, dtc):
+        request = b"\x19\x04" + int(dtc).to_bytes(3, "big") + b"\xff"
+        response = self._uds(request)
+        if (
+            len(response) < 8
+            or response[:2] != b"\x59\x04"
+            or int.from_bytes(response[2:5], "big") != dtc
+        ):
+            raise DoipError("Malformed DTC snapshot response: " + bytes_to_hex(response))
+        fields = []
+        offset = 8
+        sizes = {0xF200: 24, 0xF201: 2, 0xF202: 8, 0xF203: 8, 0xF204: 2}
+        values = {}
+        for _ in range(response[7]):
+            if offset + 2 > len(response):
+                raise DoipError("Truncated DTC snapshot DID")
+            did = int.from_bytes(response[offset : offset + 2], "big")
+            offset += 2
+            size = sizes.get(did)
+            if size is None or offset + size > len(response):
+                raise DoipError(f"Unsupported or truncated snapshot DID 0x{did:04X}")
+            values[did] = response[offset : offset + size]
+            offset += size
+        if 0xF200 in values:
+            fields.append(
+                "System date/time: " + values[0xF200].decode("ascii", errors="replace").strip()
+            )
+        if 0xF201 in values:
+            fields.append(f"CPU load: {int.from_bytes(values[0xF201], 'big') / 100.0:.2f}%")
+        if 0xF202 in values:
+            fields.append("RAM used: " + human_bytes(int.from_bytes(values[0xF202], "big")))
+        if 0xF204 in values:
+            fields.append(
+                f"CPU temperature: {int.from_bytes(values[0xF204], 'big', signed=True) / 100.0:.2f} C"
+            )
+        return "   |   ".join(fields)
+
+    def _load_dtc_rows(self, rows):
+        self.dtc_tree.delete(*self.dtc_tree.get_children())
+        for row in rows:
+            self.dtc_tree.insert("", "end", values=row)
+
+    def read_fault_memory(self):
+        def operation():
+            rows = self._read_active_dtc_rows()
+            history = self._read_did_text(0xFCD1)
+            # v2 canonical history survives journal rotation and manager/CM5 restarts.
+            # Older managers return an unsupported-DID NRC and retain the FCD1 path.
+            try:
+                stored = self._read_did_text(0xFCD4)
+            except DoipError:
+                stored = ""
+            if stored.lstrip().startswith("["):
+                try:
+                    records = json.loads(stored)
+                    if not isinstance(records, list) or any(not isinstance(r, dict) for r in records):
+                        raise ValueError("expected a diagnostic record array")
+                except (json.JSONDecodeError, ValueError) as exc:
+                    raise DoipError(f"Malformed canonical FaultMemory: {exc}") from exc
+                history = "\n".join(json.dumps(record) for record in records)
+            active_dtcs = {row[1] for row in rows}
+            latest_history = {}
+            for record_index, line in enumerate(history.splitlines()):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise DoipError(f"Malformed FaultMemory record: {exc}") from exc
+                dtc = int(str(record.get("dtc", "0")), 16)
+                status = int(record.get("status", 0))
+                state = str(record.get("state", "UNKNOWN"))
+                snapshot = record.get("snapshot") or {}
+                snapshot_text = "   |   ".join(
+                    [
+                        f"System date/time: {snapshot.get('systemDateTime', record.get('time', ''))}",
+                        f"CPU load: {float(snapshot.get('cpuLoadPercent', 0.0)):.2f}%",
+                        f"RAM used: {human_bytes(int(snapshot.get('ramUsedBytes', 0)))}",
+                        f"CPU temperature: {float(snapshot.get('cpuTemperatureC', 0.0)):.2f} C",
+                    ]
+                )
+                dtc_text = f"0x{dtc:06X}"
+                latest_history[dtc_text] = (
+                    record_index,
+                    (
+                        "CM5",
+                        dtc_text,
+                        f"{state} (0x{status:02X})",
+                        self.DTC_NAMES.get(dtc, str(record.get("name", "DiagnosticManager DTC"))),
+                        snapshot_text,
+                    ),
+                )
+            historical_rows = [
+                row
+                for _index, row in sorted(latest_history.values(), key=lambda item: item[0])
+                if row[1] not in active_dtcs
+            ]
+            rows.extend(historical_rows)
+            self.app.root.after(0, self._load_dtc_rows, rows)
+            return (
+                f"Loaded {len(active_dtcs)} active DTCs and "
+                f"{len(historical_rows)} latest historical DTC states"
+            )
+
+        self._run("FaultMemory history", operation, trace_result=False)
+
+    def read_dlt(self):
+        self._run("DLT event log", lambda: self._read_did_text(0xFCD2) or "DLT log is empty")
+
+    def clear_dtcs(self):
+        def operation():
+            response = self._uds(b"\x14\xff\xff\xff")
+            if response != b"\x54":
+                raise DoipError("ClearDiagnosticInformation failed: " + bytes_to_hex(response))
+            self.app.root.after(0, self._load_dtc_rows, [])
+            return "All active DiagnosticManager DTCs and FaultMemory history were cleared."
+
+        self._run("Clear DTCs", operation)
+
+    def delete_dlt_logs(self):
+        if not messagebox.askyesno("CM5 Diagnostics", "Delete all DLT logs from the CM5?"):
+            return
+
+        def operation():
+            response = self._uds(b"\x31\x01\xf0\x01")
+            if response != b"\x71\x01\xf0\x01":
+                raise DoipError("Delete DLT logs routine failed: " + bytes_to_hex(response))
+            return "All DLT logs were deleted. A new empty current-boot log was created."
+
+        self._run("Delete DLT logs", operation)
+
+    def save_dlt_logs(self):
+        destination = filedialog.askdirectory(title="Save CM5 DLT logs")
+        if not destination:
+            return
+        destination = Path(destination)
+
+        def operation():
+            manifest = self._read_did_text(0xFCD3)
+            entries = []
+            for line in manifest.splitlines():
+                name, separator, size_text = line.partition("\t")
+                if not separator or Path(name).name != name:
+                    raise DoipError("Malformed DLT manifest entry: " + line)
+                entries.append((name, int(size_text)))
+            saved = []
+            for name, expected_size in entries:
+                encoded_name = name.encode("utf-8")
+                if len(encoded_name) > 255:
+                    raise DoipError("DLT filename is too long: " + name)
+                start = self._uds(b"\x38\x04" + bytes([len(encoded_name)]) + encoded_name)
+                if len(start) != 12 or start[:2] != b"\x78\x04":
+                    raise DoipError("DLT transfer start failed: " + bytes_to_hex(start))
+                remote_size = int.from_bytes(start[4:12], "big")
+                if remote_size != expected_size:
+                    raise DoipError(f"DLT size changed before transfer: {name}")
+                temporary = destination / (name + ".fcd-part")
+                final = destination / name
+                received = 0
+                sequence = 1
+                try:
+                    with temporary.open("wb") as output:
+                        while received < expected_size:
+                            block = self._uds(b"\x36" + bytes([sequence]))
+                            if len(block) < 2 or block[0] != 0x76 or block[1] != sequence:
+                                raise DoipError("Invalid DLT transfer block")
+                            output.write(block[2:])
+                            received += len(block) - 2
+                            sequence = (sequence + 1) & 0xFF
+                    if received != expected_size:
+                        raise DoipError(
+                            f"DLT transfer size mismatch for {name}: {received} != {expected_size}"
+                        )
+                    if self._uds(b"\x37") != b"\x77":
+                        raise DoipError("DLT transfer exit failed")
+                    temporary.replace(final)
+                    saved.append(f"{final} ({human_bytes(received)})")
+                except Exception:
+                    try:
+                        temporary.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    raise
+            return "Saved DLT logs to PC:\n\n" + (
+                "\n".join(saved) if saved else "No DLT log files were available."
+            )
+
+        self._run("Save DLT logs", operation)
+
+
 class FcdApp:
     def __init__(self, root):
         self.root = root
@@ -2377,17 +5602,19 @@ class FcdApp:
         data_editor = self.settings.get("data_editor", {})
         if data_editor.get("output_folder"):
             self.gen_output_var.set(str(data_editor["output_folder"]))
-        for row in filtered_hex_rows_for_layout(data_editor.get("hex_rows", []), SCRIPT_DIR.parent.parent):
+        for row in filtered_hex_rows_for_layout(data_editor.get("hex_rows", []), SCRIPT_DIR.parents[1]):
             if row.get("hex"):
-                self._insert_generator_row({
-                    "ecu": row.get("ecu", Path(row["hex"]).stem.upper()),
-                    "target": row.get("target", int_hex(DEFAULT_TARGET_ADDR)),
-                    "req": row.get("req", "0x710"),
-                    "resp": row.get("resp", "0x711"),
-                    "did": row.get("did", "0xF186"),
-                    "base": row.get("base", ""),
-                    "hex": row["hex"],
-                })
+                self._insert_generator_row(
+                    {
+                        "ecu": row.get("ecu", Path(row["hex"]).stem.upper()),
+                        "target": row.get("target", int_hex(DEFAULT_TARGET_ADDR)),
+                        "req": row.get("req", "0x710"),
+                        "resp": row.get("resp", "0x711"),
+                        "did": row.get("did", "0xF186"),
+                        "base": row.get("base", ""),
+                        "hex": row["hex"],
+                    }
+                )
 
     def _save_settings_file(self):
         data = {
@@ -2405,6 +5632,24 @@ class FcdApp:
                 "nodes": {},
                 "hex_rows": [],
             },
+            "cm5": self.cm5_panel.settings() if hasattr(self, "cm5_panel") else {},
+            "cm5_diagnostics": (
+                self.cm5_diagnostics_panel.settings()
+                if hasattr(self, "cm5_diagnostics_panel")
+                else {}
+            ),
+            "cm5_sota": {
+                "host": self.sota_host_var.get(),
+                "port": self.sota_port_var.get(),
+                "gateway_host": self.sota_gateway_host_var.get(),
+                "gateway_port": self.sota_gateway_port_var.get(),
+                "gateway_profile": self.sota_gateway_profile_var.get(),
+                "new_bundle": self.sota_new_bundle_var.get(),
+                "rollback_bundle": self.sota_rollback_bundle_var.get(),
+            },
+            "cm5_backup": (
+                self.cm5_backup_panel.settings() if hasattr(self, "cm5_backup_panel") else {}
+            ),
         }
         for iid, target in self.node_rows.items():
             data["data_editor"]["nodes"][target.get("node_name", "")] = {
@@ -2456,6 +5701,10 @@ class FcdApp:
         self.generator_tab = ttk.Frame(self.notebook)
         self.tal_tab = ttk.Frame(self.notebook)
         self.tests_tab = ttk.Frame(self.notebook)
+        self.cm5_tab = ttk.Frame(self.notebook)
+        self.cm5_diagnostics_tab = ttk.Frame(self.notebook)
+        self.cm5_sota_tab = ttk.Frame(self.notebook)
+        self.cm5_emmc_dump_tab = ttk.Frame(self.notebook)
 
         self.notebook.add(self.connection_tab, text="Connection")
         self.notebook.add(self.diagnostics_tab, text="Diagnostics")
@@ -2463,6 +5712,10 @@ class FcdApp:
         self.notebook.add(self.generator_tab, text="Data Editor")
         self.notebook.add(self.tal_tab, text="Flash")
         self.notebook.add(self.tests_tab, text="Tests")
+        self.notebook.add(self.cm5_tab, text="CM5")
+        self.notebook.add(self.cm5_diagnostics_tab, text="CM5 Diagnostics")
+        self.notebook.add(self.cm5_sota_tab, text="CM5 SOTA")
+        self.notebook.add(self.cm5_emmc_dump_tab, text="CM5 eMMC Dump")
 
         self._build_connection_tab()
         self._build_diagnostics_tab()
@@ -2470,6 +5723,10 @@ class FcdApp:
         self._build_generator_tab()
         self._build_tal_tab()
         self._build_tests_tab()
+        self.cm5_panel = Cm5Panel(self, self.cm5_tab)
+        self.cm5_diagnostics_panel = Cm5DiagnosticManagerPanel(self, self.cm5_diagnostics_tab)
+        self._build_cm5_sota_tab()
+        self.cm5_backup_panel = Cm5BackupPanel(self, self.cm5_emmc_dump_tab)
         self._build_trace_tab()
         self.root.after(100, self._set_trace_split)
 
@@ -2487,19 +5744,12 @@ class FcdApp:
         entry.grid(row=row, column=column + 1, sticky="ew", padx=6, pady=4)
         return entry
 
-    def _button_row(self, parent, row, buttons):
-        frame = ttk.Frame(parent)
-        frame.grid(row=row, column=0, columnspan=8, sticky="w", padx=4, pady=8)
-        for text, command, style in buttons:
-            ttk.Button(frame, text=text, command=command, style=style or "TButton").pack(side="left", padx=4)
-        return frame
-
     def _build_connection_tab(self):
         outer = ttk.Frame(self.connection_tab)
         outer.pack(fill="both", expand=True, padx=10, pady=10)
         outer.columnconfigure(1, weight=1)
         outer.columnconfigure(3, weight=1)
-        outer.rowconfigure(5, weight=1)
+        outer.rowconfigure(2, weight=1)
 
         self.host_var = tk.StringVar(value=DEFAULT_HOST)
         self.port_var = tk.StringVar(value=str(DEFAULT_PORT))
@@ -2509,44 +5759,53 @@ class FcdApp:
         self.local_ip_var = tk.StringVar(value="auto")
         self.transport_var = tk.StringVar(value="DoIP")
         self.conn_status_var = tk.StringVar(value="Disconnected")
-
-        self._entry_row(outer, 0, "ZGW host", self.host_var, 22, 0)
-        self._entry_row(outer, 0, "TCP port", self.port_var, 10, 2)
-        self._entry_row(outer, 1, "Tester address", self.source_var, 14, 0)
-        self._entry_row(outer, 1, "Target address", self.target_var, 14, 2)
-        self._entry_row(outer, 2, "PC local IP", self.local_ip_var, 22, 0)
-        self._entry_row(outer, 2, "Timeout seconds", self.timeout_var, 10, 2)
+        self.cm5_connection_status_var = tk.StringVar(value="CM5 disconnected")
 
         status = ttk.Label(outer, textvariable=self.conn_status_var, style="Bad.TLabel")
-        status.grid(row=3, column=0, columnspan=4, sticky="w", padx=6, pady=8)
+        status.grid(row=0, column=0, columnspan=4, sticky="w", padx=6, pady=8)
         self.connection_status_label = status
+        ttk.Label(outer, textvariable=self.cm5_connection_status_var).grid(
+            row=0, column=2, columnspan=2, sticky="e", padx=6, pady=8
+        )
 
-        self._button_row(
-            outer,
-            4,
-            [
-                ("Connect", self.connect_clicked, None),
-                ("Disconnect", self.disconnect_clicked, None),
+        controls = ttk.Frame(outer)
+        controls.grid(row=1, column=0, columnspan=4, sticky="ew", padx=4, pady=(0, 6))
+        for title, buttons in [
+            ("Connections", [
+                ("Connect CM5", self.connect_cm5_clicked, None),
+                ("Disconnect CM5", self.disconnect_cm5_clicked, None),
+                ("Connect ZGW", self.connect_clicked, None),
+                ("Disconnect ZGW", self.disconnect_clicked, None),
+            ]),
+            ("Identity and session", [
                 ("Sync Time", self.sync_time_clicked, None),
                 ("Read SW Versions", self.read_sw_versions_clicked, None),
                 ("Read MCU Data", self.read_mcu_data_packet_clicked, None),
                 ("Read ZGW Date/Time", self.read_zgw_datetime_clicked, None),
                 ("Read Active Session", self.read_active_session_clicked, None),
                 ("Read Active SW Block", self.read_active_sw_block_clicked, None),
+            ]),
+            ("Timing, NvM and reports", [
                 ("Read Eth Timing", self.read_ethernet_startup_timing_clicked, None),
                 ("Read NvM Timing", self.read_nvm_timing_clicked, None),
                 ("Read NvM Stats", self.read_nvm_stats_clicked, None),
                 ("Clear NvM Stats", self.clear_nvm_stats_clicked, None),
                 ("Read CPU Perf", self.read_cpu_perf_clicked, None),
                 ("Generate Diagnostic Log", self.generate_diagnostic_log_clicked, None),
-            ],
-        )
+            ]),
+        ]:
+            group = ttk.LabelFrame(controls, text=title)
+            group.pack(fill="x", pady=2)
+            for text, command, style in buttons:
+                ttk.Button(group, text=text, command=command, style=style or "TButton").pack(
+                    side="left", padx=4, pady=4
+                )
 
         self.keepalive_var = tk.BooleanVar(value=True)
         self.keepalive_period_var = tk.StringVar(value="2.0")
 
         connection_pane = tk.PanedWindow(outer, orient=tk.VERTICAL, sashrelief=tk.RAISED)
-        connection_pane.grid(row=5, column=0, columnspan=4, sticky="nsew", padx=4, pady=8)
+        connection_pane.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=4, pady=8)
 
         node_frame = ttk.LabelFrame(connection_pane, text="Vehicle nodes")
         node_frame.columnconfigure(0, weight=1)
@@ -2568,8 +5827,12 @@ class FcdApp:
             self.connection_node_tree.column(col, width=width, stretch=(col == "bus"))
         self.connection_node_tree.grid(row=0, column=0, sticky="nsew")
         self.connection_node_tree.bind("<Button-1>", self.connection_node_tree_click)
-        self.connection_node_tree.bind("<Double-1>", lambda _event: self.edit_connection_node_clicked())
-        scroll = ttk.Scrollbar(node_frame, orient="vertical", command=self.connection_node_tree.yview)
+        self.connection_node_tree.bind(
+            "<Double-1>", lambda _event: self.edit_connection_node_clicked()
+        )
+        scroll = ttk.Scrollbar(
+            node_frame, orient="vertical", command=self.connection_node_tree.yview
+        )
         scroll.grid(row=0, column=1, sticky="ns")
         self.connection_node_tree.configure(yscrollcommand=scroll.set)
 
@@ -2591,7 +5854,9 @@ class FcdApp:
             self.connection_diag_tree.heading(col, text=text)
             self.connection_diag_tree.column(col, width=width, stretch=(col == "value"))
         self.connection_diag_tree.grid(row=0, column=0, sticky="nsew")
-        diag_scroll = ttk.Scrollbar(read_frame, orient="vertical", command=self.connection_diag_tree.yview)
+        diag_scroll = ttk.Scrollbar(
+            read_frame, orient="vertical", command=self.connection_diag_tree.yview
+        )
         diag_scroll.grid(row=0, column=1, sticky="ns")
         self.connection_diag_tree.configure(yscrollcommand=diag_scroll.set)
         self._attach_tree_tooltip(self.connection_diag_tree)
@@ -2616,9 +5881,9 @@ class FcdApp:
         ttk.Button(controls, text="Clear Results", command=self.clear_dtc_results_clicked).grid(
             row=0, column=3, sticky="w", padx=4, pady=4
         )
-        ttk.Button(controls, text="Clear DTCs", command=self.clear_diagnostic_information_clicked).grid(
-            row=0, column=4, sticky="w", padx=4, pady=4
-        )
+        ttk.Button(
+            controls, text="Clear DTCs", command=self.clear_diagnostic_information_clicked
+        ).grid(row=0, column=4, sticky="w", padx=4, pady=4)
         ttk.Button(controls, text="Hard Reset", command=self.hard_reset_clicked).grid(
             row=0, column=5, sticky="w", padx=4, pady=4
         )
@@ -2721,19 +5986,39 @@ class FcdApp:
 
         rc_frame = ttk.Frame(file_frame)
         rc_frame.pack(side="left", padx=4, pady=6)
-        ttk.Button(rc_frame, text="Code Vehicle", command=self.code_ecu_clicked).pack(side="left", padx=4)
-        ttk.Button(rc_frame, text="Read Coding", command=self.read_current_coding_clicked).pack(side="left", padx=4)
-        ttk.Button(rc_frame, text="Load Coding Default", command=self.load_default_coding_clicked).pack(side="left", padx=4)
-        ttk.Button(rc_frame, text="Check Coding", command=self.check_coding_clicked).pack(side="left", padx=4)
+        ttk.Button(rc_frame, text="Code Vehicle", command=self.code_ecu_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(rc_frame, text="Read Coding", command=self.read_current_coding_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(
+            rc_frame, text="Load Coding Default", command=self.load_default_coding_clicked
+        ).pack(side="left", padx=4)
+        ttk.Button(rc_frame, text="Check Coding", command=self.check_coding_clicked).pack(
+            side="left", padx=4
+        )
 
         file_ops = ttk.Frame(file_frame)
         file_ops.pack(side="left", padx=16, pady=6)
-        ttk.Button(file_ops, text="Save Current", command=self.save_current_coding_clicked).pack(side="left", padx=4)
-        ttk.Button(file_ops, text="Import", command=self.import_coding_clicked).pack(side="left", padx=4)
-        ttk.Button(file_ops, text="Export", command=self.export_coding_clicked).pack(side="left", padx=4)
-        ttk.Button(file_ops, text="Add Parameter", command=self.add_coding_param_clicked).pack(side="left", padx=4)
-        ttk.Button(file_ops, text="Edit Selected", command=self.edit_coding_param_clicked).pack(side="left", padx=4)
-        ttk.Button(file_ops, text="Remove Selected", command=self.remove_coding_param_clicked).pack(side="left", padx=4)
+        ttk.Button(file_ops, text="Save Current", command=self.save_current_coding_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(file_ops, text="Import", command=self.import_coding_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(file_ops, text="Export", command=self.export_coding_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(file_ops, text="Add Parameter", command=self.add_coding_param_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(file_ops, text="Edit Selected", command=self.edit_coding_param_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(file_ops, text="Remove Selected", command=self.remove_coding_param_clicked).pack(
+            side="left", padx=4
+        )
 
         self.coding_target_notebook = ttk.Notebook(outer)
         self.coding_target_notebook.grid(row=2, column=0, sticky="nsew", padx=4, pady=4)
@@ -2758,22 +6043,43 @@ class FcdApp:
         self.gen_output_var = tk.StringVar(value=str(SCRIPT_DIR / "Generated"))
         self._entry_row(meta, 0, "VIN", self.gen_vin_var, 22, 0)
         self._entry_row(meta, 1, "Output folder", self.gen_output_var, 80, 0)
-        ttk.Button(meta, text="Browse", command=self.browse_gen_output_clicked).grid(row=1, column=2, padx=4, pady=4)
+        ttk.Button(meta, text="Browse", command=self.browse_gen_output_clicked).grid(
+            row=1, column=2, padx=4, pady=4
+        )
         buttons = ttk.Frame(outer)
         buttons.grid(row=1, column=0, sticky="w", padx=4, pady=6)
-        ttk.Button(buttons, text="Discover Nodes", command=self.discover_nodes_clicked).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Discover Nodes", command=self.discover_nodes_clicked).pack(
+            side="left", padx=4
+        )
         ttk.Button(buttons, text="Add HEX", command=self.add_hex_clicked).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Remove Selected", command=self.remove_hex_clicked).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Move Up", command=lambda: self.move_hex_clicked(-1)).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Move Down", command=lambda: self.move_hex_clicked(1)).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Generate Bundle", command=self.generate_files_clicked).pack(side="left", padx=12)
+        ttk.Button(buttons, text="Remove Selected", command=self.remove_hex_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Move Up", command=lambda: self.move_hex_clicked(-1)).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Move Down", command=lambda: self.move_hex_clicked(1)).pack(
+            side="left", padx=4
+        )
+        ttk.Button(
+            buttons,
+            text="Generate Bundle New",
+            command=lambda: self.generate_files_clicked("new"),
+        ).pack(side="left", padx=12)
+        ttk.Button(
+            buttons,
+            text="Generate Bundle Rollback",
+            command=lambda: self.generate_files_clicked("rollback"),
+        ).pack(side="left", padx=4)
 
         node_frame = ttk.LabelFrame(outer, text="Discovered nodes")
         node_frame.grid(row=2, column=0, sticky="nsew", padx=4, pady=4)
         node_frame.columnconfigure(0, weight=1)
         node_frame.rowconfigure(0, weight=1)
         node_columns = ("selected", "node", "bus", "extended")
-        self.node_tree = ttk.Treeview(node_frame, columns=node_columns, show="headings", selectmode="browse", height=7)
+        self.node_tree = ttk.Treeview(
+            node_frame, columns=node_columns, show="headings", selectmode="browse", height=7
+        )
         for col, text, width in [
             ("selected", "Selection", 85),
             ("node", "Node", 130),
@@ -2790,7 +6096,9 @@ class FcdApp:
         self.node_tree.configure(yscrollcommand=node_scroll.set)
 
         columns = ("ecu", "hex")
-        self.generator_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="extended")
+        self.generator_tree = ttk.Treeview(
+            outer, columns=columns, show="headings", selectmode="extended"
+        )
         for col, text, width in [
             ("ecu", "ECU", 160),
             ("hex", "HEX File", 520),
@@ -2813,8 +6121,12 @@ class FcdApp:
 
         self.pkg_dir_var = tk.StringVar(value="")
         self._entry_row(load, 0, "Bundle file or legacy folder", self.pkg_dir_var, 85, 0)
-        ttk.Button(load, text="Browse", command=self.browse_package_clicked).grid(row=0, column=2, padx=4, pady=4)
-        ttk.Button(load, text="Load", command=self.load_package_clicked).grid(row=0, column=3, padx=4, pady=4)
+        ttk.Button(load, text="Browse", command=self.browse_package_clicked).grid(
+            row=0, column=2, padx=4, pady=4
+        )
+        ttk.Button(load, text="Load", command=self.load_package_clicked).grid(
+            row=0, column=3, padx=4, pady=4
+        )
 
         options = ttk.LabelFrame(outer, text="Flash execution options")
         options.grid(row=1, column=0, sticky="ew", padx=4, pady=8)
@@ -2834,7 +6146,9 @@ class FcdApp:
         self._entry_row(options, 1, "Block size", self.block_size_var, 10, 0)
 
         columns = ("item", "value")
-        self.payload_tree = ttk.Treeview(outer, columns=columns, show="headings", selectmode="browse")
+        self.payload_tree = ttk.Treeview(
+            outer, columns=columns, show="headings", selectmode="browse"
+        )
         for col, text, width in [
             ("item", "Summary", 220),
             ("value", "Value", 820),
@@ -2845,9 +6159,12 @@ class FcdApp:
 
         actions = ttk.Frame(outer)
         actions.grid(row=3, column=0, sticky="ew", padx=4, pady=8)
-        ttk.Button(actions, text="Start Flashing", command=self.execute_selected_clicked, style="Danger.TButton").pack(
-            side="left", padx=4
-        )
+        ttk.Button(
+            actions,
+            text="Start Flashing",
+            command=self.execute_selected_clicked,
+            style="Danger.TButton",
+        ).pack(side="left", padx=4)
         self.progress = ttk.Progressbar(
             actions,
             mode="determinate",
@@ -2857,6 +6174,437 @@ class FcdApp:
         self.progress.pack(side="left", padx=18)
         self.elapsed_var = tk.StringVar(value="Elapsed: 00:00")
         ttk.Label(actions, textvariable=self.elapsed_var).pack(side="left", padx=8)
+
+    def _build_cm5_sota_tab(self):
+        outer = ttk.Frame(self.cm5_sota_tab)
+        outer.pack(fill="both", expand=True, padx=10, pady=10)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(6, weight=1)
+
+        saved = self.settings.get("cm5_sota", {})
+        saved_host = str(saved.get("host", "192.168.1.158"))
+        if saved_host == "192.168.1.157":
+            saved_host = "192.168.1.158"
+        self.sota_host_var = tk.StringVar(value=saved_host)
+        self.sota_port_var = tk.StringVar(value="13400")
+        self.sota_gateway_host_var = tk.StringVar(value=str(saved.get("gateway_host", "192.168.1.138")))
+        self.sota_gateway_port_var = tk.StringVar(value=str(saved.get("gateway_port", "13400")))
+        self.sota_gateway_profile_var = tk.StringVar(value=str(saved.get("gateway_profile", "hybrid-zgw-v1")))
+        self._sota_poll_running = False
+        self._sota_monitor_enabled = False
+        self._sota_monitor_closed = False
+        self._sota_last_status = None
+        self._sota_current_job = None
+        self._sota_upload_view = None
+        self._sota_events_lock = threading.Lock()
+        self._sota_event_journal = SotaEventJournal(SCRIPT_DIR / "SOTALogs")
+        self._sota_observed_jobs = set()
+        self._sota_pending_event_jobs = set()
+        self._sota_live_jobs = {}
+        self._sota_session_jobs = set()
+        self._sota_quiet_history_jobs = {}
+        self._sota_monitor_attached = False
+        self._sota_elapsed_clock = None
+        self.sota_new_bundle_var = tk.StringVar(value=str(saved.get("new_bundle", "")))
+        self.sota_rollback_bundle_var = tk.StringVar(
+            value=str(saved.get("rollback_bundle", ""))
+        )
+        self.sota_status_var = tk.StringVar(value="Not queried")
+
+        endpoint = ttk.LabelFrame(outer, text="Over-the-air connection to CM5 Wi-Fi")
+        endpoint.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
+        self._entry_row(endpoint, 0, "CM5 Wi-Fi IPv4", self.sota_host_var, 22, 0)
+        self._entry_row(endpoint, 1, "Vehicle gateway IPv4", self.sota_gateway_host_var, 22, 0)
+        self._entry_row(endpoint, 1, "DoIP port", self.sota_gateway_port_var, 10, 2)
+        ttk.Label(endpoint, text="Gateway profile").grid(row=2, column=0, sticky="w", padx=4)
+        ttk.Combobox(endpoint, textvariable=self.sota_gateway_profile_var, values=("hybrid-zgw-v1", "physical-zgw"), state="readonly", width=22).grid(row=2, column=1, sticky="w", padx=4)
+        ttk.Label(endpoint, text="Hybrid: PC models + Real routes through 192.168.1.10. Physical: all targets Real.").grid(row=2, column=2, columnspan=2, sticky="w", padx=4)
+        ttk.Label(endpoint, text="Wi-Fi UDS to CM5; Ethernet UDS to ZGW for every node. Simulation runs behind the PC gateway. Parallel lanes; ZGW last.").grid(
+            row=3, column=0, columnspan=4, sticky="w", padx=4, pady=4)
+
+        bundles = ttk.LabelFrame(outer, text="Vehicle update and recovery packages")
+        bundles.grid(row=1, column=0, sticky="ew", padx=4, pady=4)
+        bundles.columnconfigure(1, weight=1)
+        self._entry_row(bundles, 0, "New software", self.sota_new_bundle_var, 80, 0)
+        ttk.Button(
+            bundles,
+            text="Browse",
+            command=lambda: self._browse_sota_bundle(self.sota_new_bundle_var),
+        ).grid(row=0, column=2, padx=4)
+        self._entry_row(
+            bundles, 1, "Recovery software", self.sota_rollback_bundle_var, 80, 0
+        )
+        ttk.Button(
+            bundles,
+            text="Browse",
+            command=lambda: self._browse_sota_bundle(self.sota_rollback_bundle_var),
+        ).grid(row=1, column=2, padx=4)
+
+        actions = ttk.Frame(outer)
+        actions.grid(row=2, column=0, sticky="ew", padx=4, pady=8)
+        ttk.Button(
+            actions, text="Transfer Both Bundles", command=self.sota_transfer_clicked
+        ).pack(side="left", padx=4)
+        ttk.Button(actions, text="Refresh Status", command=self.sota_status_clicked).pack(
+            side="left", padx=4
+        )
+        ttk.Button(actions, text="Check Readiness", command=lambda: self._sota_launch(SOTA_PREFLIGHT)).pack(side="left", padx=4)
+        ttk.Button(
+            actions,
+            text="Start SOTA",
+            command=self.sota_start_clicked,
+            style="Danger.TButton",
+        ).pack(side="left", padx=12)
+        ttk.Button(actions, text="Stop After Current ECU", command=self.sota_stop_clicked).pack(side="left", padx=4)
+        ttk.Button(actions, text="Restore Recovery Bundle", command=self.sota_recover_clicked).pack(side="left", padx=4)
+        self.sota_progress = ttk.Progressbar(
+            outer, mode="determinate", maximum=100, style="Green.Horizontal.TProgressbar")
+        self.sota_progress.grid(row=4, column=0, sticky="ew", padx=4, pady=4)
+        status_row = ttk.Frame(outer)
+        status_row.grid(row=5, column=0, sticky="ew", padx=4, pady=4)
+        status_row.columnconfigure(0, weight=1)
+        ttk.Label(status_row, textvariable=self.sota_status_var, wraplength=1000).grid(row=0, column=0, sticky="w")
+        self.sota_elapsed_var = tk.StringVar(value="Elapsed: 00:00:00")
+        ttk.Label(status_row, textvariable=self.sota_elapsed_var).grid(row=0, column=1, sticky="e", padx=8)
+        self.root.after(250, self._sota_tick_elapsed)
+
+        columns = ("bank", "source", "state")
+        self.sota_tree = ttk.Treeview(outer, columns=columns, show="headings", height=2)
+        for column, title, width in (
+            ("bank", "Package", 100),
+            ("source", "Bundle", 700),
+            ("state", "CM5 state", 300),
+        ):
+            self.sota_tree.heading(column, text=title)
+            self.sota_tree.column(column, width=width, stretch=(column != "bank"))
+        self.sota_tree.grid(row=3, column=0, sticky="nsew", padx=4, pady=4)
+        node_columns = ("node", "kind", "backend", "bus", "state", "image", "bytes")
+        self.sota_node_tree = ttk.Treeview(outer, columns=node_columns, show="headings", height=8)
+        for name, title, width in (("node", "Node", 100), ("kind", "Mode", 100), ("backend", "Confirmed backend", 140), ("bus", "Bus", 100),
+                                   ("state", "Update state", 180), ("image", "Image", 100), ("bytes", "Transferred bytes", 160)):
+            self.sota_node_tree.heading(name, text=title)
+            self.sota_node_tree.column(name, width=width, stretch=True)
+        self.sota_node_tree.grid(row=6, column=0, sticky="nsew", padx=4, pady=4)
+        self._refresh_sota_tree("Not transferred", "Not transferred")
+
+    def _browse_sota_bundle(self, variable):
+        path = filedialog.askopenfilename(
+            filetypes=[("Parallel FCD bundle", "*.pfpkg"), ("All files", "*.*")]
+        )
+        if path:
+            variable.set(path)
+
+    def _refresh_sota_tree(self, new_state, rollback_state):
+        self.sota_tree.delete(*self.sota_tree.get_children())
+        self.sota_tree.insert(
+            "", "end", values=("New", self.sota_new_bundle_var.get(), new_state)
+        )
+        self.sota_tree.insert(
+            "",
+            "end",
+            values=("Recovery", self.sota_rollback_bundle_var.get(), rollback_state),
+        )
+
+    def sota_transfer_clicked(self):
+        paths = [Path(variable.get()).expanduser() for variable in
+                 (self.sota_new_bundle_var, self.sota_rollback_bundle_var)]
+        host, port = self.sota_host_var.get().strip(), parse_int(self.sota_port_var.get())
+
+        def action():
+            for path, role in zip(paths, ("new", "rollback")):
+                if not path.is_file():
+                    raise FcdError(f"Bundle does not exist: {path}")
+                validate_sota_manifest(load_bundle(path), role)
+            payloads = [path.read_bytes() for path in paths]
+            total, acknowledged, offset = sum(map(len, payloads)), 0, 0
+            started = time.monotonic()
+            token = object()
+            self.root.after(0, lambda: self._sota_begin_upload(token))
+            responses = []
+            try:
+                for role, command, payload in zip(
+                        ("New", "Recovery"), (SOTA_UPLOAD_NEW, SOTA_UPLOAD_ROLLBACK), payloads):
+                    def progress(done, size):
+                        nonlocal acknowledged
+                        acknowledged = offset + done
+                        phase = "Validating" if done == size else "Uploading"
+                        self.root.after(0, lambda count=acknowledged, text=f"{phase} {role} bundle":
+                                        self._sota_update_upload(token, text, count, total))
+                    response = sota_request(host, port, command, payload, timeout=120.0,
+                                            log=self._sota_transport_log, progress=progress)
+                    if not response.startswith("OK"):
+                        raise FcdError(response)
+                    responses.append(response)
+                    offset += len(payload)
+            except Exception as exc:
+                self.root.after(0, lambda text=str(exc), count=acknowledged:
+                                self._sota_update_upload(token, f"Bundle transfer failed: {text}",
+                                                         count, total, outcome="failed"))
+                raise
+            self.root.after(
+                0, lambda: self._refresh_sota_tree(*responses)
+            )
+            self.root.after(0, lambda: self._sota_update_upload(
+                token, "Both bundles transferred and staged", total, total, outcome="complete"))
+            self.log("CM5 SOTA: both complete vehicle bundles transferred and staged; elapsed " + elapsed_text(time.monotonic() - started))
+
+        self.worker("CM5 SOTA transfer", action)
+
+    def _sota_begin_upload(self, token):
+        self._sota_upload_view = dict(token=token, active=True, job_id=self._sota_current_job)
+        self._sota_elapsed_clock = dict(job=token, seconds=0, received=time.monotonic(), running=True, stamp=0)
+        self.sota_progress.configure(value=0, maximum=100)
+        self.sota_status_var.set("Preparing Wi-Fi bundle upload")
+
+    def _sota_update_upload(self, token, text, completed, total, outcome=None):
+        view = self._sota_upload_view
+        if view is None or view["token"] is not token:
+            return
+        view["active"] = outcome is None
+        if outcome is not None:
+            clock = self._sota_elapsed_clock
+            if clock["running"]:
+                clock.update(seconds=time.monotonic() - clock["received"], running=False)
+        # Full byte acknowledgement still needs transfer-exit CRC/staging and
+        # session completion. Reserve 100% for two successful upload results.
+        percent = 100.0 if outcome == "complete" else min(99.9, 100.0 * completed / max(total, 1))
+        self.sota_progress.configure(value=percent, maximum=100)
+        self.sota_status_var.set(f"{text} | {completed}/{total} acknowledged bytes ({percent:.1f}%)")
+
+    def sota_status_clicked(self):
+        host, port = self.sota_host_var.get().strip(), parse_int(self.sota_port_var.get())
+        def action():
+            self._sota_read_status(host, port, timeout=5, publish=self._sota_post_status)
+            self.root.after(0, self._sota_start_monitor)
+        self.worker("CM5 SOTA status", action)
+
+    def _sota_start_monitor(self):
+        if not self._sota_monitor_enabled and not self._sota_monitor_closed:
+            self._sota_monitor_enabled = True
+            self._sota_poll()
+
+    def _sota_transport_log(self, message):
+        folder = SCRIPT_DIR / "SOTALogs"
+        folder.mkdir(parents=True, exist_ok=True)
+        with (folder / "wifi-client.log").open("a", encoding="utf-8") as output:
+            output.write(f"[{now_text()}] {message}\n")
+            output.flush()
+            os.fsync(output.fileno())
+        self.log("CM5 SOTA " + message)
+
+    def _sota_read_status(self, host, port, timeout=5, publish=None):
+        with self._sota_events_lock:
+            status = parse_sota_status(sota_request(host, port, SOTA_STATUS, timeout=timeout))
+            job = status.get("job_id")
+            live_jobs = getattr(self, "_sota_live_jobs", None)
+            if live_jobs is None:
+                live_jobs = self._sota_live_jobs = {}
+            quiet = getattr(self, "_sota_quiet_history_jobs", None)
+            if quiet is None:
+                quiet = self._sota_quiet_history_jobs = {}
+            if not getattr(self, "_sota_monitor_attached", False):
+                self._sota_monitor_attached = True
+                if (job and status["state"] in SOTA_TERMINAL_STATES
+                        and job not in getattr(self, "_sota_session_jobs", set())):
+                    quiet[job] = False
+            if job and status.get("event_stream") == "sota-events-v1":
+                backlog = False
+                self._sota_pending_event_jobs.add(job)
+                if job not in live_jobs:
+                    live_jobs[job] = SotaLiveJob()
+                    live_jobs[job].consume(self._sota_event_journal.records(job))
+                if publish:
+                    publish(live_jobs[job].status(status))
+                # Drain earlier observed jobs too, so a newly started job cannot
+                # hide the previous job's final events between status polls.
+                for pending in sorted(self._sota_pending_event_jobs):
+                    if pending not in live_jobs:
+                        live_jobs[pending] = SotaLiveJob()
+                        live_jobs[pending].consume(self._sota_event_journal.records(pending))
+                    if pending not in self._sota_observed_jobs:
+                        cached = self._sota_event_journal.records(pending)
+                        if cached and pending not in quiet:
+                            path = self._sota_event_journal.root / (str(pending) + ".jsonl")
+                            state = status["state"] if pending == job else "previous job"
+                            self.log(f"CM5 SOTA job {pending}: {state}; {len(cached)} saved events retained in {path}; showing newly received events only")
+                        self._sota_observed_jobs.add(pending)
+                    more = False
+                    for _ in range(8):
+                        query = json.dumps(dict(job_id=pending, after=self._sota_event_journal.cursor(pending), limit=128)).encode()
+                        response = sota_request(host, port, SOTA_EVENTS, query, timeout=timeout)
+                        events, more = self._sota_event_journal.append_page(pending, response)
+                        live_jobs[pending].consume(events)
+                        if pending not in quiet:
+                            self.log_batch(format_sota_event(event, live_jobs[pending].started_us) for event in events)
+                        if publish and pending == job and events:
+                            publish(live_jobs[job].status(status))
+                        if not more:
+                            break
+                    if pending != job and not more:
+                        self._sota_pending_event_jobs.remove(pending)
+                    if pending in quiet and not more and not quiet[pending]:
+                        path = self._sota_event_journal.root / (str(pending) + ".jsonl")
+                        self.log(f"CM5 SOTA job {pending}: {status['state']}; {self._sota_event_journal.cursor(pending)} saved events retained in {path}; startup history synchronized")
+                        quiet[pending] = True
+                    backlog = backlog or more
+                status = live_jobs[job].status(status)
+                status["event_backlog"] = backlog
+            elif publish:
+                publish(status)
+            return status
+
+    def _sota_post_status(self, status):
+        if not self._sota_monitor_closed:
+            self.root.after(0, lambda value=status: self._sota_apply_status(value))
+
+    def _sota_tick_elapsed(self):
+        if self._sota_monitor_closed:
+            return
+        clock = self._sota_elapsed_clock
+        seconds = 0 if clock is None else clock["seconds"] + (time.monotonic() - clock["received"] if clock["running"] else 0)
+        self.sota_elapsed_var.set("Elapsed: " + elapsed_text(seconds))
+        self.root.after(250, self._sota_tick_elapsed)
+
+    def _sota_set_elapsed(self, status):
+        now = time.monotonic()
+        job = status.get("job_id")
+        running = status["state"] not in SOTA_TERMINAL_STATES
+        seconds = float(status.get("elapsed_seconds", 0))
+        stamp = status.get("elapsed_event_us", 0)
+        clock = getattr(self, "_sota_elapsed_clock", None)
+        if clock is None or clock["job"] != job:
+            clock = dict(job=job, seconds=seconds, received=now, running=running, stamp=stamp)
+        elif stamp != clock["stamp"] or running != clock["running"]:
+            # Local monotonic time bridges pauses between journal pages. The
+            # final journal duration is exact, independent of PC/CM5 clock skew.
+            previous = clock["seconds"] + (now - clock["received"] if clock["running"] else 0)
+            clock.update(seconds=max(previous, seconds) if running else seconds,
+                         received=now, running=running, stamp=stamp)
+        self._sota_elapsed_clock = clock
+        if hasattr(self, "sota_elapsed_var"):
+            shown = clock["seconds"] + (now - clock["received"] if clock["running"] else 0)
+            self.sota_elapsed_var.set("Elapsed: " + elapsed_text(shown))
+
+    def _sota_apply_status(self, status):
+        completed, total = int(status.get("completed_bytes", 0)), int(status.get("total_bytes", 0))
+        self._sota_current_job = status.get("job_id")
+        view = getattr(self, "_sota_upload_view", None)
+        show_job = view is None or (not view["active"] and view["job_id"] != self._sota_current_job)
+        state, detail = status["state"], status.get("detail", "")
+        where = " / ".join(filter(None, (status.get("target"), status.get("image"))))
+        modes = f"{status.get('simulated_targets', '?')} simulated / {status.get('real_targets', '?')} real"
+        if show_job:
+            self._sota_upload_view = None
+            self._sota_set_elapsed(status)
+            self.sota_progress.configure(value=completed, maximum=max(total, 1))
+            percent = 100.0 * completed / max(total, 1)
+            nodes = f"{status.get('completed_targets', 0)}/7 ECUs completed"
+            self.sota_status_var.set(f"{state} | {modes} | {nodes} | {where} | {completed}/{total} bytes ({percent:.1f}%) | {detail}")
+        self.sota_node_tree.delete(*self.sota_node_tree.get_children())
+        for name, target in sorted(status.get("targets", {}).items()):
+            self.sota_node_tree.insert("", "end", values=(name, target.get("node_kind", ""), target.get("backend", "Not verified"), target.get("bus", ""),
+                target.get("state", ""), target.get("image", ""), target.get("completed_bytes", "0")))
+        self._refresh_sota_tree(
+            f"Staged: {status['new_bytes']} bytes" if int(status.get("new_bytes", 0)) else "Not staged",
+            f"Staged: {status['rollback_bytes']} bytes" if int(status.get("rollback_bytes", 0)) else "Not staged")
+        marker = (status.get("job_id"), state, where, detail)
+        if status.get("event_stream") != "sota-events-v1" and marker != self._sota_last_status:
+            self._sota_last_status = marker
+            self.log(f"CM5 SOTA job {status.get('job_id', '-')}: {state} {where}: {detail}")
+
+    def _sota_poll(self):
+        if self._sota_monitor_closed:
+            return
+        if self._sota_poll_running:
+            self.root.after(2000, self._sota_poll)
+            return
+        host, port = self.sota_host_var.get().strip(), self.sota_port_var.get().strip()
+        self._sota_poll_running = True
+
+        def poll():
+            delay = 3000
+            try:
+                result = self._sota_read_status(host, parse_int(port), timeout=3, publish=self._sota_post_status)
+                if result["state"] not in SOTA_TERMINAL_STATES or result.get("event_backlog"):
+                    delay = 250
+            except Exception as exc:
+                if not self._sota_monitor_closed:
+                    message = f"SOTA status/log sync unavailable: {exc}. Any accepted CM5 job continues independently."
+                    self.log(f"CM5 SOTA status/log sync ERROR: {exc}; retrying with retained event cursor")
+                    self.root.after(0, lambda text=message:
+                                    self.sota_status_var.set(text) if self._sota_upload_view is None else None)
+            finally:
+                self._sota_poll_running = False
+                if not self._sota_monitor_closed:
+                    self.root.after(delay, self._sota_poll)
+
+        threading.Thread(target=poll, daemon=True).start()
+
+    def _sota_launch(self, command):
+        host, port = self.sota_host_var.get().strip(), parse_int(self.sota_port_var.get())
+        options = json.dumps({
+            "gateway_host": self.sota_gateway_host_var.get().strip(),
+            "gateway_port": parse_int(self.sota_gateway_port_var.get()),
+            "tester_address": parse_int(self.source_var.get()),
+            "gateway_address": parse_int(self.target_var.get()),
+            "programming_profile": "fcd-uds-v1",
+            "gateway_profile": self.sota_gateway_profile_var.get() if hasattr(self, "sota_gateway_profile_var") else "hybrid-zgw-v1",
+            "node_modes": self._sota_node_modes(),
+        }).encode("utf-8")
+
+        def action():
+            response = sota_request(host, port, command, options, timeout=10, log=self._sota_transport_log)
+            if not response.startswith("OK JOB "):
+                raise FcdError(response.removeprefix("ERROR "))
+            if not hasattr(self, "_sota_session_jobs"):
+                self._sota_session_jobs = set()
+            self._sota_session_jobs.add(response.split("OK JOB ", 1)[1].split(";", 1)[0].strip())
+            self.log(f"CM5 SOTA accepted: {response}; CM5 owns execution and persistent progress")
+            self.root.after(0, lambda: setattr(self, "_sota_upload_view", None))
+            self._sota_read_status(host, port, timeout=5, publish=self._sota_post_status)
+            self.root.after(0, self._sota_start_monitor)
+
+        self.worker("CM5 SOTA readiness" if command == SOTA_PREFLIGHT else "CM5 SOTA start", action)
+
+    def _sota_node_modes(self):
+        saved = getattr(self, "settings", {}).get("data_editor", {}).get("nodes", {})
+        modes = sota_node_modes([dict(value, node_name=name) for name, value in saved.items()])
+        modes.update(sota_node_modes(self.node_rows.values()))
+        return modes
+
+    def sota_start_clicked(self):
+        modes = self._sota_node_modes()
+        real = sorted(name for name, kind in modes.items() if kind == "Real")
+        scope = ("Real firmware targets: " + ", ".join(real) + ". Confirm stationary vehicle and stable power.\n\n"
+                 if real else "All firmware targets are simulated behind the Ethernet ZGW.\n\n"
+                 if set(modes) == SOTA_VEHICLE_NODES else
+                 "Bundle modes apply to nodes missing from the editor. Real targets require stable vehicle power.\n\n")
+        if not messagebox.askyesno(
+            APP_NAME,
+            "Start the vehicle software update on the CM5?\n\n"
+            + scope + "The CM5 validates both packages and runs the FBL/APP sequence in parallel bus lanes, "
+            "with at most two active nodes per bus and ZGW last. Every request travels by Ethernet "
+            "to ZGW. Simulated flash images are stored behind that gateway; Real nodes require ECU responses. "
+            "The job continues if FCD disconnects.",
+        ):
+            return
+        self._sota_launch(SOTA_EXECUTE)
+
+    def sota_recover_clicked(self):
+        if messagebox.askyesno(APP_NAME,
+                "Restore the staged recovery software to all seven ECUs?\n\n"
+                "This uses the current Real/Simulated node settings and the same parallel schedule. "
+                "Real targets require responsive bootloaders and stable power."):
+            self._sota_launch(SOTA_RECOVER)
+
+    def sota_stop_clicked(self):
+        host, port = self.sota_host_var.get().strip(), parse_int(self.sota_port_var.get())
+        def action():
+            response = sota_request(host, port, SOTA_STOP, timeout=5, log=self._sota_transport_log)
+            if not response.startswith("OK"):
+                raise FcdError(response.removeprefix("ERROR "))
+            self.log(f"CM5 SOTA: {response}")
+        self.worker("CM5 SOTA stop request", action)
 
     def _build_tests_tab(self):
         outer = ttk.Frame(self.tests_tab)
@@ -2911,20 +6659,26 @@ class FcdApp:
         ttk.Button(controls, text="Run Selected", command=self.start_selected_test_clicked).grid(
             row=1, column=1, sticky="w", padx=6, pady=6
         )
-        ttk.Button(controls, text="Run All ZGW Operations", command=self.start_all_tests_clicked).grid(
-            row=1, column=2, columnspan=2, sticky="w", padx=6, pady=6
-        )
+        ttk.Button(
+            controls, text="Run All ZGW Operations", command=self.start_all_tests_clicked
+        ).grid(row=1, column=2, columnspan=2, sticky="w", padx=6, pady=6)
 
         status = ttk.Frame(outer)
         status.grid(row=1, column=0, sticky="ew", padx=4, pady=10)
-        ttk.Button(status, text="Stop Test", command=self.stop_tests_clicked).pack(side="left", padx=4)
+        ttk.Button(status, text="Stop Test", command=self.stop_tests_clicked).pack(
+            side="left", padx=4
+        )
         ttk.Label(status, textvariable=self.test_status_var).pack(side="left", padx=12)
 
     def _test_row(self, parent, row, title, iterations_var, button_text, command):
         ttk.Label(parent, text=title).grid(row=row, column=0, sticky="w", padx=6, pady=5)
         ttk.Label(parent, text="Iterations").grid(row=row, column=1, sticky="e", padx=6, pady=5)
-        ttk.Entry(parent, textvariable=iterations_var, width=10).grid(row=row, column=2, sticky="w", padx=6, pady=5)
-        ttk.Button(parent, text=button_text, command=command).grid(row=row, column=3, sticky="w", padx=6, pady=5)
+        ttk.Entry(parent, textvariable=iterations_var, width=10).grid(
+            row=row, column=2, sticky="w", padx=6, pady=5
+        )
+        ttk.Button(parent, text=button_text, command=command).grid(
+            row=row, column=3, sticky="w", padx=6, pady=5
+        )
 
     def _parse_test_iterations(self, variable):
         iterations = parse_int(variable.get())
@@ -2984,16 +6738,15 @@ class FcdApp:
                     self.log(f"{label} passed")
                 self._set_test_status(f"{test_name}: completed {completed}/{iterations}")
             except Exception as exc:
-                self._set_test_status(f"{test_name}: stopped after {completed}/{iterations} ({exc})")
+                self._set_test_status(
+                    f"{test_name}: stopped after {completed}/{iterations} ({exc})"
+                )
                 raise
             finally:
                 self._finish_test()
                 if keepalive_was_on and not self.worker_stop.is_set():
                     self.keepalive_var.set(True)
-                    if (
-                        self.client is not None
-                        and self.client.connected
-                    ):
+                    if self.client is not None and self.client.connected:
                         self.start_keepalive()
 
         self.worker(test_name, action)
@@ -3005,11 +6758,17 @@ class FcdApp:
         except FcdError:
             if self.transport_var.get() != "DoIP":
                 raise
-            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            client = self._new_parallel_client(
+                parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+            )
             created_client = True
         try:
             send = self._make_uds_sender(client, dry=False)
-            send(b"\x3E\x00", f"{label}: ZGW TesterPresent", timeout=max(2.0, float(self.timeout_var.get())))
+            send(
+                b"\x3e\x00",
+                f"{label}: ZGW TesterPresent",
+                timeout=max(2.0, float(self.timeout_var.get())),
+            )
         finally:
             if created_client:
                 client.close()
@@ -3024,14 +6783,20 @@ class FcdApp:
         self._start_test_loop("Coding Test", self.test_iterations_var, self._run_coding_test_once)
 
     def start_flashing_test_clicked(self):
-        self._start_test_loop("Flashing Test", self.test_iterations_var, self._run_flashing_test_once)
+        self._start_test_loop(
+            "Flashing Test", self.test_iterations_var, self._run_flashing_test_once
+        )
 
     def start_fault_memory_test_clicked(self):
-        self._start_test_loop("Fault Memory Test", self.test_iterations_var, self._run_fault_memory_test_once)
+        self._start_test_loop(
+            "Fault Memory Test", self.test_iterations_var, self._run_fault_memory_test_once
+        )
 
     def start_selected_test_clicked(self):
         selected = self.test_operation_var.get()
-        operation = next((command for name, command in self.test_operations if name == selected), None)
+        operation = next(
+            (command for name, command in self.test_operations if name == selected), None
+        )
         if operation is None:
             messagebox.showerror(APP_NAME, "Select a ZGW operation to test")
             return
@@ -3051,7 +6816,9 @@ class FcdApp:
                         # flashing with a fresh TCP/routing-activation state so
                         # it matches a standalone flash instead of inheriting
                         # accumulated receive/window state from the full suite.
-                        self.reconnect_doip(client, "All ZGW Operations pre-flash transport refresh")
+                        self.reconnect_doip(
+                            client, "All ZGW Operations pre-flash transport refresh"
+                        )
                 operation()
                 self.log(f"All ZGW Operations: {name} passed")
 
@@ -3071,26 +6838,49 @@ class FcdApp:
 
         bottom = ttk.Frame(outer)
         bottom.grid(row=1, column=0, columnspan=2, sticky="w", pady=6)
-        ttk.Button(bottom, text="Clear Trace", command=lambda: self.trace_text.delete("1.0", "end")).pack(side="left", padx=4)
-        ttk.Button(bottom, text="Save Trace", command=self.save_trace_clicked).pack(side="left", padx=4)
+        ttk.Button(
+            bottom, text="Clear Trace", command=lambda: self.trace_text.delete("1.0", "end")
+        ).pack(side="left", padx=4)
+        ttk.Button(bottom, text="Save Trace", command=self.save_trace_clicked).pack(
+            side="left", padx=4
+        )
         self.trace_autoscroll_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(bottom, text="Auto-scroll", variable=self.trace_autoscroll_var).pack(side="left", padx=12)
+        ttk.Checkbutton(bottom, text="Auto-scroll", variable=self.trace_autoscroll_var).pack(
+            side="left", padx=12
+        )
 
     def log(self, message):
-        self.log_queue.put(f"[{now_text()}] {message}")
+        self.log_batch((message,))
+
+    def log_batch(self, messages):
+        lines = [(f"[{now_text()}] {message}", str(message).startswith("CM5 SOTA")) for message in messages]
+        sota_lines = [line + "\n" for line, persist in lines if persist]
+        if sota_lines:
+            try:
+                with _SOTA_TEXT_LOG_LOCK:
+                    folder = SCRIPT_DIR / "SOTALogs"
+                    folder.mkdir(parents=True, exist_ok=True)
+                    with (folder / "fcd-sota.log").open("a", encoding="utf-8") as output:
+                        output.writelines(sota_lines)
+                        output.flush()
+                        os.fsync(output.fileno())
+            except OSError as exc:
+                self.log_queue.put(f"[{now_text()}] CM5 SOTA log file ERROR: {exc}")
+        for line, _ in lines:
+            self.log_queue.put(line)
 
     def _drain_log_queue(self):
-        drained = 0
+        lines = []
         try:
-            while drained < TRACE_DRAIN_MAX_LINES:
-                line = self.log_queue.get_nowait()
-                self.trace_text.insert("end", line + "\n")
-                drained += 1
+            while len(lines) < TRACE_DRAIN_MAX_LINES:
+                lines.append(self.log_queue.get_nowait())
         except queue.Empty:
             pass
-        if drained and self.trace_autoscroll_var.get():
+        if lines:
+            self.trace_text.insert("end", "\n".join(lines) + "\n")
+        if lines and self.trace_autoscroll_var.get():
             self.trace_text.see("end")
-        self.root.after(10 if drained else 50, self._drain_log_queue)
+        self.root.after(10 if lines else 50, self._drain_log_queue)
 
     def worker(self, name, func):
         run_inline = False
@@ -3163,7 +6953,15 @@ class FcdApp:
             return True
         return require_current_client and self.client is not client
 
-    def reconnect_doip(self, client, reason, stop_event=None, log_success=True, deadline=None, require_current_client=True):
+    def reconnect_doip(
+        self,
+        client,
+        reason,
+        stop_event=None,
+        log_success=True,
+        deadline=None,
+        require_current_client=True,
+    ):
         if not isinstance(client, DoipClient):
             return
 
@@ -3179,21 +6977,29 @@ class FcdApp:
         client.close()
         if require_current_client:
             self.root.after(0, self._set_connected_status, False)
-        if self._reconnect_cancelled(client, stop_event, require_current_client=require_current_client):
+        if self._reconnect_cancelled(
+            client, stop_event, require_current_client=require_current_client
+        ):
             raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button")
 
-        while not self._reconnect_cancelled(client, stop_event, require_current_client=require_current_client):
+        while not self._reconnect_cancelled(
+            client, stop_event, require_current_client=require_current_client
+        ):
             if (deadline is not None) and (time.monotonic() >= deadline):
                 break
 
             attempt += 1
             try:
                 client.connect()
-                if self._reconnect_cancelled(client, stop_event, require_current_client=require_current_client):
+                if self._reconnect_cancelled(
+                    client, stop_event, require_current_client=require_current_client
+                ):
                     client.close()
                     break
                 self.activate_doip(client)
-                if self._reconnect_cancelled(client, stop_event, require_current_client=require_current_client):
+                if self._reconnect_cancelled(
+                    client, stop_event, require_current_client=require_current_client
+                ):
                     client.close()
                     break
                 if require_current_client:
@@ -3206,7 +7012,9 @@ class FcdApp:
                 client.close()
                 if attempt == 1 or attempt % 10 == 0:
                     self.log(f"DoIP reconnect after {reason}: attempt {attempt} failed: {exc}")
-                if self._reconnect_cancelled(client, stop_event, require_current_client=require_current_client):
+                if self._reconnect_cancelled(
+                    client, stop_event, require_current_client=require_current_client
+                ):
                     break
                 wait_time = 0.5
                 if deadline is not None:
@@ -3225,9 +7033,13 @@ class FcdApp:
             raise FcdError(f"DoIP reconnect after {reason} timed out: {last_error}")
         if last_error is None:
             raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button")
-        raise FcdError(f"DoIP reconnect after {reason} cancelled by Disconnect button: {last_error}")
+        raise FcdError(
+            f"DoIP reconnect after {reason} cancelled by Disconnect button: {last_error}"
+        )
 
-    def _send_uds_with_reconnect(self, client, request, label, timeout=None, allow_no_response=False, max_retries=1):
+    def _send_uds_with_reconnect(
+        self, client, request, label, timeout=None, allow_no_response=False, max_retries=1
+    ):
         request = bytes(request)
         retries = 0
         # TransferData may be retried with the same BSC after a transport drop;
@@ -3237,7 +7049,8 @@ class FcdApp:
             len(request) >= 4
             and request[0] == 0x31
             and request[1] == 0x01
-            and struct.unpack(">H", request[2:4])[0] in (ROUTINE_ERASE_MEMORY, ROUTINE_CHECK_MEMORY_CRC)
+            and struct.unpack(">H", request[2:4])[0]
+            in (ROUTINE_ERASE_MEMORY, ROUTINE_CHECK_MEMORY_CRC)
         ):
             no_auto_retry = True
         while True:
@@ -3245,18 +7058,25 @@ class FcdApp:
             if self._reconnect_cancelled(client, require_current_client=require_current_client):
                 raise FcdError(f"{label}: cancelled by Disconnect button")
             try:
-                return client.send_uds(request, timeout=timeout, allow_no_response=allow_no_response)
+                return client.send_uds(
+                    request, timeout=timeout, allow_no_response=allow_no_response
+                )
             except (OSError, TimeoutError, DoipError) as exc:
                 request_sent = bool(getattr(client, "last_uds_request_sent", False))
-                reset_disconnect = (
-                    isinstance(exc, DoipError)
-                    and str(exc) in ("TCP connection closed", "Connection closed", "Not connected")
+                reset_disconnect = isinstance(exc, DoipError) and str(exc) in (
+                    "TCP connection closed",
+                    "Connection closed",
+                    "Not connected",
                 )
-                if allow_no_response and request_sent and (
-                    isinstance(exc, (OSError, TimeoutError)) or reset_disconnect
+                if (
+                    allow_no_response
+                    and request_sent
+                    and (isinstance(exc, (OSError, TimeoutError)) or reset_disconnect)
                 ):
                     if isinstance(client, DoipClient) and not client.connected:
-                        self.log(f"{label}: transport closed after accepted no-response request; reconnecting")
+                        self.log(
+                            f"{label}: transport closed after accepted no-response request; reconnecting"
+                        )
                         self.reconnect_doip(
                             client,
                             f"{label} accepted no-response recovery",
@@ -3270,7 +7090,104 @@ class FcdApp:
                 retries += 1
                 self.log(f"{label}: DoIP request failed ({exc}); reconnecting and retrying")
                 self.reconnect_doip(client, label, require_current_client=require_current_client)
-                self.log(f"TX {label} retry {retries}/{max_retries}: {uds_request_log_text(request)}")
+                self.log(
+                    f"TX {label} retry {retries}/{max_retries}: {uds_request_log_text(request)}"
+                )
+
+    def connect_cm5_clicked(self):
+        if getattr(self, "cm5_connection_busy", False):
+            return
+        if self.cm5_backup_panel.busy or self.cm5_panel.busy or self.cm5_diagnostics_panel.busy:
+            messagebox.showerror("FCD", "A CM5 operation is already running")
+            return
+        self.cm5_connection_busy = True
+        self.cm5_connection_status_var.set("Connecting CM5...")
+        agent = self.cm5_panel
+        backup = self.cm5_backup_panel
+        diagnostics = self.cm5_diagnostics_panel
+        with backup.busy_lock:
+            backup.busy = True
+        agent.busy = True
+        diagnostics.busy = True
+        agent_args = (agent.host_var.get().strip(), int(agent.port_var.get()),
+                      agent.token_var.get(), agent.fingerprint_var.get())
+        diagnostic_args = (diagnostics.host_var.get().strip(), int(diagnostics.port_var.get()))
+
+        def work():
+            try:
+                # The CM5-side application checks service health before FCD opens sessions.
+                check = subprocess.run(
+                    ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+                     "cm5", "sudo", "-n", "/usr/local/bin/ConnectionManager", "--ensure"],
+                    capture_output=True, text=True, timeout=15, check=False,
+                )
+                if check.returncode:
+                    raise FcdError("CM5 ConnectionManager: " +
+                                   (check.stdout.strip() or check.stderr.strip() or "unavailable"))
+                state = json.loads(check.stdout)
+                if not state.get("ready"):
+                    raise FcdError("CM5 services are not ready: " + ", ".join(state.get("failed", [])))
+                backup._connect()
+                client = Cm5DiagnosticsClient(*agent_args)
+                client.on_connection_event = self.log
+                try:
+                    client.connect()
+                except Exception:
+                    client.disconnect()
+                    raise
+                agent.client = client
+                self.root.after(0, agent.status_var.set,
+                                f"Securely connected to {client.host}:{client.port}")
+                doip = DoipClient(diagnostic_args[0], diagnostic_args[1],
+                                  diagnostics.SOURCE_ADDRESS, diagnostics.TARGET_ADDRESS,
+                                  timeout=3.0)
+                try:
+                    doip.connect()
+                    doip.routing_activation()
+                    response = doip.send_uds(b"\x10\x03")
+                    if not response.startswith(b"\x50\x03"):
+                        raise DoipError("Extended session rejected: " + bytes_to_hex(response))
+                except Exception:
+                    doip.close()
+                    raise
+                diagnostics.client = doip
+                self.root.after(0, diagnostics.status_var.set, "Connected — extended session")
+                self.root.after(0, self.cm5_connection_status_var.set, "CM5 connected")
+                self.log("CM5 connected: Ethernet agent, eMMC backup, DiagnosticManager; SOTA service ready")
+            except Exception as exc:
+                if diagnostics.client is not None:
+                    diagnostics.client.close()
+                    diagnostics.client = None
+                if agent.client is not None:
+                    agent.client.disconnect()
+                    agent.client = None
+                if backup.client is not None:
+                    backup.client.close()
+                    backup.client = None
+                self.root.after(0, diagnostics.status_var.set, "Disconnected")
+                self.root.after(0, agent.status_var.set, "Disconnected")
+                self.root.after(0, backup.connection_var.set, "Disconnected")
+                self.root.after(0, self.cm5_connection_status_var.set, "CM5 disconnected")
+                self.log(f"CM5 connection failed: {exc}")
+            finally:
+                with backup.busy_lock:
+                    backup.busy = False
+                agent.busy = False
+                diagnostics.busy = False
+                self.cm5_connection_busy = False
+
+        threading.Thread(target=work, name="cm5-connect-all", daemon=True).start()
+
+    def disconnect_cm5_clicked(self):
+        if (getattr(self, "cm5_connection_busy", False) or self.cm5_backup_panel.busy
+                or self.cm5_panel.busy or self.cm5_diagnostics_panel.busy):
+            messagebox.showerror("FCD", "Wait for the active CM5 operation to finish before disconnecting")
+            return
+        self.cm5_diagnostics_panel.close()
+        self.cm5_panel.disconnect()
+        self.cm5_backup_panel.disconnect()
+        self.cm5_connection_status_var.set("CM5 disconnected")
+        self.log("CM5 disconnected")
 
     def connect_clicked(self):
         def action():
@@ -3284,7 +7201,9 @@ class FcdApp:
             selected_target = parse_int(self.target_var.get())
             self.log(
                 "Local bind candidates: "
-                + ", ".join(ip or "OS default" for ip in local_bind_candidates(host_before, local_ip))
+                + ", ".join(
+                    ip or "OS default" for ip in local_bind_candidates(host_before, local_ip)
+                )
             )
 
             self.log("Discover DoIP: started")
@@ -3307,8 +7226,12 @@ class FcdApp:
                     selected_host = first["ip"]
                     selected_target = first["logical_address"]
                     self.root.after(0, lambda: self.host_var.set(first["ip"]))
-                    self.root.after(0, lambda: self.target_var.set(int_hex(first["logical_address"])))
-                    self.root.after(0, lambda: self.fa_vin_var.set(first["vin"] or self.fa_vin_var.get()))
+                    self.root.after(
+                        0, lambda: self.target_var.set(int_hex(first["logical_address"]))
+                    )
+                    self.root.after(
+                        0, lambda: self.fa_vin_var.set(first["vin"] or self.fa_vin_var.get())
+                    )
                 else:
                     self.log("Discover DoIP: no response; continuing with configured host")
             except Exception as exc:
@@ -3321,7 +7244,9 @@ class FcdApp:
             else:
                 self.log("Vehicle Identification: started")
                 try:
-                    info = DoipClient.vehicle_identification(selected_host, port=port, timeout=timeout, local_ip=local_ip)
+                    info = DoipClient.vehicle_identification(
+                        selected_host, port=port, timeout=timeout, local_ip=local_ip
+                    )
                     self.log(
                         f"Vehicle ID: from={info['ip']}:13400 vin={info['vin']} "
                         f"logical={int_hex(info['logical_address'])} eid={info['eid']} gid={info['gid']}"
@@ -3329,7 +7254,9 @@ class FcdApp:
                     selected_host = info["ip"]
                     selected_target = info["logical_address"]
                     self.root.after(0, lambda: self.host_var.set(info["ip"]))
-                    self.root.after(0, lambda: self.target_var.set(int_hex(info["logical_address"])))
+                    self.root.after(
+                        0, lambda: self.target_var.set(int_hex(info["logical_address"]))
+                    )
                     if info.get("vin"):
                         self.root.after(0, lambda: self.fa_vin_var.set(info["vin"]))
                 except Exception as exc:
@@ -3415,7 +7342,9 @@ class FcdApp:
 
     def _log_time_sync_status(self, response, prefix):
         if not isinstance(response, bytes) or len(response) < 44:
-            self.log(f"{prefix}: Time status raw: {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            self.log(
+                f"{prefix}: Time status raw: {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
             return
 
         data = response[4:]
@@ -3451,7 +7380,9 @@ class FcdApp:
                     0,
                     0,
                 )
-                request = b"\x31\x01" + struct.pack(">H", TIMESYNC_ROUTINE_SET_UTC) + request_payload
+                request = (
+                    b"\x31\x01" + struct.pack(">H", TIMESYNC_ROUTINE_SET_UTC) + request_payload
+                )
                 response = send(
                     request,
                     f"RoutineControl F190 Set ZGW time from PC local {pc_now.isoformat(timespec='milliseconds')}",
@@ -3498,10 +7429,12 @@ class FcdApp:
                     if client is not None and client.connected:
                         if isinstance(client, DoipClient):
                             timeout = max(float(self.timeout_var.get()), 3.0)
-                            client.send_uds_suppress_positive(b"\x3E\x80", timeout=timeout)
+                            client.send_uds_suppress_positive(b"\x3e\x80", timeout=timeout)
                             log_keepalive_success("TesterPresent OK: 3E 80 DoIP ACK")
                         else:
-                            response = client.send_uds(b"\x3E\x00", timeout=float(self.timeout_var.get()))
+                            response = client.send_uds(
+                                b"\x3e\x00", timeout=float(self.timeout_var.get())
+                            )
                             require_positive_response(response, 0x3E)
                             log_keepalive_success(f"TesterPresent RX: {bytes_to_hex(response)}")
                 except Exception as exc:
@@ -3519,9 +7452,15 @@ class FcdApp:
                                 break
                             log_keepalive_success("TesterPresent refreshed DoIP connection")
                         except Exception as reconnect_exc:
-                            if self.keepalive_stop.is_set() or self.worker_stop.is_set() or self.client is not client:
+                            if (
+                                self.keepalive_stop.is_set()
+                                or self.worker_stop.is_set()
+                                or self.client is not client
+                            ):
                                 break
-                            self.log(f"TesterPresent ERROR: {exc}; reconnect stopped: {reconnect_exc}")
+                            self.log(
+                                f"TesterPresent ERROR: {exc}; reconnect stopped: {reconnect_exc}"
+                            )
                             break
                     elif client is not None and self.client is client:
                         self.log(f"TesterPresent ERROR: {exc}")
@@ -3578,7 +7517,9 @@ class FcdApp:
         def zgw_worker(send, target, client):
             node = self._target_label(target)
             self._send_ecu_reset_best_effort(send, f"{node}: ECUReset hardReset")
-            self._recover_doip_after_reset(client, f"{node} hard reset", require_current_client=False)
+            self._recover_doip_after_reset(
+                client, f"{node} hard reset", require_current_client=False
+            )
 
         self._run_vehicle_uds_action("Hard Reset", requests, zgw_worker=zgw_worker)
 
@@ -3753,7 +7694,9 @@ class FcdApp:
 
     def _decode_time_status_value(self, response):
         if not isinstance(response, bytes) or len(response) < 44:
-            raise FcdError(f"short ZGW time status response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            raise FcdError(
+                f"short ZGW time status response {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
         data = response[4:]
         vehicle_ns = int.from_bytes(data[0:8], "big")
         utc_ns = int.from_bytes(data[8:16], "big")
@@ -3808,7 +7751,11 @@ class FcdApp:
             result.state = "FAILED_TIMEOUT"
         elif isinstance(exc, (DoipError, NodeTimeout, OSError)):
             result.transport_failure = True
-            result.state = "FAILED_CONNECTION_LOST" if "closed" in str(exc).lower() or "not connected" in str(exc).lower() else "FAILED_TRANSPORT"
+            result.state = (
+                "FAILED_CONNECTION_LOST"
+                if "closed" in str(exc).lower() or "not connected" in str(exc).lower()
+                else "FAILED_TRANSPORT"
+            )
         elif isinstance(exc, (IndexError, struct.error)):
             result.parser_failure = True
             result.state = "FAILED_PARSER"
@@ -3832,9 +7779,23 @@ class FcdApp:
         else:
             result.state = "FAILED_INTERNAL"
         if sender is not None and hasattr(sender, "last_nrc78_count"):
-            result.response_pending_count = max(result.response_pending_count, getattr(sender, "last_nrc78_count", 0))
+            result.response_pending_count = max(
+                result.response_pending_count, getattr(sender, "last_nrc78_count", 0)
+            )
 
-    def _acquire_uds_value(self, send, target, key, item, service, identifier, request, decoder, timeout=5.0, retry_read=False):
+    def _acquire_uds_value(
+        self,
+        send,
+        target,
+        key,
+        item,
+        service,
+        identifier,
+        request,
+        decoder,
+        timeout=5.0,
+        retry_read=False,
+    ):
         node = self._target_label(target)
         result = self._make_acquisition_result(key, item, service, identifier, request)
         started = time.monotonic()
@@ -3853,7 +7814,9 @@ class FcdApp:
             result.response_pending_count = getattr(send, "last_nrc78_count", 0)
             result.state = "WAITING_FOR_RESPONSE"
             if not response:
-                result.state = "FAILED_TIMEOUT" if not self._target_is_simulated(target) else "SKIPPED"
+                result.state = (
+                    "FAILED_TIMEOUT" if not self._target_is_simulated(target) else "SKIPPED"
+                )
                 result.value = "NO RESPONSE ACCEPTED"
                 self._acq_log(result)
                 return result
@@ -3870,9 +7833,16 @@ class FcdApp:
                 self._classify_acquisition_exception(result, parse_exc, send)
             return result
         except Exception as exc:
-            result.request_sent = bool(getattr(getattr(send, "__self__", None), "last_uds_request_sent", False)) or result.attempted
+            result.request_sent = (
+                bool(getattr(getattr(send, "__self__", None), "last_uds_request_sent", False))
+                or result.attempted
+            )
             self._classify_acquisition_exception(result, exc, send)
-            if retry_read and result.state in ("FAILED_TIMEOUT", "FAILED_TRANSPORT", "FAILED_CONNECTION_LOST"):
+            if retry_read and result.state in (
+                "FAILED_TIMEOUT",
+                "FAILED_TRANSPORT",
+                "FAILED_CONNECTION_LOST",
+            ):
                 result.error_text = f"{result.error_text}; retry not executed by generic wrapper"
             return result
         finally:
@@ -3907,11 +7877,15 @@ class FcdApp:
 
     def _decode_eth_startup_timing_chunk(self, response):
         if not isinstance(response, bytes) or len(response) < 32:
-            raise FcdError(f"short Ethernet startup timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            raise FcdError(
+                f"short Ethernet startup timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
         if response[0] != 0x71 or response[1] not in (0x01, 0x03):
             raise FcdError(f"unexpected Ethernet startup timing response {bytes_to_hex(response)}")
         if int.from_bytes(response[2:4], "big") != ETH_STARTUP_TIMING_ROUTINE_GET:
-            raise FcdError(f"unexpected Ethernet startup timing routine response {bytes_to_hex(response)}")
+            raise FcdError(
+                f"unexpected Ethernet startup timing routine response {bytes_to_hex(response)}"
+            )
         payload = response[4:]
         if len(payload) < 28:
             raise FcdError(f"short Ethernet startup timing payload {bytes_to_hex(response)}")
@@ -3975,35 +7949,46 @@ class FcdApp:
                     elapsed_ms = elapsed_us / 1000.0
                 elif valid and reference_ticks and timestamp_ticks < reference_ticks:
                     invalid_reason = "event timestamp precedes reference timestamp"
-                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+                    integrity_reasons.append(
+                        f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}"
+                    )
                 elif valid and not stm_hz:
                     invalid_reason = "STM frequency is zero"
-                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+                    integrity_reasons.append(
+                        f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}"
+                    )
                 elif valid and not reference_ticks:
                     invalid_reason = "reference timestamp is zero"
-                    integrity_reasons.append(f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}")
+                    integrity_reasons.append(
+                        f"{ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f'Event {event_id}')}: {invalid_reason}"
+                    )
             else:
                 elapsed_us = read_u32(payload, offset + 12)
                 elapsed_ms = elapsed_us / 1000.0
                 invalid_reason = None
-            entries.append({
-                "event_id": event_id,
-                "raw_event_id": raw_event_id,
-                "name": ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f"Event {event_id}"),
-                "valid": valid,
-                "raw_valid": raw_valid,
-                "timestamp_ticks": timestamp_ticks,
-                "metadata": metadata,
-                "generation": generation,
-                "metadata_text": ETH_STARTUP_TIMING_RX_CLASS_TEXT.get(metadata, f"0x{metadata:08X}") if metadata else "",
-                "elapsed_us": elapsed_us,
-                "elapsed_ms": elapsed_ms,
-                "invalid_reason": invalid_reason,
-            })
+            entries.append(
+                {
+                    "event_id": event_id,
+                    "raw_event_id": raw_event_id,
+                    "name": ETH_STARTUP_TIMING_EVENT_TEXT.get(event_id, f"Event {event_id}"),
+                    "valid": valid,
+                    "raw_valid": raw_valid,
+                    "timestamp_ticks": timestamp_ticks,
+                    "metadata": metadata,
+                    "generation": generation,
+                    "metadata_text": (
+                        ETH_STARTUP_TIMING_RX_CLASS_TEXT.get(metadata, f"0x{metadata:08X}")
+                        if metadata
+                        else ""
+                    ),
+                    "elapsed_us": elapsed_us,
+                    "elapsed_ms": elapsed_ms,
+                    "invalid_reason": invalid_reason,
+                }
+            )
             offset += entry_len
         flag_names = [
-            text for bit, text in ETH_STARTUP_TIMING_FLAG_TEXT.items()
-            if (flags & bit) != 0
+            text for bit, text in ETH_STARTUP_TIMING_FLAG_TEXT.items() if (flags & bit) != 0
         ]
         if flags & 0x08 and not integrity_reasons:
             integrity_reasons.append("firmware reported timestamp invalid")
@@ -4051,7 +8036,9 @@ class FcdApp:
                 if entry.get("invalid_reason"):
                     elapsed_text = f"INVALID - {entry['invalid_reason']}"
                 else:
-                    elapsed_text = f"{elapsed:.3f} ms" if elapsed is not None else "elapsed unavailable"
+                    elapsed_text = (
+                        f"{elapsed:.3f} ms" if elapsed is not None else "elapsed unavailable"
+                    )
                 meta_text = f" [{entry['metadata_text']}]" if entry.get("metadata_text") else ""
                 event_parts.append(
                     f"{entry['event_id']:02d} {entry['name']}={elapsed_text}, "
@@ -4074,7 +8061,11 @@ class FcdApp:
         stm_hz = timing.get("stm_hz")
         reasons = []
         reference_entry = next(
-            (entry for entry in timing.get("entries", []) if entry.get("event_id") == 0 and entry.get("valid")),
+            (
+                entry
+                for entry in timing.get("entries", [])
+                if entry.get("event_id") == 0 and entry.get("valid")
+            ),
             None,
         )
         generation = reference_entry.get("generation") if reference_entry else None
@@ -4089,7 +8080,11 @@ class FcdApp:
                     f"measurement generation mismatch "
                     f"(0x{int(entry.get('generation') or 0):08X} != 0x{int(generation):08X})"
                 )
-            elif reference_ticks and timestamp_ticks is not None and int(timestamp_ticks) < int(reference_ticks):
+            elif (
+                reference_ticks
+                and timestamp_ticks is not None
+                and int(timestamp_ticks) < int(reference_ticks)
+            ):
                 reason = "event timestamp precedes reference timestamp"
             elif not stm_hz:
                 reason = "STM frequency is zero"
@@ -4101,7 +8096,9 @@ class FcdApp:
                 entry["elapsed_ms"] = None
                 reasons.append(f"{entry.get('name', 'event')}: {reason}")
             elif entry.get("elapsed_ms") is None and timestamp_ticks is not None:
-                entry["elapsed_us"] = ((int(timestamp_ticks) - int(reference_ticks)) * 1000000) // int(stm_hz)
+                entry["elapsed_us"] = (
+                    (int(timestamp_ticks) - int(reference_ticks)) * 1000000
+                ) // int(stm_hz)
                 entry["elapsed_ms"] = entry["elapsed_us"] / 1000.0
         if timing.get("flags", 0) & 0x08 and not reasons:
             reasons.append("firmware reported timestamp invalid")
@@ -4120,9 +8117,12 @@ class FcdApp:
             end = by_id.get(end_id)
             value_ms = None
             valid = (
-                start is not None and end is not None and
-                start.get("valid") and end.get("valid") and
-                not start.get("invalid_reason") and not end.get("invalid_reason")
+                start is not None
+                and end is not None
+                and start.get("valid")
+                and end.get("valid")
+                and not start.get("invalid_reason")
+                and not end.get("invalid_reason")
             )
             if valid:
                 value_ms = self._ticks_delta_ms(
@@ -4130,7 +8130,9 @@ class FcdApp:
                     start.get("timestamp_ticks"),
                     timing.get("stm_hz"),
                 )
-            durations.append({"label": label, "start": start_id, "end": end_id, "elapsed_ms": value_ms})
+            durations.append(
+                {"label": label, "start": start_id, "end": end_id, "elapsed_ms": value_ms}
+            )
         return durations
 
     def _read_ethernet_startup_timing(self, send, target):
@@ -4184,7 +8186,9 @@ class FcdApp:
 
     def _decode_nvm_timing_response(self, response):
         if not isinstance(response, bytes) or len(response) < 5:
-            raise FcdError(f"short NvM timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            raise FcdError(
+                f"short NvM timing response {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
         if response[0] != 0x71 or response[1] not in (0x01, 0x03):
             raise FcdError(f"unexpected NvM timing response {bytes_to_hex(response)}")
         if int.from_bytes(response[2:4], "big") != NVM_TIMING_ROUTINE_GET:
@@ -4225,16 +8229,18 @@ class FcdApp:
         for _ in range(returned):
             event_id = payload[offset]
             valid = payload[offset + 1] != 0
-            ticks = int.from_bytes(payload[offset + 4:offset + 12], "big")
-            elapsed_us = int.from_bytes(payload[offset + 12:offset + 16], "big")
-            entries.append({
-                "event_id": event_id,
-                "name": NVM_TIMING_STARTUP_TEXT.get(event_id, f"Startup event {event_id}"),
-                "valid": valid,
-                "ticks": ticks,
-                "elapsed_us": elapsed_us,
-                "elapsed_ms": elapsed_us / 1000.0,
-            })
+            ticks = int.from_bytes(payload[offset + 4 : offset + 12], "big")
+            elapsed_us = int.from_bytes(payload[offset + 12 : offset + 16], "big")
+            entries.append(
+                {
+                    "event_id": event_id,
+                    "name": NVM_TIMING_STARTUP_TEXT.get(event_id, f"Startup event {event_id}"),
+                    "valid": valid,
+                    "ticks": ticks,
+                    "elapsed_us": elapsed_us,
+                    "elapsed_ms": elapsed_us / 1000.0,
+                }
+            )
             offset += 16
         return total, stm_hz, entries
 
@@ -4325,7 +8331,13 @@ class FcdApp:
             response = request(0x10 + idx)
             selector, payload = self._decode_nvm_timing_response(response)
             history.append(self._decode_nvm_timing_single(bytes([selector]) + payload))
-        return {"summary": summary, "startup": startup, "read_all": read_all, "write_all": write_all, "history": history}
+        return {
+            "summary": summary,
+            "startup": startup,
+            "read_all": read_all,
+            "write_all": write_all,
+            "history": history,
+        }
 
     def _format_nvm_timing_lines(self, timing):
         if not timing:
@@ -4345,7 +8357,9 @@ class FcdApp:
             previous_boot = key == "write_all" and (summary.get("flags", 0) & 0x00000004) != 0
             lines.append(f"  {label}:")
             if previous_boot:
-                lines.append("    Source: previous boot; phase timestamps are relative to the WriteAll request")
+                lines.append(
+                    "    Source: previous boot; phase timestamps are relative to the WriteAll request"
+                )
             flags = item.get("flags", 0)
             field_flags = {
                 "first_main": 0x00000001,
@@ -4367,28 +8381,60 @@ class FcdApp:
                 ("completion", "Completion"),
             ]:
                 captured = field == "request" or (flags & field_flags.get(field, 0)) != 0
-                base_ticks = item.get("request", 0) if previous_boot else summary.get("boot_ticks", 0)
-                ms = self._ticks_delta_ms(item.get(field, 0), base_ticks, stm_hz) if captured else None
-                lines.append(f"    {text}: {ms:.3f} ms" if ms is not None else f"    {text}: NOT CAPTURED")
-            total = self._ticks_delta_ms(item.get("completion", 0), item.get("request", 0), stm_hz) if (flags & 0x00000040) != 0 else None
-            lines.append(f"    Total: {total:.3f} ms" if total is not None else "    Total: NOT CAPTURED")
-            lines.append(f"    Cycles: NvM={item.get('nvm_cycles')} Fee={item.get('fee_cycles')} Fls={item.get('fls_cycles')}")
-            lines.append(f"    Blocks: planned={item.get('blocks_planned')} started={item.get('blocks_started')} done={item.get('blocks_done')} failed={item.get('blocks_failed')} skipped={item.get('blocks_skipped')}")
-            lines.append(f"    Result: {NVM_RESULT_TEXT.get(item.get('result'), item.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(item.get('memif_result'), item.get('memif_result'))}")
+                base_ticks = (
+                    item.get("request", 0) if previous_boot else summary.get("boot_ticks", 0)
+                )
+                ms = (
+                    self._ticks_delta_ms(item.get(field, 0), base_ticks, stm_hz)
+                    if captured
+                    else None
+                )
+                lines.append(
+                    f"    {text}: {ms:.3f} ms" if ms is not None else f"    {text}: NOT CAPTURED"
+                )
+            total = (
+                self._ticks_delta_ms(item.get("completion", 0), item.get("request", 0), stm_hz)
+                if (flags & 0x00000040) != 0
+                else None
+            )
+            lines.append(
+                f"    Total: {total:.3f} ms" if total is not None else "    Total: NOT CAPTURED"
+            )
+            lines.append(
+                f"    Cycles: NvM={item.get('nvm_cycles')} Fee={item.get('fee_cycles')} Fls={item.get('fls_cycles')}"
+            )
+            lines.append(
+                f"    Blocks: planned={item.get('blocks_planned')} started={item.get('blocks_started')} done={item.get('blocks_done')} failed={item.get('blocks_failed')} skipped={item.get('blocks_skipped')}"
+            )
+            lines.append(
+                f"    Result: {NVM_RESULT_TEXT.get(item.get('result'), item.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(item.get('memif_result'), item.get('memif_result'))}"
+            )
         lines.append("  Recent NvM operations:")
         for idx, entry in enumerate(timing.get("history", [])):
             if entry.get("operation", 0) == 0 and entry.get("flags", 0) == 0:
                 continue
             if entry.get("operation", 0) == 8:
                 continue
-            total = self._ticks_delta_ms(entry.get("completion", 0), entry.get("request", 0), stm_hz) if (entry.get("flags", 0) & 0x00000080) != 0 else None
-            lines.append(f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total={total:.3f} ms" if total is not None else f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total=NOT CAPTURED")
-            lines.append(f"        Result: {NVM_RESULT_TEXT.get(entry.get('result'), entry.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(entry.get('memif_result'), entry.get('memif_result'))}; cycles NvM={entry.get('nvm_cycles')} Fee={entry.get('fee_cycles')} Fls={entry.get('fls_cycles')}")
+            total = (
+                self._ticks_delta_ms(entry.get("completion", 0), entry.get("request", 0), stm_hz)
+                if (entry.get("flags", 0) & 0x00000080) != 0
+                else None
+            )
+            lines.append(
+                f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total={total:.3f} ms"
+                if total is not None
+                else f"    [{idx}] {NVM_TIMING_OPERATION_TEXT.get(entry.get('operation'), entry.get('operation'))} block={entry.get('block_id')} total=NOT CAPTURED"
+            )
+            lines.append(
+                f"        Result: {NVM_RESULT_TEXT.get(entry.get('result'), entry.get('result'))}; MemIf={MEMIF_JOB_TEXT.get(entry.get('memif_result'), entry.get('memif_result'))}; cycles NvM={entry.get('nvm_cycles')} Fee={entry.get('fee_cycles')} Fls={entry.get('fls_cycles')}"
+            )
         return lines
 
     def _decode_nvm_stats_response(self, response):
         if not isinstance(response, bytes) or len(response) < 5:
-            raise FcdError(f"short NvM statistics response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            raise FcdError(
+                f"short NvM statistics response {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
         if response[0] != 0x71 or response[1] not in (0x01, 0x03, 0x04):
             raise FcdError(f"unexpected NvM statistics response {bytes_to_hex(response)}")
         if int.from_bytes(response[2:4], "big") != NVM_STATS_ROUTINE_GET:
@@ -4399,7 +8445,10 @@ class FcdApp:
     def _u64_list(payload, names):
         if len(payload) < 8 * len(names):
             raise FcdError("truncated NvM statistics payload")
-        return {name: int.from_bytes(payload[idx * 8:idx * 8 + 8], "big") for idx, name in enumerate(names)}
+        return {
+            name: int.from_bytes(payload[idx * 8 : idx * 8 + 8], "big")
+            for idx, name in enumerate(names)
+        }
 
     def _read_nvm_stats(self, send, target):
         def request(selector, *extra):
@@ -4426,11 +8475,74 @@ class FcdApp:
             "boot_count": int.from_bytes(payload[12:20], "big"),
         }
         names_by_selector = {
-            0x01: ("nvm", ["read_all", "write_all", "write_block_requests", "write_block_accepted", "write_block_rejected", "successful_logical_writes", "failed_logical_writes", "queue_rejections", "busy_rejections", "uninit_rejections", "invalid_block_rejections", "write_protection_rejections"]),
-            0x02: ("read", ["read_block_requests", "read_block_accepted", "read_block_rejected", "successful_reads", "read_failures", "crc_failures", "invalid_block_reads", "restored_defaults", "fee_integrity_failures", "fee_invalid_missing_block_reads"]),
-            0x03: ("write", ["invalidation_requests", "invalidation_successes", "invalidation_failures", "erase_requests"]),
-            0x04: ("fee", ["write_requests", "successful_logical_writes", "failed_logical_writes", "invalidation_requests", "invalidation_successes", "deferred_format_events", "scan_recovery_events"]),
-            0x06: ("fls", ["page_write_count", "write_bytes", "erase_sector_count", "erase_bytes", "failed_jobs", "write_failures", "erase_failures", "read_failures", "dmu_busy_rejects", "dmu_timeouts"]),
+            0x01: (
+                "nvm",
+                [
+                    "read_all",
+                    "write_all",
+                    "write_block_requests",
+                    "write_block_accepted",
+                    "write_block_rejected",
+                    "successful_logical_writes",
+                    "failed_logical_writes",
+                    "queue_rejections",
+                    "busy_rejections",
+                    "uninit_rejections",
+                    "invalid_block_rejections",
+                    "write_protection_rejections",
+                ],
+            ),
+            0x02: (
+                "read",
+                [
+                    "read_block_requests",
+                    "read_block_accepted",
+                    "read_block_rejected",
+                    "successful_reads",
+                    "read_failures",
+                    "crc_failures",
+                    "invalid_block_reads",
+                    "restored_defaults",
+                    "fee_integrity_failures",
+                    "fee_invalid_missing_block_reads",
+                ],
+            ),
+            0x03: (
+                "write",
+                [
+                    "invalidation_requests",
+                    "invalidation_successes",
+                    "invalidation_failures",
+                    "erase_requests",
+                ],
+            ),
+            0x04: (
+                "fee",
+                [
+                    "write_requests",
+                    "successful_logical_writes",
+                    "failed_logical_writes",
+                    "invalidation_requests",
+                    "invalidation_successes",
+                    "deferred_format_events",
+                    "scan_recovery_events",
+                ],
+            ),
+            0x06: (
+                "fls",
+                [
+                    "page_write_count",
+                    "write_bytes",
+                    "erase_sector_count",
+                    "erase_bytes",
+                    "failed_jobs",
+                    "write_failures",
+                    "erase_failures",
+                    "read_failures",
+                    "dmu_busy_rejects",
+                    "dmu_timeouts",
+                ],
+            ),
         }
         for selector_value, (section_name, names) in names_by_selector.items():
             _sub, selector, payload = self._decode_nvm_stats_response(request(selector_value))
@@ -4438,12 +8550,23 @@ class FcdApp:
                 raise FcdError(f"NvM statistics selector mismatch {selector}")
             sections[section_name] = self._u64_list(payload, names)
         _sub, selector, payload = self._decode_nvm_stats_response(request(0x05))
-        sections["gc"] = self._u64_list(payload[:40], ["gc_count", "sector_switch_count", "copied_blocks", "copied_payload_bytes", "copied_physical_bytes"])
-        sections["gc"].update({
-            "max_copied_blocks": int.from_bytes(payload[40:44], "big"),
-            "max_copied_payload_bytes": int.from_bytes(payload[44:48], "big"),
-            "max_copied_physical_bytes": int.from_bytes(payload[48:52], "big"),
-        })
+        sections["gc"] = self._u64_list(
+            payload[:40],
+            [
+                "gc_count",
+                "sector_switch_count",
+                "copied_blocks",
+                "copied_payload_bytes",
+                "copied_physical_bytes",
+            ],
+        )
+        sections["gc"].update(
+            {
+                "max_copied_blocks": int.from_bytes(payload[40:44], "big"),
+                "max_copied_payload_bytes": int.from_bytes(payload[44:48], "big"),
+                "max_copied_physical_bytes": int.from_bytes(payload[48:52], "big"),
+            }
+        )
         _sub, selector, payload = self._decode_nvm_stats_response(request(0x07))
         sections["errors"] = {
             "last_nvm_error": int.from_bytes(payload[0:4], "big"),
@@ -4466,8 +8589,14 @@ class FcdApp:
             returned = payload[1] if len(payload) >= 2 else 0
             offset = 2
             for _ in range(returned):
-                block_id = int.from_bytes(payload[offset:offset + 2], "big")
-                blocks.append({"id": block_id, "excluded": payload[offset + 2] != 0, "count": int.from_bytes(payload[offset + 4:offset + 12], "big")})
+                block_id = int.from_bytes(payload[offset : offset + 2], "big")
+                blocks.append(
+                    {
+                        "id": block_id,
+                        "excluded": payload[offset + 2] != 0,
+                        "count": int.from_bytes(payload[offset + 4 : offset + 12], "big"),
+                    }
+                )
                 offset += 12
             if returned == 0:
                 break
@@ -4492,7 +8621,13 @@ class FcdApp:
     def _format_nvm_stats_lines(self, stats):
         if not stats:
             return ["  (no data)"]
-        s = stats["summary"]; n = stats["nvm"]; r = stats["read"]; w = stats["write"]; fee = stats["fee"]; gc = stats["gc"]; fls = stats["fls"]
+        s = stats["summary"]
+        n = stats["nvm"]
+        r = stats["read"]
+        w = stats["write"]
+        fee = stats["fee"]
+        gc = stats["gc"]
+        fls = stats["fls"]
         lines = [
             "  NvM Lifetime Statistics:",
             f"    Routine: 0x{NVM_STATS_ROUTINE_GET:04X}; version={s['version']}; imageLength={s['length']}; blocks={s['block_count']}; counterWidth={s['counter_width']}",
@@ -4530,7 +8665,9 @@ class FcdApp:
 
     def _decode_cpu_perf_chunk(self, response):
         if not isinstance(response, bytes) or len(response) < 20:
-            raise FcdError(f"short CPU performance response {bytes_to_hex(response) if isinstance(response, bytes) else response}")
+            raise FcdError(
+                f"short CPU performance response {bytes_to_hex(response) if isinstance(response, bytes) else response}"
+            )
         if response[0] != 0x71 or response[1] not in (0x01, 0x03):
             raise FcdError(f"unexpected CPU performance response {bytes_to_hex(response)}")
         if int.from_bytes(response[2:4], "big") != CPU_PERF_ROUTINE_GET:
@@ -4555,38 +8692,90 @@ class FcdApp:
             if len(payload) < offset + entry_len:
                 raise FcdError(f"truncated CPU performance entry {bytes_to_hex(response)}")
             measurement_id = payload[offset]
-            entries.append({
-                "id": measurement_id,
-                "name": CPU_PERF_MEASUREMENT_TEXT.get(measurement_id, f"Measurement {measurement_id}"),
-                "valid": payload[offset + 1] != 0,
-                "core": payload[offset + 2],
-                "entry_flags": payload[offset + 3],
-                "hardware_counters_available": (payload[offset + 3] & 0x01) != 0 if version >= 2 else True,
-                "scheduler_trace_available": (payload[offset + 3] & 0x02) != 0 if version >= 3 else False,
-                "last_cycles": int.from_bytes(payload[offset + 4:offset + 8], "big"),
-                "min_cycles": int.from_bytes(payload[offset + 8:offset + 12], "big"),
-                "max_cycles": int.from_bytes(payload[offset + 12:offset + 16], "big"),
-                "avg_cycles": int.from_bytes(payload[offset + 16:offset + 20], "big"),
-                "last_instructions": int.from_bytes(payload[offset + 20:offset + 24], "big"),
-                "avg_instructions": int.from_bytes(payload[offset + 24:offset + 28], "big"),
-                "cpi_x1000": int.from_bytes(payload[offset + 28:offset + 32], "big"),
-                "sample_count": int.from_bytes(payload[offset + 32:offset + 36], "big"),
-                "overflow_count": int.from_bytes(payload[offset + 36:offset + 40], "big"),
-                "last_ns": int.from_bytes(payload[offset + 40:offset + 44], "big"),
-                "avg_ns": int.from_bytes(payload[offset + 44:offset + 48], "big"),
-                "total_bytes": int.from_bytes(payload[offset + 48:offset + 56], "big"),
-                "min_ns": int.from_bytes(payload[offset + 56:offset + 60], "big") if entry_len >= 76 else 0,
-                "max_ns": int.from_bytes(payload[offset + 60:offset + 64], "big") if entry_len >= 76 else 0,
-                "over_5ms": int.from_bytes(payload[offset + 64:offset + 68], "big") if entry_len >= 76 else 0,
-                "over_10ms": int.from_bytes(payload[offset + 68:offset + 72], "big") if entry_len >= 76 else 0,
-                "over_20ms": int.from_bytes(payload[offset + 72:offset + 76], "big") if entry_len >= 76 else 0,
-                "last_descheduled_ns": int.from_bytes(payload[offset + 76:offset + 80], "big") if entry_len >= 104 else 0,
-                "avg_descheduled_ns": int.from_bytes(payload[offset + 80:offset + 84], "big") if entry_len >= 104 else 0,
-                "max_descheduled_ns": int.from_bytes(payload[offset + 84:offset + 88], "big") if entry_len >= 104 else 0,
-                "total_descheduled_ns": int.from_bytes(payload[offset + 88:offset + 96], "big") if entry_len >= 104 else 0,
-                "last_switch_outs": int.from_bytes(payload[offset + 96:offset + 100], "big") if entry_len >= 104 else 0,
-                "total_switch_outs": int.from_bytes(payload[offset + 100:offset + 104], "big") if entry_len >= 104 else 0,
-            })
+            entries.append(
+                {
+                    "id": measurement_id,
+                    "name": CPU_PERF_MEASUREMENT_TEXT.get(
+                        measurement_id, f"Measurement {measurement_id}"
+                    ),
+                    "valid": payload[offset + 1] != 0,
+                    "core": payload[offset + 2],
+                    "entry_flags": payload[offset + 3],
+                    "hardware_counters_available": (
+                        (payload[offset + 3] & 0x01) != 0 if version >= 2 else True
+                    ),
+                    "scheduler_trace_available": (
+                        (payload[offset + 3] & 0x02) != 0 if version >= 3 else False
+                    ),
+                    "last_cycles": int.from_bytes(payload[offset + 4 : offset + 8], "big"),
+                    "min_cycles": int.from_bytes(payload[offset + 8 : offset + 12], "big"),
+                    "max_cycles": int.from_bytes(payload[offset + 12 : offset + 16], "big"),
+                    "avg_cycles": int.from_bytes(payload[offset + 16 : offset + 20], "big"),
+                    "last_instructions": int.from_bytes(payload[offset + 20 : offset + 24], "big"),
+                    "avg_instructions": int.from_bytes(payload[offset + 24 : offset + 28], "big"),
+                    "cpi_x1000": int.from_bytes(payload[offset + 28 : offset + 32], "big"),
+                    "sample_count": int.from_bytes(payload[offset + 32 : offset + 36], "big"),
+                    "overflow_count": int.from_bytes(payload[offset + 36 : offset + 40], "big"),
+                    "last_ns": int.from_bytes(payload[offset + 40 : offset + 44], "big"),
+                    "avg_ns": int.from_bytes(payload[offset + 44 : offset + 48], "big"),
+                    "total_bytes": int.from_bytes(payload[offset + 48 : offset + 56], "big"),
+                    "min_ns": (
+                        int.from_bytes(payload[offset + 56 : offset + 60], "big")
+                        if entry_len >= 76
+                        else 0
+                    ),
+                    "max_ns": (
+                        int.from_bytes(payload[offset + 60 : offset + 64], "big")
+                        if entry_len >= 76
+                        else 0
+                    ),
+                    "over_5ms": (
+                        int.from_bytes(payload[offset + 64 : offset + 68], "big")
+                        if entry_len >= 76
+                        else 0
+                    ),
+                    "over_10ms": (
+                        int.from_bytes(payload[offset + 68 : offset + 72], "big")
+                        if entry_len >= 76
+                        else 0
+                    ),
+                    "over_20ms": (
+                        int.from_bytes(payload[offset + 72 : offset + 76], "big")
+                        if entry_len >= 76
+                        else 0
+                    ),
+                    "last_descheduled_ns": (
+                        int.from_bytes(payload[offset + 76 : offset + 80], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                    "avg_descheduled_ns": (
+                        int.from_bytes(payload[offset + 80 : offset + 84], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                    "max_descheduled_ns": (
+                        int.from_bytes(payload[offset + 84 : offset + 88], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                    "total_descheduled_ns": (
+                        int.from_bytes(payload[offset + 88 : offset + 96], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                    "last_switch_outs": (
+                        int.from_bytes(payload[offset + 96 : offset + 100], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                    "total_switch_outs": (
+                        int.from_bytes(payload[offset + 100 : offset + 104], "big")
+                        if entry_len >= 104
+                        else 0
+                    ),
+                }
+            )
             offset += entry_len
         return {
             "version": version,
@@ -4628,9 +8817,12 @@ class FcdApp:
         if not perf:
             return ["  (no data)"]
         entries = [entry for entry in perf.get("entries", []) if entry.get("valid")]
-        entries.sort(key=lambda entry: (entry.get("avg_ns", 0), entry.get("avg_cycles", 0)), reverse=True)
+        entries.sort(
+            key=lambda entry: (entry.get("avg_ns", 0), entry.get("avg_cycles", 0)), reverse=True
+        )
         zero_cycle_count = sum(
-            1 for entry in entries
+            1
+            for entry in entries
             if entry.get("sample_count", 0) and entry.get("avg_cycles", 0) == 0
         )
         lines = [
@@ -4644,27 +8836,42 @@ class FcdApp:
         for entry in entries:
             cpi = entry.get("cpi_x1000", 0) / 1000.0
             time_text = (
-                (f"last/min/avg/max={entry.get('last_ns')} ns/{entry.get('min_ns')} ns/"
-                 f"{entry.get('avg_ns')} ns/{entry.get('max_ns')} ns")
+                (
+                    f"last/min/avg/max={entry.get('last_ns')} ns/{entry.get('min_ns')} ns/"
+                    f"{entry.get('avg_ns')} ns/{entry.get('max_ns')} ns"
+                )
                 if perf.get("version", 0) >= 2 and entry.get("avg_ns", 0)
-                else f"last/avg={entry.get('last_ns')} ns/{entry.get('avg_ns')} ns"
-                if entry.get("avg_ns", 0)
-                else "duration=NOT CAPTURED"
+                else (
+                    f"last/avg={entry.get('last_ns')} ns/{entry.get('avg_ns')} ns"
+                    if entry.get("avg_ns", 0)
+                    else "duration=NOT CAPTURED"
+                )
             )
             cycle_text = (
                 f"; cycles last/min/max/avg={entry.get('last_cycles')}/{entry.get('min_cycles')}/{entry.get('max_cycles')}/{entry.get('avg_cycles')}"
                 if entry.get("hardware_counters_available") and entry.get("avg_cycles", 0)
                 else ""
             )
-            cpi_text = f"; CPI={cpi:.3f}" if entry.get("hardware_counters_available") and entry.get("cpi_x1000", 0) else ""
+            cpi_text = (
+                f"; CPI={cpi:.3f}"
+                if entry.get("hardware_counters_available") and entry.get("cpi_x1000", 0)
+                else ""
+            )
             byte_text = f"; bytes={entry.get('total_bytes')}" if entry.get("total_bytes", 0) else ""
-            overflow_text = f"; overflows={entry.get('overflow_count')}" if entry.get("overflow_count", 0) else ""
+            overflow_text = (
+                f"; overflows={entry.get('overflow_count')}"
+                if entry.get("overflow_count", 0)
+                else ""
+            )
             threshold_text = (
                 f"; >5/>10/>20ms={entry.get('over_5ms', 0)}/"
                 f"{entry.get('over_10ms', 0)}/{entry.get('over_20ms', 0)}"
-                if perf.get("version", 0) >= 2 else ""
+                if perf.get("version", 0) >= 2
+                else ""
             )
-            hw_text = "; CCNT/ICNT=UNAVAILABLE" if not entry.get("hardware_counters_available") else ""
+            hw_text = (
+                "; CCNT/ICNT=UNAVAILABLE" if not entry.get("hardware_counters_available") else ""
+            )
             scheduler_text = ""
             if entry.get("scheduler_trace_available"):
                 last_on_core = max(0, entry.get("last_ns", 0) - entry.get("last_descheduled_ns", 0))
@@ -4725,7 +8932,11 @@ class FcdApp:
                     )
                 rows = []
                 for item, request, decoder, timeout in specs:
-                    rows.append(self._read_single_connection_diagnostic(send, target, item, request, decoder, timeout))
+                    rows.append(
+                        self._read_single_connection_diagnostic(
+                            send, target, item, request, decoder, timeout
+                        )
+                    )
                 with sink["lock"]:
                     sink["rows"].extend(rows)
             finally:
@@ -4737,7 +8948,11 @@ class FcdApp:
             self.root.after(0, self._connection_diag_insert_rows, rows, True)
 
         def action():
-            runner = self._run_zgw_coding_action_once if zgw_only else self._run_vehicle_coding_action_once
+            runner = (
+                self._run_zgw_coding_action_once
+                if zgw_only
+                else self._run_vehicle_coding_action_once
+            )
             runner(action_name, worker)
             on_complete()
 
@@ -4745,34 +8960,70 @@ class FcdApp:
 
     def read_sw_versions_clicked(self):
         specs = [
-            ("Read SW Versions (FBL, APP)", b"\x22" + struct.pack(">H", DID_APP_SW_VERSION), self._decode_app_fbl_sw_version_payload, 5.0),
-            ("Read SW Version (Coding)", b"\x22" + struct.pack(">H", CODING_DID_VERSION), self._decode_coding_sw_version_payload, 5.0),
+            (
+                "Read SW Versions (FBL, APP)",
+                b"\x22" + struct.pack(">H", DID_APP_SW_VERSION),
+                self._decode_app_fbl_sw_version_payload,
+                5.0,
+            ),
+            (
+                "Read SW Version (Coding)",
+                b"\x22" + struct.pack(">H", CODING_DID_VERSION),
+                self._decode_coding_sw_version_payload,
+                5.0,
+            ),
         ]
         self._run_connection_diagnostic_read("Read SW Versions", specs, session=SESSION_EXTENDED)
 
     def read_mcu_data_packet_clicked(self):
         specs = [
-            ("Read MCU Data Packet", b"\x22" + struct.pack(">H", DID_MCU_DATA_PACKET), self._decode_mcu_data_packet_payload, 5.0),
+            (
+                "Read MCU Data Packet",
+                b"\x22" + struct.pack(">H", DID_MCU_DATA_PACKET),
+                self._decode_mcu_data_packet_payload,
+                5.0,
+            ),
         ]
-        self._run_connection_diagnostic_read("Read MCU Data Packet", specs, session=SESSION_EXTENDED, zgw_only=True)
+        self._run_connection_diagnostic_read(
+            "Read MCU Data Packet", specs, session=SESSION_EXTENDED, zgw_only=True
+        )
 
     def read_zgw_datetime_clicked(self):
         specs = [
-            ("Read Current Date and Time calculated by ZGW", b"\x31\x03" + struct.pack(">H", TIMESYNC_ROUTINE_GET_STATUS), self._decode_time_status_value, 5.0),
+            (
+                "Read Current Date and Time calculated by ZGW",
+                b"\x31\x03" + struct.pack(">H", TIMESYNC_ROUTINE_GET_STATUS),
+                self._decode_time_status_value,
+                5.0,
+            ),
         ]
-        self._run_connection_diagnostic_read("Read ZGW Date/Time", specs, session=SESSION_EXTENDED, zgw_only=True)
+        self._run_connection_diagnostic_read(
+            "Read ZGW Date/Time", specs, session=SESSION_EXTENDED, zgw_only=True
+        )
 
     def read_active_session_clicked(self):
         specs = [
-            ("Read Active Diagnostic Session", b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION), self._decode_active_session_value, 5.0),
+            (
+                "Read Active Diagnostic Session",
+                b"\x22" + struct.pack(">H", DID_ACTIVE_DIAG_SESSION),
+                self._decode_active_session_value,
+                5.0,
+            ),
         ]
         self._run_connection_diagnostic_read("Read Active Diagnostic Session", specs)
 
     def read_active_sw_block_clicked(self):
         specs = [
-            ("Read Active Software Block", b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK), self._decode_active_sw_block_value, 5.0),
+            (
+                "Read Active Software Block",
+                b"\x22" + struct.pack(">H", DID_ACTIVE_SW_BLOCK),
+                self._decode_active_sw_block_value,
+                5.0,
+            ),
         ]
-        self._run_connection_diagnostic_read("Read Active Software Block", specs, session=SESSION_EXTENDED)
+        self._run_connection_diagnostic_read(
+            "Read Active Software Block", specs, session=SESSION_EXTENDED
+        )
 
     def read_ethernet_startup_timing_clicked(self):
         sink = {"lock": threading.Lock(), "rows": []}
@@ -4783,9 +9034,18 @@ class FcdApp:
             try:
                 send = self._make_target_uds_sender(client, target, dry=False)
                 try:
-                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read Ethernet Startup Timing session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    self._send_session(
+                        send,
+                        SESSION_EXTENDED,
+                        f"{node}: Read Ethernet Startup Timing session 0x{SESSION_EXTENDED:02X}",
+                        timeout=5.0,
+                    )
                     timing = self._read_ethernet_startup_timing(send, target)
-                    value = self._format_eth_startup_timing_value(timing) if timing else "NO RESPONSE ACCEPTED"
+                    value = (
+                        self._format_eth_startup_timing_value(timing)
+                        if timing
+                        else "NO RESPONSE ACCEPTED"
+                    )
                 except NegativeResponse as exc:
                     value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
                 except Exception as exc:
@@ -4794,7 +9054,9 @@ class FcdApp:
                     value = f"ERROR: {exc}"
                 self.log(f"{node}: Read Ethernet Startup Timing: {value}")
                 with sink["lock"]:
-                    sink["rows"].append({"node": node, "item": "Read Ethernet Startup Timing", "value": value})
+                    sink["rows"].append(
+                        {"node": node, "item": "Read Ethernet Startup Timing", "value": value}
+                    )
             finally:
                 self._release_coding_worker_client(client)
 
@@ -4819,9 +9081,18 @@ class FcdApp:
             try:
                 send = self._make_target_uds_sender(client, target, dry=False)
                 try:
-                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read AUTOSAR NvM Timing session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    self._send_session(
+                        send,
+                        SESSION_EXTENDED,
+                        f"{node}: Read AUTOSAR NvM Timing session 0x{SESSION_EXTENDED:02X}",
+                        timeout=5.0,
+                    )
                     timing = self._read_nvm_timing(send, target)
-                    value = " | ".join(self._format_nvm_timing_lines(timing)) if timing else "NO RESPONSE ACCEPTED"
+                    value = (
+                        " | ".join(self._format_nvm_timing_lines(timing))
+                        if timing
+                        else "NO RESPONSE ACCEPTED"
+                    )
                 except NegativeResponse as exc:
                     value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
                 except Exception as exc:
@@ -4830,7 +9101,9 @@ class FcdApp:
                     value = f"ERROR: {exc}"
                 self.log(f"{node}: Read AUTOSAR NvM Timing: {value}")
                 with sink["lock"]:
-                    sink["rows"].append({"node": node, "item": "Read AUTOSAR NvM Timing", "value": value})
+                    sink["rows"].append(
+                        {"node": node, "item": "Read AUTOSAR NvM Timing", "value": value}
+                    )
             finally:
                 self._release_coding_worker_client(client)
 
@@ -4851,9 +9124,18 @@ class FcdApp:
             try:
                 send = self._make_target_uds_sender(client, target, dry=False)
                 try:
-                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    self._send_session(
+                        send,
+                        SESSION_EXTENDED,
+                        f"{node}: Read NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}",
+                        timeout=5.0,
+                    )
                     stats = self._read_nvm_stats(send, target)
-                    value = " | ".join(self._format_nvm_stats_lines(stats)) if stats else "NO RESPONSE ACCEPTED"
+                    value = (
+                        " | ".join(self._format_nvm_stats_lines(stats))
+                        if stats
+                        else "NO RESPONSE ACCEPTED"
+                    )
                 except NegativeResponse as exc:
                     value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
                 except Exception as exc:
@@ -4862,7 +9144,9 @@ class FcdApp:
                     value = f"ERROR: {exc}"
                 self.log(f"{node}: Read NvM Lifetime Statistics: {value}")
                 with sink["lock"]:
-                    sink["rows"].append({"node": node, "item": "Read NvM Lifetime Statistics", "value": value})
+                    sink["rows"].append(
+                        {"node": node, "item": "Read NvM Lifetime Statistics", "value": value}
+                    )
             finally:
                 self._release_coding_worker_client(client)
 
@@ -4880,7 +9164,12 @@ class FcdApp:
             client = self._coding_worker_client(target)
             try:
                 send = self._make_target_uds_sender(client, target, dry=False)
-                self._send_session(send, SESSION_EXTENDED, f"{node}: Clear NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                self._send_session(
+                    send,
+                    SESSION_EXTENDED,
+                    f"{node}: Clear NvM Lifetime Statistics session 0x{SESSION_EXTENDED:02X}",
+                    timeout=5.0,
+                )
                 response = send(
                     b"\x31\x04" + struct.pack(">H", NVM_STATS_ROUTINE_GET),
                     f"{node}: Clear NvM Lifetime Statistics",
@@ -4896,7 +9185,10 @@ class FcdApp:
             finally:
                 self._release_coding_worker_client(client)
 
-        self.worker("Clear NvM Lifetime Statistics", lambda: self._run_zgw_coding_action_once("Clear NvM Lifetime Statistics", worker))
+        self.worker(
+            "Clear NvM Lifetime Statistics",
+            lambda: self._run_zgw_coding_action_once("Clear NvM Lifetime Statistics", worker),
+        )
 
     def read_cpu_perf_clicked(self):
         sink = {"lock": threading.Lock(), "rows": []}
@@ -4907,9 +9199,18 @@ class FcdApp:
             try:
                 send = self._make_target_uds_sender(client, target, dry=False)
                 try:
-                    self._send_session(send, SESSION_EXTENDED, f"{node}: Read CPU Performance Counters session 0x{SESSION_EXTENDED:02X}", timeout=5.0)
+                    self._send_session(
+                        send,
+                        SESSION_EXTENDED,
+                        f"{node}: Read CPU Performance Counters session 0x{SESSION_EXTENDED:02X}",
+                        timeout=5.0,
+                    )
                     perf = self._read_cpu_perf(send, target)
-                    value = " | ".join(self._format_cpu_perf_lines(perf)) if perf else "NO RESPONSE ACCEPTED"
+                    value = (
+                        " | ".join(self._format_cpu_perf_lines(perf))
+                        if perf
+                        else "NO RESPONSE ACCEPTED"
+                    )
                 except NegativeResponse as exc:
                     value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
                 except Exception as exc:
@@ -4918,7 +9219,9 @@ class FcdApp:
                     value = f"ERROR: {exc}"
                 self.log(f"{node}: Read CPU Performance Counters: {value}")
                 with sink["lock"]:
-                    sink["rows"].append({"node": node, "item": "Read CPU Performance Counters", "value": value})
+                    sink["rows"].append(
+                        {"node": node, "item": "Read CPU Performance Counters", "value": value}
+                    )
             finally:
                 self._release_coding_worker_client(client)
 
@@ -4956,7 +9259,10 @@ class FcdApp:
     def _report_enum(self, raw):
         text = str(raw).strip()
         plain = text.replace("_", " ").replace("-", " ").lower()
-        plain = " ".join(word.upper() if word in ("can", "lin", "pdu", "rx", "tx") else word.capitalize() for word in plain.split())
+        plain = " ".join(
+            word.upper() if word in ("can", "lin", "pdu", "rx", "tx") else word.capitalize()
+            for word in plain.split()
+        )
         return f"{plain} ({text})" if text and plain.upper().replace(" ", "_") != text else text
 
     def _report_uds_status_lines(self, status_text, indent=2):
@@ -4979,31 +9285,51 @@ class FcdApp:
         return [self._report_field("DTC status", f"0x{status:02X}{suffix}", indent)]
 
     def _snapshot_parts(self, snapshot):
-        return [part.strip() for part in str(snapshot or "").split("|") if part.strip() and not part.strip().startswith("[rec ")]
+        return [
+            part.strip()
+            for part in str(snapshot or "").split("|")
+            if part.strip() and not part.strip().startswith("[rec ")
+        ]
 
     def _snapshot_value(self, parts, prefix):
         for part in parts:
             if part.startswith(prefix):
-                return part[len(prefix):].strip()
+                return part[len(prefix) :].strip()
         return ""
 
     def _format_timestamp_part(self, part):
         text = str(part)
         if "UTC " in text:
-            utc = text.split("UTC ", 1)[1].split(",", 1)[0].strip().replace("T", " ").replace("Z", " UTC")
+            utc = (
+                text.split("UTC ", 1)[1]
+                .split(",", 1)[0]
+                .strip()
+                .replace("T", " ")
+                .replace("Z", " UTC")
+            )
             return utc
         if "UTC date/time " in text:
-            utc = text.split("UTC date/time ", 1)[1].split(",", 1)[0].strip().replace("T", " ").replace("Z", " UTC")
+            utc = (
+                text.split("UTC date/time ", 1)[1]
+                .split(",", 1)[0]
+                .strip()
+                .replace("T", " ")
+                .replace("Z", " UTC")
+            )
             return utc
         return text
 
     def _report_mask_lines(self, label, value_text, table, indent=2):
         text = str(value_text or "").strip()
         try:
-            value = int(text.rsplit("(", 1)[1].split(")", 1)[0], 16) if "(" in text else int(text, 0)
+            value = (
+                int(text.rsplit("(", 1)[1].split(")", 1)[0], 16) if "(" in text else int(text, 0)
+            )
         except Exception:
             return [self._report_field(label, text, indent)]
-        lines = [self._report_field(label, f"0x{value:08X}" + (" (none)" if value == 0 else ""), indent)]
+        lines = [
+            self._report_field(label, f"0x{value:08X}" + (" (none)" if value == 0 else ""), indent)
+        ]
         if value:
             for mask, name in table:
                 if value & mask:
@@ -5044,7 +9370,9 @@ class FcdApp:
             except Exception:
                 lines.append(self._report_field(name, raw, indent + 2))
                 continue
-            lines.append(self._report_field(name, self._pms_register_decode_text(name, value), indent + 2))
+            lines.append(
+                self._report_field(name, self._pms_register_decode_text(name, value), indent + 2)
+            )
         return lines
 
     def _report_unavailable_lines(self, title, request):
@@ -5074,11 +9402,17 @@ class FcdApp:
     def _report_acquisition_lines(self, result):
         if not isinstance(result, DiagnosticAcquisitionResult):
             return []
-        lines = [self._report_field("Acquisition", f"{result.identifier} - {result.state} ({result.duration_ms:.1f} ms)")]
+        lines = [
+            self._report_field(
+                "Acquisition", f"{result.identifier} - {result.state} ({result.duration_ms:.1f} ms)"
+            )
+        ]
         if result.state == "SUCCESS":
             return lines
         if result.response_pending_count:
-            lines.append(self._report_field("ResponsePending count", result.response_pending_count, 2))
+            lines.append(
+                self._report_field("ResponsePending count", result.response_pending_count, 2)
+            )
         if result.response:
             lines.append(self._report_field("Response", bytes_to_hex(result.response[:64]), 2))
         if result.negative_response:
@@ -5097,14 +9431,20 @@ class FcdApp:
         if not rows:
             return ["No DTCs reported by the ECU for the requested status mask."]
         lines = []
-        pdm_rows = [r for r in rows if str(r.get("description", "")).startswith("Message Timeout: CANFD_PDM1")]
+        pdm_rows = [
+            r
+            for r in rows
+            if str(r.get("description", "")).startswith("Message Timeout: CANFD_PDM1")
+        ]
         if pdm_rows:
             lines.extend(self._report_minor("PDM1 Communication Loss"))
             lines.append(f"Count: {len(pdm_rows)}")
             lines.append("  DTC       Status  Message")
             lines.append("  --------  ------  -----------------------------------")
             for row in pdm_rows:
-                lines.append(f"  {row.get('dtc', ''):<8}  {row.get('status', ''):<6}  {str(row.get('description', '')).replace('Message Timeout: ', '')}")
+                lines.append(
+                    f"  {row.get('dtc', ''):<8}  {row.get('status', ''):<6}  {str(row.get('description', '')).replace('Message Timeout: ', '')}"
+                )
         for row in rows:
             dtc = row.get("dtc", "")
             desc = row.get("description", "")
@@ -5114,14 +9454,22 @@ class FcdApp:
             lines.extend(["", "-" * 70, f"DTC {dtc} - {desc}", "-" * 70, ""])
             lines.extend(self._report_uds_status_lines(status, 2))
             lines.append("")
-            occurrence = next((p for p in parts if "DTC occurrence time:" in p or "DTC occurrence time" in p), "")
+            occurrence = next(
+                (p for p in parts if "DTC occurrence time:" in p or "DTC occurrence time" in p), ""
+            )
             if occurrence:
                 lines.append("Occurrence:")
-                lines.append(self._report_field("UTC time", self._format_timestamp_part(occurrence), 2))
+                lines.append(
+                    self._report_field("UTC time", self._format_timestamp_part(occurrence), 2)
+                )
                 for key in ("vehicleTimeNs=", "utcNs=", "MCU temperature:"):
                     if key in occurrence:
                         tail = occurrence.split(key, 1)[1].split(",", 1)[0].strip()
-                        label = {"vehicleTimeNs=": "Vehicle time", "utcNs=": "UTC raw time", "MCU temperature:": "MCU temperature"}[key]
+                        label = {
+                            "vehicleTimeNs=": "Vehicle time",
+                            "utcNs=": "UTC raw time",
+                            "MCU temperature:": "MCU temperature",
+                        }[key]
                         unit = " ns" if key != "MCU temperature:" else ""
                         lines.append(self._report_field(label, f"{tail}{unit}", 2))
                 lines.append("")
@@ -5142,7 +9490,13 @@ class FcdApp:
                 ]:
                     value = self._snapshot_value(parts, prefix)
                     if value:
-                        if prefix in ("CanSM=", "ComM=", "CanIf PDU mode=", "CAN state=", "error state="):
+                        if prefix in (
+                            "CanSM=",
+                            "ComM=",
+                            "CanIf PDU mode=",
+                            "CAN state=",
+                            "error state=",
+                        ):
                             value = self._report_enum(value)
                         elif prefix in ("operational=", "normal RX enabled=", "normal TX enabled="):
                             value = self._report_bool(value)
@@ -5151,7 +9505,9 @@ class FcdApp:
                             rec = value.split("REC=", 1)[1].strip() if "REC=" in value else ""
                             lines.append(self._report_field("Transmit Error Counter (TEC)", tec, 2))
                             if rec:
-                                lines.append(self._report_field("Receive Error Counter (REC)", rec, 2))
+                                lines.append(
+                                    self._report_field("Receive Error Counter (REC)", rec, 2)
+                                )
                         else:
                             lines.append(self._report_field(label, value, 2))
             elif "LIN1" in desc:
@@ -5201,38 +9557,78 @@ class FcdApp:
                     value = self._snapshot_value(parts, prefix)
                     if value:
                         if prefix in ("PMS errata failure mask:", "PMS standby ignored mask:"):
-                            lines.extend(self._report_mask_lines(label, value, PMS_ERRATA_FAILURE_BITS, 2))
+                            lines.extend(
+                                self._report_mask_lines(label, value, PMS_ERRATA_FAILURE_BITS, 2)
+                            )
                             continue
                         if prefix == "PMS errata status=":
                             pms = value.split(",", 1)[0].strip()
-                            fw = value.split("FW-check status=", 1)[1].strip() if "FW-check status=" in value else ""
+                            fw = (
+                                value.split("FW-check status=", 1)[1].strip()
+                                if "FW-check status=" in value
+                                else ""
+                            )
                             try:
                                 pms_i = int(pms, 0)
-                                lines.append(self._report_field("PMS errata status", f"{PMS_ERRATA_STATUS_TEXT.get(pms_i, 'UNKNOWN')} ({pms_i})", 2))
+                                lines.append(
+                                    self._report_field(
+                                        "PMS errata status",
+                                        f"{PMS_ERRATA_STATUS_TEXT.get(pms_i, 'UNKNOWN')} ({pms_i})",
+                                        2,
+                                    )
+                                )
                             except Exception:
                                 lines.append(self._report_field("PMS errata status", pms, 2))
                             if fw:
                                 try:
                                     fw_i = int(fw, 0)
-                                    lines.append(self._report_field("Firmware check status", f"{SSW_STATUS_TEXT.get(fw_i, 'UNKNOWN')} ({fw_i})", 2))
+                                    lines.append(
+                                        self._report_field(
+                                            "Firmware check status",
+                                            f"{SSW_STATUS_TEXT.get(fw_i, 'UNKNOWN')} ({fw_i})",
+                                            2,
+                                        )
+                                    )
                                 except Exception:
                                     lines.append(self._report_field("Firmware check status", fw, 2))
                             continue
                         if prefix == "checked EVRSTAT/MONSTAT1:":
-                            lines.extend(self._report_pms_register_group(label, ("EVRSTAT", "MONSTAT1"), value, 2))
+                            lines.extend(
+                                self._report_pms_register_group(
+                                    label, ("EVRSTAT", "MONSTAT1"), value, 2
+                                )
+                            )
                             continue
                         if prefix == "captured EVRSTAT/ADCSTAT/MONSTAT1:":
-                            lines.extend(self._report_pms_register_group(label, ("EVRSTAT", "ADCSTAT", "MONSTAT1"), value, 2))
+                            lines.extend(
+                                self._report_pms_register_group(
+                                    label, ("EVRSTAT", "ADCSTAT", "MONSTAT1"), value, 2
+                                )
+                            )
                             continue
                         if prefix == "EVRRSTCON/EVROVMON2/EVRUVMON2:":
-                            lines.extend(self._report_pms_register_group(label, ("EVRRSTCON", "EVROVMON2", "EVRUVMON2"), value, 2))
+                            lines.extend(
+                                self._report_pms_register_group(
+                                    label, ("EVRRSTCON", "EVROVMON2", "EVRUVMON2"), value, 2
+                                )
+                            )
                             continue
                         lines.append(self._report_field(label, value, 2))
             elif "Message Timeout" in desc:
                 msg = desc.replace("Message Timeout: ", "")
                 lines.append("Communication timeout:")
                 lines.append(self._report_field("Missing message", msg, 2))
-            if not any(key in desc for key in ("Bus-Off", "Error Passive", "LIN1", "AiModel", "PMS errata", "Message Timeout")):
+            if not any(
+                key in desc
+                for key in (
+                    "Bus-Off",
+                    "Error Passive",
+                    "LIN1",
+                    "AiModel",
+                    "PMS errata",
+                    "Message Timeout",
+                )
+            ):
                 decoded = [p for p in parts if p and not p.startswith(str(desc))]
                 if decoded:
                     lines.append("Snapshot:")
@@ -5249,7 +9645,9 @@ class FcdApp:
 
     def _format_executive_summary(self, data):
         rows = data.get("dtcs", [])
-        lines = [self._report_field("Overall status", "FAULTS PRESENT" if rows else "NO FAULTS REPORTED")]
+        lines = [
+            self._report_field("Overall status", "FAULTS PRESENT" if rows else "NO FAULTS REPORTED")
+        ]
         lines.append(self._report_field("Active DTCs", len(rows)))
         pdm = [r for r in rows if "CANFD_PDM1" in str(r.get("description", ""))]
         key_faults = []
@@ -5278,8 +9676,7 @@ class FcdApp:
         lines = []
         for row in rows:
             lines.append(
-                f"  {row.get('dtc', '')} [{row.get('status', '')}] "
-                f"{row.get('description', '')}"
+                f"  {row.get('dtc', '')} [{row.get('status', '')}] " f"{row.get('description', '')}"
             )
             snapshot = str(row.get("snapshot_data", "")).strip()
             if snapshot:
@@ -5307,15 +9704,25 @@ class FcdApp:
                         lines.append(f"  Reason: {reason}")
                 else:
                     lines.append("  Measurement integrity: OK")
-                lines.append(f"  Reference raw ticks: {timing.get('reference_ticks')} (0x{timing.get('reference_ticks', 0):016X})")
+                lines.append(
+                    f"  Reference raw ticks: {timing.get('reference_ticks')} (0x{timing.get('reference_ticks', 0):016X})"
+                )
                 for entry in timing.get("entries", []):
                     if entry.get("valid"):
                         elapsed = entry.get("elapsed_ms")
                         if entry.get("invalid_reason"):
                             elapsed_text = f"INVALID - {entry['invalid_reason']}"
                         else:
-                            elapsed_text = f"{elapsed:.3f} ms" if elapsed is not None else "elapsed unavailable"
-                        meta_text = f", metadata={entry['metadata_text']}" if entry.get("metadata_text") else ""
+                            elapsed_text = (
+                                f"{elapsed:.3f} ms"
+                                if elapsed is not None
+                                else "elapsed unavailable"
+                            )
+                        meta_text = (
+                            f", metadata={entry['metadata_text']}"
+                            if entry.get("metadata_text")
+                            else ""
+                        )
                         lines.append(
                             f"  {entry['event_id']:02d} {entry['name']}: "
                             f"{elapsed_text}, raw ticks={entry['timestamp_ticks']}, "
@@ -5328,7 +9735,9 @@ class FcdApp:
                     if elapsed is not None:
                         lines.append(f"  {duration['label']}: {elapsed:.3f} ms")
             elif isinstance(timing, dict):
-                lines.append(f"  {timing.get('item', 'Ethernet Startup Timing')}: {timing.get('value', '')}")
+                lines.append(
+                    f"  {timing.get('item', 'Ethernet Startup Timing')}: {timing.get('value', '')}"
+                )
             else:
                 lines.append(f"  {timing}")
         return lines
@@ -5341,7 +9750,9 @@ class FcdApp:
             if isinstance(perf, dict) and "entries" in perf:
                 lines.extend(self._format_cpu_perf_lines(perf))
             elif isinstance(perf, dict):
-                lines.append(f"  {perf.get('item', 'CPU Performance Counters')}: {perf.get('value', '')}")
+                lines.append(
+                    f"  {perf.get('item', 'CPU Performance Counters')}: {perf.get('value', '')}"
+                )
             else:
                 lines.append(f"  {perf}")
         return lines
@@ -5357,7 +9768,9 @@ class FcdApp:
                 if raw_hex:
                     lines.append(f"  Raw: {raw_hex}")
             elif isinstance(packet, dict):
-                lines.append(f"  {packet.get('item', 'Read MCU Data Packet')}: {packet.get('value', '')}")
+                lines.append(
+                    f"  {packet.get('item', 'Read MCU Data Packet')}: {packet.get('value', '')}"
+                )
             else:
                 lines.append(f"  {packet}")
         return lines
@@ -5370,7 +9783,9 @@ class FcdApp:
             if isinstance(stats, dict) and "summary" in stats:
                 lines.extend(self._format_nvm_stats_lines(stats))
             elif isinstance(stats, dict):
-                lines.append(f"  {stats.get('item', 'NvM Lifetime Statistics')}: {stats.get('value', '')}")
+                lines.append(
+                    f"  {stats.get('item', 'NvM Lifetime Statistics')}: {stats.get('value', '')}"
+                )
             else:
                 lines.append(f"  {stats}")
         return lines
@@ -5389,7 +9804,9 @@ class FcdApp:
             "",
             self._report_field("Report generated", created),
             self._report_field("VIN", self.fa_vin_var.get()),
-            self._report_field("ECU", ", ".join(sorted(collected, key=lambda name: name.upper())) or "ZGW"),
+            self._report_field(
+                "ECU", ", ".join(sorted(collected, key=lambda name: name.upper())) or "ZGW"
+            ),
             "",
         ]
         for node in sorted(collected, key=lambda name: name.upper()):
@@ -5409,17 +9826,31 @@ class FcdApp:
             sw_rows = data.get("sw_versions", [])
             if sw_rows:
                 for row in sw_rows:
-                    lines.append(self._report_field(row.get("item", "Software"), row.get("value", "")))
+                    lines.append(
+                        self._report_field(row.get("item", "Software"), row.get("value", ""))
+                    )
             else:
-                lines.extend(self._report_failure_lines("Software Versions", {}, "ReadDataByIdentifier 0x22 DID 0xF101 / 0xF1C3"))
+                lines.extend(
+                    self._report_failure_lines(
+                        "Software Versions", {}, "ReadDataByIdentifier 0x22 DID 0xF101 / 0xF1C3"
+                    )
+                )
 
             lines.extend(self._report_major("4. MCU STATUS"))
-            mcu_packets = [p for p in data.get("mcu_data", []) if isinstance(p, dict) and "magic" in p]
+            mcu_packets = [
+                p for p in data.get("mcu_data", []) if isinstance(p, dict) and "magic" in p
+            ]
             if mcu_packets:
                 lines.extend(self._format_diag_log_mcu_data(mcu_packets))
             else:
                 rows = data.get("mcu_data", [])
-                lines.extend(self._report_failure_lines("MCU Data Packet", rows[0] if rows else {}, "ReadDataByIdentifier 0x22 DID 0xFCD1"))
+                lines.extend(
+                    self._report_failure_lines(
+                        "MCU Data Packet",
+                        rows[0] if rows else {},
+                        "ReadDataByIdentifier 0x22 DID 0xFCD1",
+                    )
+                )
 
             lines.extend(self._report_major("5. ETHERNET STARTUP TIMING"))
             lines.extend(self._report_acquisition_lines(acquisitions.get("eth_startup_timing")))
@@ -5427,7 +9858,13 @@ class FcdApp:
             if eth_rows and isinstance(eth_rows[0], dict) and "entries" in eth_rows[0]:
                 lines.extend(self._format_diag_log_eth_timing(eth_rows))
             elif "eth_startup_timing" not in acquisitions:
-                lines.extend(self._report_failure_lines("Ethernet Startup Timing", eth_rows[0] if eth_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}"))
+                lines.extend(
+                    self._report_failure_lines(
+                        "Ethernet Startup Timing",
+                        eth_rows[0] if eth_rows else {},
+                        f"RoutineControl 0x31 Start/Result Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}",
+                    )
+                )
 
             lines.extend(self._report_major("6. AUTOSAR NVM TIMING"))
             lines.extend(self._report_acquisition_lines(acquisitions.get("nvm_timing")))
@@ -5436,11 +9873,22 @@ class FcdApp:
                 text = "\n".join(nvm_lines).strip()
                 if text.startswith(("NRC ", "ERROR:", "NO RESPONSE")):
                     if "nvm_timing" not in acquisitions:
-                        lines.extend(self._report_failure_lines("AUTOSAR NvM Timing", {"value": text}, f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"))
+                        lines.extend(
+                            self._report_failure_lines(
+                                "AUTOSAR NvM Timing",
+                                {"value": text},
+                                f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}",
+                            )
+                        )
                 else:
                     lines.extend(nvm_lines)
             elif "nvm_timing" not in acquisitions:
-                lines.extend(self._report_unavailable_lines("AUTOSAR NvM Timing", f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"))
+                lines.extend(
+                    self._report_unavailable_lines(
+                        "AUTOSAR NvM Timing",
+                        f"RoutineControl 0x31 Start/Result Routine 0x{NVM_TIMING_ROUTINE_GET:04X}",
+                    )
+                )
 
             lines.extend(self._report_major("7. NVM LIFETIME STATISTICS"))
             lines.extend(self._report_acquisition_lines(acquisitions.get("nvm_stats")))
@@ -5448,7 +9896,13 @@ class FcdApp:
             if stats_rows and isinstance(stats_rows[0], dict) and "summary" in stats_rows[0]:
                 lines.extend(self._format_diag_log_nvm_stats(stats_rows))
             elif "nvm_stats" not in acquisitions:
-                lines.extend(self._report_failure_lines("NvM Lifetime Statistics", stats_rows[0] if stats_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{NVM_STATS_ROUTINE_GET:04X}"))
+                lines.extend(
+                    self._report_failure_lines(
+                        "NvM Lifetime Statistics",
+                        stats_rows[0] if stats_rows else {},
+                        f"RoutineControl 0x31 Start/Result Routine 0x{NVM_STATS_ROUTINE_GET:04X}",
+                    )
+                )
 
             lines.extend(self._report_major("8. CPU PERFORMANCE COUNTERS"))
             lines.extend(self._report_acquisition_lines(acquisitions.get("cpu_perf")))
@@ -5456,34 +9910,70 @@ class FcdApp:
             if perf_rows and isinstance(perf_rows[0], dict) and "entries" in perf_rows[0]:
                 lines.extend(self._format_diag_log_cpu_perf(perf_rows))
             elif "cpu_perf" not in acquisitions:
-                lines.extend(self._report_failure_lines("CPU Performance Counters", perf_rows[0] if perf_rows else {}, f"RoutineControl 0x31 Start/Result Routine 0x{CPU_PERF_ROUTINE_GET:04X}"))
+                lines.extend(
+                    self._report_failure_lines(
+                        "CPU Performance Counters",
+                        perf_rows[0] if perf_rows else {},
+                        f"RoutineControl 0x31 Start/Result Routine 0x{CPU_PERF_ROUTINE_GET:04X}",
+                    )
+                )
 
             lines.extend(self._report_major("9. CODING INFORMATION"))
             lines.extend(self._report_acquisition_lines(acquisitions.get("coding_readout")))
             coding_rows = data.get("coding", [])
             if coding_rows:
                 for row in coding_rows:
-                    lines.append(self._report_field(row.get("item", "Coding read-out"), row.get("value", "")))
+                    lines.append(
+                        self._report_field(row.get("item", "Coding read-out"), row.get("value", ""))
+                    )
             elif "coding_readout" not in acquisitions:
-                lines.extend(self._report_unavailable_lines("Coding Read-Out", f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_READ_NVM:04X}"))
+                lines.extend(
+                    self._report_unavailable_lines(
+                        "Coding Read-Out",
+                        f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_READ_NVM:04X}",
+                    )
+                )
             lines.extend(self._report_acquisition_lines(acquisitions.get("coding_check")))
             check_rows = data.get("check_coding", [])
             if check_rows:
                 for row in check_rows:
-                    lines.append(self._report_field(row.get("item", "Coding validation"), row.get("value", "")))
+                    lines.append(
+                        self._report_field(
+                            row.get("item", "Coding validation"), row.get("value", "")
+                        )
+                    )
             elif "coding_check" not in acquisitions:
-                lines.extend(self._report_unavailable_lines("Check Coding Result", f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_VALIDATE:04X}"))
+                lines.extend(
+                    self._report_unavailable_lines(
+                        "Check Coding Result",
+                        f"RoutineControl 0x31 Routine 0x{CODING_ROUTINE_VALIDATE:04X}",
+                    )
+                )
 
             lines.extend(self._report_major("10. DIAGNOSTIC SESSION / PROGRAMMING STATE"))
             for row in data.get("active_session", []):
-                lines.append(self._report_field(row.get("item", "Active session"), row.get("value", "")))
+                lines.append(
+                    self._report_field(row.get("item", "Active session"), row.get("value", ""))
+                )
             for row in data.get("active_sw_block", []):
-                lines.append(self._report_field(row.get("item", "Active software block"), row.get("value", "")))
+                lines.append(
+                    self._report_field(
+                        row.get("item", "Active software block"), row.get("value", "")
+                    )
+                )
 
             lines.extend(self._report_major("11. DATA AVAILABILITY / UNSUPPORTED MEASUREMENTS"))
             for title, key, request in [
-                ("Ethernet Startup Timing", "eth_startup_timing", f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}"),
-                ("AUTOSAR NvM Timing", "nvm_timing_lines", f"Routine 0x{NVM_TIMING_ROUTINE_GET:04X}"),
+                (
+                    "Ethernet Startup Timing",
+                    "eth_startup_timing",
+                    f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}",
+                ),
+                (
+                    "AUTOSAR NvM Timing",
+                    "nvm_timing_lines",
+                    f"Routine 0x{NVM_TIMING_ROUTINE_GET:04X}",
+                ),
                 ("NvM Lifetime Statistics", "nvm_stats", f"Routine 0x{NVM_STATS_ROUTINE_GET:04X}"),
                 ("CPU Performance Counters", "cpu_perf", f"Routine 0x{CPU_PERF_ROUTINE_GET:04X}"),
                 ("Coding Read-Out", "coding", f"Routine 0x{CODING_ROUTINE_READ_NVM:04X}"),
@@ -5499,9 +9989,15 @@ class FcdApp:
                 }[key]
                 result = acquisitions.get(acq_key)
                 if result:
-                    lines.append(self._report_field(title, f"{result.state} ({result.duration_ms:.1f} ms)"))
+                    lines.append(
+                        self._report_field(title, f"{result.state} ({result.duration_ms:.1f} ms)")
+                    )
                 else:
-                    lines.append(self._report_field(title, f"NOT_ATTEMPTED; no scheduled result for {request}"))
+                    lines.append(
+                        self._report_field(
+                            title, f"NOT_ATTEMPTED; no scheduled result for {request}"
+                        )
+                    )
             lines.append("")
         path.write_text("\n".join(lines), encoding="utf-8")
         return path
@@ -5562,13 +10058,23 @@ class FcdApp:
                 add_node_data(node, "time", time_row)
 
                 for item, request, decoder in [
-                    ("Read SW Versions (FBL, APP)", b"\x22" + struct.pack(">H", DID_APP_SW_VERSION), self._decode_app_fbl_sw_version_payload),
-                    ("Read SW Version (Coding)", b"\x22" + struct.pack(">H", CODING_DID_VERSION), self._decode_coding_sw_version_payload),
+                    (
+                        "Read SW Versions (FBL, APP)",
+                        b"\x22" + struct.pack(">H", DID_APP_SW_VERSION),
+                        self._decode_app_fbl_sw_version_payload,
+                    ),
+                    (
+                        "Read SW Version (Coding)",
+                        b"\x22" + struct.pack(">H", CODING_DID_VERSION),
+                        self._decode_coding_sw_version_payload,
+                    ),
                 ]:
                     add_node_data(
                         node,
                         "sw_versions",
-                        self._read_single_connection_diagnostic(send, target, item, request, decoder, 5.0),
+                        self._read_single_connection_diagnostic(
+                            send, target, item, request, decoder, 5.0
+                        ),
                     )
 
                 try:
@@ -5588,16 +10094,22 @@ class FcdApp:
                             "mcu_data",
                             {"item": "Read MCU Data Packet", "value": "NO RESPONSE ACCEPTED"},
                         )
-                        self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: NO RESPONSE ACCEPTED")
+                        self.log(
+                            f"{node}: Generate Diagnostic Log MCU Data Packet: NO RESPONSE ACCEPTED"
+                        )
                 except NegativeResponse as exc:
                     value = f"NRC 0x{exc.nrc:02X} {NRC_TEXT.get(exc.nrc, 'Unknown')}"
-                    add_node_data(node, "mcu_data", {"item": "Read MCU Data Packet", "value": value})
+                    add_node_data(
+                        node, "mcu_data", {"item": "Read MCU Data Packet", "value": value}
+                    )
                     self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: {value}")
                 except Exception as exc:
                     if not self._target_is_simulated(target):
                         raise
                     value = f"ERROR: {exc}"
-                    add_node_data(node, "mcu_data", {"item": "Read MCU Data Packet", "value": value})
+                    add_node_data(
+                        node, "mcu_data", {"item": "Read MCU Data Packet", "value": value}
+                    )
                     self.log(f"{node}: Generate Diagnostic Log MCU Data Packet: {value}")
 
                 add_node_data(
@@ -5630,11 +10142,13 @@ class FcdApp:
                     "Ethernet Startup Timing",
                     "RoutineControl (0x31)",
                     f"Routine 0x{ETH_STARTUP_TIMING_ROUTINE_GET:04X}",
-                    b"\x31\x03" + struct.pack(">H", ETH_STARTUP_TIMING_ROUTINE_GET) + b"\x00\x0B",
+                    b"\x31\x03" + struct.pack(">H", ETH_STARTUP_TIMING_ROUTINE_GET) + b"\x00\x0b",
                     lambda: self._read_ethernet_startup_timing(send, target),
                 )
                 set_acquisition(node, eth_result)
-                add_node_data(node, "eth_startup_timing", self._diagnostic_result_row(node, eth_result))
+                add_node_data(
+                    node, "eth_startup_timing", self._diagnostic_result_row(node, eth_result)
+                )
 
                 nvm_timing_result = self._acquire_callable(
                     "nvm_timing",
@@ -5649,7 +10163,9 @@ class FcdApp:
                     collected.setdefault(node, {})["nvm_timing_lines"] = (
                         self._format_nvm_timing_lines(nvm_timing_result.parsed_data)
                         if nvm_timing_result.state == "SUCCESS"
-                        else [f"  {nvm_timing_result.state}: {nvm_timing_result.error_text or nvm_timing_result.value}"]
+                        else [
+                            f"  {nvm_timing_result.state}: {nvm_timing_result.error_text or nvm_timing_result.value}"
+                        ]
                     )
 
                 nvm_stats_result = self._acquire_callable(
@@ -5661,7 +10177,9 @@ class FcdApp:
                     lambda: self._read_nvm_stats(send, target),
                 )
                 set_acquisition(node, nvm_stats_result)
-                add_node_data(node, "nvm_stats", self._diagnostic_result_row(node, nvm_stats_result))
+                add_node_data(
+                    node, "nvm_stats", self._diagnostic_result_row(node, nvm_stats_result)
+                )
 
                 cpu_perf_result = self._acquire_callable(
                     "cpu_perf",
@@ -5681,9 +10199,13 @@ class FcdApp:
                     "RoutineControl (0x31)",
                     f"Routine 0x{rid:04X}",
                     b"\x31\x03" + struct.pack(">H", rid),
-                    lambda: bytes_to_hex(self._parse_read_coding_result(
-                        self._request_read_coding_routine(send, rid, node, phase="Diagnostic Log", timeout=20.0)
-                    )),
+                    lambda: bytes_to_hex(
+                        self._parse_read_coding_result(
+                            self._request_read_coding_routine(
+                                send, rid, node, phase="Diagnostic Log", timeout=20.0
+                            )
+                        )
+                    ),
                 )
                 set_acquisition(node, coding_result)
                 add_node_data(node, "coding", coding_result.to_report_row(node))
@@ -5695,13 +10217,15 @@ class FcdApp:
                     "RoutineControl (0x31)",
                     f"Routine 0x{validate_rid:04X}",
                     b"\x31\x01" + struct.pack(">H", validate_rid),
-                    lambda: self._describe_coding_routine_response(self._run_coding_routine(
-                        send,
-                        validate_rid,
-                        b"",
-                        f"{node}: Generate Diagnostic Log Check Coding",
-                        timeout=20.0,
-                    )),
+                    lambda: self._describe_coding_routine_response(
+                        self._run_coding_routine(
+                            send,
+                            validate_rid,
+                            b"",
+                            f"{node}: Generate Diagnostic Log Check Coding",
+                            timeout=20.0,
+                        )
+                    ),
                 )
                 set_acquisition(node, check_result)
                 add_node_data(node, "check_coding", check_result.to_report_row(node))
@@ -5709,15 +10233,29 @@ class FcdApp:
             except Exception as exc:
                 self.log(f"{node}: Generate Diagnostic Log collection aborted: {exc}")
                 for key, item, routine_id in [
-                    ("eth_startup_timing", "Ethernet Startup Timing", ETH_STARTUP_TIMING_ROUTINE_GET),
+                    (
+                        "eth_startup_timing",
+                        "Ethernet Startup Timing",
+                        ETH_STARTUP_TIMING_ROUTINE_GET,
+                    ),
                     ("nvm_timing", "AUTOSAR NvM Timing", NVM_TIMING_ROUTINE_GET),
                     ("nvm_stats", "NvM Lifetime Statistics", NVM_STATS_ROUTINE_GET),
                     ("cpu_perf", "CPU Performance Counters", CPU_PERF_ROUTINE_GET),
-                    ("coding_readout", "Coding Read-Out", parse_int(self.coding_read_nvm_rid_var.get())),
-                    ("coding_check", "Check Coding Result", parse_int(self.coding_validate_rid_var.get())),
+                    (
+                        "coding_readout",
+                        "Coding Read-Out",
+                        parse_int(self.coding_read_nvm_rid_var.get()),
+                    ),
+                    (
+                        "coding_check",
+                        "Check Coding Result",
+                        parse_int(self.coding_validate_rid_var.get()),
+                    ),
                 ]:
                     with collected_lock:
-                        exists = key in collected.setdefault(node, {}).setdefault("acquisitions", {})
+                        exists = key in collected.setdefault(node, {}).setdefault(
+                            "acquisitions", {}
+                        )
                     if exists:
                         continue
                     result = self._make_acquisition_result(
@@ -5728,7 +10266,9 @@ class FcdApp:
                         b"\x31\x03" + struct.pack(">H", routine_id),
                     )
                     result.state = "SKIPPED_TRANSPORT_UNAVAILABLE"
-                    result.error_text = f"Earlier diagnostic step aborted collection before this acquisition: {exc}"
+                    result.error_text = (
+                        f"Earlier diagnostic step aborted collection before this acquisition: {exc}"
+                    )
                     result.completion_time = datetime.now().isoformat(timespec="milliseconds")
                     set_acquisition(node, result)
             finally:
@@ -5781,7 +10321,8 @@ class FcdApp:
             raise FcdError("Status mask must be one byte")
 
         strict_targets = [
-            target for target in self._selected_vehicle_targets()
+            target
+            for target in self._selected_vehicle_targets()
             if self._strict_response_for_target(target, True)
         ]
         sink = {"lock": threading.Lock(), "rows": [], "summaries": []}
@@ -5839,7 +10380,9 @@ class FcdApp:
             raise FcdError(f"{label}: malformed detail response {bytes_to_hex(response)}")
         dtc = (response[2] << 16) | (response[3] << 8) | response[4]
         if dtc != expected_dtc:
-            raise FcdError(f"{label}: response DTC 0x{dtc:06X} does not match request 0x{expected_dtc:06X}")
+            raise FcdError(
+                f"{label}: response DTC 0x{dtc:06X} does not match request 0x{expected_dtc:06X}"
+            )
         status = response[5]
         record = response[6]
         data = bytes(response[7:])
@@ -5858,7 +10401,7 @@ class FcdApp:
         New ZGW firmware returns one combined Snapshot Data buffer on 0x19/04.
         Returns "" when the DTC has no
         specific decoder so the caller falls back to the raw hex."""
-        is_snapshot = (subfunction == 0x04)
+        is_snapshot = subfunction == 0x04
         try:
             if dtc == DEM_DTC_MCUSM_SW_ERROR:
                 return self._explain_mcusm_detail(data, is_snapshot)
@@ -5868,16 +10411,24 @@ class FcdApp:
                 return self._explain_can_bus_detail(dtc, data, is_snapshot)
             if DEM_DTC_LIN_BUS_DIAG <= dtc < (DEM_DTC_LIN_BUS_DIAG + DEM_LIN_BUS_DIAG_EVENT_COUNT):
                 return self._explain_lin_bus_detail(dtc, data, is_snapshot)
-            if DEM_DTC_ETHERNET_DIAG <= dtc < (DEM_DTC_ETHERNET_DIAG + DEM_ETHERNET_DIAG_EVENT_COUNT):
+            if (
+                DEM_DTC_ETHERNET_DIAG
+                <= dtc
+                < (DEM_DTC_ETHERNET_DIAG + DEM_ETHERNET_DIAG_EVENT_COUNT)
+            ):
                 return self._explain_ethernet_detail(dtc, data, is_snapshot)
-            if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (
-                    DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
+            if (
+                DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
+                <= dtc
+                < (DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)
+            ):
                 return self._explain_gateway_detail(dtc, data, is_snapshot)
             if dtc in (
-                    DEM_DTC_AIMODEL_INPUT_INVALID,
-                    DEM_DTC_AIMODEL_INFERENCE_INVALID,
-                    DEM_DTC_AIMODEL_DEADLINE_EXCEEDED,
-                    DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE):
+                DEM_DTC_AIMODEL_INPUT_INVALID,
+                DEM_DTC_AIMODEL_INFERENCE_INVALID,
+                DEM_DTC_AIMODEL_DEADLINE_EXCEEDED,
+                DEM_DTC_AIMODEL_OUTPUT_OUT_OF_RANGE,
+            ):
                 return self._explain_aimodel_detail(dtc, data, is_snapshot)
             if is_aimodel_consumer_dtc(dtc):
                 return self._explain_aimodel_detail(dtc, data, is_snapshot)
@@ -5932,24 +10483,26 @@ class FcdApp:
         parts = [self._describe_zgw_dtc(dtc)]
         if timestamp_text:
             parts.append(timestamp_text)
-        parts.extend([
-            f"Port=ETH0",
-            f"Link={'Up' if link_up else 'Down'}",
-            f"PHY=0x{phy_addr:02X}",
-            f"PHY state={ETHDIAG_PHY_STATE_TEXT.get(phy_state, phy_state)}",
-            f"PHY initDone={phy_init_done}, autonegDone={phy_autoneg_done}",
-            f"Speed={'100 Mbps' if phy_speed100 else '10 Mbps'}",
-            f"Duplex={'Full' if phy_full_duplex else 'Half'}",
-            f"SoCon={socon_id}, connection={connection_id}, protocol={ETHDIAG_PROTOCOL_TEXT.get(protocol, protocol)}",
-            f"SoAd={ETHDIAG_SOAD_STATE_TEXT.get(soad_state, soad_state)}",
-            f"Local={ip4_to_text(local_ip)}:{local_port}",
-            f"Remote={ip4_to_text(remote_ip)}:{remote_port}",
-            f"Sockets listen={listen_socket}, active={active_socket}",
-            f"RX errors={rx_errors}, TX errors={tx_errors}, DMA errors={dma_errors}",
-            f"TCP closes={tcp_closes}, socket open failures={open_fails}, link-down transitions={link_downs}",
-            f"PHY reset timeouts={phy_reset_timeouts}, autoneg timeouts={phy_autoneg_timeouts}, MDIO errors={phy_mdio_errors}",
-            f"Resource errors={resource_errors}, resource flags={flag_names(resource_flags, ETHDIAG_RESOURCE_FLAG_TEXT)} (0x{resource_flags:04X})",
-        ])
+        parts.extend(
+            [
+                f"Port=ETH0",
+                f"Link={'Up' if link_up else 'Down'}",
+                f"PHY=0x{phy_addr:02X}",
+                f"PHY state={ETHDIAG_PHY_STATE_TEXT.get(phy_state, phy_state)}",
+                f"PHY initDone={phy_init_done}, autonegDone={phy_autoneg_done}",
+                f"Speed={'100 Mbps' if phy_speed100 else '10 Mbps'}",
+                f"Duplex={'Full' if phy_full_duplex else 'Half'}",
+                f"SoCon={socon_id}, connection={connection_id}, protocol={ETHDIAG_PROTOCOL_TEXT.get(protocol, protocol)}",
+                f"SoAd={ETHDIAG_SOAD_STATE_TEXT.get(soad_state, soad_state)}",
+                f"Local={ip4_to_text(local_ip)}:{local_port}",
+                f"Remote={ip4_to_text(remote_ip)}:{remote_port}",
+                f"Sockets listen={listen_socket}, active={active_socket}",
+                f"RX errors={rx_errors}, TX errors={tx_errors}, DMA errors={dma_errors}",
+                f"TCP closes={tcp_closes}, socket open failures={open_fails}, link-down transitions={link_downs}",
+                f"PHY reset timeouts={phy_reset_timeouts}, autoneg timeouts={phy_autoneg_timeouts}, MDIO errors={phy_mdio_errors}",
+                f"Resource errors={resource_errors}, resource flags={flag_names(resource_flags, ETHDIAG_RESOURCE_FLAG_TEXT)} (0x{resource_flags:04X})",
+            ]
+        )
         if ethsm_requested is not None:
             parts.append(
                 f"Raw evidence: netif flags=0x{netif_flags:02X}, "
@@ -5974,43 +10527,47 @@ class FcdApp:
         cansm_state = data[base + 7]
         comm_mode = data[base + 8]
         pdu_mode = data[base + 9]
-        bus_off_count = int.from_bytes(data[base + 10:base + 14], "big")
+        bus_off_count = int.from_bytes(data[base + 10 : base + 14], "big")
         bus_text = CANDIAG_CONTROLLER_TEXT.get(controller, f"controller {controller}")
         fault_text = CANDIAG_FAULT_TEXT.get(fault, f"fault {fault}")
         parts = [f"{bus_text} {fault_text}"]
         if timestamp_text:
             parts.append(timestamp_text)
-        parts.extend([
-            f"controller={controller}",
-            f"CAN state={CANDIAG_CAN_STATE_TEXT.get(can_state, can_state)}",
-            f"error state={CANDIAG_ERROR_STATE_TEXT.get(error_state, error_state)}",
-            f"TEC={tx_error_counter}, REC={rx_error_counter}",
-            f"CanSM={CANDIAG_CANSM_STATE_TEXT.get(cansm_state, cansm_state)}",
-            f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
-            f"CanIf PDU mode={CANDIAG_PDU_MODE_TEXT.get(pdu_mode, pdu_mode)}",
-            f"bus-off count={bus_off_count}",
-        ])
+        parts.extend(
+            [
+                f"controller={controller}",
+                f"CAN state={CANDIAG_CAN_STATE_TEXT.get(can_state, can_state)}",
+                f"error state={CANDIAG_ERROR_STATE_TEXT.get(error_state, error_state)}",
+                f"TEC={tx_error_counter}, REC={rx_error_counter}",
+                f"CanSM={CANDIAG_CANSM_STATE_TEXT.get(cansm_state, cansm_state)}",
+                f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
+                f"CanIf PDU mode={CANDIAG_PDU_MODE_TEXT.get(pdu_mode, pdu_mode)}",
+                f"bus-off count={bus_off_count}",
+            ]
+        )
         if len(data) >= DEM_DTC_TIMESTAMP_DATA_SIZE + 28:
             operational = data[base + 14]
             rx_enabled = data[base + 15]
             tx_enabled = data[base + 16]
             controller_pending = data[base + 17]
             recovered_pending = data[base + 18]
-            error_passive_fail = int.from_bytes(data[base + 19:base + 21], "big")
-            error_passive_pass = int.from_bytes(data[base + 21:base + 23], "big")
-            protocol_fail = int.from_bytes(data[base + 23:base + 25], "big")
-            protocol_pass = int.from_bytes(data[base + 25:base + 27], "big")
+            error_passive_fail = int.from_bytes(data[base + 19 : base + 21], "big")
+            error_passive_pass = int.from_bytes(data[base + 21 : base + 23], "big")
+            protocol_fail = int.from_bytes(data[base + 23 : base + 25], "big")
+            protocol_pass = int.from_bytes(data[base + 25 : base + 27], "big")
             error_passive_seen = data[base + 27]
-            parts.extend([
-                f"operational={'yes' if operational else 'no'}",
-                f"normal RX enabled={'yes' if rx_enabled else 'no'}",
-                f"normal TX enabled={'yes' if tx_enabled else 'no'}",
-                f"controller fault pending={'yes' if controller_pending else 'no'}",
-                f"recovery pending={'yes' if recovered_pending else 'no'}",
-                f"error-passive debounce fail/pass={error_passive_fail}/{error_passive_pass}",
-                f"protocol-error debounce fail/pass={protocol_fail}/{protocol_pass}",
-                f"error-passive indication latched={'yes' if error_passive_seen else 'no'}",
-            ])
+            parts.extend(
+                [
+                    f"operational={'yes' if operational else 'no'}",
+                    f"normal RX enabled={'yes' if rx_enabled else 'no'}",
+                    f"normal TX enabled={'yes' if tx_enabled else 'no'}",
+                    f"controller fault pending={'yes' if controller_pending else 'no'}",
+                    f"recovery pending={'yes' if recovered_pending else 'no'}",
+                    f"error-passive debounce fail/pass={error_passive_fail}/{error_passive_pass}",
+                    f"protocol-error debounce fail/pass={protocol_fail}/{protocol_pass}",
+                    f"error-passive indication latched={'yes' if error_passive_seen else 'no'}",
+                ]
+            )
         return " | ".join(parts)
 
     def _explain_lin_bus_detail(self, dtc, data, is_snapshot):
@@ -6055,28 +10612,30 @@ class FcdApp:
         parts = [f"{channel_text} {fault_text}"]
         if timestamp_text:
             parts.append(timestamp_text)
-        parts.extend([
-            f"channel={channel}",
-            f"Last PID=0x{pid:02X}",
-            f"Frame ID=0x{frame_id:02X}",
-            f"Slave NAD={slave_nad}",
-            f"Schedule={LINDIAG_SCHEDULE_TEXT.get(schedule, schedule)}",
-            f"LinSM={LINDIAG_LINSM_STATE_TEXT.get(linsm_state, linsm_state)}",
-            f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
-            f"LIN state={LINDIAG_LIN_STATE_TEXT.get(lin_state, lin_state)}",
-            f"Error type={LINDIAG_RESULT_TEXT.get(last_result, last_result)}",
-            f"Error class={LINDIAG_ERROR_CLASS_TEXT.get(error_class, error_class)}",
-            f"No-response counter={no_response_count}",
-            f"Protocol error counter={protocol_count}",
-            f"Controller fault counter={controller_count}",
-            f"Checksum/PID/Framing/Sync/Header={checksum_count}/{pid_count}/{framing_count}/{sync_count}/{header_count}",
-            f"Wakeup failures={wakeup_count}, sleep failures={sleep_count}",
-            f"LinIf state={LINDIAG_CHANNEL_STATE_TEXT.get(linif_state, linif_state)}",
-            f"Diag schedule={LINDIAG_DIAG_STATE_TEXT.get(diag_state, diag_state)}",
-            f"Schedule errors={schedule_errors}, diag timeouts={diag_timeouts}",
-            f"Normal communication rx/tx={comm_rx_enabled}/{comm_tx_enabled}",
-            f"Slave response expected={slave_expected}, diag schedule active={diag_schedule_active}, channel unavailable={channel_unavailable}",
-        ])
+        parts.extend(
+            [
+                f"channel={channel}",
+                f"Last PID=0x{pid:02X}",
+                f"Frame ID=0x{frame_id:02X}",
+                f"Slave NAD={slave_nad}",
+                f"Schedule={LINDIAG_SCHEDULE_TEXT.get(schedule, schedule)}",
+                f"LinSM={LINDIAG_LINSM_STATE_TEXT.get(linsm_state, linsm_state)}",
+                f"ComM={CANDIAG_COMM_MODE_TEXT.get(comm_mode, comm_mode)}",
+                f"LIN state={LINDIAG_LIN_STATE_TEXT.get(lin_state, lin_state)}",
+                f"Error type={LINDIAG_RESULT_TEXT.get(last_result, last_result)}",
+                f"Error class={LINDIAG_ERROR_CLASS_TEXT.get(error_class, error_class)}",
+                f"No-response counter={no_response_count}",
+                f"Protocol error counter={protocol_count}",
+                f"Controller fault counter={controller_count}",
+                f"Checksum/PID/Framing/Sync/Header={checksum_count}/{pid_count}/{framing_count}/{sync_count}/{header_count}",
+                f"Wakeup failures={wakeup_count}, sleep failures={sleep_count}",
+                f"LinIf state={LINDIAG_CHANNEL_STATE_TEXT.get(linif_state, linif_state)}",
+                f"Diag schedule={LINDIAG_DIAG_STATE_TEXT.get(diag_state, diag_state)}",
+                f"Schedule errors={schedule_errors}, diag timeouts={diag_timeouts}",
+                f"Normal communication rx/tx={comm_rx_enabled}/{comm_tx_enabled}",
+                f"Slave response expected={slave_expected}, diag schedule active={diag_schedule_active}, channel unavailable={channel_unavailable}",
+            ]
+        )
         return " | ".join(parts)
 
     def _explain_aimodel_detail(self, dtc, data, is_snapshot):
@@ -6111,26 +10670,32 @@ class FcdApp:
         parts = [self._describe_zgw_dtc(dtc)]
         if timestamp_text:
             parts.append(timestamp_text)
-        parts.extend([
-            f"event id {event_id}",
-            f"error flags 0x{error_flags:08X}",
-            f"input {input_voltage:.3f} V, valid={input_valid}, windowReady={window_ready}",
-            f"inference valid={inference_valid}, sequence={inference_sequence}",
-            f"channel {channel + 1}, predicted class={predicted_fault}",
-            f"measured={measured_current:.3f} A, rating={current_rating:.3f} A, predicted={predicted_current:.3f} A",
-            f"fault soon={fault_soon:.3f}, utilization={utilization:.3f}",
-            f"fault probabilities={', '.join(f'{value:.3f}' for value in probabilities)}",
-            f"limits: undervoltage={undervoltage}, overvoltage={overvoltage}, overcurrent={overcurrent}",
-            f"inputTimestamp={input_timestamp} ms",
-            f"timing: channel={channel_us} us, total={total_us} us, processing={processing_us} us",
-        ])
+        parts.extend(
+            [
+                f"event id {event_id}",
+                f"error flags 0x{error_flags:08X}",
+                f"input {input_voltage:.3f} V, valid={input_valid}, windowReady={window_ready}",
+                f"inference valid={inference_valid}, sequence={inference_sequence}",
+                f"channel {channel + 1}, predicted class={predicted_fault}",
+                f"measured={measured_current:.3f} A, rating={current_rating:.3f} A, predicted={predicted_current:.3f} A",
+                f"fault soon={fault_soon:.3f}, utilization={utilization:.3f}",
+                f"fault probabilities={', '.join(f'{value:.3f}' for value in probabilities)}",
+                f"limits: undervoltage={undervoltage}, overvoltage={overvoltage}, overcurrent={overcurrent}",
+                f"inputTimestamp={input_timestamp} ms",
+                f"timing: channel={channel_us} us, total={total_us} us, processing={processing_us} us",
+            ]
+        )
         return " | ".join(parts)
 
     def _explain_gateway_detail(self, dtc, data, is_snapshot, is_message=True):
         # GatewaySwc_CaptureRxDiagSnapshotData layout, with legacy 0x19/06 fallback.
         if is_message:
             index = dtc - DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
-            name = CODING_PARAMETER_NAMES[index] if index < len(CODING_PARAMETER_NAMES) else f"index {index}"
+            name = (
+                CODING_PARAMETER_NAMES[index]
+                if index < len(CODING_PARAMETER_NAMES)
+                else f"index {index}"
+            )
         if is_snapshot:
             timestamp_text = format_dtc_timestamp_data(data)
             if timestamp_text:
@@ -6148,14 +10713,16 @@ class FcdApp:
             if is_message:
                 cycle_ticks = u16_be(data, 12)
                 timeout_ticks = u16_be(data, 14)
-                return " | ".join([
-                    f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
-                    f"current status: {status_text}",
-                    f"expected RX every {cycle_ticks} ticks, declared lost after {timeout_ticks} ticks",
-                    f"ECU main-loop count when captured: {main_cycles}",
-                    f"messages timed out right now: {active_count}",
-                    f"total timeout events since power-up: {event_count}",
-                ])
+                return " | ".join(
+                    [
+                        f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
+                        f"current status: {status_text}",
+                        f"expected RX every {cycle_ticks} ticks, declared lost after {timeout_ticks} ticks",
+                        f"ECU main-loop count when captured: {main_cycles}",
+                        f"messages timed out right now: {active_count}",
+                        f"total timeout events since power-up: {event_count}",
+                    ]
+                )
             return ""
         # Legacy 0x19/06 record (16 bytes): a smaller subset of the same fields.
         if len(data) < 16:
@@ -6165,11 +10732,13 @@ class FcdApp:
         threshold = u32_be(data, 8)
         main_cycles = u32_be(data, 12)
         if is_message:
-            return " | ".join([
-                f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
-                f"timeout limit: {threshold} ticks",
-                f"ECU main-loop count when captured: {main_cycles}",
-            ])
+            return " | ".join(
+                [
+                    f"RX message timeout ? {name} (COM PDU id {object_id}) on {bus_text}",
+                    f"timeout limit: {threshold} ticks",
+                    f"ECU main-loop count when captured: {main_cycles}",
+                ]
+            )
         return ""
 
     def _explain_mcusm_detail(self, data, is_snapshot):
@@ -6290,39 +10859,41 @@ class FcdApp:
                 f"SMU keys clear={status_name(data[61], SMU_STATUS_TEXT)}",
                 f"SMU init={status_name(data[62], SMU_STATUS_TEXT)}",
             ]
-            parts.extend([
-                f"capture version: {data[16]}",
-                f"last reset reason: {reset_reason_name(reset_reason, reset_info)} (0x{reset_reason:08X})",
-                f"last reset information: 0x{reset_info:08X}",
-                f"SafetyKit failure mask: {flag_names(safety_mask, MCUSM_SAFETYKIT_FAILURE_BITS)} (0x{safety_mask:08X})",
-                f"FW-check result mask: {flag_names(fw_result, MCUSM_FW_CHECK_RESULT_BITS)} (0x{fw_result:08X})",
-                (
-                    f"SafetyKit reset: type {enum_name(reset_type, SAFETYKIT_RESET_TYPE_TEXT, 'type')}, "
-                    f"trigger {enum_name(reset_trigger, SCU_RESET_TRIGGER_TEXT, 'trigger')}, "
-                    f"RSTSTAT 0x{rststat:08X}, reason 0x{ssw_reset_reason:04X}"
-                ),
-                f"SafetyKit statuses: {', '.join(ssw_status)}",
-                (
-                    f"SafetyKit counters: inhibit={data[17]}, FBL resets={data[18]}, "
-                    f"FBL request={data[19]}, LBIST request={data[50]}, "
-                    f"LBIST runs={data[51]}, FW-check runs={data[52]}, standby wake={data[63]}"
-                ),
-                (
-                    f"FW-check SSH: last={fw_last_ssh}, actual ECCD/FAULTSTS/ERRINFO="
-                    f"0x{actual_eccd:08X}/0x{actual_faultsts:08X}/0x{actual_errinfo:08X}, "
-                    f"expected=0x{expected_eccd:08X}/0x{expected_faultsts:08X}/0x{expected_errinfo:08X}"
-                ),
-                (
-                    f"trap registers: count={trap_counter}, DSTR/DATR/DEADD/DIEAR/DIETR/PIEAR/PIETR="
-                    f"{'/'.join(f'0x{value:08X}' for value in trap_regs)}"
-                ),
-                f"selected SMU alarm word: raw 0x{smu_raw:08X}, masked 0x{smu_masked:08X}",
-                (
-                    f"DFlash recovery: counter={dflash_counter}, attempts={dflash_attempts}, "
-                    f"suppressed={dflash_suppressed}, Fee access=0x{dflash_access:08X}, "
-                    f"physical=0x{dflash_physical:08X}, request=0x{dflash_request:08X}, info=0x{dflash_info:08X}"
-                ),
-            ])
+            parts.extend(
+                [
+                    f"capture version: {data[16]}",
+                    f"last reset reason: {reset_reason_name(reset_reason, reset_info)} (0x{reset_reason:08X})",
+                    f"last reset information: 0x{reset_info:08X}",
+                    f"SafetyKit failure mask: {flag_names(safety_mask, MCUSM_SAFETYKIT_FAILURE_BITS)} (0x{safety_mask:08X})",
+                    f"FW-check result mask: {flag_names(fw_result, MCUSM_FW_CHECK_RESULT_BITS)} (0x{fw_result:08X})",
+                    (
+                        f"SafetyKit reset: type {enum_name(reset_type, SAFETYKIT_RESET_TYPE_TEXT, 'type')}, "
+                        f"trigger {enum_name(reset_trigger, SCU_RESET_TRIGGER_TEXT, 'trigger')}, "
+                        f"RSTSTAT 0x{rststat:08X}, reason 0x{ssw_reset_reason:04X}"
+                    ),
+                    f"SafetyKit statuses: {', '.join(ssw_status)}",
+                    (
+                        f"SafetyKit counters: inhibit={data[17]}, FBL resets={data[18]}, "
+                        f"FBL request={data[19]}, LBIST request={data[50]}, "
+                        f"LBIST runs={data[51]}, FW-check runs={data[52]}, standby wake={data[63]}"
+                    ),
+                    (
+                        f"FW-check SSH: last={fw_last_ssh}, actual ECCD/FAULTSTS/ERRINFO="
+                        f"0x{actual_eccd:08X}/0x{actual_faultsts:08X}/0x{actual_errinfo:08X}, "
+                        f"expected=0x{expected_eccd:08X}/0x{expected_faultsts:08X}/0x{expected_errinfo:08X}"
+                    ),
+                    (
+                        f"trap registers: count={trap_counter}, DSTR/DATR/DEADD/DIEAR/DIETR/PIEAR/PIETR="
+                        f"{'/'.join(f'0x{value:08X}' for value in trap_regs)}"
+                    ),
+                    f"selected SMU alarm word: raw 0x{smu_raw:08X}, masked 0x{smu_masked:08X}",
+                    (
+                        f"DFlash recovery: counter={dflash_counter}, attempts={dflash_attempts}, "
+                        f"suppressed={dflash_suppressed}, Fee access=0x{dflash_access:08X}, "
+                        f"physical=0x{dflash_physical:08X}, request=0x{dflash_request:08X}, info=0x{dflash_info:08X}"
+                    ),
+                ]
+            )
         return " | ".join(parts)
 
     def _explain_pms_errata_detail(self, data, is_snapshot):
@@ -6410,7 +10981,9 @@ class FcdApp:
 
     def _decode_read_dtc_response(self, label, response):
         if len(response) < 2 or response[0] != 0x59:
-            raise FcdError(f"{label}: malformed ReadDTCInformation response {bytes_to_hex(response)}")
+            raise FcdError(
+                f"{label}: malformed ReadDTCInformation response {bytes_to_hex(response)}"
+            )
 
         subfunction = response[1]
         payload = response[2:]
@@ -6466,9 +11039,17 @@ class FcdApp:
         if DEM_DTC_ETHERNET_DIAG <= dtc < (DEM_DTC_ETHERNET_DIAG + DEM_ETHERNET_DIAG_EVENT_COUNT):
             return STATIC_DTC_DESCRIPTIONS.get(dtc, "Ethernet diagnostic")
 
-        if DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT <= dtc < (DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT):
+        if (
+            DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
+            <= dtc
+            < (DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT + DEM_GATEWAY_RX_MESSAGE_EVENT_COUNT)
+        ):
             index = dtc - DEM_DTC_GATEWAY_RX_MESSAGE_TIMEOUT
-            name = CODING_PARAMETER_NAMES[index] if index < len(CODING_PARAMETER_NAMES) else f"RX message index {index}"
+            name = (
+                CODING_PARAMETER_NAMES[index]
+                if index < len(CODING_PARAMETER_NAMES)
+                else f"RX message index {index}"
+            )
             return f"Message Timeout: {name}"
 
         return "Unknown ZGW APP DTC"
@@ -6547,7 +11128,9 @@ class FcdApp:
         }
 
         ttk.Label(dialog, text="Coding Field").grid(row=0, column=0, sticky="w", padx=8, pady=6)
-        field = ttk.Combobox(dialog, textvariable=vars_["param"], values=CODING_VISIBLE_PARAMETER_NAMES, width=70)
+        field = ttk.Combobox(
+            dialog, textvariable=vars_["param"], values=CODING_VISIBLE_PARAMETER_NAMES, width=70
+        )
         field.grid(row=0, column=1, sticky="ew", padx=8, pady=6)
         ttk.Label(dialog, text="Value").grid(row=1, column=0, sticky="w", padx=8, pady=6)
         ttk.Combobox(dialog, textvariable=vars_["expected"], values=("1", "0"), width=10).grid(
@@ -6562,7 +11145,9 @@ class FcdApp:
             dialog.destroy()
 
         ttk.Button(dialog, text="OK", command=ok).grid(row=2, column=0, padx=8, pady=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(row=2, column=1, sticky="w", padx=8, pady=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(
+            row=2, column=1, sticky="w", padx=8, pady=10
+        )
         dialog.wait_window()
         return result or None
 
@@ -6584,22 +11169,36 @@ class FcdApp:
             if not param_name:
                 try:
                     idx = parse_int(index_value)
-                    param_name = CODING_PARAMETER_NAMES[idx] if 0 <= idx < len(CODING_PARAMETER_NAMES) else ""
+                    param_name = (
+                        CODING_PARAMETER_NAMES[idx]
+                        if 0 <= idx < len(CODING_PARAMETER_NAMES)
+                        else ""
+                    )
                 except (ValueError, TypeError):
                     param_name = ""
             if param_name and not is_reserved_coding_parameter(param_name):
-                tree.insert("", "end", values=(param_name, item.get("expected", item.get("value", ""))))
+                tree.insert(
+                    "", "end", values=(param_name, item.get("expected", item.get("value", "")))
+                )
         self.log(f"Imported coding JSON: {path}")
 
     def export_coding_clicked(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json", filetypes=[("JSON", "*.json")]
+        )
         if not path:
             return
         parameters = []
         tree = self._active_coding_tree()
         for iid in tree.get_children():
             values = tree.item(iid, "values")
-            parameters.append({"param": values[0], "index": coding_parameter_index(values[0]), "expected": values[1]})
+            parameters.append(
+                {
+                    "param": values[0],
+                    "index": coding_parameter_index(values[0]),
+                    "expected": values[1],
+                }
+            )
         data = {
             "schema": "FCD_CODING_CONFIG_v1",
             "created": datetime.now().isoformat(timespec="seconds"),
@@ -6649,11 +11248,13 @@ class FcdApp:
             fields = []
             for iid in tree.get_children():
                 values = tree.item(iid, "values")
-                fields.append({
-                    "field": values[0],
-                    "index": coding_parameter_index(values[0]),
-                    "value": values[1],
-                })
+                fields.append(
+                    {
+                        "field": values[0],
+                        "index": coding_parameter_index(values[0]),
+                        "value": values[1],
+                    }
+                )
             descriptors[ecu_name.upper()] = {
                 "schema": "FCD_CODING_DESCRIPTOR_v1",
                 "did": self.coding_mask_did_var.get(),
@@ -6686,7 +11287,8 @@ class FcdApp:
             if is_reserved_coding_parameter(name):
                 continue
             tree.insert(
-                "", "end",
+                "",
+                "end",
                 values=(name, "1" if expected else "0"),
             )
 
@@ -6744,7 +11346,9 @@ class FcdApp:
             self.root.after(0, self._set_connected_status, False)
 
         if POST_RESET_RECONNECT_DELAY_SECONDS > 0.0:
-            if self.worker_stop.wait(min(POST_RESET_RECONNECT_DELAY_SECONDS, POST_RESET_RESPONSE_TIMEOUT_SECONDS)):
+            if self.worker_stop.wait(
+                min(POST_RESET_RECONNECT_DELAY_SECONDS, POST_RESET_RESPONSE_TIMEOUT_SECONDS)
+            ):
                 raise FcdError(f"DoIP poll after {reason}: cancelled by Disconnect button")
 
         while not self._reconnect_cancelled(client, require_current_client=require_current_client):
@@ -6757,15 +11361,21 @@ class FcdApp:
 
             try:
                 phase = "TCP connect"
-                step_timeout = max(0.001, min(POST_RESET_CONNECT_STEP_TIMEOUT_SECONDS, deadline - time.monotonic()))
+                step_timeout = max(
+                    0.001, min(POST_RESET_CONNECT_STEP_TIMEOUT_SECONDS, deadline - time.monotonic())
+                )
                 client.connect(timeout=step_timeout)
 
                 phase = "routing activation"
-                step_timeout = max(0.001, min(POST_RESET_ROUTING_STEP_TIMEOUT_SECONDS, deadline - time.monotonic()))
+                step_timeout = max(
+                    0.001, min(POST_RESET_ROUTING_STEP_TIMEOUT_SECONDS, deadline - time.monotonic())
+                )
                 activation = self.activate_doip(client, timeout=step_timeout, log_success=False)
 
                 phase = "UDS probe"
-                step_timeout = max(0.001, min(POST_RESET_UDS_PROBE_TIMEOUT_SECONDS, deadline - time.monotonic()))
+                step_timeout = max(
+                    0.001, min(POST_RESET_UDS_PROBE_TIMEOUT_SECONDS, deadline - time.monotonic())
+                )
                 response = client.send_uds(request, timeout=step_timeout)
                 require_positive_response(response, positive_sid)
                 if expected_responses is not None and response not in expected_responses:
@@ -6801,7 +11411,9 @@ class FcdApp:
         if self._reconnect_cancelled(client, require_current_client=require_current_client):
             raise FcdError(f"DoIP poll after {reason}: cancelled by Disconnect button")
         try:
-            self.log(f"DoIP poll after {reason}: timed probe window expired; running final liveness check")
+            self.log(
+                f"DoIP poll after {reason}: timed probe window expired; running final liveness check"
+            )
             self.reconnect_doip(
                 client,
                 f"{reason} final liveness check",
@@ -6841,27 +11453,39 @@ class FcdApp:
             return
         self._poll_doip_after_reset(client, reason, require_current_client=require_current_client)
 
-    def _execute_zgw_flash_hard_reset(self, client, reason, probe_target="ZGW", require_current_client=True):
+    def _execute_zgw_flash_hard_reset(
+        self, client, reason, probe_target="ZGW", require_current_client=True
+    ):
         req = b"\x11\x01"
         self.log(f"TX ECUReset hardReset {reason}: {bytes_to_hex(req)}")
         try:
-            resp = client.send_uds_suppress_positive(req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS)
+            resp = client.send_uds_suppress_positive(
+                req, timeout=POST_RESET_RESPONSE_TIMEOUT_SECONDS
+            )
             if resp:
                 self.log(f"RX ECUReset hardReset {reason}: {bytes_to_hex(resp)}")
             else:
-                self.log(f"RX ECUReset hardReset {reason}: DoIP ACK accepted; probing for {probe_target}")
+                self.log(
+                    f"RX ECUReset hardReset {reason}: DoIP ACK accepted; probing for {probe_target}"
+                )
         except Exception as exc:
             if not bool(getattr(client, "last_uds_request_sent", True)):
-                raise FcdError(f"ECUReset hardReset {reason}: request was not sent ({exc})") from exc
-            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
-                raise FcdError(f"ECUReset hardReset {reason}: request was rejected ({exc})") from exc
+                raise FcdError(
+                    f"ECUReset hardReset {reason}: request was not sent ({exc})"
+                ) from exc
+            if isinstance(exc, DoipError) and str(exc).startswith(
+                ("Diagnostic NACK", "Diagnostic ACK code")
+            ):
+                raise FcdError(
+                    f"ECUReset hardReset {reason}: request was rejected ({exc})"
+                ) from exc
             self.log(f"ECUReset hardReset {reason}: no clean response ({exc})")
 
         if isinstance(client, DoipClient):
             self._poll_doip_after_reset_with_probe(
                 client,
                 reason,
-                b"\x3E\x00",
+                b"\x3e\x00",
                 f"Post-reset {probe_target} TesterPresent probe",
                 0x3E,
                 require_current_client=require_current_client,
@@ -6966,7 +11590,9 @@ class FcdApp:
                 self.log(f"DRY {prefix}: CodingApp status decode skipped")
                 return
             payload = response[3:] if len(response) >= 3 else b""
-            self.log(f"{prefix}: CodingApp status decoded: {self._decode_coding_status_payload(payload)}")
+            self.log(
+                f"{prefix}: CodingApp status decoded: {self._decode_coding_status_payload(payload)}"
+            )
         except Exception as exc:
             self.log(f"{prefix}: CodingApp status read failed: {exc}")
             if required:
@@ -6985,7 +11611,12 @@ class FcdApp:
             )
         except Exception as exc:
             self.log(f"{label}: active session check failed ({exc}); requesting coding session")
-        self._ensure_session(send, SESSION_CODING_REQUESTED, f"{label}: Coding Session requested as 10 41", timeout=timeout)
+        self._ensure_session(
+            send,
+            SESSION_CODING_REQUESTED,
+            f"{label}: Coding Session requested as 10 41",
+            timeout=timeout,
+        )
 
     def _run_coding_routine(self, send, rid, option, label, timeout=60.0, max_pending_polls=10):
         self._ensure_coding_session_for_routine(send, label)
@@ -7032,7 +11663,9 @@ class FcdApp:
                 continue
             except NegativeResponse as exc:
                 if exc.sid == 0x31 and exc.nrc == 0x7F:
-                    raise FcdError(f"{label}: coding session expired while routine was pending") from exc
+                    raise FcdError(
+                        f"{label}: coding session expired while routine was pending"
+                    ) from exc
                 raise
             status = self._coding_routine_status(result_resp, label)
 
@@ -7045,14 +11678,20 @@ class FcdApp:
         if not self.node_rows:
             self.discover_nodes_clicked()
         self._sync_coding_tabs_from_nodes()
-        targets = [dict(target) for target in self.node_rows.values() if target.get("simulated_enabled", True)]
+        targets = [
+            dict(target)
+            for target in self.node_rows.values()
+            if target.get("simulated_enabled", True)
+        ]
         if not targets:
-            targets = [{
-                "node_name": "ZGW",
-                "bus_type": "ETHERNET",
-                "is_zgw": True,
-                "route_metadata": {"target_logical_address": self.target_var.get()},
-            }]
+            targets = [
+                {
+                    "node_name": "ZGW",
+                    "bus_type": "ETHERNET",
+                    "is_zgw": True,
+                    "route_metadata": {"target_logical_address": self.target_var.get()},
+                }
+            ]
         return targets
 
     def _target_logical_address(self, target):
@@ -7122,7 +11761,9 @@ class FcdApp:
             target_strict = self._strict_response_for_target(target, strict_response)
             if isinstance(exc, NodeTimeout):
                 if target_strict:
-                    raise FcdError(f"{action_name}: {event.node_name} node timeout ({exc})") from exc
+                    raise FcdError(
+                        f"{action_name}: {event.node_name} node timeout ({exc})"
+                    ) from exc
                 self.log(f"{action_name}: {event.node_name} node timeout; skipped ({exc})")
                 return
             if target_strict:
@@ -7132,11 +11773,10 @@ class FcdApp:
             self.log(f"{action_name}: {event.node_name} did not respond or failed; skipped ({exc})")
 
         def run_waiting_work(work):
-            with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-                future_to_event = {
-                    executor.submit(worker, target): event
-                    for event, target in work
-                }
+            with ThreadPoolExecutor(
+                max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))
+            ) as executor:
+                future_to_event = {executor.submit(worker, target): event for event, target in work}
                 for future in as_completed(future_to_event):
                     event = future_to_event[future]
                     target = target_by_name.get(event.node_name, {})
@@ -7181,22 +11821,29 @@ class FcdApp:
                 for tasks in lanes.values()
                 for _slot, work in tasks
             ):
-                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_paced_client = self._new_parallel_client(
+                    parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+                )
+                shared_paced_client.request_spacing_seconds = max(
+                    shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS
+                )
                 shared_paced_client.drain()
                 self.log(f"{action_name}: using one DoIP TCP connection for routed bus schedule")
 
             if lanes:
-                lane_text = ", ".join(f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items()))
+                lane_text = ", ".join(
+                    f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items())
+                )
                 self.log(f"{action_name}: bus lanes={lane_text}")
                 if len(lanes) == 1:
                     bus, tasks = next(iter(lanes.items()))
                     run_lane(bus, tasks)
                 else:
-                    with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                    with ThreadPoolExecutor(
+                        max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))
+                    ) as executor:
                         futures = [
-                            executor.submit(run_lane, bus, tasks)
-                            for bus, tasks in lanes.items()
+                            executor.submit(run_lane, bus, tasks) for bus, tasks in lanes.items()
                         ]
                         for future in as_completed(futures):
                             future.result()
@@ -7262,17 +11909,22 @@ class FcdApp:
         are staggered by ROUTED_READ_CODING_NODE_STAGGER_SECONDS (5 ms)."""
         rounds = []
         for idx, (req_bytes, label_suffix) in enumerate(requests):
-            rounds.append((
-                idx * ROUTED_READ_CODING_SERVICE_GAP_SECONDS,
-                (lambda rb: (lambda _target, _item: bytes(rb)))(req_bytes),
-                (lambda ls: (lambda target, _item: f"{target.get('node_name', '')}: {ls}"))(label_suffix),
-            ))
+            rounds.append(
+                (
+                    idx * ROUTED_READ_CODING_SERVICE_GAP_SECONDS,
+                    (lambda rb: (lambda _target, _item: bytes(rb)))(req_bytes),
+                    (lambda ls: (lambda target, _item: f"{target.get('node_name', '')}: {ls}"))(
+                        label_suffix
+                    ),
+                )
+            )
         return tuple(rounds)
 
     def _default_uds_zgw_worker(self, requests):
         """Waiting per-target worker for the ZGW and any real node: fire each request in
         order and accept no response (so the routed relay / direct response is decoded
         when present, but a silent node does not stall the action)."""
+
         def worker(send, target, client):
             node = self._target_label(target)
             for req_bytes, label_suffix in requests:
@@ -7282,9 +11934,12 @@ class FcdApp:
                     timeout=max(5.0, float(self.timeout_var.get())),
                     allow_no_response=True,
                 )
+
         return worker
 
-    def _run_vehicle_uds_action_once(self, action_name, requests, zgw_worker=None, on_complete=None, strict_response=False):
+    def _run_vehicle_uds_action_once(
+        self, action_name, requests, zgw_worker=None, on_complete=None, strict_response=False
+    ):
         """Drive a one-shot UDS action across every selected vehicle target using the
         same routing rules - and the same pacing - as Coding/Flashing.
 
@@ -7343,14 +11998,20 @@ class FcdApp:
         def handle_waiting_exception(target, exc):
             if isinstance(exc, NodeTimeout):
                 if self._strict_response_for_target(target, strict_response):
-                    raise FcdError(f"{action_name}: {self._target_label(target)} node timeout ({exc})") from exc
-                self.log(f"{action_name}: {self._target_label(target)} node timeout; skipped ({exc})")
+                    raise FcdError(
+                        f"{action_name}: {self._target_label(target)} node timeout ({exc})"
+                    ) from exc
+                self.log(
+                    f"{action_name}: {self._target_label(target)} node timeout; skipped ({exc})"
+                )
                 return
             if self._strict_response_for_target(target, strict_response):
                 raise FcdError(
                     f"{action_name}: {self._target_label(target)} did not respond or failed ({exc})"
                 ) from exc
-            self.log(f"{action_name}: {self._target_label(target)} did not respond or failed; skipped ({exc})")
+            self.log(
+                f"{action_name}: {self._target_label(target)} did not respond or failed; skipped ({exc})"
+            )
 
         def run_waiting_item(item):
             _event, target = item
@@ -7374,7 +12035,11 @@ class FcdApp:
                 paced_work = [item for item in work if self._can_pace_uds_target(item[1])]
                 waiting_work = [item for item in work if not self._can_pace_uds_target(item[1])]
 
-                if paced_work and self.transport_var.get() == "DoIP" and shared_paced_client is not None:
+                if (
+                    paced_work
+                    and self.transport_var.get() == "DoIP"
+                    and shared_paced_client is not None
+                ):
                     nodes = ", ".join(
                         f"{self._work_item_node_name(item)}({self._work_item_bus_type(item)})"
                         for item in paced_work
@@ -7403,19 +12068,27 @@ class FcdApp:
                 for _slot, work in tasks
                 for item in work
             ):
-                shared_paced_client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
-                shared_paced_client.request_spacing_seconds = max(shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                shared_paced_client = self._new_parallel_client(
+                    parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+                )
+                shared_paced_client.request_spacing_seconds = max(
+                    shared_paced_client.request_spacing_seconds, REQUEST_SPACING_SECONDS
+                )
                 shared_paced_client.drain()
                 self.log(f"{action_name}: using one DoIP TCP connection for routed bus schedule")
 
             if lanes:
-                lane_text = ", ".join(f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items()))
+                lane_text = ", ".join(
+                    f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items())
+                )
                 self.log(f"{action_name}: bus lanes={lane_text}")
                 if len(lanes) == 1:
                     bus, tasks = next(iter(lanes.items()))
                     run_uds_lane(bus, tasks)
                 else:
-                    with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+                    with ThreadPoolExecutor(
+                        max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))
+                    ) as executor:
                         futures = [
                             executor.submit(run_uds_lane, bus, tasks)
                             for bus, tasks in lanes.items()
@@ -7443,18 +12116,24 @@ class FcdApp:
     def _run_vehicle_uds_action(self, action_name, requests, zgw_worker=None, on_complete=None):
         self.worker(
             action_name,
-            lambda: self._run_vehicle_uds_action_once(action_name, requests, zgw_worker, on_complete),
+            lambda: self._run_vehicle_uds_action_once(
+                action_name, requests, zgw_worker, on_complete
+            ),
         )
 
-    def _routed_dtc_detail_read(self, send, node, dtc, subfunction, detail_name, strict_response=False):
-        request = bytes([
-            0x19,
-            subfunction,
-            (dtc >> 16) & 0xFF,
-            (dtc >> 8) & 0xFF,
-            dtc & 0xFF,
-            0xFF,
-        ])
+    def _routed_dtc_detail_read(
+        self, send, node, dtc, subfunction, detail_name, strict_response=False
+    ):
+        request = bytes(
+            [
+                0x19,
+                subfunction,
+                (dtc >> 16) & 0xFF,
+                (dtc >> 8) & 0xFF,
+                dtc & 0xFF,
+                0xFF,
+            ]
+        )
         label = f"{node}: 19 {subfunction:02X} {dtc:06X} FF {detail_name}"
         try:
             response = send(
@@ -7527,7 +12206,9 @@ class FcdApp:
         )
         return self._combine_snapshot_data_text(snapshot_data, legacy_record)
 
-    def _read_fault_memory_target_worker(self, send, target, client, status_mask, sink, strict_response=False):
+    def _read_fault_memory_target_worker(
+        self, send, target, client, status_mask, sink, strict_response=False
+    ):
         node = self._target_label(target)
         read_started = time.monotonic()
         list_finished = None
@@ -7536,7 +12217,10 @@ class FcdApp:
         summaries = []
         for request, label in [
             (bytes([0x19, 0x01, 0xFF]), f"{node}: 19 01 FF reportNumberOfDTCByStatusMask"),
-            (bytes([0x19, 0x02, status_mask]), f"{node}: 19 02 {status_mask:02X} reportDTCByStatusMask"),
+            (
+                bytes([0x19, 0x02, status_mask]),
+                f"{node}: 19 02 {status_mask:02X} reportDTCByStatusMask",
+            ),
         ]:
             try:
                 response = send(
@@ -7590,7 +12274,12 @@ class FcdApp:
         )
 
     def _can_run_paced_coding_slot(self, action_name, work):
-        if action_name not in ("Read Coding", "Load Coding Default", "Check Coding", "Code Vehicle"):
+        if action_name not in (
+            "Read Coding",
+            "Load Coding Default",
+            "Check Coding",
+            "Code Vehicle",
+        ):
             return False
         if not work:
             return False
@@ -7650,7 +12339,9 @@ class FcdApp:
 
         if apply_pacing:
             self._pace_routed_bus_request(target)
-        self.log(f"TX {label}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
+        self.log(
+            f"TX {label}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}"
+        )
         client.send_uds_no_wait(prefixed_request)
         with self.routed_bus_pace_lock:
             self.routed_bus_last_request_ts[bus] = time.monotonic()
@@ -7662,7 +12353,8 @@ class FcdApp:
         if not expected_requests:
             return
         wait_requests = [
-            expected for expected in expected_requests
+            expected
+            for expected in expected_requests
             if not (len(expected) > 2 and bool(expected[2]))
         ]
         for expected in expected_requests:
@@ -7694,7 +12386,9 @@ class FcdApp:
             if progress_count:
                 progress_cb(progress_count)
 
-    def _paced_grouped_no_wait_rounds(self, groups, client, rounds, progress_cb=None, drain_every_sends=0):
+    def _paced_grouped_no_wait_rounds(
+        self, groups, client, rounds, progress_cb=None, drain_every_sends=0
+    ):
         bus_order = {"CAN": 0, "CANFD": 1, "LIN": 2}
         ordered_buses = sorted(groups, key=lambda bus: bus_order.get(bus, 99))
         if not ordered_buses:
@@ -7718,27 +12412,43 @@ class FcdApp:
                     request = request_factory(target, item)
                     if request is None:
                         continue
-                    desired_due = start_time + round_offset + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
+                    desired_due = (
+                        start_time
+                        + round_offset
+                        + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
+                    )
                     due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
                     progress_count = 0
                     if len(item) > 4:
                         progress_count = item[4] or 0
                     label = label_factory(target, item)
-                    events.append((
-                        due,
-                        bus_order.get(bus, 99),
-                        node_index,
-                        order,
-                        bus,
-                        target,
-                        bytes(request),
-                        label,
-                        progress_count,
-                    ))
+                    events.append(
+                        (
+                            due,
+                            bus_order.get(bus, 99),
+                            node_index,
+                            order,
+                            bus,
+                            target,
+                            bytes(request),
+                            label,
+                            progress_count,
+                        )
+                    )
                     order += 1
 
         expected_requests = []
-        for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+        for (
+            due,
+            _bus_rank,
+            _node_index,
+            _order,
+            bus,
+            target,
+            request,
+            label,
+            progress_count,
+        ) in sorted(events):
             self._sleep_until_monotonic(due)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
@@ -7755,7 +12465,9 @@ class FcdApp:
             expected_requests.append((label, prefixed_request, no_response_only, progress_count))
             sends_since_drain += 1
             if drain_every_sends and sends_since_drain >= drain_every_sends:
-                self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
+                self._wait_routed_transport_acks_and_progress(
+                    client, expected_requests, progress_cb
+                )
                 expected_requests = []
                 sends_since_drain = 0
 
@@ -7795,7 +12507,9 @@ class FcdApp:
         for _event, target in work:
             node_name = target.get("node_name", "")
             self.root.after(0, self._load_dummy_coding_values_to_coding_tree, node_name)
-            self.log(f"Read Coding: {node_name} no coding response accepted; wrote dummy coding values")
+            self.log(
+                f"Read Coding: {node_name} no coding response accepted; wrote dummy coding values"
+            )
 
     def _run_paced_load_default_coding_slot(self, slot, work, client):
         rid = parse_int(self.coding_defaults_rid_var.get())
@@ -7847,7 +12561,9 @@ class FcdApp:
                 write_rid = parse_int(descriptor.get("write_routine"))
                 validate_rid = parse_int(descriptor.get("validate_routine"))
             except Exception as exc:
-                self.log(f"Code Vehicle: {node_name} has invalid routine configuration; skipped ({exc})")
+                self.log(
+                    f"Code Vehicle: {node_name} has invalid routine configuration; skipped ({exc})"
+                )
                 continue
             prepared.append((event, target, write_rid, validate_rid, read_rid, mask))
 
@@ -7858,8 +12574,7 @@ class FcdApp:
             return target.get("node_name", "")
 
         post_reset_base = (
-            7 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS
-            + ROUTED_CODE_VEHICLE_POST_RESET_GAP_SECONDS
+            7 * ROUTED_READ_CODING_SERVICE_GAP_SECONDS + ROUTED_CODE_VEHICLE_POST_RESET_GAP_SECONDS
         )
         rounds = (
             (
@@ -7928,13 +12643,12 @@ class FcdApp:
             and self.client.connected
         ):
             return self.client
-        return self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+        return self._new_parallel_client(
+            parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+        )
 
     def _release_coding_worker_client(self, client):
-        if (
-            client is not getattr(self, "coding_shared_client", None)
-            and client is not self.client
-        ):
+        if client is not getattr(self, "coding_shared_client", None) and client is not self.client:
             client.close()
 
     def _pace_routed_bus_request(self, target):
@@ -7943,14 +12657,18 @@ class FcdApp:
             return
         extended = target.get("extended_diag_address", "")
         if not extended:
-            extended = default_extended_diag_address(target.get("node_name", ""), target.get("bus_type", "UNKNOWN"))
+            extended = default_extended_diag_address(
+                target.get("node_name", ""), target.get("bus_type", "UNKNOWN")
+            )
             target["extended_diag_address"] = extended
         node_key = (bus, parse_int(extended) & 0xFF)
         now = time.monotonic()
         with self.routed_bus_pace_lock:
             last_node = self.routed_node_last_request_ts.get(node_key, 0.0)
             last_bus = self.routed_bus_last_request_ts.get(bus, 0.0)
-        node_spacing = ROUTED_LIN_REQUEST_SPACING_SECONDS if bus == "LIN" else REQUEST_SPACING_SECONDS
+        node_spacing = (
+            ROUTED_LIN_REQUEST_SPACING_SECONDS if bus == "LIN" else REQUEST_SPACING_SECONDS
+        )
         node_wait = node_spacing - (now - last_node)
         bus_spacing = (
             ROUTED_LIN_REQUEST_SPACING_SECONDS
@@ -7979,7 +12697,9 @@ class FcdApp:
             return None, None
         extended = target.get("extended_diag_address", "")
         if not extended:
-            extended = default_extended_diag_address(target.get("node_name", ""), target.get("bus_type", "UNKNOWN"))
+            extended = default_extended_diag_address(
+                target.get("node_name", ""), target.get("bus_type", "UNKNOWN")
+            )
             target["extended_diag_address"] = extended
         key = (bus, parse_int(extended) & 0xFF)
         with self.routed_bus_pace_lock:
@@ -8005,14 +12725,16 @@ class FcdApp:
             )
             return True
         except Exception as reconnect_exc:
-            self.log(f"{node_name}: DoIP reconnect after accepted no-response failed ({reconnect_exc})")
+            self.log(
+                f"{node_name}: DoIP reconnect after accepted no-response failed ({reconnect_exc})"
+            )
             return False
 
     def _make_target_uds_sender(self, client, target, dry=False, strict_response=False):
         node_name = target.get("node_name", "")
         is_zgw = bool(target.get("is_zgw")) or node_name.upper() == "ZGW"
         simulated = self._target_is_simulated(target)
-        target_strict = self._strict_response_for_target(target, strict_response)
+        target_strict = is_g26_target(target) or self._strict_response_for_target(target, strict_response)
         effective_dry = dry
         base_send = self._make_uds_sender(
             client,
@@ -8045,14 +12767,18 @@ class FcdApp:
         def send(request, name, timeout=None, allow_no_response=False):
             request = bytes(request)
             prefixed_request = bytes([extended_byte]) + request
-            accept_no_response = allow_no_response or simulated
+            # A G26 programming step must be backed by an ECU response even
+            # when the discovered descriptor has not yet been marked real.
+            accept_no_response = (allow_no_response or simulated) and not is_g26_target(target)
             request_timeout = (
-                SIMULATED_BUS_TARGET_DIAG_TIMEOUT_SECONDS
-                if simulated
-                else BUS_TARGET_DIAG_TIMEOUT_SECONDS
+                float(timeout) if timeout is not None else
+                (SIMULATED_BUS_TARGET_DIAG_TIMEOUT_SECONDS if simulated
+                 else BUS_TARGET_DIAG_TIMEOUT_SECONDS)
             )
             if effective_dry:
-                self.log(f"DRY {name}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
+                self.log(
+                    f"DRY {name}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}"
+                )
                 return b""
             bus, bus_semaphore = self._routed_bus_semaphore(target)
             _node_key, node_semaphore = self._routed_node_semaphore(target)
@@ -8062,16 +12788,28 @@ class FcdApp:
                 while True:
                     self._pace_routed_bus_request(target)
                     retry_note = "" if attempt == 0 else f" retry={attempt}"
-                    self.log(f"TX {name}{retry_note}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}")
+                    self.log(
+                        f"TX {name}{retry_note}: ext={int_hex(extended_byte, 2)} {uds_request_log_text(prefixed_request)}"
+                    )
                     try:
-                        response = client.send_uds(prefixed_request, timeout=request_timeout, allow_no_response=accept_no_response)
+                        response = client.send_uds(
+                            prefixed_request,
+                            timeout=request_timeout,
+                            allow_no_response=accept_no_response,
+                        )
                         send.last_nrc78_count = getattr(client, "last_nrc78_count", 0)
                         response = bytes(response)
                         if not response:
+                            if is_g26_target(target):
+                                raise FcdError(f"{node_name}: no ECU response for {name}")
                             self.log(f"RX {name}: no response accepted")
                             return b""
                         self.log(f"RX {name}: {bytes_to_hex(response)}")
-                        uds_response = response[1:] if response[:1] == bytes([extended_byte]) else response
+                        if is_g26_target(target) and response[:1] != bytes([extended_byte]):
+                            raise FcdError(f"{node_name}: response is missing route 0x{extended_byte:02X}")
+                        uds_response = (
+                            response[1:] if response[:1] == bytes([extended_byte]) else response
+                        )
                         require_positive_response(uds_response, request[0])
                         return uds_response
                     except NegativeResponse as exc:
@@ -8104,14 +12842,24 @@ class FcdApp:
                             else:
                                 self.log(f"RX {name}: no response accepted ({exc})")
                             return b""
-                        raise NodeTimeout(f"{node_name}: node timeout via extended address {int_hex(extended_byte, 2)}") from exc
+                        raise NodeTimeout(
+                            f"{node_name}: node timeout via extended address {int_hex(extended_byte, 2)}"
+                        ) from exc
+                    except FcdError:
+                        raise
                     except Exception as exc:
                         if accept_no_response:
                             self.log(f"RX {name}: no response accepted ({exc})")
-                            if not self._recover_routed_client_after_accepted_error(client, node_name, name, exc):
-                                raise NodeTimeout(f"{node_name}: DoIP recovery failed after accepted {name} error") from exc
+                            if not self._recover_routed_client_after_accepted_error(
+                                client, node_name, name, exc
+                            ):
+                                raise NodeTimeout(
+                                    f"{node_name}: DoIP recovery failed after accepted {name} error"
+                                ) from exc
                             return b""
-                        raise NodeTimeout(f"{node_name}: node timeout via extended address {int_hex(extended_byte, 2)}") from exc
+                        raise NodeTimeout(
+                            f"{node_name}: node timeout via extended address {int_hex(extended_byte, 2)}"
+                        ) from exc
                     finally:
                         if bus:
                             with self.routed_bus_pace_lock:
@@ -8127,7 +12875,9 @@ class FcdApp:
         send.last_nrc78_count = 0
         return send
 
-    def _request_read_coding_routine(self, send, rid, node_name, phase="", timeout=20.0, max_pending_polls=10):
+    def _request_read_coding_routine(
+        self, send, rid, node_name, phase="", timeout=20.0, max_pending_polls=10
+    ):
         prefix = f"{node_name}: {phase}: " if phase else f"{node_name}: "
         start_label = f"{prefix}Read Coding start"
         result_label = f"{prefix}Read Coding result"
@@ -8187,12 +12937,22 @@ class FcdApp:
             if not result_resp:
                 if self._target_is_simulated(target):
                     self.root.after(0, self._load_dummy_coding_values_to_coding_tree, node_name)
-                    self.log(f"Read Coding: {node_name} no coding response accepted; wrote dummy coding values")
+                    self.log(
+                        f"Read Coding: {node_name} no coding response accepted; wrote dummy coding values"
+                    )
                 else:
-                    self.log(f"Read Coding: {node_name} no coding response accepted; skipped result decode")
+                    self.log(
+                        f"Read Coding: {node_name} no coding response accepted; skipped result decode"
+                    )
                 return
             coding_payload = self._parse_read_coding_result(result_resp)
-            self.root.after(0, self._load_mask_to_coding_tree, coding_payload, f"{node_name} coding routine 0x0203", node_name)
+            self.root.after(
+                0,
+                self._load_mask_to_coding_tree,
+                coding_payload,
+                f"{node_name} coding routine 0x0203",
+                node_name,
+            )
         finally:
             self._release_coding_worker_client(client)
 
@@ -8212,25 +12972,37 @@ class FcdApp:
                 f"{label}: coding readback too short "
                 f"(expected {len(expected)} bytes, got {len(actual)} bytes)"
             )
-        if actual[:len(expected)] != expected:
+        if actual[: len(expected)] != expected:
             raise FcdError(
                 f"{label}: coding readback mismatch "
                 f"(expected {bytes_to_hex(expected)}, got {bytes_to_hex(actual[:len(expected)])})"
             )
 
-    def _read_back_coding_for_target(self, send, target, phase, strict_response=False, expected_mask=None):
+    def _read_back_coding_for_target(
+        self, send, target, phase, strict_response=False, expected_mask=None
+    ):
         node_name = target.get("node_name", "")
         rid = parse_int(self.coding_read_nvm_rid_var.get())
-        result_resp = self._request_read_coding_routine(send, rid, node_name, phase=phase, timeout=10.0)
+        result_resp = self._request_read_coding_routine(
+            send, rid, node_name, phase=phase, timeout=10.0
+        )
         if not result_resp:
             if strict_response:
                 raise FcdError(f"{node_name}: {phase}: no coding readback response")
-            self.log(f"{node_name}: {phase}: no coding readback response accepted; skipped result decode")
+            self.log(
+                f"{node_name}: {phase}: no coding readback response accepted; skipped result decode"
+            )
             return None
         coding_payload = self._parse_read_coding_result(result_resp)
         if expected_mask is not None:
             self._assert_coding_mask_present(coding_payload, expected_mask, f"{node_name}: {phase}")
-        self.root.after(0, self._load_mask_to_coding_tree, coding_payload, f"{node_name} {phase} coding routine 0x0203", node_name)
+        self.root.after(
+            0,
+            self._load_mask_to_coding_tree,
+            coding_payload,
+            f"{node_name} {phase} coding routine 0x0203",
+            node_name,
+        )
         return coding_payload
 
     def _code_target(self, target, strict_response=False, verify_coding_present=False):
@@ -8249,16 +13021,42 @@ class FcdApp:
             return
         client = self._coding_worker_client(target)
         try:
-            send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41")
-            self._read_post_coding_status_for_target(send, target, "Before Coding", required=strict_response)
-            self._run_coding_routine(send, parse_int(descriptor.get("write_routine")), mask, f"{node_name}: Write Coding", timeout=90.0)
-            self._run_coding_routine(send, parse_int(descriptor.get("validate_routine")), b"", f"{node_name}: Check Coding", timeout=20.0)
+            send = self._make_target_uds_sender(
+                client, target, dry=False, strict_response=strict_response
+            )
+            self._ensure_session(
+                send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41"
+            )
+            self._read_post_coding_status_for_target(
+                send, target, "Before Coding", required=strict_response
+            )
+            self._run_coding_routine(
+                send,
+                parse_int(descriptor.get("write_routine")),
+                mask,
+                f"{node_name}: Write Coding",
+                timeout=90.0,
+            )
+            self._run_coding_routine(
+                send,
+                parse_int(descriptor.get("validate_routine")),
+                b"",
+                f"{node_name}: Check Coding",
+                timeout=20.0,
+            )
             self._send_ecu_reset_best_effort(send, f"{node_name}: ECUReset hardReset after coding")
             if not self._target_is_simulated(target):
-                self._recover_doip_after_reset(client, f"{node_name} after coding", require_current_client=False)
-            send = self._make_target_uds_sender(client, target, dry=False, strict_response=strict_response)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session after coding reset requested as 10 41")
+                self._recover_doip_after_reset(
+                    client, f"{node_name} after coding", require_current_client=False
+                )
+            send = self._make_target_uds_sender(
+                client, target, dry=False, strict_response=strict_response
+            )
+            self._ensure_session(
+                send,
+                SESSION_CODING_REQUESTED,
+                f"{node_name}: Coding Session after coding reset requested as 10 41",
+            )
             self._read_back_coding_for_target(
                 send,
                 target,
@@ -8275,8 +13073,14 @@ class FcdApp:
         client = self._coding_worker_client(target)
         try:
             send = self._make_target_uds_sender(client, target, dry=False)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41")
-            send(b"\x31\x01" + struct.pack(">H", rid), f"{node_name}: Load Coding Default", timeout=20.0)
+            self._ensure_session(
+                send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41"
+            )
+            send(
+                b"\x31\x01" + struct.pack(">H", rid),
+                f"{node_name}: Load Coding Default",
+                timeout=20.0,
+            )
         finally:
             self._release_coding_worker_client(client)
 
@@ -8286,7 +13090,9 @@ class FcdApp:
         client = self._coding_worker_client(target)
         try:
             send = self._make_target_uds_sender(client, target, dry=False)
-            self._ensure_session(send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41")
+            self._ensure_session(
+                send, SESSION_CODING_REQUESTED, f"{node_name}: Coding Session requested as 10 41"
+            )
             self._run_coding_routine(send, rid, b"", f"{node_name}: Check Coding", timeout=20.0)
         finally:
             self._release_coding_worker_client(client)
@@ -8320,16 +13126,31 @@ class FcdApp:
                 accept_no_response=self._connected_target_is_simulated(),
             )
             self._send_session(send, SESSION_EXTENDED, "Extended Session")
-            dids = [parse_int(self.coding_status_did_var.get()), parse_int(self.coding_mask_did_var.get()), parse_int(self.coding_version_did_var.get())]
-            data = {"schema": "FCD_CODING_CURRENT_v1", "created": datetime.now().isoformat(timespec="seconds"), "vin": self.fa_vin_var.get(), "responses": {}}
+            dids = [
+                parse_int(self.coding_status_did_var.get()),
+                parse_int(self.coding_mask_did_var.get()),
+                parse_int(self.coding_version_did_var.get()),
+            ]
+            data = {
+                "schema": "FCD_CODING_CURRENT_v1",
+                "created": datetime.now().isoformat(timespec="seconds"),
+                "vin": self.fa_vin_var.get(),
+                "responses": {},
+            }
             for did in dids:
                 req = bytes([0x22, (did >> 8) & 0xFF, did & 0xFF])
-                resp = send(req, f"Read Coding DID {int_hex(did)}", timeout=float(self.timeout_var.get()))
+                resp = send(
+                    req, f"Read Coding DID {int_hex(did)}", timeout=float(self.timeout_var.get())
+                )
                 if not resp:
-                    self.log(f"Save Current Coding: DID {int_hex(did)} no response accepted; skipped")
+                    self.log(
+                        f"Save Current Coding: DID {int_hex(did)} no response accepted; skipped"
+                    )
                     continue
                 data["responses"][int_hex(did)] = bytes_to_hex(resp[3:] if len(resp) >= 3 else resp)
-            path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+            path = filedialog.asksaveasfilename(
+                defaultextension=".json", filetypes=[("JSON", "*.json")]
+            )
             if path:
                 Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
                 self.log(f"Saved current coding: {path}")
@@ -8348,7 +13169,9 @@ class FcdApp:
             self.gen_output_var.set(path)
 
     def add_hex_clicked(self):
-        paths = filedialog.askopenfilenames(filetypes=[("Intel HEX", "*.hex;*.ihex"), ("All files", "*.*")])
+        paths = filedialog.askopenfilenames(
+            filetypes=[("Intel HEX", "*.hex;*.ihex"), ("All files", "*.*")]
+        )
         for path in paths:
             hex_path = Path(path)
             try:
@@ -8360,12 +13183,13 @@ class FcdApp:
                 messagebox.showerror(APP_NAME, f"{hex_path}: {exc}")
                 continue
             stem = hex_path.stem
+            node_name = ecu_name_from_hex_stem(stem)
             row = {
-                "ecu": ecu_name_from_hex_stem(stem),
+                "ecu": node_name,
                 "target": int_hex(DEFAULT_TARGET_ADDR),
                 "req": "0x710",
-                "resp": "0x711",
-                "did": "0xF186",
+                "resp": "0x709" if node_name in ("G26", "I4G26") else "0x711",
+                "did": "0xF187" if node_name in ("G26", "I4G26") else "0xF186",
                 "base": base,
                 "hex": str(hex_path),
             }
@@ -8385,11 +13209,15 @@ class FcdApp:
             persisted = persisted_nodes.get(node.node_name, {})
             if "selected" in persisted:
                 target["simulated_enabled"] = bool(persisted["selected"])
-            target["node_kind"] = str(persisted.get("node_kind", target.get("node_kind", "Simulated")))
+            target["node_kind"] = str(
+                persisted.get("node_kind", target.get("node_kind", "Simulated"))
+            )
             if "extended_diag_address" in persisted:
                 target["extended_diag_address"] = str(persisted["extended_diag_address"])
             elif not target.get("extended_diag_address"):
-                target["extended_diag_address"] = default_extended_diag_address(node.node_name, node.bus_type)
+                target["extended_diag_address"] = default_extended_diag_address(
+                    node.node_name, node.bus_type
+                )
             iid = self.node_tree.insert(
                 "",
                 "end",
@@ -8417,8 +13245,14 @@ class FcdApp:
 
         def run():
             try:
-                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parent.parent)
+                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parents[2])
+                if not discovered_nodes:
+                    discovered_nodes = fallback_vehicle_nodes(self.settings)
+                    discovery_logs = [
+                        "No repository DBC/LDF databases found; using FCD built-in vehicle layout"
+                    ]
             except Exception as exc:
+
                 def handle_error():
                     if startup:
                         self.log(f"Node discovery: ERROR: {exc}")
@@ -8427,7 +13261,9 @@ class FcdApp:
 
                 self.root.after(0, handle_error)
             else:
-                self.root.after(0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs))
+                self.root.after(
+                    0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs)
+                )
             finally:
                 with self.discovery_lock:
                     self.discovery_running = False
@@ -8496,11 +13332,19 @@ class FcdApp:
         dialog.grab_set()
         kind = tk.StringVar(value=target.get("node_kind", "Simulated"))
         extended = tk.StringVar(value=target.get("extended_diag_address", ""))
-        ttk.Label(dialog, text=f"{node_name} ({target.get('bus_type', '')})").grid(row=0, column=0, columnspan=2, sticky="w", padx=8, pady=6)
+        ttk.Label(dialog, text=f"{node_name} ({target.get('bus_type', '')})").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=8, pady=6
+        )
         ttk.Label(dialog, text="Type").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        ttk.Combobox(dialog, textvariable=kind, values=("Simulated", "Real"), width=16, state="readonly").grid(row=1, column=1, sticky="w", padx=8, pady=6)
-        ttk.Label(dialog, text="Extended diagnostic address").grid(row=2, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(dialog, textvariable=extended, width=28).grid(row=2, column=1, sticky="ew", padx=8, pady=6)
+        ttk.Combobox(
+            dialog, textvariable=kind, values=("Simulated", "Real"), width=16, state="readonly"
+        ).grid(row=1, column=1, sticky="w", padx=8, pady=6)
+        ttk.Label(dialog, text="Extended diagnostic address").grid(
+            row=2, column=0, sticky="w", padx=8, pady=6
+        )
+        ttk.Entry(dialog, textvariable=extended, width=28).grid(
+            row=2, column=1, sticky="ew", padx=8, pady=6
+        )
 
         def ok():
             text = extended.get().strip()
@@ -8517,7 +13361,9 @@ class FcdApp:
             dialog.destroy()
 
         ttk.Button(dialog, text="OK", command=ok).grid(row=3, column=0, padx=8, pady=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(row=3, column=1, sticky="w", padx=8, pady=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(
+            row=3, column=1, sticky="w", padx=8, pady=10
+        )
         dialog.wait_window()
 
     def node_tree_click(self, event):
@@ -8552,8 +13398,12 @@ class FcdApp:
         ttk.Label(dialog, text=f"{target.get('node_name')} ({target.get('bus_type')})").grid(
             row=0, column=0, columnspan=2, sticky="w", padx=8, pady=6
         )
-        ttk.Label(dialog, text="Extended diagnostic address").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(dialog, textvariable=value, width=32).grid(row=1, column=1, sticky="ew", padx=8, pady=6)
+        ttk.Label(dialog, text="Extended diagnostic address").grid(
+            row=1, column=0, sticky="w", padx=8, pady=6
+        )
+        ttk.Entry(dialog, textvariable=value, width=32).grid(
+            row=1, column=1, sticky="ew", padx=8, pady=6
+        )
 
         def ok():
             text = value.get().strip()
@@ -8571,7 +13421,9 @@ class FcdApp:
             dialog.destroy()
 
         ttk.Button(dialog, text="OK", command=ok).grid(row=2, column=0, padx=8, pady=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(row=2, column=1, sticky="w", padx=8, pady=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(
+            row=2, column=1, sticky="w", padx=8, pady=10
+        )
         dialog.wait_window()
 
     def _insert_generator_row(self, row):
@@ -8600,13 +13452,13 @@ class FcdApp:
         self.generator_tree.move(iid, "", new_index)
         self.generator_tree.selection_set(iid)
 
-    def generate_files_clicked(self):
+    def generate_files_clicked(self, bundle_role="new"):
         def action():
             if not self.generator_rows:
                 raise FcdError("Add at least one HEX file")
             local_node_rows = None
             if not self.node_rows:
-                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parent.parent)
+                discovered_nodes, discovery_logs = discover_nodes(SCRIPT_DIR.parents[2])
                 persisted_nodes = self.settings.get("data_editor", {}).get("nodes", {})
                 local_node_rows = []
                 for node in discovered_nodes:
@@ -8614,15 +13466,23 @@ class FcdApp:
                     persisted = persisted_nodes.get(node.node_name, {})
                     if "selected" in persisted:
                         target["simulated_enabled"] = bool(persisted["selected"])
-                    target["node_kind"] = str(persisted.get("node_kind", target.get("node_kind", "Simulated")))
+                    target["node_kind"] = str(
+                        persisted.get("node_kind", target.get("node_kind", "Simulated"))
+                    )
                     if "extended_diag_address" in persisted:
                         target["extended_diag_address"] = str(persisted["extended_diag_address"])
                     elif not target.get("extended_diag_address"):
-                        target["extended_diag_address"] = default_extended_diag_address(node.node_name, node.bus_type)
+                        target["extended_diag_address"] = default_extended_diag_address(
+                            node.node_name, node.bus_type
+                        )
                     local_node_rows.append(target)
-                self.root.after(0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs))
+                self.root.after(
+                    0, lambda: self._apply_discovered_nodes(discovered_nodes, discovery_logs)
+                )
             out_root = Path(self.gen_output_var.get()).expanduser()
-            package_dir = out_root / f"FCD_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            package_dir = out_root / (
+                f"FCD_{bundle_role.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
             payload_dir = package_dir / "payloads"
             payload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -8634,7 +13494,9 @@ class FcdApp:
             self._sync_coding_tabs_from_nodes()
             coding_descriptors = self._all_coding_descriptors()
             all_targets_by_name = {}
-            source_node_rows = local_node_rows if local_node_rows is not None else self.node_rows.values()
+            source_node_rows = (
+                local_node_rows if local_node_rows is not None else self.node_rows.values()
+            )
             for t in source_node_rows:
                 if not t.get("simulated_enabled", True):
                     continue
@@ -8642,12 +13504,23 @@ class FcdApp:
                 target["payload_blocks"] = []
                 all_targets_by_name[target["node_name"].upper()] = target
 
-            selected_iids = [iid for iid in self.generator_tree.selection() if iid in self.generator_rows]
-            all_iids = [iid for iid in self.generator_tree.get_children() if iid in self.generator_rows]
+            selected_iids = [
+                iid for iid in self.generator_tree.selection() if iid in self.generator_rows
+            ]
+            all_iids = [
+                iid for iid in self.generator_tree.get_children() if iid in self.generator_rows
+            ]
             if not selected_iids and len(all_iids) > 1:
                 raise FcdError("Select the HEX row(s) to include in the generated bundle")
             source_iids = selected_iids or all_iids
-            ordered_rows = [self.generator_rows[iid] for iid in source_iids]
+            ordered_rows = [dict(self.generator_rows[iid]) for iid in source_iids]
+            if bundle_role == "rollback":
+                rollback_root = SCRIPT_DIR.parents[1] / "Firmware" / "Binary_RollBack"
+                for row in ordered_rows:
+                    candidate = rollback_root / Path(row["hex"]).name
+                    if not candidate.is_file():
+                        raise FcdError(f"Rollback HEX is missing: {candidate}")
+                    row["hex"] = str(candidate)
             if selected_iids:
                 self.log(f"Generate FCD Files: using {len(selected_iids)} selected HEX row(s)")
             else:
@@ -8662,7 +13535,9 @@ class FcdApp:
                 if name in generator_ecu_names
             }
             for target in targets_by_name.values():
-                target["coding_descriptor"] = coding_descriptors.get(target["node_name"].upper(), {})
+                target["coding_descriptor"] = coding_descriptors.get(
+                    target["node_name"].upper(), {}
+                )
 
             seen_payload_blocks = set()
             for row in ordered_rows:
@@ -8674,10 +13549,14 @@ class FcdApp:
                 segments = parse_intel_hex(hex_path)
                 if not segments:
                     raise FcdError(f"No data records in {hex_path}")
+                if ecu_key in ("G26", "I4G26"):
+                    segments = coalesce_g26_hex_image(segments, flash_kind == "FBL")
 
                 derived_base = hex_download_base(segments)
                 download_base = parse_int(row["base"]) if row.get("base") else derived_base
                 base_delta = download_base - derived_base
+                if ecu_key in ("G26", "I4G26") and base_delta != 0:
+                    raise FcdError("G26 HEX image must not be rebased")
                 ecu = {
                     "name": ecu_name,
                     "target_logical_address": int_hex(parse_int(row["target"])),
@@ -8692,11 +13571,17 @@ class FcdApp:
                 if target_entry is None:
                     target_entry = {
                         "node_name": ecu_name,
-                        "bus_type": "UNKNOWN",
+                        "bus_type": "CAN" if ecu_key in ("G26", "I4G26") else "UNKNOWN",
                         "node_kind": "Simulated",
                         "simulated_enabled": True,
-                        "extended_diag_address": "",
-                        "route_metadata": {"source_file": "", "inferred": True, "notes": ["Created from HEX filename"]},
+                        "extended_diag_address": (
+                            "0x55" if ecu_key in ("G26", "I4G26") else ""
+                        ),
+                        "route_metadata": {
+                            "source_file": "",
+                            "inferred": True,
+                            "notes": ["Created from HEX filename"],
+                        },
                         "is_zgw": ecu_name == "ZGW",
                         "flash_order_group": 99 if ecu_name == "ZGW" else 10,
                         "coding_order_group": 99 if ecu_name == "ZGW" else 10,
@@ -8705,18 +13590,52 @@ class FcdApp:
                     }
                     targets_by_name[ecu_key] = target_entry
 
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 03"})
+                tal_steps.append(
+                    {
+                        "step": step_no,
+                        "ecu": ecu_name,
+                        "service": "DiagnosticSessionControl",
+                        "request": "10 03",
+                    }
+                )
                 step_no += 1
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "CommunicationControl", "request": "28 01 03"})
+                tal_steps.append(
+                    {
+                        "step": step_no,
+                        "ecu": ecu_name,
+                        "service": "CommunicationControl",
+                        "request": "28 01 03",
+                    }
+                )
                 step_no += 1
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "ControlDTCSetting", "request": "85 02"})
+                tal_steps.append(
+                    {
+                        "step": step_no,
+                        "ecu": ecu_name,
+                        "service": "ControlDTCSetting",
+                        "request": "85 02",
+                    }
+                )
                 step_no += 1
-                tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "DiagnosticSessionControl", "request": "10 02"})
+                tal_steps.append(
+                    {
+                        "step": step_no,
+                        "ecu": ecu_name,
+                        "service": "DiagnosticSessionControl",
+                        "request": "10 02",
+                    }
+                )
                 step_no += 1
 
                 for index, segment in enumerate(segments):
                     address = download_address_from_hex_address(segment.address) + base_delta
-                    payload_key = (ecu_name, flash_kind, address, len(segment.data), str(hex_path).lower())
+                    payload_key = (
+                        ecu_name,
+                        flash_kind,
+                        address,
+                        len(segment.data),
+                        str(hex_path).lower(),
+                    )
                     if payload_key in seen_payload_blocks:
                         continue
                     seen_payload_blocks.add(payload_key)
@@ -8749,7 +13668,9 @@ class FcdApp:
                             "flash_kind": payload_entry["flash_kind"],
                         }
                     )
-                    ecu_segment = {key: value for key, value in payload_entry.items() if key != "data_base64"}
+                    ecu_segment = {
+                        key: value for key, value in payload_entry.items() if key != "data_base64"
+                    }
                     ecu["segments"].append(ecu_segment)
                     tal_steps.append(
                         {
@@ -8771,9 +13692,15 @@ class FcdApp:
                         }
                     )
                     step_no += 1
-                    tal_steps.append({"step": step_no, "ecu": ecu_name, "service": "RequestTransferExit"})
+                    tal_steps.append(
+                        {"step": step_no, "ecu": ecu_name, "service": "RequestTransferExit"}
+                    )
                     step_no += 1
-                    if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and flash_kind != "FBL":
+                    if (
+                        self.verify_crc_var.get()
+                        and (not self.transfer_crc_var.get())
+                        and flash_kind != "FBL"
+                    ):
                         tal_steps.append(
                             {
                                 "step": step_no,
@@ -8806,7 +13733,9 @@ class FcdApp:
             (package_dir / "fcd_fa.json").write_text(json.dumps(fa, indent=2), encoding="utf-8")
             (package_dir / "fcd_svt.json").write_text(json.dumps(svt, indent=2), encoding="utf-8")
             (package_dir / "fcd_tal.json").write_text(json.dumps(tal, indent=2), encoding="utf-8")
-            (package_dir / "fcd_psdzdata.json").write_text(json.dumps(psdz, indent=2), encoding="utf-8")
+            (package_dir / "fcd_psdzdata.json").write_text(
+                json.dumps(psdz, indent=2), encoding="utf-8"
+            )
             source_dbs = sorted({n.source_file for n in self.discovered_nodes})
             targets = list(targets_by_name.values())
             manifest = manifest_from_targets(
@@ -8816,8 +13745,13 @@ class FcdApp:
                 targets,
             )
             manifest["legacy_package_folder"] = str(package_dir)
-            manifest["schedule"] = to_jsonable_events(build_schedule(manifest["targets"], include_flash=True, include_coding=True))
-            schedule_errors = validate_schedule(build_schedule(manifest["targets"], include_flash=True, include_coding=True))
+            manifest["sota_bundle_role"] = bundle_role
+            manifest["schedule"] = to_jsonable_events(
+                build_schedule(manifest["targets"], include_flash=True, include_coding=True)
+            )
+            schedule_errors = validate_schedule(
+                build_schedule(manifest["targets"], include_flash=True, include_coding=True)
+            )
             if schedule_errors:
                 raise FcdError("; ".join(schedule_errors))
             bundle_path = package_dir.with_suffix(".pfpkg")
@@ -8825,6 +13759,12 @@ class FcdApp:
             self.log(f"Generated FCD legacy folder: {package_dir}")
             self.log(f"Generated primary parallel bundle: {bundle_path}")
             self.root.after(0, lambda: self.pkg_dir_var.set(str(bundle_path)))
+            target_var = (
+                self.sota_rollback_bundle_var
+                if bundle_role == "rollback"
+                else self.sota_new_bundle_var
+            )
+            self.root.after(0, lambda: target_var.set(str(bundle_path)))
 
         self.worker("Generate FCD Files", action)
 
@@ -8844,7 +13784,9 @@ class FcdApp:
             filetypes=[("Parallel FCD bundle", "*.pfpkg;*.fcdpkg"), ("All files", "*.*")],
         )
         if not path:
-            path = filedialog.askdirectory(initialdir=self.pkg_dir_var.get() or self.gen_output_var.get() or str(Path.cwd()))
+            path = filedialog.askdirectory(
+                initialdir=self.pkg_dir_var.get() or self.gen_output_var.get() or str(Path.cwd())
+            )
         if path:
             self.pkg_dir_var.set(path)
 
@@ -8874,7 +13816,9 @@ class FcdApp:
                     ) or int_hex(DEFAULT_TARGET_ADDR)
                     self.package_payloads.append(item)
             self._populate_payload_tree_from_schedule(manifest)
-            self.log(f"Loaded parallel bundle: {package_path} ({len(self.package_payloads)} payload blocks)")
+            self.log(
+                f"Loaded parallel bundle: {package_path} ({len(self.package_payloads)} payload blocks)"
+            )
             return
 
         package_dir = package_path
@@ -8907,7 +13851,10 @@ class FcdApp:
         flash_slot_count = len({e.get("time_slot", 0) for e in flash_events})
         coding_slot_count = len({e.get("time_slot", 0) for e in coding_events})
         rows = [
-            ("Targets", str(len(targets) or len({p.get("ecu", "") for p in self.package_payloads}))),
+            (
+                "Targets",
+                str(len(targets) or len({p.get("ecu", "") for p in self.package_payloads})),
+            ),
             ("Payload blocks", str(len(self.package_payloads))),
             ("Payload bytes", f"{total_bytes} ({total_mib:.2f} MiB data records)"),
             ("TransferData requests", str(self._payloads_total_packets(self.package_payloads))),
@@ -8972,7 +13919,7 @@ class FcdApp:
                         is_fbl=False,
                         progress_cb=progress_cb,
                         strict_response=strict_response,
-                )
+                    )
                 self._execute_zgw_flash_hard_reset(client, "after APPL flash", probe_target="APP")
 
             complete_progress()
@@ -8994,7 +13941,11 @@ class FcdApp:
             messagebox.showerror(APP_NAME, str(exc))
             return
 
-        action_name = "Execute Parallel Bundle" if self.package_manifest is not None else "Execute ZGW Sequence"
+        action_name = (
+            "Execute Parallel Bundle"
+            if self.package_manifest is not None
+            else "Execute ZGW Sequence"
+        )
         self.worker(action_name, lambda: self._execute_selected_payloads_once(payloads))
 
     def _new_parallel_client(self, target_addr):
@@ -9014,7 +13965,9 @@ class FcdApp:
 
     def _update_elapsed(self, start_time):
         elapsed = int(time.monotonic() - start_time)
-        self.root.after(0, lambda: self.elapsed_var.set(f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}"))
+        self.root.after(
+            0, lambda: self.elapsed_var.set(f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
+        )
 
     def _payloads_total_bytes(self, payloads):
         total = 0
@@ -9030,15 +13983,19 @@ class FcdApp:
         # number of TransferData requests actually sent at runtime.
         target_info = self._target_for_payload(payload)
         target_is_zgw = self._payload_targets_zgw(payload, target_info)
-        routed_target = bool(target_info) and not (
-            self._payload_targets_zgw(payload, target_info)
-        )
+        routed_target = bool(target_info) and not (self._payload_targets_zgw(payload, target_info))
         configured_block_size = parse_int(self.block_size_var.get())
         max_chunk_size = (
-            ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE if target_is_zgw
-            else ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target
-            else TRANSFER_DATA_MAX_CHUNK_SIZE
+            ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE
+            if target_is_zgw
+            else (
+                ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE
+                if routed_target
+                else TRANSFER_DATA_MAX_CHUNK_SIZE
+            )
         )
+        if is_g26_target(target_info, payload) and not self._payload_is_fbl(payload):
+            max_chunk_size = min(max_chunk_size, G26_MAX_APP_BLOCK_DATA)
         return max(8, min(max_chunk_size, configured_block_size))
 
     @staticmethod
@@ -9089,7 +14046,11 @@ class FcdApp:
                 value = min(maximum, progress_state["units"])
                 active = progress_state["active"]
             elapsed = int(time.monotonic() - start_time)
-            if (not force) and value == progress_state["last_rendered_units"] and elapsed == progress_state["last_rendered_elapsed"]:
+            if (
+                (not force)
+                and value == progress_state["last_rendered_units"]
+                and elapsed == progress_state["last_rendered_elapsed"]
+            ):
                 if active:
                     self.root.after(200, render_progress)
                 return
@@ -9190,7 +14151,9 @@ class FcdApp:
             if keepalive_was_on and completed and not self.worker_stop.is_set():
                 self.start_keepalive()
 
-    def _execute_non_zgw_flash_by_bus(self, events, by_node, targets, progress_cb, strict_response=False):
+    def _execute_non_zgw_flash_by_bus(
+        self, events, by_node, targets, progress_cb, strict_response=False
+    ):
         by_bus = {}
         for event in events:
             by_bus.setdefault(bus_category(event.get("bus_type", "UNKNOWN")), []).append(event)
@@ -9201,17 +14164,25 @@ class FcdApp:
         app_lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl=False)
         phase_lanes = {}
         for bus, tasks in fbl_lanes.items():
-            phase_lanes.setdefault(bus, []).extend(("FBL", True, slot, work) for slot, work in tasks)
+            phase_lanes.setdefault(bus, []).extend(
+                ("FBL", True, slot, work) for slot, work in tasks
+            )
         for bus, tasks in app_lanes.items():
-            phase_lanes.setdefault(bus, []).extend(("APP", False, slot, work) for slot, work in tasks)
+            phase_lanes.setdefault(bus, []).extend(
+                ("APP", False, slot, work) for slot, work in tasks
+            )
         if phase_lanes and all(
             self._can_run_paced_flash_slot(work)
             for tasks in phase_lanes.values()
             for _phase_name, _is_fbl, _slot, work in tasks
         ):
-            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            client = self._new_parallel_client(
+                parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+            )
             try:
-                client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                client.request_spacing_seconds = max(
+                    client.request_spacing_seconds, REQUEST_SPACING_SECONDS
+                )
                 client.drain()
                 self.log(
                     "Execute Parallel Bundle: non-ZGW flash uses one DoIP TCP connection "
@@ -9248,7 +14219,9 @@ class FcdApp:
             run_bus(next(iter(by_bus.values())))
             return
 
-        with ThreadPoolExecutor(max_workers=max(1, min(len(by_bus), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+        with ThreadPoolExecutor(
+            max_workers=max(1, min(len(by_bus), PARALLEL_BUNDLE_MAX_WORKERS))
+        ) as executor:
             futures = [executor.submit(run_bus, bus_events) for bus_events in by_bus.values()]
             for future in as_completed(futures):
                 future.result()
@@ -9261,7 +14234,8 @@ class FcdApp:
             for event in slot_events:
                 node_name = event.get("node_name", "")
                 node_payloads = [
-                    payload for payload in by_node.get(node_name, [])
+                    payload
+                    for payload in by_node.get(node_name, [])
                     if self._payload_is_fbl(payload) == is_fbl
                 ]
                 node_payloads = self._unique_payloads(node_payloads)
@@ -9273,23 +14247,26 @@ class FcdApp:
                 lanes.setdefault(bus, []).append((slot, work))
         return lanes
 
-    def _execute_parallel_flash_phase(self, events, by_node, targets, progress_cb, is_fbl, strict_response=False):
+    def _execute_parallel_flash_phase(
+        self, events, by_node, targets, progress_cb, is_fbl, strict_response=False
+    ):
         phase_name = "FBL" if is_fbl else "APP"
         lanes = self._collect_parallel_flash_lanes(events, by_node, targets, is_fbl)
 
         if not lanes:
             return
 
-        lane_text = ", ".join(
-            f"{bus}:{len(tasks)} slot(s)"
-            for bus, tasks in sorted(lanes.items())
-        )
+        lane_text = ", ".join(f"{bus}:{len(tasks)} slot(s)" for bus, tasks in sorted(lanes.items()))
         self.log(f"Execute Parallel Bundle: {phase_name} bus lanes={lane_text}")
 
         if self._can_run_paced_flash_lanes(lanes):
-            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            client = self._new_parallel_client(
+                parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+            )
             try:
-                client.request_spacing_seconds = max(client.request_spacing_seconds, REQUEST_SPACING_SECONDS)
+                client.request_spacing_seconds = max(
+                    client.request_spacing_seconds, REQUEST_SPACING_SECONDS
+                )
                 client.drain()
                 self.log(
                     f"Execute Parallel Bundle: {phase_name} uses one DoIP TCP connection "
@@ -9323,15 +14300,16 @@ class FcdApp:
             run_lane(bus, tasks)
             return
 
-        with ThreadPoolExecutor(max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
-            futures = [
-                executor.submit(run_lane, bus, tasks)
-                for bus, tasks in lanes.items()
-            ]
+        with ThreadPoolExecutor(
+            max_workers=max(1, min(len(lanes), PARALLEL_BUNDLE_MAX_WORKERS))
+        ) as executor:
+            futures = [executor.submit(run_lane, bus, tasks) for bus, tasks in lanes.items()]
             for future in as_completed(futures):
                 future.result()
 
-    def _execute_parallel_flash_slot_work(self, phase_name, slot, bus, work, progress_cb, is_fbl, strict_response):
+    def _execute_parallel_flash_slot_work(
+        self, phase_name, slot, bus, work, progress_cb, is_fbl, strict_response
+    ):
         if not work:
             return
         self.log(
@@ -9339,13 +14317,17 @@ class FcdApp:
             f"nodes={', '.join(item[0] for item in work)}"
         )
         if self._can_run_paced_flash_slot(work):
-            client = self._new_parallel_client(parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR)))
+            client = self._new_parallel_client(
+                parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
+            )
             try:
                 self._execute_paced_simulated_flash_slot(slot, work, client, progress_cb, is_fbl)
             finally:
                 client.close()
             return
-        with ThreadPoolExecutor(max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))) as executor:
+        with ThreadPoolExecutor(
+            max_workers=max(1, min(len(work), PARALLEL_BUNDLE_MAX_WORKERS))
+        ) as executor:
             futures = [
                 executor.submit(
                     self._execute_payloads_parallel_worker,
@@ -9420,7 +14402,9 @@ class FcdApp:
             for slot, work in sorted(lanes[bus], key=lambda item: item[0]):
                 prepared = []
                 for node_name, payloads, target in work:
-                    sequence = self._simulated_flash_request_sequence(node_name, payloads, target, is_fbl)
+                    sequence = self._simulated_flash_request_sequence(
+                        node_name, payloads, target, is_fbl
+                    )
                     if sequence:
                         prepared.append((node_name, payloads, target, sequence))
                 if not prepared:
@@ -9433,7 +14417,9 @@ class FcdApp:
 
                 max_steps = max(len(item[3]) for item in prepared)
                 for step_index in range(max_steps):
-                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(prepared):
+                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(
+                        prepared
+                    ):
                         if step_index >= len(sequence):
                             continue
                         request, label, progress_count = sequence[step_index]
@@ -9445,18 +14431,20 @@ class FcdApp:
                             + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
                         )
                         due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
-                        events.append((
-                            due,
-                            bus_order.get(bus, 99),
-                            slot,
-                            node_index,
-                            order,
-                            bus,
-                            target,
-                            bytes(request),
-                            label,
-                            progress_count,
-                        ))
+                        events.append(
+                            (
+                                due,
+                                bus_order.get(bus, 99),
+                                slot,
+                                node_index,
+                                order,
+                                bus,
+                                target,
+                                bytes(request),
+                                label,
+                                progress_count,
+                            )
+                        )
                         order += 1
 
                 lane_start += (
@@ -9466,7 +14454,18 @@ class FcdApp:
                 )
 
         expected_requests = []
-        for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+        for (
+            due,
+            _bus_rank,
+            _slot,
+            _node_index,
+            _order,
+            bus,
+            target,
+            request,
+            label,
+            progress_count,
+        ) in sorted(events):
             self._sleep_until_monotonic(due)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
@@ -9475,7 +14474,9 @@ class FcdApp:
                 label,
                 apply_pacing=(bus != "LIN"),
             )
-            expected_requests.append((label, prefixed_request, self._target_is_simulated(target), progress_count))
+            expected_requests.append(
+                (label, prefixed_request, self._target_is_simulated(target), progress_count)
+            )
 
         self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
@@ -9497,10 +14498,14 @@ class FcdApp:
 
         for bus in sorted(phase_lanes, key=lambda item: bus_order.get(item, 99)):
             lane_start = start_time
-            for phase_name, is_fbl, slot, work in sorted(phase_lanes[bus], key=lambda item: (item[2], 0 if item[1] else 1)):
+            for phase_name, is_fbl, slot, work in sorted(
+                phase_lanes[bus], key=lambda item: (item[2], 0 if item[1] else 1)
+            ):
                 prepared = []
                 for node_name, payloads, target in work:
-                    sequence = self._simulated_flash_request_sequence(node_name, payloads, target, is_fbl)
+                    sequence = self._simulated_flash_request_sequence(
+                        node_name, payloads, target, is_fbl
+                    )
                     if sequence:
                         prepared.append((node_name, payloads, target, sequence))
                 if not prepared:
@@ -9513,7 +14518,9 @@ class FcdApp:
 
                 max_steps = max(len(item[3]) for item in prepared)
                 for step_index in range(max_steps):
-                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(prepared):
+                    for node_index, (_node_name, _payloads, target, sequence) in enumerate(
+                        prepared
+                    ):
                         if step_index >= len(sequence):
                             continue
                         request, label, progress_count = sequence[step_index]
@@ -9525,18 +14532,20 @@ class FcdApp:
                             + (node_index * ROUTED_READ_CODING_NODE_STAGGER_SECONDS)
                         )
                         due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
-                        events.append((
-                            due,
-                            bus_order.get(bus, 99),
-                            slot,
-                            node_index,
-                            order,
-                            bus,
-                            target,
-                            bytes(request),
-                            label,
-                            progress_count,
-                        ))
+                        events.append(
+                            (
+                                due,
+                                bus_order.get(bus, 99),
+                                slot,
+                                node_index,
+                                order,
+                                bus,
+                                target,
+                                bytes(request),
+                                label,
+                                progress_count,
+                            )
+                        )
                         order += 1
 
                 lane_start += (
@@ -9546,7 +14555,18 @@ class FcdApp:
                 )
 
         expected_requests = []
-        for due, _bus_rank, _slot, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+        for (
+            due,
+            _bus_rank,
+            _slot,
+            _node_index,
+            _order,
+            bus,
+            target,
+            request,
+            label,
+            progress_count,
+        ) in sorted(events):
             self._sleep_until_monotonic(due)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
@@ -9555,7 +14575,9 @@ class FcdApp:
                 label,
                 apply_pacing=(bus != "LIN"),
             )
-            expected_requests.append((label, prefixed_request, self._target_is_simulated(target), progress_count))
+            expected_requests.append(
+                (label, prefixed_request, self._target_is_simulated(target), progress_count)
+            )
 
         self._wait_routed_transport_acks_and_progress(client, expected_requests, progress_cb)
         time.sleep(ROUTED_READ_CODING_DRAIN_SECONDS)
@@ -9611,21 +14633,33 @@ class FcdApp:
                     if request is None:
                         continue
                     due = self._scheduled_routed_due(bus, desired_due, next_due_by_bus)
-                    events.append((
-                        due,
-                        bus_order.get(bus, 99),
-                        node_index,
-                        order,
-                        bus,
-                        target,
-                        bytes(request),
-                        label,
-                        progress_count,
-                    ))
+                    events.append(
+                        (
+                            due,
+                            bus_order.get(bus, 99),
+                            node_index,
+                            order,
+                            bus,
+                            target,
+                            bytes(request),
+                            label,
+                            progress_count,
+                        )
+                    )
                     order += 1
 
         expected_requests = []
-        for due, _bus_rank, _node_index, _order, bus, target, request, label, progress_count in sorted(events):
+        for (
+            due,
+            _bus_rank,
+            _node_index,
+            _order,
+            bus,
+            target,
+            request,
+            label,
+            progress_count,
+        ) in sorted(events):
             self._sleep_until_monotonic(due)
             prefixed_request = self._send_routed_uds_no_wait(
                 client,
@@ -9647,18 +14681,35 @@ class FcdApp:
 
     def _simulated_flash_request_sequence(self, node_name, payloads, target, is_fbl):
         sequence = []
+        g26_target = is_g26_target(target, payloads[0] if payloads else None)
 
         def add(request, label, progress_count=0):
-            sequence.append((bytes(request) if request is not None else None, label, progress_count))
+            sequence.append(
+                (bytes(request) if request is not None else None, label, progress_count)
+            )
 
-        if is_fbl:
-            add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session before flash controls")
+        if g26_target:
+            if len(payloads) != 1:
+                raise FcdError("G26 requires one contiguous image per APP/FBL stage")
+            add(b"\x22\xF1\x87", f"{node_name}: identify APP/FBL")
+            add(bytes([0x10, SESSION_EXTENDED]), f"{node_name}: Extended Session")
+            add(b"\x28\x01\x03", f"{node_name}: CommunicationControl")
+            add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+            add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: enter resident FBL")
+            add(b"\x22\xF1\x87", f"{node_name}: resident FBL identity")
+        elif is_fbl:
+            add(
+                bytes([0x10, SESSION_EXTENDED]),
+                f"{node_name}: Extended Session before flash controls",
+            )
             add(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
             add(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
             add(bytes([0x10, SESSION_PROGRAMMING]), f"{node_name}: Programming Session")
 
         configured_block_size = parse_int(self.block_size_var.get())
         block_size = max(8, min(ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE, configured_block_size))
+        if g26_target and not is_fbl:
+            block_size = min(block_size, G26_MAX_APP_BLOCK_DATA)
         for payload in payloads:
             address = parse_int(payload["address"])
             size = int(payload["size"])
@@ -9668,6 +14719,8 @@ class FcdApp:
                 raise FcdError(f"{payload['ecu']}: payload size mismatch {len(data)} != {size}")
             if (binascii.crc32(data) & 0xFFFFFFFF) != expected_crc:
                 raise FcdError(f"{payload['ecu']}: payload CRC mismatch")
+            if g26_target:
+                validate_g26_image(address, data, self._payload_is_fbl(payload))
 
             block_name = "FBL" if self._payload_is_fbl(payload) else "APPL"
             label = f"{payload['ecu']} {block_name} {int_hex(address, 8)} size={size}"
@@ -9677,21 +14730,28 @@ class FcdApp:
             )
 
             if block_name == "FBL":
-                add(
-                    b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_FBL]),
-                    f"{node_name}: RoutineControl 0200 Select FBL software block",
-                )
+                if not g26_target:
+                    add(
+                        b"\x31\x01"
+                        + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK)
+                        + bytes([ACTIVE_SW_BLOCK_FBL]),
+                        f"{node_name}: RoutineControl 0200 Select FBL software block",
+                    )
                 add(
                     b"\x31\x01" + struct.pack(">H", ROUTINE_START_FBL_RAM_UPDATER),
                     f"{node_name}: RoutineControl 0155 Start FBL RAM Updater",
                 )
                 add(
-                    b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size),
+                    b"\x31\x01"
+                    + struct.pack(">H", ROUTINE_ERASE_MEMORY)
+                    + struct.pack(">II", address, size),
                     f"{node_name}: RoutineControl Erase {block_name}",
                 )
             elif self.erase_var.get():
                 add(
-                    b"\x31\x01" + struct.pack(">H", ROUTINE_ERASE_MEMORY) + struct.pack(">II", address, size),
+                    b"\x31\x01"
+                    + struct.pack(">H", ROUTINE_ERASE_MEMORY)
+                    + struct.pack(">II", address, size),
                     f"{node_name}: RoutineControl Erase {block_name}",
                 )
 
@@ -9722,7 +14782,11 @@ class FcdApp:
                 transfer_exit += struct.pack(">I", expected_crc)
             add(transfer_exit, f"{node_name}: RequestTransferExit {block_name}")
 
-            if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and block_name != "FBL":
+            if (
+                self.verify_crc_var.get()
+                and (not self.transfer_crc_var.get())
+                and block_name != "FBL"
+            ):
                 add(
                     b"\x31\x01"
                     + struct.pack(">H", ROUTINE_CHECK_MEMORY_CRC)
@@ -9730,18 +14794,33 @@ class FcdApp:
                     f"{node_name}: RoutineControl CRC {block_name}",
                 )
             elif self.verify_crc_var.get():
-                self.log(f"{node_name}: skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC")
+                self.log(
+                    f"{node_name}: skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC"
+                )
             self.log(f"Flash dry-run routed queued: {label}")
 
-        add(b"\x11\x01", f"{node_name}: ECUReset hardReset after {node_name} {'FBL' if is_fbl else 'APP'} flash")
-        wait_steps = max(1, int(round(ROUTED_FLASH_POST_RESET_GAP_SECONDS / ROUTED_READ_CODING_SERVICE_GAP_SECONDS)))
+        add(
+            b"\x11\x01",
+            f"{node_name}: ECUReset hardReset after {node_name} {'FBL' if is_fbl else 'APP'} flash",
+        )
+        wait_steps = max(
+            1,
+            int(
+                round(ROUTED_FLASH_POST_RESET_GAP_SECONDS / ROUTED_READ_CODING_SERVICE_GAP_SECONDS)
+            ),
+        )
         for _index in range(wait_steps):
             add(None, "")
-        add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Post-reset UDS readiness probe")
+        if g26_target:
+            add(b"\x22\xF1\x87", f"{node_name}: APP restart identity")
+        else:
+            add(bytes([0x10, SESSION_DEFAULT]), f"{node_name}: Post-reset UDS readiness probe")
         return sequence
 
     def _parallel_target_addr(self, target, payloads=None):
-        if target and not (bool(target.get("is_zgw")) or str(target.get("node_name", "")).upper() == "ZGW"):
+        if target and not (
+            bool(target.get("is_zgw")) or str(target.get("node_name", "")).upper() == "ZGW"
+        ):
             return parse_int(self.target_var.get() or int_hex(DEFAULT_TARGET_ADDR))
         route_target = target.get("route_metadata", {}).get("target_logical_address", "")
         if route_target:
@@ -9753,9 +14832,24 @@ class FcdApp:
                     return parse_int(payload_target)
         return DEFAULT_TARGET_ADDR
 
-    def _execute_payloads_parallel_worker(self, payloads, target, progress_cb, strict_response=False):
+    def _execute_payloads_parallel_worker(
+        self, payloads, target, progress_cb, strict_response=False
+    ):
         if not payloads:
             return
+        if is_g26_target(target, payloads[0]):
+            validate_g26_target_info(target, payloads[0])
+            if len(payloads) != 1:
+                raise FcdError("G26 requires one contiguous image per APP/FBL stage")
+            image = self._read_payload_data(payloads[0])
+            if len(image) != int(payloads[0]["size"]):
+                raise FcdError("G26 image size does not match package metadata")
+            if (binascii.crc32(image) & 0xFFFFFFFF) != parse_int(payloads[0]["crc32"]):
+                raise FcdError("G26 image CRC32 does not match package metadata")
+            validate_g26_image(
+                parse_int(payloads[0]["address"]), image,
+                self._payload_is_fbl(payloads[0]),
+            )
         target_addr = self._parallel_target_addr(target, payloads)
         client = self._new_parallel_client(target_addr)
         try:
@@ -9784,6 +14878,20 @@ class FcdApp:
         finally:
             client.close()
 
+    def _wait_g26_identity(self, send, expected, phase, timeout=30.0):
+        deadline = time.monotonic() + timeout
+        last_error = None
+        while time.monotonic() < deadline:
+            try:
+                identity = send(b"\x22\xF1\x87", f"G26 {phase} identity", timeout=2.0)
+                if identity == expected:
+                    return
+                last_error = FcdError(f"G26 {phase}: unexpected identity {bytes_to_hex(identity)}")
+            except Exception as exc:
+                last_error = exc
+            time.sleep(0.1)
+        raise FcdError(f"G26 {phase}: expected identity was not observed ({last_error})")
+
     def _execute_target_flash_preamble(self, client, target, is_fbl=False, strict_response=False):
         node_name = target.get("node_name", "target")
         send = self._make_target_uds_sender(
@@ -9792,13 +14900,29 @@ class FcdApp:
             dry=False,
             strict_response=strict_response,
         )
-        if (not is_fbl) and target.get("_fcd_fbl_flash_reset_ready"):
+        if (not is_fbl) and target.get("_fcd_fbl_flash_reset_ready") and not is_g26_target(target):
             return
         target_is_zgw = bool(target.get("is_zgw")) or str(node_name).upper() == "ZGW"
         if target_is_zgw:
             self._execute_zgw_flash_entry(send, node_name, is_fbl=is_fbl)
             return
-        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls")
+        if is_g26_target(target):
+            validate_g26_target_info(target)
+            identity = send(b"\x22\xF1\x87", f"{node_name}: identify APP/FBL", timeout=3.0)
+            if identity == G26_FBL_IDENTITY:
+                self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: FBL Programming Session")
+                return
+            if identity != G26_APP_IDENTITY:
+                raise FcdError(f"{node_name}: unknown APP/FBL identity {bytes_to_hex(identity)}")
+            self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session")
+            send(b"\x28\x01\x03", f"{node_name}: CommunicationControl")
+            send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
+            self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: enter resident FBL", timeout=30.0)
+            self._wait_g26_identity(send, G26_FBL_IDENTITY, "resident FBL entry")
+            return
+        self._send_session(
+            send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls"
+        )
         send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
@@ -9815,7 +14939,18 @@ class FcdApp:
         )
         target_is_zgw = bool(target.get("is_zgw")) or str(node_name).upper() == "ZGW"
         reason_upper = str(reason).upper()
-        if target_is_zgw and ("FBL" in reason_upper or "APP" in reason_upper) and isinstance(client, DoipClient):
+        if is_g26_target(target):
+            try:
+                send(b"\x11\x01", f"{node_name}: hardReset after flash", timeout=10.0)
+            except NodeTimeout:
+                self.log(f"{node_name}: reset response lost; checking APP identity")
+            self._wait_g26_identity(send, G26_APP_IDENTITY, "APP restart")
+            return
+        if (
+            target_is_zgw
+            and ("FBL" in reason_upper or "APP" in reason_upper)
+            and isinstance(client, DoipClient)
+        ):
             probe_target = "FBL" if "FBL" in reason_upper else "APP"
             self._execute_zgw_flash_hard_reset(
                 client,
@@ -9830,7 +14965,9 @@ class FcdApp:
         if not getattr(send, "dry_run", False) and not self._target_is_simulated(target):
             self._recover_doip_after_reset(client, reason, require_current_client=False)
         else:
-            self._send_session(send, SESSION_DEFAULT, f"{node_name}: Post-reset UDS readiness probe")
+            self._send_session(
+                send, SESSION_DEFAULT, f"{node_name}: Post-reset UDS readiness probe"
+            )
         if "FBL" in reason_upper:
             target["_fcd_fbl_flash_reset_ready"] = True
 
@@ -9838,6 +14975,8 @@ class FcdApp:
         flash_kind = str(payload.get("flash_kind", "")).strip().upper()
         if flash_kind:
             return flash_kind == "FBL"
+        if is_g26_target(None, payload):
+            return parse_int(payload.get("address", "0")) == G26_FBL_BASE
         name = str(payload.get("ecu", "") + " " + payload.get("file", "")).upper()
         address = parse_int(payload.get("address", "0"))
         return "FBL" in name or address < DEFAULT_APP_START
@@ -9870,9 +15009,13 @@ class FcdApp:
 
         if bool(payload.get("is_zgw")) or bool(target_info.get("is_zgw")) or ("ZGW" in names):
             return True
+        if target_info.get("node_name") and str(target_info["node_name"]).upper() != "ZGW":
+            return False
 
         try:
-            payload_target = parse_int(payload.get("target_logical_address", int_hex(DEFAULT_TARGET_ADDR)))
+            payload_target = parse_int(
+                payload.get("target_logical_address", int_hex(DEFAULT_TARGET_ADDR))
+            )
         except Exception:
             payload_target = 0
 
@@ -9927,7 +15070,9 @@ class FcdApp:
                 ack_s = timing.get("ack_s")
                 response_s = timing.get("response_s")
                 ack_text = "n/a" if ack_s is None else f"{float(ack_s) * 1000.0:.1f} ms"
-                response_text = "n/a" if response_s is None else f"{float(response_s) * 1000.0:.1f} ms"
+                response_text = (
+                    "n/a" if response_s is None else f"{float(response_s) * 1000.0:.1f} ms"
+                )
                 self.log(
                     f"TIMING {name}: total={total_ms:.1f} ms, pace={pace_ms:.1f} ms, "
                     f"DoIP_ACK={ack_text}, UDS_response={response_text}, rx_bytes={len(response)}"
@@ -9964,7 +15109,9 @@ class FcdApp:
         )
         require_positive_response(response, 0x22)
         if (len(response) < 4) or (response[1] != 0xF1) or (response[2] != 0x86):
-            raise FcdError(f"{prefix}: malformed active-session DID response {bytes_to_hex(response)}")
+            raise FcdError(
+                f"{prefix}: malformed active-session DID response {bytes_to_hex(response)}"
+            )
         session = response[3]
         self.log(f"{prefix}: active_session=0x{session:02X}")
         return session
@@ -9973,7 +15120,9 @@ class FcdApp:
         try:
             return self._send_session(send, session, label, timeout=timeout)
         except Exception as session_exc:
-            self.log(f"{label}: no positive session response ({session_exc}); verifying active session")
+            self.log(
+                f"{label}: no positive session response ({session_exc}); verifying active session"
+            )
             try:
                 active_session = self._read_active_diag_session(send, label, timeout=2.0)
             except Exception as verify_exc:
@@ -9989,7 +15138,9 @@ class FcdApp:
                 f"{label}: requested session 0x{session:02X}, active session is 0x{active_session:02X}"
             ) from session_exc
 
-    def _run_flash_routine_control(self, send, rid, option, label, timeout, expected_payload=None, allow_no_response=False):
+    def _run_flash_routine_control(
+        self, send, rid, option, label, timeout, expected_payload=None, allow_no_response=False
+    ):
         request = b"\x31\x01" + struct.pack(">H", rid) + bytes(option or b"")
         expected_payload = bytes(expected_payload) if expected_payload is not None else None
         start = time.monotonic()
@@ -10068,7 +15219,9 @@ class FcdApp:
 
     def _select_zgw_fbl_software_block(self, client, send, label_prefix):
         label = f"{label_prefix}: RoutineControl 0200 Select FBL software block"
-        request = b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_FBL])
+        request = (
+            b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_FBL])
+        )
         expected_payload = bytes([ACTIVE_SW_BLOCK_FBL])
         start = time.monotonic()
         self.log(
@@ -10103,7 +15256,9 @@ class FcdApp:
         except Exception as exc:
             if not bool(getattr(client, "last_uds_request_sent", False)):
                 raise FcdError(f"{label}: request was not sent ({exc})") from exc
-            if isinstance(exc, DoipError) and str(exc).startswith(("Diagnostic NACK", "Diagnostic ACK code")):
+            if isinstance(exc, DoipError) and str(exc).startswith(
+                ("Diagnostic NACK", "Diagnostic ACK code")
+            ):
                 raise FcdError(f"{label}: request was rejected ({exc})") from exc
             self.log(
                 f"{label}: transition response not available after "
@@ -10113,7 +15268,7 @@ class FcdApp:
         self._poll_doip_after_reset_with_probe(
             client,
             label,
-            b"\x3E\x00",
+            b"\x3e\x00",
             "Post-select FBL TesterPresent probe",
             0x3E,
             require_current_client=(self.client is client),
@@ -10137,7 +15292,9 @@ class FcdApp:
             send(b"\x22" + struct.pack(">H", did), f"{prefix}: {name}")
 
     def _execute_zgw_flash_entry(self, send, node_name, is_fbl=False):
-        self._send_session(send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls")
+        self._send_session(
+            send, SESSION_EXTENDED, f"{node_name}: Extended Session before flash controls"
+        )
         send(b"\x28\x01\x03", f"{node_name}: CommunicationControl enableRxAndDisableTx")
         send(b"\x85\x02", f"{node_name}: ControlDTCSetting off")
         self._send_session(send, SESSION_PROGRAMMING, f"{node_name}: Programming Session")
@@ -10160,7 +15317,15 @@ class FcdApp:
         path = self.package_dir / payload["file"]
         return path.read_bytes()
 
-    def _execute_payload(self, client, payload, is_fbl=False, progress_cb=None, target_info=None, strict_response=False):
+    def _execute_payload(
+        self,
+        client,
+        payload,
+        is_fbl=False,
+        progress_cb=None,
+        target_info=None,
+        strict_response=False,
+    ):
         target = parse_int(payload["target_logical_address"])
         address = parse_int(payload["address"])
         size = int(payload["size"])
@@ -10172,28 +15337,38 @@ class FcdApp:
             raise FcdError(f"{payload['ecu']}: payload size mismatch {len(data)} != {size}")
         if (binascii.crc32(data) & 0xFFFFFFFF) != expected_crc:
             raise FcdError(f"{payload['ecu']}: payload CRC mismatch")
+        g26_target = is_g26_target(target_info, payload)
+        if g26_target:
+            validate_g26_target_info(target_info, payload)
+            validate_g26_image(address, data, is_fbl)
+            if not self.transfer_crc_var.get():
+                raise FcdError("G26 requires a CRC32 in RequestTransferExit")
+            if not is_fbl and not self.erase_var.get():
+                raise FcdError("G26 APP programming requires the erase routine")
         target_is_zgw = self._payload_targets_zgw(payload, target_info)
         if isinstance(client, DoipClient) and target_is_zgw:
             client.target_addr = target
 
         configured_block_size = parse_int(self.block_size_var.get())
-        routed_target = bool(target_info) and not (
-            target_is_zgw
-        )
+        routed_target = bool(target_info) and not (target_is_zgw)
         if target_is_zgw:
             max_chunk_size = ZGW_ETHERNET_TRANSFER_DATA_MAX_CHUNK_SIZE
             transfer_request_limit = ZGW_ETHERNET_TRANSFER_DATA_REQUEST_LIMIT
             block_size = max(8, min(max_chunk_size, configured_block_size))
         else:
-            max_chunk_size = ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE if routed_target else TRANSFER_DATA_MAX_CHUNK_SIZE
+            max_chunk_size = (
+                ROUTED_TRANSFER_DATA_MAX_CHUNK_SIZE
+                if routed_target
+                else TRANSFER_DATA_MAX_CHUNK_SIZE
+            )
             transfer_request_limit = TRANSFER_DATA_REQUEST_LIMIT
             block_size = max(8, min(max_chunk_size, configured_block_size))
+        if g26_target and not is_fbl:
+            block_size = min(block_size, G26_MAX_APP_BLOCK_DATA)
         block_name = "FBL" if is_fbl else "APPL"
 
         label = f"{payload['ecu']} {block_name} {int_hex(address, 8)} size={size}"
-        block_note = (
-            f"block_data={block_size} transfer_request_limit={transfer_request_limit}"
-        )
+        block_note = f"block_data={block_size} transfer_request_limit={transfer_request_limit}"
         if configured_block_size != block_size:
             block_note += f" configured_block_size={configured_block_size}"
         if routed_target:
@@ -10211,7 +15386,9 @@ class FcdApp:
             send = self._make_uds_sender(client)
 
         if is_fbl:
-            if isinstance(client, DoipClient) and target_is_zgw:
+            if g26_target:
+                self.log("G26 FBL: entering resident RAM updater with RID 0x0155")
+            elif isinstance(client, DoipClient) and target_is_zgw:
                 self._select_zgw_fbl_software_block(client, send, block_name)
             else:
                 self._select_fbl_software_block(send, block_name)
@@ -10238,13 +15415,13 @@ class FcdApp:
             self._poll_doip_after_reset_with_probe(
                 client,
                 "APPL programming entry",
-                b"\x31\x01" + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK) + bytes([ACTIVE_SW_BLOCK_APP]),
+                b"\x31\x01"
+                + struct.pack(">H", ROUTINE_SELECT_SW_BLOCK)
+                + bytes([ACTIVE_SW_BLOCK_APP]),
                 "Before APPL erase: Select APPL in FBL",
                 0x31,
                 require_current_client=(self.client is client),
-                expected_responses=(
-                    b"\x71\x01\x02\x00" + bytes([ACTIVE_SW_BLOCK_APP]),
-                ),
+                expected_responses=(b"\x71\x01\x02\x00" + bytes([ACTIVE_SW_BLOCK_APP]),),
             )
 
         if not is_fbl and self.erase_var.get():
@@ -10295,14 +15472,23 @@ class FcdApp:
             if progress_cb is not None:
                 progress_cb(len(chunk))
             else:
-                self.root.after(0, lambda done=offset, total=size, name=block_name: self.progress.configure(value=min(done, total), maximum=max(1, total)))
+                self.root.after(
+                    0,
+                    lambda done=offset, total=size, name=block_name: self.progress.configure(
+                        value=min(done, total), maximum=max(1, total)
+                    ),
+                )
             block_counter = (block_counter + 1) & 0xFF
             transfer_index += 1
 
         transfer_exit = b"\x37"
         if self.transfer_crc_var.get():
             transfer_exit += struct.pack(">I", expected_crc)
-        send(transfer_exit, f"RequestTransferExit {block_name}", timeout=15.0)
+        send(
+            transfer_exit, f"RequestTransferExit {block_name}",
+            timeout=max(FBL_ERASE_TIMEOUT_SECONDS, float(self.fbl_erase_timeout_var.get()))
+            if g26_target else 15.0,
+        )
 
         if self.verify_crc_var.get() and (not self.transfer_crc_var.get()) and not is_fbl:
             crc_request = (
@@ -10312,17 +15498,22 @@ class FcdApp:
             )
             send(crc_request, f"RoutineControl CRC {block_name}", timeout=30.0)
         elif self.verify_crc_var.get():
-            self.log(f"Skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC")
+            self.log(
+                f"Skipped separate CRC routine for {block_name}; RequestTransferExit carries CRC"
+            )
 
         self.log(f"Flash complete: {label}")
 
     def save_trace_clicked(self):
-        path = filedialog.asksaveasfilename(defaultextension=".log", filetypes=[("Log", "*.log"), ("Text", "*.txt")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".log", filetypes=[("Log", "*.log"), ("Text", "*.txt")]
+        )
         if not path:
             return
         Path(path).write_text(self.trace_text.get("1.0", "end"), encoding="utf-8")
 
     def _on_close(self):
+        self._sota_monitor_closed = True
         try:
             self._save_settings_file()
         except Exception as exc:
@@ -10330,6 +15521,12 @@ class FcdApp:
         self.test_stop.set()
         self.worker_stop.set()
         self.stop_keepalive()
+        if hasattr(self, "cm5_panel"):
+            self.cm5_panel.close()
+        if hasattr(self, "cm5_diagnostics_panel"):
+            self.cm5_diagnostics_panel.close()
+        if hasattr(self, "cm5_backup_panel"):
+            self.cm5_backup_panel.close()
         if self.client is not None:
             self.client.close()
         self.root.destroy()

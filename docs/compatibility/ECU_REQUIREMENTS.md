@@ -18,7 +18,9 @@
 
 ## FCD defaults are not support evidence
 
-`Scripts/FCD/fcd_settings.json` defaults ZGW to ext address `0x41`, downstream PDM1 `0x42`, HVDCDC `0x51`, CBM `0x54`, DMU `0x56`, ELC `0x58`, FRBE `0x59`. Checked-in settings mark ZGW real/selected and downstream simulated/unselected. `fcd_parallel.py` parses DBC/PDBC/LDF/ARXML/XML/JSON metadata; parsing a node does not establish its diagnostic behavior.
+`Scripts/FCD/fcd_settings.json` defaults ZGW to ext address `0x41`, downstream PDM1 `0x42`, HVDCDC `0x51`, CBM `0x54`, DMU `0x56`, ELC `0x58`, FRBE `0x59`. Checked-in settings preserve ZGW as real/selected and downstream ECUs as simulated/unselected; CM5 is a separate, unselected node. The GUI's database discovery and bundle functions now live in `FCD.pyw`. It also exposes a built-in G26 lab profile, which is not evidence that a G26 ECU is attached or compatible. Parsing a node does not establish its diagnostic behavior.
+
+G26 has a dedicated source route: FCD `[0x55][UDS...]` over DoIP to ZGW; ZGW sends extended-address Classic CAN requests on `0x710`, receives G26 responses on `0x709`, and sends response FC at EA `0x41`. FCD requires the returned `0x55` route prefix and a real UDS response. The corresponding board guard remains off pending wiring verification.
 
 ## Gaps and optional features
 

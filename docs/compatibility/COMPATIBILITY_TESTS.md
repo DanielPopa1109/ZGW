@@ -10,6 +10,7 @@ Tests below are protocol acceptance cases derived from source contracts; hardwar
 | NET-04 | Routed request `[0x51][UDS...]` | ZGW strips route byte and transmits via LIN NAD `4`; response relays under same route. |
 | NET-05 | Route `0x42` and a classic-CAN route such as `0x54` | Correct FD vs classic channel chosen; no cross-bus transmit. |
 | NET-06 | Unknown route and malformed short routed envelope | Bounded failure/negative response; no arbitrary bus broadcast. |
+| NET-07 | G26 route `0x55`, multi-frame DID `F187` on `0x709` | ZGW emits request on `0x710` with EA `0x55`; G26 response EA `0xF0` is reassembled after ZGW FC EA `0x41`, then relayed as `[0x55][62 F1 87 ...]`. |
 | DIAG-01 | Local supported SID in allowed session | DCM handler response; confirm service/session table. |
 | DIAG-02 | Local unsupported SID `0x27` to app | NRC `0x11` (app service absent), distinguish from FBL. |
 | DIAG-03 | Target route + unsupported downstream SID | Target NRC relayed; do not substitute local DCM result. |
@@ -20,10 +21,12 @@ Tests below are protocol acceptance cases derived from source contracts; hardwar
 | FLASH-03 | Same FBL sequence out of order / wrong block counter | Rejected with configured NRC; no unintended flash write. |
 | FLASH-04 | Downstream per-target sequence | ECU-specific profile passes; explicitly verify routed request max, response correlation, target CRC, reset/reconnect. |
 | FLASH-05 | Interrupt TransferData and reconnect | Target's documented resume/restart/recovery behavior; never infer from successful normal transfer. |
+| FLASH-06 | G26 APP image at `0x08020200` | FCD confirms resident identity, uses RID `0001`, at most 240 data bytes per `36`, CRC32 `37`, then observes APP identity; no synthetic ACK accepted. |
+| FLASH-07 | G26 resident-FBL image at `0x08000000` with updater interlock off | RID `0155` returns NRC22 before erase; FCD fails safely and never sends ZGW-only RID `0200`. |
 | CODING-01 | ZGW coding read DID `F1C0/F1C3`, run `0203/0201` in coding session `41` | Exact response shape/echo and expected status/version. |
 | CODING-02 | Invalid coding image magic/version/length/message counts | Reject with source-configured NRC; active image remains valid. CodingApp validation checks these fields; do not assume image CRC validation. |
 | CODING-03 | Downstream coding descriptor round-trip | Target read/write/read-back matches target schema; test does not assume ZGW coding DIDs. |
 | NEG-01 | Physical target response from different route/address | Not correlated to request; no cross-ECU response leakage. |
 | NEG-02 | Segmented real CAN transfer without expected flow control | Characterize configured assume-FC behavior; reject or document target-specific successful pacing. |
 
-Existing `Scripts/FCD/test_fcd_parallel.py` and `Scripts/FCD/test_diagnostic_acquisition.py` validate tool logic/simulation only; they do not prove firmware build or physical ECU compatibility.
+The offline `Scripts/FCD/test_*.py` suite covers bundle logic, diagnostic acquisition, CM5 transport, backup, SOTA and UI helpers with fixtures and mocks. It does not prove firmware build, deployed CM5 services, or physical ECU compatibility.

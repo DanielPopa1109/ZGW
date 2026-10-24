@@ -1,5 +1,34 @@
 # FCD maintenance notes
 
+## Desktop application layout
+
+`FCD.pyw` contains the current bundle parser, scheduler, ZGW diagnostics, and
+CM5 panels. `cm5_ethernet.py` provides the fail-closed Ethernet path used by
+CM5 backup. `dtc_names.json` is a local copy of the CM5 DiagnosticManager
+display-name catalog. The older `fcd_parallel.py` remains for callers that
+import its original API; the GUI uses the implementations in `FCD.pyw`.
+
+`fcd_settings.json` keeps this checkout's ZGW node selections and points its
+HEX rows at `Binary/`. CM5 connection settings are included, but no
+authentication token or generated update package is shipped by this merge.
+Select and verify both SOTA packages before an update. `Generated/` holds
+existing example artifacts and is not evidence of a successful flash.
+
+Run offline tests from the repository root with
+`python -m unittest discover -s Scripts/FCD -p 'test_*.py'`.
+
+## G26 lab profile
+
+FCD discovers G26 on Classic CAN route `0x55` and accepts one contiguous APP
+image at `0x08020200` or resident FBL image at `0x08000000`. HEX gaps become
+erased `0xFF` bytes; image bounds and vectors are checked before a programming
+request. The APP path proves `G26A2` to `G26F2` handover using DID `F187`, then
+uses G26 erase/download/transfer/CRC32 TransferExit and checks APP restart.
+The FBL path omits ZGW-specific RID `0200` and requests G26 SRAM updater RID
+`0155`. Its activation is disabled in G26 firmware until board wiring and
+recovery are demonstrated. Host tests and package creation do not prove a
+connected CAN or flash session.
+
 ## ZGW operation buttons and the Tests tab
 
 Every FCD button that sends a request to, changes state on, codes, or flashes
