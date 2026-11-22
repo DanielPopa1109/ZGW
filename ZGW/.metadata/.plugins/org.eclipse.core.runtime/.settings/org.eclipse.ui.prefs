@@ -1,2 +1,15 @@
+activeproject.background=255,255,255
+com.ifx.davex.ce.ui.views.linkbutton=true
+com.ifx.davex.enable.log=false
+com.ifx.davex.preferences.closeeditors=true
+com.ifx.davex.preferences.codegen.beforebuild=true
+com.ifx.davex.preferences.docenabled=true
+com.ifx.davex.preferences.latestversionenabled=true
+com.ifx.davex.preferences.remember.prev.mappings=false
+com.ifx.davex.preferences.restore.date=true
+com.ifx.davex.preferences.showbetaapps=false
+com.ifx.davex.preferences.showhiddencategories=false
+com.ifx.librarymanager.davesites=<?xml version\="1.0" encoding\="utf-8"?><Pref version\="1.0"><Lib uri\="file\:/C\:/Infineon/AURIX-Configuration-Studio-1.0.24/libstore/" provider\="Infineon Technologies AG" displayName\="file\:/C\:/Infineon/AURIX-Configuration-Studio-1.0.24/libstore/" enabled\="Yes"/><Lib uri\="https\://itools.infineon.com/aurix_ide/ACS/updatesite/ls-massmarket/1.0.24/" provider\="Infineon Technologies AG" displayName\="librarystore_updatesite" enabled\="Yes"/></Pref>
+com.ifx.librarymanager.libstore=${eclipse_home}..\\libstore
 eclipse.preferences.version=1
 showIntro=false

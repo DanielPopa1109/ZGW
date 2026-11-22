@@ -1,2 +1,13 @@
 eclipse.preferences.version=1
+environment/workspace/DAVE_APP_STORE/delimiter=;
+environment/workspace/DAVE_APP_STORE/operation=replace
+environment/workspace/DAVE_APP_STORE/value=C\:/Infineon/AURIX-Configuration-Studio-1.0.24/libstore
+environment/workspace/DEVICE_FILE_LOCATION/delimiter=;
+environment/workspace/DEVICE_FILE_LOCATION/operation=replace
+environment/workspace/DEVICE_FILE_LOCATION/value=C\:\\Infineon\\AURIX-Configuration-Studio-1.0.24\\libstore\\DeviceFeatures\\XMC4500DeviceFeatures.xml
+environment/workspace/DEVICE_FOLDER_LOCATION/delimiter=;
+environment/workspace/DEVICE_FOLDER_LOCATION/operation=replace
+environment/workspace/DEVICE_FOLDER_LOCATION/value=C\:\\Infineon\\AURIX-Configuration-Studio-1.0.24\\libstore\\DeviceFeatures
+environment/workspace/append=true
+environment/workspace/appendContributed=true
 macros/workspace=<?xml version\="1.0" encoding\="UTF-8" standalone\="no"?>\r\n<macros/>\r\n

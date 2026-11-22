@@ -10,6 +10,7 @@ Start here. Paths below are relative to repository root (`D:\GitHub_Repos\ZGW`).
 | [Bootloader and update](bootloader.md) | FBL UDS, flash programming, transport, update state | `ZGW/ZGW_FBL/Cpu0_Main.c`, `Fbl_RamUpdater_AURIX.c` |
 | [Build and artifacts](build.md) | TASKING builds, linker, image filtering, release binaries | `ZGW/ZGW_APP/.cproject`, `Scripts/Build/` |
 | [Supporting tools and data](tools.md) | FCD, logger, simulator, model pipeline, databases | `Scripts/`, `SIM/`, `DB/`, `Load Predictor ML/`, `Binary/` |
+| [ACS project](acs-project.md) | Opening ZGW in AURIX Configuration Studio, TASKING build from ACS, license limit | `ZGW/ZGW_APP_ACS/` |
 
 ## Downstream ECU integration
 

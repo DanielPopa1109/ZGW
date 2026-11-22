@@ -1,0 +1,7 @@
+dsld
+gradle
+groovy
+java
+manifest
+tmpl
+wg
